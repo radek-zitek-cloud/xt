@@ -16,6 +16,8 @@ class Adapter:
     model_flag: str | None = None
     summary: str = ""
     limits: list[str] = field(default_factory=list)
+    # Dialogs the harness may show before it takes input: [{"match": [...], "keys": [...]}]
+    startup_dialogs: list[dict] = field(default_factory=list)
 
     @property
     def installed(self) -> bool:
@@ -42,6 +44,14 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
             model_flag=d.get("model_flag"),
             summary=d.get("summary", ""),
             limits=list(d.get("limits", [])),
+            startup_dialogs=[
+                {
+                    "match": [dlg["match"]] if isinstance(dlg["match"], str) else list(dlg["match"]),
+                    "keys": list(dlg.get("keys", ["enter"])),
+                    "name": dlg.get("name", dlg["match"] if isinstance(dlg["match"], str) else dlg["match"][0]),
+                }
+                for dlg in d.get("startup_dialogs", [])
+            ],
         )
     return out
 

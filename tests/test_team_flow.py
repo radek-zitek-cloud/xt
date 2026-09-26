@@ -35,6 +35,50 @@ def test_first_prompt_that_never_lands_raises_an_alert(ctx):
     assert "NOT CONFIRMED" in started[-1]["body"]
 
 
+def test_startup_dialog_is_answered_before_the_first_prompt(ctx):
+    # codex's folder-trust dialog swallowed the liaison's first prompt in both real runs
+    ctx.herdr.dialog_on_start = "  Folder access\n  Trust this folder? Codex can read, edit, and run files here"
+    up(ctx)
+    assert any(keys == ("enter",) for _, keys in ctx.herdr.keys)
+    assert "You are **liaison**" in ctx.herdr.last_prompt("liaison")
+    assert not Alerts(ctx).active()
+    log = [m["body"] for m in ctx.ledger.messages() if m["type"] == "system"]
+    assert any("answered codex's 'folder trust' dialog for liaison" in b for b in log)
+
+
+def test_agent_blocked_at_startup_by_a_known_dialog_still_starts(ctx):
+    # claude: herdr refuses with agent_not_ready while "Is this a project you created or one you
+    # trust?" is up, with "No, exit" preselected, so xt must press down, then enter
+    add_member(ctx, "carol")  # a claude agent
+    ctx.herdr.block_on_start = "Quick safety check: Is this a project you created or one you trust?"
+    request_spawn(ctx, "human", "carol", None, None, None, None)
+    assert (ctx.herdr.live["carol"].pane_id, ("down", "enter")) in ctx.herdr.keys
+    assert "You are **carol**" in ctx.herdr.last_prompt("carol")
+    assert not ctx.herdr.closed and not Alerts(ctx).active()
+
+
+def test_agent_blocked_by_an_unknown_dialog_is_closed_and_reported(ctx):
+    add_member(ctx, "carol")
+    ctx.herdr.block_on_start = "Some dialog xt has never seen"
+    with pytest.raises(XtError, match="agent_not_ready"):
+        request_spawn(ctx, "human", "carol", None, None, None, None)
+    assert ctx.herdr.closed
+
+
+def test_prompt_that_vanishes_without_a_known_dialog_is_caught(ctx):
+    # herdr sees "working" (the harness starting up) but the prompt never reaches the transcript
+    ctx.herdr.swallow["liaison"] = 1
+    up(ctx)
+    assert not Alerts(ctx).active()  # retried, and the second one landed
+    assert sum(1 for n, _ in ctx.herdr.prompts if n == "liaison") == 1
+
+
+def test_prompt_that_never_shows_up_raises_an_alert(ctx):
+    ctx.herdr.swallow["liaison"] = 5
+    up(ctx)
+    assert "noprompt:liaison" in Alerts(ctx).active()
+
+
 def test_goal_dispatch_starts_lead_lazily_with_goal_in_brief(ctx):
     up(ctx)
     ctx.herdr.live["liaison"].status = "idle"

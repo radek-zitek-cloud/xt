@@ -26,6 +26,12 @@ class FakeHerdr:
         self.pane_runs: list[tuple[str, str]] = []
         self.started: list[tuple[str, str, list[str]]] = []
         self.stall: dict[str, int] = {}  # name -> how many confirmed prompts to "lose"
+        self.swallow: dict[str, int] = {}  # name -> prompts that vanish silently
+        self.dialogs: dict[str, str] = {}  # pane -> startup dialog text currently shown
+        self.dialog_on_start: str | None = None  # dialog every newly started agent shows
+        self.block_on_start: str | None = None  # dialog that makes herdr refuse the start
+        self.screens: dict[str, list[str]] = {}
+        self.keys: list[tuple[str, tuple]] = []
 
     def check_session(self):
         pass
@@ -41,8 +47,29 @@ class FakeHerdr:
         if confirm and self.stall.get(name, 0) > 0:
             self.stall[name] -= 1
             raise HerdrError("agent_prompt_stalled", "no working state observed")
+        pane = self.live[name].pane_id
+        self.live[name].status = "working"  # a harness starting up looks "working" too
+        if self.dialogs.get(pane):
+            return  # typed into a startup dialog: the prompt is lost
+        if self.swallow.get(name, 0) > 0:
+            self.swallow[name] -= 1
+            return
         self.prompts.append((name, text))
-        self.live[name].status = "working"
+        self.screens.setdefault(pane, []).append(text)
+
+    def read_pane(self, pane, lines=200):
+        parts = list(self.screens.get(pane, []))
+        if self.dialogs.get(pane):
+            parts.append(self.dialogs[pane])
+        return "\n".join(parts)
+
+    def send_keys(self, pane, *keys):
+        self.keys.append((pane, keys))
+        if "enter" in keys:
+            self.dialogs.pop(pane, None)
+            for a in self.live.values():
+                if a.pane_id == pane and a.status == "blocked":
+                    a.status = "idle"
 
     def create_workspace(self, cwd, label):
         ws = f"w{len(self.workspaces) + 1}"
@@ -57,6 +84,13 @@ class FakeHerdr:
     def start_agent(self, name, kind, pane, args):
         self.started.append((name, kind, args))
         self.live[name] = LiveAgent(name, "idle", pane, pane.split(":")[0])
+        if self.dialog_on_start:
+            self.dialogs[pane] = self.dialog_on_start
+        if self.block_on_start:
+            # like claude's trust question: herdr registers the agent as blocked and refuses
+            self.dialogs[pane] = self.block_on_start
+            self.live[name].status = "blocked"
+            raise HerdrError("agent_not_ready", f"agent {name} is blocked during startup")
 
     def run_in_fresh_pane(self, pane, cmd):
         self.pane_runs.append((pane, cmd))
@@ -84,6 +118,8 @@ class Clock:
 def all_harnesses_installed(monkeypatch):
     monkeypatch.setattr(Adapter, "installed", property(lambda self: True))
     monkeypatch.setattr(spawn, "RETRY_DELAY", 0)
+    monkeypatch.setattr(spawn, "POLL", 0)
+    monkeypatch.setattr(spawn, "LANDED_WAIT", 0)
 
 
 @pytest.fixture

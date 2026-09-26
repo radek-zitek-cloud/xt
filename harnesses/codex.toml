@@ -7,4 +7,13 @@ summary = "OpenAI Codex CLI: recommended for the liaison and lead; reads repo sk
 limits = [
   "Shell commands run through one shared machine-wide app-server daemon: per-pane env never reaches them",
   "Its sandbox makes ~/.cache read-only; bin/xt keeps uv's cache inside the repo",
+  "First start in a new folder asks 'Trust this folder?' (not skippable with -c); xt answers it",
 ]
+
+# Answered by xt before the first prompt. Running xt in a team repo is the human's consent to
+# trust it; codex saves the decision itself. Without this, the first prompt is typed into the
+# dialog and lost (it happened to the liaison in both of the first two real runs).
+[[startup_dialogs]]
+name = "folder trust"
+match = "Trust this folder?"
+keys = ["enter"]

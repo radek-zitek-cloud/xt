@@ -56,41 +56,109 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         raise XtError(f"{name} is already running")
     adapter = get_adapter(ctx.paths, a.harness)
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
+    answered: list[str] = []
     try:
         ctx.herdr.start_agent(name, adapter.herdr_kind, pane, adapter.start_args(a.model))
+    except HerdrError as e:
+        # Herdr refuses when the harness blocks at startup (e.g. claude's folder-trust question).
+        # The agent is registered and blocked; answer the dialog and wait until it's ready.
+        if e.code != "agent_not_ready" or not _ready_after_dialogs(ctx, name, adapter, pane, answered):
+            ctx.herdr.close_workspace(workspace)
+            raise
     except XtError:
         ctx.herdr.close_workspace(workspace)
         raise
     set_expected(ctx, name, True)
-    landed = send_first_prompt(ctx, name, first_prompt(ctx, name))
+    answered += answer_startup_dialogs(ctx, adapter, pane)
+    for dialog in answered:
+        ctx.ledger.append(SYSTEM, HUMAN, "system", f"answered {a.harness}'s '{dialog}' dialog for {name}")
+    landed = send_first_prompt(ctx, name, pane, adapter, first_prompt(ctx, name))
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     ctx.ledger.append(SYSTEM, HUMAN, "system", f"started {name} ({a.role}, {a.harness}) in workspace {workspace}{note}")
     return workspace
 
 
 RETRY_DELAY = 5.0
+POLL = 1.0
+DIALOG_QUIET_CHECKS = 4  # consecutive checks (POLL apart) without a known dialog = ready
+LANDED_WAIT = 20  # seconds to wait for the first prompt's text to show up in the transcript
+MARKER = "an agent in the xt team"
 
 
-def send_first_prompt(ctx: Ctx, name: str, text: str) -> bool:
-    """Deliver the first prompt and confirm the agent started working on it.
+def _flat(text: str) -> str:
+    """Screen text with line wrapping undone, so a phrase split across lines still matches."""
+    return " ".join(text.split())
 
-    A cold-started harness can drop input typed before it's really ready (seen with codex on
-    2026-09-26: the liaison never got its identity and acted as a plain assistant). Retry once;
-    if it still doesn't take, alert the human instead of carrying on silently."""
+
+def answer_startup_dialogs(ctx: Ctx, adapter, pane: str) -> list[str]:
+    """Answer dialogs the adapter declares (e.g. codex's folder trust) before any prompt is sent.
+
+    Typing a prompt into such a dialog loses the prompt: codex's 'Trust this folder?' consumed the
+    liaison's first prompt in both of the first two real runs (2026-09-26)."""
+    if not adapter.startup_dialogs:
+        return []
+    answered: list[str] = []
+    quiet = checks = 0
+    while quiet < DIALOG_QUIET_CHECKS and checks < 40:
+        checks += 1
+        screen = _flat(ctx.herdr.read_pane(pane, lines=60))
+        hit = next((d for d in adapter.startup_dialogs if any(_flat(m) in screen for m in d["match"])), None)
+        if hit:
+            ctx.herdr.send_keys(pane, *hit["keys"])
+            answered.append(hit["name"])
+            quiet = 0
+            time.sleep(2 * POLL)
+            continue
+        quiet += 1
+        time.sleep(POLL)
+    return answered
+
+
+READY_CHECKS = 30  # POLL-spaced checks for a blocked-at-startup agent to become ready
+
+
+def _ready_after_dialogs(ctx: Ctx, name: str, adapter, pane: str, answered: list[str]) -> bool:
+    answered += answer_startup_dialogs(ctx, adapter, pane)
+    for _ in range(READY_CHECKS):
+        if ctx.herdr.status(name) in ("idle", "done"):
+            return True
+        time.sleep(POLL)
+    return False
+
+
+def _landed(ctx: Ctx, pane: str) -> bool:
+    deadline = time.monotonic() + LANDED_WAIT
+    while True:
+        if MARKER in _flat(ctx.herdr.read_pane(pane, lines=400)):
+            return True
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(POLL)
+
+
+def send_first_prompt(ctx: Ctx, name: str, pane: str, adapter, text: str) -> bool:
+    """Deliver the first prompt and confirm it really landed in the conversation.
+
+    Two checks, both needed: herdr must see the agent start working on it (catches a prompt that
+    was typed but never submitted), and the prompt's text must appear on the agent's screen
+    (catches a prompt swallowed by a startup dialog, where the harness's own startup looked like
+    'working'). Retry once; if it still doesn't land, alert the human instead of carrying on."""
+    assert MARKER in text
     for attempt in (1, 2):
         try:
             ctx.herdr.prompt(name, text, confirm=True)
-            return True
         except HerdrError as e:
             if e.code not in ("agent_prompt_stalled", "timeout"):
                 raise
             time.sleep(RETRY_DELAY)
-            if ctx.herdr.status(name) in ("working", "blocked"):
-                return True
+        if _landed(ctx, pane):
+            return True
+        answer_startup_dialogs(ctx, adapter, pane)
     Alerts(ctx).raise_(
         f"noprompt:{name}",
-        f"{name} started but never picked up its first prompt (identity, role, protocol). It will "
-        f"act without knowing who it is. Look at its pane, then `xt stop {name}` and `xt spawn {name}`.",
+        f"{name} started but its first prompt (identity, role, protocol) never showed up in its "
+        f"conversation. It would act without knowing who it is. Look at its pane (a dialog xt doesn't "
+        f"know?), then `xt stop {name}` and `xt spawn {name}`.",
     )
     return False
 

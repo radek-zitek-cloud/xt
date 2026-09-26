@@ -44,6 +44,12 @@ def _exec(argv: list[str], timeout: float = 120) -> dict:
         data = json.loads(text) if text else {}
     except json.JSONDecodeError:
         raise XtError(f"herdr returned non-JSON output for {' '.join(argv[1:])}: {text[:200] or p.stderr[:200]}")
+    if "error" not in data and p.returncode != 0:
+        # Some failures (e.g. agent_not_ready from `agent start`) put the error JSON on stderr.
+        try:
+            data = json.loads((p.stderr or "").strip() or "{}")
+        except json.JSONDecodeError:
+            raise XtError(f"herdr failed ({p.returncode}): {p.stderr.strip()[:300]}")
     if "error" in data:
         err = data["error"]
         raise HerdrError(err.get("code", "error"), err.get("message", ""))
@@ -101,6 +107,17 @@ class Herdr:
         if args:
             argv += ["--", *args]
         self._run(*argv, timeout=150)
+
+    def read_pane(self, pane_id: str, lines: int = 200) -> str:
+        """Recent screen text of a pane (plain text, as the terminal shows it)."""
+        p = subprocess.run(
+            ["herdr", "--session", self.session, "pane", "read", pane_id, "--source", "recent", "--lines", str(lines)],
+            capture_output=True, text=True, timeout=20,
+        )
+        return p.stdout
+
+    def send_keys(self, pane_id: str, *keys: str) -> None:
+        self._run("pane", "send-keys", pane_id, *keys)
 
     def run_in_fresh_pane(self, pane_id: str, command: str) -> None:
         # Only ever used on a pane xt just created (a bare shell): `pane run` types into
