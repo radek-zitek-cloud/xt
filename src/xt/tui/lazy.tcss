@@ -1,0 +1,112 @@
+/* lazygit-style look: terminal colours, single thin frames with titles in the border,
+   focus shown only by frame colour, dense rows, no stock header/footer. */
+
+Screen {
+    background: ansi_default;
+    color: ansi_default;
+    layout: vertical;
+}
+
+#main {
+    height: 1fr;
+}
+
+#left {
+    width: 36%;
+    min-width: 30;
+}
+
+/* lazygit-style: the focused panel on the left grows, the others shrink. */
+#left > .panel:focus {
+    height: 3fr;
+}
+
+.panel {
+    background: ansi_default;
+    border: solid ansi_bright_black;
+    border-title-color: ansi_default;
+    border-title-style: none;
+    border-subtitle-color: ansi_bright_black;
+    padding: 0;
+    margin: 0;
+    height: 1fr;
+    scrollbar-size-vertical: 0;
+    scrollbar-size-horizontal: 0;
+}
+
+.panel:focus, .panel:focus-within {
+    border: solid ansi_green;
+    border-title-color: ansi_green;
+    border-title-style: bold;
+}
+
+#detail {
+    width: 1fr;
+}
+
+/* Lists: one dense line per item, plain highlight bar. */
+OptionList {
+    background: ansi_default;
+    color: ansi_default;
+}
+
+OptionList > .option-list--option {
+    padding: 0;
+}
+
+/* Unfocused panels keep their selection visible but quiet; only the focused one gets the bar. */
+OptionList > .option-list--option-highlighted {
+    background: ansi_default;
+    text-style: bold;
+}
+
+OptionList:focus > .option-list--option-highlighted {
+    background: ansi_blue;
+    color: ansi_bright_white;
+    text-style: bold;
+}
+
+OptionList > .option-list--option-hover {
+    background: ansi_default;
+}
+
+#detail-body {
+    background: ansi_default;
+    padding: 0;
+}
+
+#hints {
+    height: 1;
+    background: ansi_default;
+    color: ansi_blue;
+    padding: 0 1;
+}
+
+/* Popups: same thin frame, title in the border, no dimmed backdrop. */
+ModalScreen {
+    background: ansi_default 0%;
+    align: center middle;
+}
+
+.popup {
+    width: 60;
+    height: auto;
+    max-height: 80%;
+    background: ansi_default;
+    border: solid ansi_green;
+    border-title-color: ansi_green;
+    border-title-style: bold;
+    border-subtitle-color: ansi_bright_black;
+    padding: 0 1;
+}
+
+.popup Input {
+    background: ansi_default;
+    border: none;
+    padding: 0;
+    height: 1;
+}
+
+.popup Input:focus {
+    border: none;
+}

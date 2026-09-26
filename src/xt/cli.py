@@ -183,7 +183,11 @@ def cmd_watch(args) -> None:
 
 
 def cmd_tui(args) -> None:
-    raise XtError("the TUI isn't built yet — use `xt status` and `xt inbox`")
+    if not args.demo:
+        raise XtError("the TUI is a look-and-feel spike so far — try `xt tui --demo`; use `xt status` and `xt inbox`")
+    from .tui.app import run_demo
+
+    run_demo()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -267,7 +271,8 @@ def build_parser() -> argparse.ArgumentParser:
         gp.add_argument("--as", dest="as_", metavar="NAME", default=argparse.SUPPRESS)
 
     add("watch", cmd_watch, "run the supervisor (xt up starts it in its own pane)")
-    add("tui", cmd_tui, "the lazygit-style overview (not built yet)")
+    sp = add("tui", cmd_tui, "the lazygit-style overview (spike: --demo)")
+    sp.add_argument("--demo", action="store_true", help="show the look-and-feel spike with demo data")
     return p
 
 
