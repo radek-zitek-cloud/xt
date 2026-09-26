@@ -6,6 +6,8 @@ goals for a **lead**, which builds and runs whatever team the work needs: softwa
 research, anything. xt itself owns the coordination (messaging, the ledger of open work, the
 supervisor, recovery), so agents only need a shell and a prompt.
 
+**How it works:** [docs/architecture.md](docs/architecture.md).
+
 **Status:** early build (v0.1). CLI, dispatcher, ledger, supervisor, and roles are in place; the
 lazygit-style TUI is next. Design and history live in the lab repo (`cross-talk/design.md`).
 
