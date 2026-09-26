@@ -143,6 +143,18 @@ def test_supervisor_alerts_on_crash_and_blocked(ctx, clock):
     assert "blocked:carol" in active and "missing:carol" not in active
 
 
+def test_lead_missing_with_open_goal_alerts_once(ctx):
+    ctx.ledger.append("liaison", "lead", "goal", "a goal")  # dispatched, but the lead never started
+    sup = Supervisor(ctx, out=lambda s: None)
+    for t in range(5):
+        sup.tick(now=t)
+    alerts = [m for m in ctx.ledger.messages() if m["type"] == "alert"]
+    assert len(alerts) == 1 and "missing:lead" in Alerts(ctx).active()
+    ctx.herdr.add("lead")
+    sup.tick(now=10)
+    assert "missing:lead" not in Alerts(ctx).active()
+
+
 def test_heartbeat_nudges_idle_owner_then_alerts(ctx, clock):
     add_member(ctx, "carol")
     ctx.herdr.add("carol")

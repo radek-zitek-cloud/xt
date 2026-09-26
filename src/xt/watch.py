@@ -88,6 +88,7 @@ class Supervisor:
         self.alerts.resolve_prefix("blocked:", {f"blocked:{n}" for n in blocked})
 
         missing = {n for n in expected(self.ctx) if n not in live and team.agent(n) and team.agent(n).active}
+        keep = {f"missing:{n}" for n in missing}
         for n in missing:
             if self.alerts.raise_(
                 f"missing:{n}",
@@ -95,12 +96,16 @@ class Supervisor:
                 f"Look into why, then `xt spawn {n}` to start it again.",
             ):
                 self.say(f"alert: {n} not running")
-        self.alerts.resolve_prefix("missing:", {f"missing:{n}" for n in missing})
 
         goals_open = any(i["type"] == "goal" for i in self.ctx.ledger.open_items())
         lead = team.lead_of_role("lead")
         if lead and goals_open and lead.name not in live and lead.name not in missing:
-            self.alerts.raise_(f"missing:{lead.name}", f"{lead.name} is not running but goals are open — `xt up`")
+            keep.add(f"missing:{lead.name}")
+            if self.alerts.raise_(f"missing:{lead.name}", f"{lead.name} is not running but goals are open — `xt up`"):
+                self.say(f"alert: {lead.name} not running, goals open")
+        # Resolve only after every check has had its say, so an alert raised above isn't
+        # cleared in the same pass and raised again on the next one (it spammed every 3 s).
+        self.alerts.resolve_prefix("missing:", keep)
 
     def check_volume(self) -> None:
         limit = int(self.ctx.team.log_setting("daily_alert_mb")) * 1024 * 1024
