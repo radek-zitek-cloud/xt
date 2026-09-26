@@ -2,9 +2,12 @@
 
 import json
 import os
+import time
 
 from . import brief, skills
 from .adapters import get_adapter
+from .alerts import Alerts
+from .herdr import HerdrError
 from .context import Ctx
 from .paths import XtError
 from .team import HUMAN, SYSTEM
@@ -59,9 +62,37 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         ctx.herdr.close_workspace(workspace)
         raise
     set_expected(ctx, name, True)
-    ctx.herdr.prompt(name, first_prompt(ctx, name))
-    ctx.ledger.append(SYSTEM, HUMAN, "system", f"started {name} ({a.role}, {a.harness}) in workspace {workspace}")
+    landed = send_first_prompt(ctx, name, first_prompt(ctx, name))
+    note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
+    ctx.ledger.append(SYSTEM, HUMAN, "system", f"started {name} ({a.role}, {a.harness}) in workspace {workspace}{note}")
     return workspace
+
+
+RETRY_DELAY = 5.0
+
+
+def send_first_prompt(ctx: Ctx, name: str, text: str) -> bool:
+    """Deliver the first prompt and confirm the agent started working on it.
+
+    A cold-started harness can drop input typed before it's really ready (seen with codex on
+    2026-09-26: the liaison never got its identity and acted as a plain assistant). Retry once;
+    if it still doesn't take, alert the human instead of carrying on silently."""
+    for attempt in (1, 2):
+        try:
+            ctx.herdr.prompt(name, text, confirm=True)
+            return True
+        except HerdrError as e:
+            if e.code not in ("agent_prompt_stalled", "timeout"):
+                raise
+            time.sleep(RETRY_DELAY)
+            if ctx.herdr.status(name) in ("working", "blocked"):
+                return True
+    Alerts(ctx).raise_(
+        f"noprompt:{name}",
+        f"{name} started but never picked up its first prompt (identity, role, protocol). It will "
+        f"act without knowing who it is. Look at its pane, then `xt stop {name}` and `xt spawn {name}`.",
+    )
+    return False
 
 
 class Approvals:

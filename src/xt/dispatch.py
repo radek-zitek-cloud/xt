@@ -84,33 +84,66 @@ class Queue:
             items.append({"id": msg_id, "to": to, "reason": reason})
             self._save(items)
 
-    def remove(self, msg_id: int) -> None:
+    def remove_many(self, ids: set[int]) -> None:
         with self.ctx.ledger.lock():
-            self._save([i for i in self._load() if i["id"] != msg_id])
+            self._save([i for i in self._load() if i["id"] not in ids])
 
-    def set_reason(self, msg_id: int, reason: str) -> None:
+    def set_reason(self, ids: set[int], reason: str) -> None:
         with self.ctx.ledger.lock():
             items = self._load()
             for i in items:
-                if i["id"] == msg_id:
+                if i["id"] in ids:
                     i["reason"] = reason
             self._save(items)
 
 
+def _stale_note(ctx: Ctx, msg: dict, open_ids: set[int]) -> str | None:
+    """Say so when a queued message is about a goal/task that has since been closed."""
+    if msg["type"] in ("goal", "task") and msg["id"] not in open_ids:
+        return f"#{msg['id']} has since been closed"
+    ref = msg.get("ref")
+    if ref is not None and ref not in open_ids:
+        target = ctx.ledger.message(ref)
+        if target and target["type"] in ("goal", "task"):
+            return f"it's about #{ref}, which has since been closed"
+    return None
+
+
+def batch_text(ctx: Ctx, msgs: list[dict]) -> str:
+    """One prompt for everything waiting for an agent, instead of one wake-up per message."""
+    if len(msgs) == 1:
+        return envelope(ctx, msgs[0])
+    open_ids = {i["id"] for i in ctx.ledger.open_items()}
+    parts = [
+        f"[xt: {len(msgs)} messages arrived while you were busy, oldest first. Read them all before "
+        f"acting; messages marked stale need no action unless something is still wrong.]"
+    ]
+    for m in msgs:
+        stale = _stale_note(ctx, m, open_ids)
+        prefix = f"(stale: {stale})\n" if stale else ""
+        parts.append(prefix + envelope(ctx, m))
+    return "\n\n---\n\n".join(parts)
+
+
+def _deliver_batch(ctx: Ctx, to: str, msgs: list[dict]) -> None:
+    ctx.herdr.prompt(to, batch_text(ctx, msgs))
+
+
 def deliver_or_queue(ctx: Ctx, msg: dict) -> str:
-    """Deliver now if the target is idle, else queue. Returns a short status string."""
+    """Deliver now if the target is idle (together with anything already queued for it), else
+    queue. Returns a short status string."""
     to = msg["to"]
     if to == HUMAN:
         return "for human (see `xt inbox` / TUI)"
     q = Queue(ctx)
-    if any(i["to"] == to for i in q.pending()):
-        q.add(msg["id"], to, "behind earlier queued messages")
-        return f"queued (earlier messages to {to} still waiting)"
     status = ctx.herdr.status(to)
     if status in DELIVERABLE:
+        waiting = sorted((i["id"] for i in q.pending() if i["to"] == to))
+        batch = [m for m in (ctx.ledger.message(i) for i in waiting) if m] + [msg]
         try:
-            ctx.herdr.prompt(to, envelope(ctx, msg))
-            return "delivered"
+            _deliver_batch(ctx, to, batch)
+            q.remove_many(set(waiting))
+            return "delivered" if len(batch) == 1 else f"delivered with {len(batch) - 1} earlier queued"
         except HerdrError as e:
             q.add(msg["id"], to, f"delivery failed: {e.code}")
             return f"queued ({e.code})"
@@ -119,12 +152,30 @@ def deliver_or_queue(ctx: Ctx, msg: dict) -> str:
     return f"queued ({to} is {reason})"
 
 
+def done_recipient(team: Team, sender: str, item: dict) -> str:
+    """Whoever opened the item, if the sender may message them; otherwise up the sender's chain
+    (e.g. a goal the human dispatched directly: the lead reports done to the liaison)."""
+    opener = item["opener"]
+    if sender == HUMAN or may_send(team, sender, opener, "done"):
+        return opener
+    s = team.agent(sender)
+    if s and s.reports_to:
+        return s.reports_to
+    return opener
+
+
 def send(
     ctx: Ctx, sender: str, to: str, mtype: str, body: str, ref: int | None = None, deliver: bool = True
 ) -> tuple[dict, str]:
     body = body.strip()
     if not body:
         raise XtError("empty message")
+    if mtype == "note":
+        s = ctx.team.agent(sender)
+        if sender != SYSTEM and (s is None or not s.active):
+            raise XtError(f"sender {sender!r} is not an active member of this team")
+        msg = ctx.ledger.append(sender, sender, "note", body, ref)
+        return msg, "noted (logged, not delivered)"
     check_policy(ctx.team, sender, to, mtype)
     limit = int(ctx.team.log_setting("message_max_kb")) * 1024
     if sender != SYSTEM and len(body.encode()) > limit:
@@ -140,8 +191,9 @@ def send(
             raise XtError(f"#{ref} is not an open goal or task")
         if item["owner"] != sender and sender != HUMAN:
             raise XtError(f"#{ref} is owned by {item['owner']}, not {sender}")
-        if item["opener"] != to and sender != HUMAN:
-            raise XtError(f"report done for #{ref} to {item['opener']}, who opened it")
+        expected = done_recipient(ctx.team, sender, item)
+        if to != expected and sender != HUMAN:
+            raise XtError(f"report done for #{ref} to {expected} (`xt done {ref}` picks the right recipient)")
     if mtype == "task" and ref is not None:
         item = ctx.ledger.item(ref)
         if item is None or item["type"] != "goal":
@@ -152,27 +204,25 @@ def send(
 
 
 def drain(ctx: Ctx) -> list[str]:
-    """Deliver queued messages whose target has gone idle. Oldest first, one per target per pass."""
+    """Deliver everything queued for each target that has gone idle, as one batch per target."""
     out = []
     q = Queue(ctx)
     live = ctx.herdr.agents()
-    seen: set[str] = set()
+    by_target: dict[str, list[int]] = {}
     for item in sorted(q.pending(), key=lambda i: i["id"]):
-        to = item["to"]
-        if to in seen:
-            continue
+        by_target.setdefault(item["to"], []).append(item["id"])
+    for to, ids in by_target.items():
         agent = live.get(to)
         if agent is None or agent.status not in DELIVERABLE:
             continue
-        msg = ctx.ledger.message(item["id"])
-        if msg is None:
-            q.remove(item["id"])
+        msgs = [m for m in (ctx.ledger.message(i) for i in ids) if m]
+        if not msgs:
+            q.remove_many(set(ids))
             continue
-        seen.add(to)
         try:
-            ctx.herdr.prompt(to, envelope(ctx, msg))
-            q.remove(item["id"])
-            out.append(f"delivered #{msg['id']} to {to}")
+            _deliver_batch(ctx, to, msgs)
+            q.remove_many(set(ids))
+            out.append(f"delivered {', '.join('#' + str(m['id']) for m in msgs)} to {to}")
         except HerdrError as e:
-            q.set_reason(item["id"], f"delivery failed: {e.code}")
+            q.set_reason(set(ids), f"delivery failed: {e.code}")
     return out

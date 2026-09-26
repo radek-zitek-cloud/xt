@@ -37,6 +37,22 @@ def test_as_is_accepted_after_goal_subcommands():
     assert a.as_ == "liaison"
 
 
+def test_brief_only_for_yourself_or_your_reports(ctx, monkeypatch, capsys):
+    from xt import cli
+
+    from .conftest import add_member
+
+    add_member(ctx, "carol")
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    monkeypatch.setattr(sys, "stdin", _Stdin(tty=False))
+    p = build_parser()
+    with pytest.raises(XtError, match="not lead's"):
+        cli.cmd_brief(p.parse_args(["brief", "lead", "--as", "carol"]))
+    cli.cmd_brief(p.parse_args(["brief", "--as", "carol"]))
+    cli.cmd_brief(p.parse_args(["brief", "carol", "--as", "lead"]))
+    assert "for carol" in capsys.readouterr().out
+
+
 def test_send_defaults_to_report():
     a = build_parser().parse_args(["send", "lead", "--as", "carol", "hello", "there"])
     assert (a.to, a.type, a.body, a.as_) == ("lead", "report", ["hello", "there"], "carol")

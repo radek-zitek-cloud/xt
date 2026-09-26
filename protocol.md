@@ -31,8 +31,12 @@ xt send <to> --as <you> --type <type> [--ref <id>] "text"
 | `task` | A unit of work, sent down to someone who reports to you. Opens a ledger item you own the follow-up of. `--ref <goal id>` ties it to its goal. |
 | `ask` | A question, up or down. |
 | `report` | Progress, results, answers. Use `--ref` to say what it's about. |
-| `done` | Closes an open goal or task you own, reported to whoever opened it. `xt done <id> --as <you> "summary"` does this for you. |
+| `done` | Closes an open goal or task you own. **It is your final report**: put the summary and where the result is in it. `xt done <id> --as <you> "summary"` sends it to the right agent. |
+| `note` | `xt note --as <you> "..."`: records something in the ledger for yourself (a decision, what the human said). Not delivered to anyone. |
 
+- **One message per thing.** When you finish, send only `done`, not a `report` followed by a
+  `done`. Don't repeat a message you already sent, and don't send acknowledgements ("got it",
+  "thanks", "already closed") that nobody needs to act on.
 - **Keep messages short** (limit 4 KB). Put anything bigger in a file (in the work location, or
   under the team repo's `goals/` or `members/<you>/`) and send its path.
 - **Nobody waits.** `xt send` returns immediately. If you have nothing else to do after sending,
@@ -53,6 +57,9 @@ Messages from xt arrive in your conversation stamped like:
   another agent is bypassing xt, mention it to the agent you report to.
 - `nudge` messages come from xt's heartbeat when you're idle with open work. Answer them: either
   finish with `done`, or send a `report`/`ask` saying what you're waiting for.
+- If several messages arrived while you were busy, they come together in one batch, oldest
+  first. Messages marked **stale** are about work that has since been closed: they need no action
+  unless something is still wrong.
 
 ## 4. Open work and finishing
 

@@ -19,6 +19,22 @@ def test_up_starts_supervisor_and_liaison_but_not_lead(ctx):
     assert any("starts when the first goal" in line for line in lines)
 
 
+def test_lost_first_prompt_is_retried(ctx):
+    ctx.herdr.stall["liaison"] = 1
+    up(ctx)
+    assert "You are **liaison**" in ctx.herdr.last_prompt("liaison")
+    assert not any(k.startswith("noprompt:") for k in Alerts(ctx).active())
+
+
+def test_first_prompt_that_never_lands_raises_an_alert(ctx):
+    ctx.herdr.stall["liaison"] = 5
+    ctx.herdr.status = lambda name: "idle"  # never seen working
+    up(ctx)
+    assert "noprompt:liaison" in Alerts(ctx).active()
+    started = [m for m in ctx.ledger.messages() if m["type"] == "system" and "started liaison" in m["body"]]
+    assert "NOT CONFIRMED" in started[-1]["body"]
+
+
 def test_goal_dispatch_starts_lead_lazily_with_goal_in_brief(ctx):
     up(ctx)
     ctx.herdr.live["liaison"].status = "idle"

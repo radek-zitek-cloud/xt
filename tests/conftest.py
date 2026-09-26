@@ -6,7 +6,8 @@ import pytest
 
 from xt.adapters import Adapter
 from xt.context import Ctx
-from xt.herdr import LiveAgent
+from xt import spawn
+from xt.herdr import HerdrError, LiveAgent
 from xt.ledger import Ledger
 from xt.paths import Paths
 from xt.team import Team, new_team_doc
@@ -24,6 +25,7 @@ class FakeHerdr:
         self.closed: list[str] = []
         self.pane_runs: list[tuple[str, str]] = []
         self.started: list[tuple[str, str, list[str]]] = []
+        self.stall: dict[str, int] = {}  # name -> how many confirmed prompts to "lose"
 
     def check_session(self):
         pass
@@ -35,7 +37,10 @@ class FakeHerdr:
         a = self.live.get(name)
         return a.status if a else None
 
-    def prompt(self, name, text):
+    def prompt(self, name, text, confirm=False):
+        if confirm and self.stall.get(name, 0) > 0:
+            self.stall[name] -= 1
+            raise HerdrError("agent_prompt_stalled", "no working state observed")
         self.prompts.append((name, text))
         self.live[name].status = "working"
 
@@ -78,6 +83,7 @@ class Clock:
 @pytest.fixture(autouse=True)
 def all_harnesses_installed(monkeypatch):
     monkeypatch.setattr(Adapter, "installed", property(lambda self: True))
+    monkeypatch.setattr(spawn, "RETRY_DELAY", 0)
 
 
 @pytest.fixture

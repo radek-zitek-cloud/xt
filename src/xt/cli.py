@@ -6,7 +6,7 @@ from . import goals
 from .adapters import load_adapters
 from .alerts import Alerts
 from .context import Ctx
-from .dispatch import Queue, send
+from .dispatch import Queue, done_recipient, send
 from .ledger import AGENT_TYPES
 from .paths import Paths, XtError, find_root
 from .spawn import Approvals, decide, request_spawn, retire, stop
@@ -72,13 +72,26 @@ def cmd_done(args) -> None:
     item = ctx.ledger.item(args.id)
     if item is None:
         raise XtError(f"#{args.id} is not an open goal or task")
-    msg, status = send(ctx, who, item["opener"], "done", " ".join(args.body) or "done", args.id)
-    print(f"#{msg['id']} done for #{args.id} → {item['opener']}: {status}")
+    to = done_recipient(ctx.team, who, item)
+    msg, status = send(ctx, who, to, "done", " ".join(args.body) or "done", args.id)
+    print(f"#{msg['id']} done for #{args.id} → {to}: {status}")
+
+
+def cmd_note(args) -> None:
+    ctx = Ctx.load()
+    body = " ".join(args.body) if args.body else sys.stdin.read()
+    msg, status = send(ctx, _who(args), "", "note", body, args.ref)
+    print(f"#{msg['id']} note: {status}")
 
 
 def cmd_brief(args) -> None:
     ctx = Ctx.load()
-    name = args.as_ or args.name
+    who = _who(args)
+    name = args.name or (None if who == HUMAN else who)
+    if who != HUMAN and name != who:
+        target = ctx.team.agent(name)
+        if target is None or target.reports_to != who:
+            raise XtError(f"you can read your own brief and your reports' briefs, not {name}'s")
     print(brief_mod.build(ctx, name))
 
 
@@ -229,6 +242,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("done", cmd_done, "close an open goal or task you own (reports to whoever opened it)")
     sp.add_argument("id", type=int)
+    sp.add_argument("body", nargs="*")
+
+    sp = add("note", cmd_note, "log a note in the ledger for yourself (not delivered to anyone)")
+    sp.add_argument("--ref", type=int, help="goal/task/message id this is about")
     sp.add_argument("body", nargs="*")
 
     sp = add("brief", cmd_brief, "recovery summary: team, open work, recent messages")

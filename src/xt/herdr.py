@@ -80,8 +80,13 @@ class Herdr:
         a = self.agents().get(name)
         return a.status if a else None
 
-    def prompt(self, name: str, text: str) -> None:
-        self._run("agent", "prompt", name, text)
+    def prompt(self, name: str, text: str, confirm: bool = False) -> None:
+        """Submit a prompt. With confirm, fail with `agent_prompt_stalled` unless the agent is
+        seen to start working (or block) on it, which catches prompts lost during startup."""
+        args = ["agent", "prompt", name, text]
+        if confirm:
+            args += ["--wait", "--until", "working", "--until", "blocked", "--timeout", "30000"]
+        self._run(*args, timeout=60)
 
     def create_workspace(self, cwd: str, label: str) -> tuple[str, str]:
         data = self._run("workspace", "create", "--cwd", cwd, "--label", label, "--no-focus")

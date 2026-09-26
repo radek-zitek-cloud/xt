@@ -1,6 +1,6 @@
 import pytest
 
-from xt.dispatch import Queue, drain, send
+from xt.dispatch import Queue, done_recipient, drain, send
 from xt.paths import XtError
 
 from .conftest import add_member
@@ -46,30 +46,56 @@ def test_delivers_when_idle_with_envelope_and_reply_hint(ctx):
     assert f"--type done --ref {msg['id']}" in text
 
 
-def test_queues_when_busy_and_drains_in_order(ctx):
+def test_queued_messages_are_delivered_as_one_batch(ctx):
     add_member(ctx, "carol")
     ctx.herdr.add("carol", status="working")
     m1, s1 = send(ctx, "lead", "carol", "task", "first")
-    m2, s2 = send(ctx, "lead", "carol", "task", "second")
+    m2, s2 = send(ctx, "lead", "carol", "ask", "second")
     assert s1.startswith("queued") and s2.startswith("queued")
     assert drain(ctx) == []
     ctx.herdr.live["carol"].status = "idle"
-    assert drain(ctx) == [f"delivered #{m1['id']} to carol"]
-    assert "first" in ctx.herdr.last_prompt("carol")
-    assert drain(ctx) == []  # carol is working again
-    ctx.herdr.live["carol"].status = "done"
-    assert drain(ctx) == [f"delivered #{m2['id']} to carol"]
+    assert drain(ctx) == [f"delivered #{m1['id']}, #{m2['id']} to carol"]
+    assert len(ctx.herdr.prompts) == 1
+    text = ctx.herdr.last_prompt("carol")
+    assert "2 messages arrived while you were busy" in text
+    assert text.index("first") < text.index("second")
     assert Queue(ctx).pending() == []
 
 
-def test_new_message_waits_behind_queued_ones(ctx):
+def test_new_message_to_idle_agent_carries_queued_ones_along(ctx):
     add_member(ctx, "carol")
     ctx.herdr.add("carol", status="blocked")
     send(ctx, "lead", "carol", "task", "first")
     ctx.herdr.live["carol"].status = "idle"
     _, status = send(ctx, "lead", "carol", "ask", "second")
-    assert "earlier messages" in status
-    assert ctx.herdr.prompts == []
+    assert status == "delivered with 1 earlier queued"
+    text = ctx.herdr.last_prompt("carol")
+    assert "first" in text and "second" in text
+    assert Queue(ctx).pending() == []
+
+
+def test_batch_marks_messages_about_closed_items_as_stale(ctx):
+    add_member(ctx, "carol")
+    for a in ("lead", "carol"):
+        ctx.herdr.add(a)
+    ctx.herdr.live["lead"].status = "working"
+    t, _ = send(ctx, "lead", "carol", "task", "do x")
+    send(ctx, "carol", "lead", "report", "halfway on x", ref=t["id"])
+    send(ctx, "carol", "lead", "done", "x finished", ref=t["id"])
+    ctx.herdr.live["lead"].status = "idle"
+    drain(ctx)
+    text = ctx.herdr.last_prompt("lead")
+    assert text.count("(stale:") == 2  # both are about the now-closed task
+    assert "halfway on x" in text and "x finished" in text
+
+
+def test_notes_are_logged_not_delivered(ctx):
+    ctx.herdr.add("liaison")
+    msg, status = send(ctx, "liaison", "", "note", "Human: wants a 1,000-word article")
+    assert (msg["from"], msg["to"], msg["type"]) == ("liaison", "liaison", "note")
+    assert "not delivered" in status and ctx.herdr.prompts == []
+    with pytest.raises(XtError, match="not an active member"):
+        send(ctx, "mallory", "", "note", "x")
 
 
 def test_done_rules(ctx):
@@ -86,6 +112,19 @@ def test_done_rules(ctx):
     assert ctx.ledger.item(t["id"]) is None
     with pytest.raises(XtError, match="not an open"):
         send(ctx, "carol", "lead", "done", "again", ref=t["id"])
+
+
+def test_done_for_a_human_opened_goal_goes_up_the_chain(ctx):
+    for a in ("liaison", "lead"):
+        ctx.herdr.add(a)
+    g, _ = send(ctx, "human", "lead", "goal", "a goal the human dispatched")
+    item = ctx.ledger.item(g["id"])
+    assert done_recipient(ctx.team, "lead", item) == "liaison"
+    add_member(ctx, "carol")
+    with pytest.raises(XtError, match="report done for"):
+        send(ctx, "lead", "carol", "done", "allowed chain, wrong recipient", ref=g["id"])
+    send(ctx, "lead", "liaison", "done", "finished", ref=g["id"])
+    assert ctx.ledger.item(g["id"]) is None
 
 
 def test_message_size_limit(ctx):

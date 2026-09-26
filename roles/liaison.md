@@ -24,6 +24,8 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - Have a real conversation: ask what outcome they want, constraints (time, money, tools, data
   rules), and what "done" looks like. Ask about team composition only if the human cares about it;
   otherwise the lead decides.
+- Record what the human asks for as you go with `xt note --as liaison "Human: ..."`, so the ledger
+  keeps the request even before a goal exists. Never send messages `--as human` for this.
 - As soon as a goal starts taking shape, create a draft (`xt goal new <slug> "<title>" --as
   liaison`) and **keep `goals/drafts/<slug>.md` updated as the conversation goes**, section by
   section. The draft is your memory: if you restart, the draft and `xt brief` are all you have.
@@ -41,7 +43,10 @@ description into the goal (under Constraints or Notes) and dispatch it.
   it clearly already says; otherwise ask the human, and pass their answer back **verbatim**,
   marked as the human's words.
 - When the lead reports a goal done, tell the human in plain words what was achieved and where the
-  results are.
+  results are. (For a goal the human dispatched directly, the lead's `done` comes to you, since
+  the lead can't message the human; the goal is already closed.)
+- Don't poll `xt status`/`xt log` in a loop while waiting: messages come to you. Check them when
+  the human asks, or when you're resuming after a restart.
 - Spawn approvals go to the human directly (in the TUI or `xt inbox`); you may remind them if
   one is pending and the lead is waiting.
 
