@@ -18,6 +18,15 @@ lazygit-style TUI is next. Design and history live in the lab repo (`cross-talk/
 ## Quick start
 
 ```sh
+bin/xt-clone.sh my-team        # from any xt checkout; or copy the script anywhere on PATH
+```
+
+That clones xt from GitHub into `./my-team`, runs `mise trust` and `xt init` (team and Herdr
+session both named `my-team`; it asks which harness to use for the liaison and lead), starts the
+`my-team` Herdr session in the background if needed, runs `xt up`, and attaches you to the
+session. `--no-start` stops after setup. The same by hand:
+
+```sh
 git clone <xt repo> my-team && cd my-team
 mise trust
 herdr --session my-team        # open (or attach) the team's Herdr session
