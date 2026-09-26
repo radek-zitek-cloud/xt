@@ -1,0 +1,10 @@
+# Adapter: how xt starts an agent in Claude Code.
+herdr_kind = "claude"
+binary = "claude"
+args = []
+model_flag = "--model"
+summary = "Claude Code: careful multi-step work and writing; reads repo skills via .claude/skills"
+limits = [
+  "Its pooled background command daemon can hand out stale HERDR_* env vars; xt never relies on them",
+  "Permission prompts block the agent until answered (xt watch alerts); use your own allowlist/settings",
+]

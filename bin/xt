@@ -1,0 +1,13 @@
+#!/bin/sh
+# Run xt from this repo's own locked environment.
+set -e
+root=$(dirname "$(dirname "$(realpath "$0")")")
+export XT_ROOT="$root"
+# Sandboxed harnesses (e.g. codex) can't write ~/.cache/uv; keep uv's cache inside the repo.
+export UV_CACHE_DIR="${UV_CACHE_DIR:-$root/.xt/cache/uv}"
+venv="$root/.venv"
+if [ ! -x "$venv/bin/python" ] || [ "$root/uv.lock" -nt "$venv/.xt-synced" ]; then
+  uv sync --project "$root" --frozen --quiet
+  touch "$venv/.xt-synced"
+fi
+exec "$venv/bin/python" -m xt "$@"

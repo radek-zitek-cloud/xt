@@ -1,0 +1,56 @@
+"""Harness adapters: `harnesses/<kind>.toml` declares how xt starts an agent in that harness."""
+
+import shutil
+import tomllib
+from dataclasses import dataclass, field
+
+from .paths import Paths, XtError
+
+
+@dataclass
+class Adapter:
+    name: str
+    herdr_kind: str
+    binary: str
+    args: list[str] = field(default_factory=list)
+    model_flag: str | None = None
+    summary: str = ""
+    limits: list[str] = field(default_factory=list)
+
+    @property
+    def installed(self) -> bool:
+        return shutil.which(self.binary) is not None
+
+    def start_args(self, model: str | None) -> list[str]:
+        args = list(self.args)
+        if model:
+            if not self.model_flag:
+                raise XtError(f"harness {self.name} has no model flag declared; leave the model empty")
+            args += [self.model_flag, model]
+        return args
+
+
+def load_adapters(paths: Paths) -> dict[str, Adapter]:
+    out = {}
+    for f in sorted(paths.harnesses.glob("*.toml")):
+        d = tomllib.loads(f.read_text())
+        out[f.stem] = Adapter(
+            name=f.stem,
+            herdr_kind=d.get("herdr_kind", f.stem),
+            binary=d.get("binary", f.stem),
+            args=list(d.get("args", [])),
+            model_flag=d.get("model_flag"),
+            summary=d.get("summary", ""),
+            limits=list(d.get("limits", [])),
+        )
+    return out
+
+
+def get_adapter(paths: Paths, harness: str) -> Adapter:
+    adapters = load_adapters(paths)
+    if harness not in adapters:
+        raise XtError(f"no adapter for harness {harness!r} (have: {', '.join(adapters) or 'none'})")
+    a = adapters[harness]
+    if not a.installed:
+        raise XtError(f"harness {harness!r} isn't installed here (`{a.binary}` not on PATH)")
+    return a

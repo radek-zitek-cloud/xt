@@ -1,0 +1,11 @@
+# Adapter: how xt starts an agent in pi.
+herdr_kind = "pi"
+binary = "pi"
+# -a (--approve): trust project-local files for this run. Without it pi stops at a
+# "Trust project folder?" dialog and ignores the repo's .agents/skills.
+args = ["-a"]
+model_flag = "--model"
+summary = "pi: lightweight, many model providers; reads repo skills via .agents/skills"
+limits = [
+  "-a also trusts project .pi settings and extensions for the run: don't keep a .pi/ dir you don't mean",
+]

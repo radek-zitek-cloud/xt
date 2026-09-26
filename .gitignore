@@ -1,0 +1,11 @@
+# xt runtime data (message log, queue, supervisor state, uv cache)
+.xt/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Claude Code local settings
+.claude/settings.local.json
