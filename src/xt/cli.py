@@ -14,10 +14,19 @@ from .team import HUMAN
 
 
 def _who(args) -> str:
-    if getattr(args, "as_", None):
-        return args.as_
+    who = getattr(args, "as_", None)
+    if who and who != HUMAN:
+        return who
+    # Acting as the human needs a real terminal. Agents' shell tools don't run in one, so an
+    # agent can't simply claim `--as human` to skip approvals. Soft, but it closes the easy path.
     if sys.stdin.isatty():
         return HUMAN
+    if who == HUMAN:
+        raise XtError(
+            "`--as human` only works from the human's own terminal. Agents act as themselves: "
+            "pass --as <your name>. If the human wants something done that you're not allowed to "
+            "do, ask them (or the agent you report to) to do it."
+        )
     raise XtError("pass --as <your name> (agents must always say who they are)")
 
 

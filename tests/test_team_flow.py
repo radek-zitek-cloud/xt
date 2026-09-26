@@ -47,6 +47,14 @@ def test_spawn_needs_human_approval_by_default(ctx):
     assert "approved" in ctx.herdr.last_prompt("lead")
 
 
+def test_liaison_cannot_spawn_or_retire(ctx):
+    (ctx.paths.roles / "researcher.md").write_text("# Role: researcher\n")
+    with pytest.raises(XtError, match="liaison doesn't spawn"):
+        request_spawn(ctx, "liaison", "researcher", "codex", None, "researcher", "lead")
+    with pytest.raises(XtError, match="liaison doesn't retire"):
+        retire(ctx, "liaison", "lead")
+
+
 def test_spawn_refuses_missing_role(ctx):
     with pytest.raises(XtError, match="write the role brief"):
         request_spawn(ctx, "human", "carol", "claude", None, "nonexistent", "lead")
@@ -54,9 +62,10 @@ def test_spawn_refuses_missing_role(ctx):
 
 def test_retire_only_by_own_lead(ctx):
     add_member(ctx, "carol")
+    add_member(ctx, "dave")
     ctx.herdr.add("carol")
     with pytest.raises(XtError, match="only lead"):
-        retire(ctx, "liaison", "carol")
+        retire(ctx, "dave", "carol")
     retire(ctx, "lead", "carol")
     assert "carol" not in ctx.herdr.live and not ctx.team.agent("carol").active
 

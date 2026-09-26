@@ -123,6 +123,11 @@ def request_spawn(
         r = ctx.team.agent(requester)
         if r is None or not r.active:
             raise XtError(f"{requester!r} is not an active member")
+        if r.role == "liaison":
+            raise XtError(
+                "the liaison doesn't spawn agents: write what the human wants into a goal "
+                "(`xt goal new` / `xt goal dispatch`) and the lead will design and staff the team"
+            )
         if reports_to != requester and ctx.team.agent(reports_to) and ctx.team.agent(reports_to).reports_to != requester:
             raise XtError("you can spawn agents only into your own part of the hierarchy")
     if ctx.team.agent(reports_to) is None:
@@ -168,6 +173,9 @@ def retire(ctx: Ctx, requester: str, name: str) -> str:
     a = ctx.team.agent(name)
     if a is None or a.kind == HUMAN:
         raise XtError(f"no agent named {name!r}")
+    r = ctx.team.agent(requester)
+    if requester != HUMAN and r is not None and r.role == "liaison":
+        raise XtError("the liaison doesn't retire agents; ask the human")
     if requester != HUMAN and a.reports_to != requester:
         raise XtError(f"only {a.reports_to} or the human can retire {name}")
     live = ctx.herdr.agents().get(name)

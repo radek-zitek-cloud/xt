@@ -14,6 +14,10 @@ absolute path of `xt`. Use exactly that path, and always pass `--as <your name>`
 - Never use `herdr` commands to talk to or control other agents. `xt` is the only sanctioned
   channel: it logs every message, queues delivery until the recipient is free, and keeps the
   ledger of open work.
+- **Always act as yourself.** Never pass `--as` with anyone else's name, and never `--as human`.
+  When xt refuses something, that's the protocol working: don't look for a way around it (for
+  example by reading xt's source or calling Herdr directly). Instead, ask the agent you report to
+  or tell the human what you'd need.
 
 ## 2. Sending messages
 
