@@ -59,8 +59,11 @@ def _exec(argv: list[str], timeout: float = 120) -> dict:
 
 
 class Herdr:
-    def __init__(self, session: str):
+    def __init__(self, session: str, snapshot=None):
         self.session = session
+        # Where the supervisor saves `agent list` each tick. Agents whose harness sandboxes their
+        # shell (codex: "Operation not permitted" on Herdr's socket) read live state from it.
+        self.snapshot = snapshot
 
     def _run(self, *args: str, timeout: float = 120) -> dict:
         return _exec(["herdr", "--session", self.session, *args], timeout=timeout)
@@ -74,13 +77,28 @@ class Herdr:
             )
 
     def agents(self) -> dict[str, LiveAgent]:
-        data = self._run("agent", "list")
+        try:
+            data = self._run("agent", "list")
+        except XtError:
+            if self.snapshot is not None and self.snapshot.exists():
+                snap = json.loads(self.snapshot.read_text())
+                return {n: LiveAgent(n, *v) for n, v in snap.get("agents", {}).items()}
+            raise
         out = {}
         for a in data.get("result", {}).get("agents", []):
             name = a.get("name")
             if name:
                 out[name] = LiveAgent(name, a.get("agent_status", "unknown"), a["pane_id"], a["workspace_id"])
         return out
+
+    def save_snapshot(self, agents: dict[str, LiveAgent], ts: str) -> None:
+        if self.snapshot is None:
+            return
+        tmp = self.snapshot.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"ts": ts, "agents": {
+            n: [a.status, a.pane_id, a.workspace_id] for n, a in agents.items()
+        }}))
+        tmp.replace(self.snapshot)
 
     def status(self, name: str) -> str | None:
         a = self.agents().get(name)

@@ -30,8 +30,9 @@ research, forecasting, anything. The domain lives in the roles and skills you wr
 3. Choose a harness (and model, only if it matters) per role. Default to the harness you're
    running in unless a role clearly benefits from another.
 4. Spawn: `xt spawn <name> --harness <h> [--model <m>] --role <role> --as lead`. Names are short
-   and lowercase. By default the human must approve each spawn: you'll get a message when it's
-   decided, so carry on or end your turn meanwhile. Explain *why* you want each agent in a report
+   and lowercase. By default the human must approve each spawn; either way the supervisor
+   starts the agent and you get a message with the result, so carry on or end your turn
+   meanwhile. Explain *why* you want each agent in a report
    to the liaison, so the human can decide quickly.
 5. Sub-teams: for large mixed goals, spawn a sub-lead (`--role` of a lead-like role you write)
    and spawn its members with `--reports-to <sub-lead>`.

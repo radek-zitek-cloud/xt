@@ -2,8 +2,11 @@ import pytest
 
 from xt import brief, goals
 from xt.alerts import Alerts
+from xt.context import Ctx
+from xt.ledger import Ledger
 from xt.paths import XtError
 from xt.spawn import Approvals, decide, request_spawn, retire
+from xt.team import Team
 from xt.up import up
 from xt.watch import Supervisor
 
@@ -86,7 +89,11 @@ def test_goal_dispatch_starts_lead_lazily_with_goal_in_brief(ctx):
     with pytest.raises(XtError, match="only the liaison"):
         goals.dispatch(ctx, "lead", "forecast-team")
     out = goals.dispatch(ctx, "liaison", "forecast-team")
-    assert "started lead" in out
+    assert "supervisor starts lead" in out and "lead" not in ctx.herdr.live
+    Supervisor(ctx, out=lambda s: None).tick(now=0)  # the job runs outside the liaison's sandbox
+    assert "lead" in ctx.herdr.live
+    assert not Alerts(ctx).active()
+    assert "Done: start lead" in ctx.herdr.last_prompt("liaison")
     assert (ctx.paths.goals / "forecast-team.md").exists()
     assert not (ctx.paths.drafts / "forecast-team.md").exists()
     first = ctx.herdr.last_prompt("lead")
@@ -126,8 +133,41 @@ def test_retire_only_by_own_lead(ctx):
     ctx.herdr.add("carol")
     with pytest.raises(XtError, match="only lead"):
         retire(ctx, "dave", "carol")
-    retire(ctx, "lead", "carol")
+    assert "retire job" in retire(ctx, "lead", "carol")
+    assert "carol" in ctx.herdr.live
+    ctx.herdr.add("lead")
+    Supervisor(ctx, out=lambda s: None).tick(now=0)
+    ctx.reload_team()
     assert "carol" not in ctx.herdr.live and not ctx.team.agent("carol").active
+
+
+def test_agent_spawn_without_approval_goes_through_the_supervisor(ctx):
+    ctx.team.doc["policy"]["spawn_approval"] = False
+    ctx.team.save()
+    ctx.reload_team()
+    ctx.herdr.add("lead")
+    (ctx.paths.roles / "coder.md").write_text("# Role: coder\n")
+    out = request_spawn(ctx, "lead", "carol", "claude", None, "coder", None)
+    assert "spawn job" in out and "carol" not in ctx.herdr.live
+    Supervisor(ctx, out=lambda s: None).tick(now=0)
+    assert "carol" in ctx.herdr.live
+    assert "Done: spawn carol" in ctx.herdr.last_prompt("lead")
+
+
+def test_brief_falls_back_to_the_supervisors_snapshot_when_herdr_is_unreachable(paths, clock):
+    from xt.herdr import Herdr, LiveAgent
+
+    paths.ensure_runtime()
+    h = Herdr("test", snapshot=paths.state / "live.json")
+    h.save_snapshot({"liaison": LiveAgent("liaison", "working", "w2:p1", "w2")}, "2026-09-26T17:41:00")
+
+    def blocked(*a, **k):
+        raise XtError("herdr failed (1): Operation not permitted")
+
+    h._run = blocked
+    assert h.agents()["liaison"].status == "working"
+    c = Ctx(paths, Team.load(paths.team_toml), Ledger(paths, clock=clock), h)
+    assert "liaison (liaison, codex, reports to human): working" in brief.build(c, "liaison")
 
 
 def test_supervisor_alerts_on_crash_and_blocked(ctx, clock):

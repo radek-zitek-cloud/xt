@@ -124,9 +124,15 @@ def cmd_status(args) -> None:
         state = live[a.name].status if a.name in live else ("not running" if a.active else "retired")
         mine = sum(1 for i in items if i["owner"] == a.name)
         print(f"  {a.name:<12} {a.role or '':<12} {a.harness or '':<7} {state:<12} open:{mine}")
+    from .jobs import Jobs
+    from .watch import watch_pid
+
     q = Queue(ctx).pending()
-    print(f"open goals/tasks: {len(items)} · queued messages: {len(q)} · "
+    jobs = Jobs(ctx).pending()
+    print(f"open goals/tasks: {len(items)} · queued messages: {len(q)} · jobs: {len(jobs)} · "
           f"pending approvals: {len(Approvals(ctx).pending())} · alerts: {len(Alerts(ctx).active())}")
+    if (q or jobs) and not watch_pid(ctx):
+        print("the supervisor isn't running: queued messages and jobs wait for it (`xt up`)")
 
 
 def cmd_inbox(args) -> None:

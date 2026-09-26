@@ -243,6 +243,11 @@ def request_spawn(
     if requester != HUMAN and ctx.team.policy("spawn_approval"):
         rid = Approvals(ctx).add(req)
         return f"approval #{rid} requested from the human; you'll get a message when it's decided"
+    if requester != HUMAN:
+        from .jobs import Jobs
+
+        jid = Jobs(ctx).add("spawn", req, requester)
+        return f"spawn job #{jid} queued; the supervisor starts {name} within seconds and messages you"
     return execute_spawn(ctx, req)
 
 
@@ -277,6 +282,16 @@ def retire(ctx: Ctx, requester: str, name: str) -> str:
         raise XtError("the liaison doesn't retire agents; ask the human")
     if requester != HUMAN and a.reports_to != requester:
         raise XtError(f"only {a.reports_to} or the human can retire {name}")
+    if requester != HUMAN:
+        from .jobs import Jobs
+
+        jid = Jobs(ctx).add("retire", {"name": name}, requester)
+        return f"retire job #{jid} queued; the supervisor closes {name} within seconds and messages you"
+    return retire_now(ctx, requester, name)
+
+
+def retire_now(ctx: Ctx, requester: str, name: str) -> str:
+    """Close the agent's workspace and mark it retired (the human, or the supervisor for a job)."""
     live = ctx.herdr.agents().get(name)
     set_expected(ctx, name, False)
     if live:

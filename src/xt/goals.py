@@ -72,6 +72,13 @@ def dispatch(ctx: Ctx, sender: str, slug: str) -> str:
     if lead.name in ctx.herdr.agents():
         status = deliver_or_queue(ctx, msg)
         return f"goal #{msg['id']} dispatched to {lead.name}: {status}"
+    if sender != HUMAN:
+        # The liaison may be sandboxed (codex blocks Herdr): let the supervisor start the lead.
+        from .jobs import Jobs
+
+        Jobs(ctx).add("start", {"name": lead.name}, sender)
+        return (f"goal #{msg['id']} dispatched; the supervisor starts {lead.name} within seconds "
+                f"(the goal is in its first brief) and messages you")
     do_spawn(ctx, lead.name)
     return f"goal #{msg['id']} dispatched; started {lead.name} (the goal is in its first brief)"
 

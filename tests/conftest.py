@@ -32,6 +32,7 @@ class FakeHerdr:
         self.block_on_start: str | None = None  # dialog that makes herdr refuse the start
         self.screens: dict[str, list[str]] = {}
         self.keys: list[tuple[str, tuple]] = []
+        self.snapshots: list = []
 
     def check_session(self):
         pass
@@ -56,6 +57,9 @@ class FakeHerdr:
             return
         self.prompts.append((name, text))
         self.screens.setdefault(pane, []).append(text)
+
+    def save_snapshot(self, agents, ts):
+        self.snapshots.append((ts, sorted(agents)))
 
     def read_pane(self, pane, lines=200):
         parts = list(self.screens.get(pane, []))

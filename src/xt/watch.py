@@ -12,6 +12,7 @@ from .alerts import Alerts
 from .context import Ctx
 from .dispatch import Queue, drain, send
 from .herdr import DELIVERABLE
+from .jobs import Jobs, run_pending
 from .paths import XtError
 from .team import HUMAN, SYSTEM
 
@@ -64,9 +65,12 @@ class Supervisor:
     def tick(self, now: float | None = None) -> None:
         now = now if now is not None else time.time()
         self.ctx.reload_team()
-        for line in drain(self.ctx):
+        for line in run_pending(self.ctx):
             self.say(line)
         live = self.ctx.herdr.agents()
+        self.ctx.herdr.save_snapshot(live, self.ctx.ledger.clock().isoformat(timespec="seconds"))
+        for line in drain(self.ctx):
+            self.say(line)
         self.check_agents(live)
         self.check_volume()
         if now - self.last_heartbeat >= 60 * int(self.ctx.team.policy("heartbeat_minutes")):
@@ -99,7 +103,8 @@ class Supervisor:
 
         goals_open = any(i["type"] == "goal" for i in self.ctx.ledger.open_items())
         lead = team.lead_of_role("lead")
-        if lead and goals_open and lead.name not in live and lead.name not in missing:
+        starting = {j["args"].get("name") for j in Jobs(self.ctx).pending() if j["kind"] in ("start", "spawn")}
+        if lead and goals_open and lead.name not in live and lead.name not in missing and lead.name not in starting:
             keep.add(f"missing:{lead.name}")
             if self.alerts.raise_(f"missing:{lead.name}", f"{lead.name} is not running but goals are open — `xt up`"):
                 self.say(f"alert: {lead.name} not running, goals open")

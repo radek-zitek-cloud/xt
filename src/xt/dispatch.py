@@ -4,7 +4,7 @@ import json
 import os
 
 from .context import Ctx
-from .herdr import DELIVERABLE, HerdrError
+from .herdr import DELIVERABLE
 from .ledger import AGENT_TYPES
 from .paths import XtError
 from .team import HUMAN, SYSTEM, Team
@@ -136,7 +136,16 @@ def deliver_or_queue(ctx: Ctx, msg: dict) -> str:
     if to == HUMAN:
         return "for human (see `xt inbox` / TUI)"
     q = Queue(ctx)
-    status = ctx.herdr.status(to)
+    if msg["from"] not in (HUMAN, SYSTEM):
+        # Agents never call Herdr: their harness may sandbox the shell (codex blocks Herdr's
+        # socket). The supervisor, which runs unsandboxed, delivers within a few seconds.
+        q.add(msg["id"], to, "waiting for the supervisor")
+        return "queued (the supervisor delivers it within seconds)"
+    try:
+        status = ctx.herdr.status(to)
+    except XtError as e:
+        q.add(msg["id"], to, "Herdr unreachable from the sender")
+        return f"queued (Herdr unreachable here: {str(e)[:80]})"
     if status in DELIVERABLE:
         waiting = sorted((i["id"] for i in q.pending() if i["to"] == to))
         batch = [m for m in (ctx.ledger.message(i) for i in waiting) if m] + [msg]
@@ -144,9 +153,10 @@ def deliver_or_queue(ctx: Ctx, msg: dict) -> str:
             _deliver_batch(ctx, to, batch)
             q.remove_many(set(waiting))
             return "delivered" if len(batch) == 1 else f"delivered with {len(batch) - 1} earlier queued"
-        except HerdrError as e:
-            q.add(msg["id"], to, f"delivery failed: {e.code}")
-            return f"queued ({e.code})"
+        except XtError as e:
+            code = getattr(e, "code", "herdr error")
+            q.add(msg["id"], to, f"delivery failed: {code}")
+            return f"queued ({code})"
     reason = "not running" if status is None else status
     q.add(msg["id"], to, reason)
     return f"queued ({to} is {reason})"
@@ -223,6 +233,6 @@ def drain(ctx: Ctx) -> list[str]:
             _deliver_batch(ctx, to, msgs)
             q.remove_many(set(ids))
             out.append(f"delivered {', '.join('#' + str(m['id']) for m in msgs)} to {to}")
-        except HerdrError as e:
-            q.set_reason(set(ids), f"delivery failed: {e.code}")
+        except XtError as e:
+            q.set_reason(set(ids), f"delivery failed: {getattr(e, 'code', 'herdr error')}")
     return out

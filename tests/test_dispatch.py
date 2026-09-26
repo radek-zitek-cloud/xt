@@ -35,11 +35,13 @@ def test_unknown_or_retired_agents_are_refused(ctx):
         send(ctx, "lead", "carol", "task", "x")
 
 
-def test_delivers_when_idle_with_envelope_and_reply_hint(ctx):
+def test_agents_never_call_herdr_the_supervisor_delivers(ctx):
+    # an agent's shell may be sandboxed (codex blocks Herdr's socket), so agent sends only queue
     add_member(ctx, "carol")
     ctx.herdr.add("carol")
     msg, status = send(ctx, "lead", "carol", "task", "parse the file")
-    assert status == "delivered"
+    assert status.startswith("queued") and ctx.herdr.prompts == []
+    assert drain(ctx) == [f"delivered #{msg['id']} to carol"]
     text = ctx.herdr.last_prompt("carol")
     assert text.startswith(f"[xt #{msg['id']} task from:lead to:carol]\nparse the file")
     assert f"--as carol --type report --ref {msg['id']}" in text
@@ -62,12 +64,12 @@ def test_queued_messages_are_delivered_as_one_batch(ctx):
     assert Queue(ctx).pending() == []
 
 
-def test_new_message_to_idle_agent_carries_queued_ones_along(ctx):
+def test_human_message_to_idle_agent_carries_queued_ones_along(ctx):
     add_member(ctx, "carol")
     ctx.herdr.add("carol", status="blocked")
     send(ctx, "lead", "carol", "task", "first")
     ctx.herdr.live["carol"].status = "idle"
-    _, status = send(ctx, "lead", "carol", "ask", "second")
+    _, status = send(ctx, "human", "carol", "ask", "second")
     assert status == "delivered with 1 earlier queued"
     text = ctx.herdr.last_prompt("carol")
     assert "first" in text and "second" in text

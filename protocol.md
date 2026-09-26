@@ -39,6 +39,10 @@ xt send <to> --as <you> --type <type> [--ref <id>] "text"
   "thanks", "already closed") that nobody needs to act on.
 - **Keep messages short** (limit 4 KB). Put anything bigger in a file (in the work location, or
   under the team repo's `goals/` or `members/<you>/`) and send its path.
+- **xt never needs Herdr access from you.** Your `xt` commands only write to the team's files;
+  xt's supervisor (running in its own pane) delivers your messages within a few seconds and
+  carries out spawn/retire requests, then messages you the result. So xt works even if your
+  harness sandboxes your shell.
 - **Nobody waits.** `xt send` returns immediately. If you have nothing else to do after sending,
   end your turn. Replies arrive later as new messages; you don't poll for them.
 
