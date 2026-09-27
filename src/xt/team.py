@@ -25,6 +25,7 @@ class Agent:
     kind: str = "agent"
     wake_every: str | None = None
     wake_message: str | None = None
+    wake_between: str | None = None  # "05:00-21:00": local-time window for wake-ups; None = any time
 
     @property
     def active(self) -> bool:
@@ -78,6 +79,7 @@ class Team:
                     kind=str(a.get("kind", "agent")),
                     wake_every=a.get("wake_every") or None,
                     wake_message=a.get("wake_message") or None,
+                    wake_between=a.get("wake_between") or None,
                 )
             )
         return out
@@ -116,18 +118,28 @@ class Team:
         t["reports_to"] = reports_to
         t["status"] = "active"
 
-    def set_schedule(self, name: str, every: str | None, message: str | None) -> None:
+    def set_schedule(self, name: str, every: str | None, message: str | None = None,
+                     between: str | None = None) -> None:
+        """Set or clear an agent's schedule. `every=None` clears it. A message or window left out
+        (None) keeps the one the agent has; `between=ALWAYS` removes the window."""
         t = self._table(name)
         if t is None:
             raise XtError(f"no agent named {name!r} in team.toml")
-        for key in ("wake_every", "wake_message"):
-            if key in t:
-                del t[key]
-        if every:
-            parse_interval(every)
-            t["wake_every"] = every
-            if message:
-                t["wake_message"] = message
+        if not every:
+            for key in ("wake_every", "wake_message", "wake_between"):
+                if key in t:
+                    del t[key]
+            return
+        parse_interval(every)
+        t["wake_every"] = every
+        if message:
+            t["wake_message"] = message
+        if between == ALWAYS:
+            if "wake_between" in t:
+                del t["wake_between"]
+        elif between:
+            parse_window(between)
+            t["wake_between"] = normalise_window(between)
 
     def set_status(self, name: str, status: str) -> None:
         t = self._table(name)
@@ -185,6 +197,47 @@ status = "active"
 
 {agent_block("lead", "lead", lead, "liaison")}
 """
+
+
+ALWAYS = "always"
+
+
+def parse_window(text: str) -> tuple[int, int]:
+    """'05:00-21:00' -> (300, 1260), minutes after local midnight. The window may wrap past
+    midnight ('22:00-06:00'); start and end must differ."""
+    import re
+
+    m = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*", text or "")
+    if not m:
+        raise XtError(f"window {text!r} isn't like 05:00-21:00 (local time)")
+    h1, m1, h2, m2 = (int(g) for g in m.groups())
+    if h1 > 23 or h2 > 24 or m1 > 59 or m2 > 59 or (h2 == 24 and m2):
+        raise XtError(f"window {text!r} has an impossible time")
+    start, end = h1 * 60 + m1, h2 * 60 + m2
+    if start == end % 1440:
+        raise XtError(f"window {text!r} is empty; leave it out to allow any time")
+    return start, end
+
+
+def normalise_window(text: str) -> str:
+    start, end = parse_window(text)
+    return f"{start // 60:02d}:{start % 60:02d}-{end // 60:02d}:{end % 60:02d}"
+
+
+def in_window(window: str | None, when: dt.datetime) -> bool:
+    """Is local time `when` inside the window? No window means always."""
+    if not window:
+        return True
+    start, end = parse_window(window)
+    t = when.hour * 60 + when.minute
+    return start <= t < end if start < end else (t >= start or t < end)
+
+
+def schedule_text(a: "Agent") -> str:
+    """'every 60m, 05:00-21:00' for displays; '' when the agent has no schedule."""
+    if not a.wake_every:
+        return ""
+    return f"every {a.wake_every}" + (f", {a.wake_between}" if a.wake_between else "")
 
 
 def parse_interval(text: str) -> int:

@@ -17,7 +17,7 @@ from ..dispatch import Queue
 from ..jobs import Jobs
 from ..paths import XtError
 from ..spawn import Approvals
-from ..team import HUMAN
+from ..team import HUMAN, schedule_text
 
 PANELS = ("Goals", "Team", "Tasks", "Inbox", "Log")
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
@@ -158,7 +158,7 @@ def build(ctx: Ctx) -> Snapshot:
         def detail(a=a, la=la, state=state, owned=owned):
             out = Text()
             out.append(f"{a.name}", style="bold")
-            wakes = f" · woken every {a.wake_every}" if a.wake_every else ""
+            wakes = f" · woken {schedule_text(a)}" if a.wake_every else ""
             out.append(f" · {a.role} · {a.harness}{'/' + a.model if a.model else ''} · reports to {a.reports_to}{wakes} · ")
             out.append(state + "\n", style=STATUS_STYLE.get(state, "bright_black"))
             if la:

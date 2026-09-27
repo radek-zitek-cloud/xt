@@ -3,7 +3,7 @@
 import datetime as dt
 
 from .context import Ctx
-from .team import HUMAN
+from .team import HUMAN, schedule_text
 
 MAX_ITEMS = 50
 RECENT = 20
@@ -44,7 +44,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         la = live.get(a.name)
         state = la.status if la else "not running"
         model = f"/{a.model}" if a.model else ""
-        wakes = f", woken every {a.wake_every}" if a.wake_every else ""
+        wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
         out.append(f"- {a.name} ({a.role}, {a.harness}{model}, reports to {a.reports_to}{wakes}): {state}")
 
     items = ctx.ledger.open_items()

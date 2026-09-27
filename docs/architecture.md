@@ -65,7 +65,7 @@ come from upstream and aren't edited by the team, so upstream merges rarely conf
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [defaults]  liaison / lead harness (and optional model)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
-            wake_every? (e.g. "30m"), wake_message? (set with `xt schedule`)
+            wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"; set with `xt schedule`)
 ```
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
@@ -164,7 +164,8 @@ briefs. `xt log` gives the full history.
    `min_wake_minutes` (default 15) and, with `schedule_approval` (default on), waits in the human's
    Inbox like a spawn; the human sets any interval directly, and switching a schedule off needs no
    approval; this is how a periodic role like a monitor works, since agents only act when
-   prompted.
+   prompted. An optional `wake_between` window (local time, may wrap midnight) limits wake-ups to
+   those hours; an agent that became due outside it gets a single wake-up when the window opens.
 8. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
    gets a `nudge`; after two unanswered nudges the human gets an alert instead.
 9. **Rotation**, hourly.

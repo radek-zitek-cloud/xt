@@ -9,6 +9,32 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-27
+
+### Added
+
+- **Quiet hours for schedules.** `wake_between = "05:00-21:00"` on an agent in `team.toml`, set with
+  `xt schedule <name> <interval> --between 05:00-21:00` (local time; a window may wrap midnight,
+  e.g. `22:00-06:00`; `--between always` removes it). The supervisor wakes the agent only inside the
+  window; an agent that became due outside it gets one wake-up when the window opens, not one per
+  missed interval. Agent-set windows go through the same approval as the schedule. The window shows
+  in the brief, the TUI's Team detail, wake messages and approval requests.
+- The lead's role says to use a window when a goal asks for quiet hours, rather than having the agent
+  skip runs itself (each skipped run is still a billed turn).
+
+### Changed
+
+- `xt schedule` keeps an agent's current wake message and window when `--message` or `--between`
+  is left out (before, a schedule set without `--message` dropped the message). `off` still clears
+  everything.
+
+### Upgrading
+
+- Restart the team (`xt down`, then `xt`) so the supervisor runs the new code and the lead gets the
+  updated role.
+- A schedule an agent answers with "quiet hours" can move into xt: from your terminal,
+  `xt schedule <name> <interval> --between HH:MM-HH:MM` (it keeps the wake message).
+
 ## [0.1.0] — 2026-09-27
 
 The first public release, under the MIT licence. Tested with a six-agent newsroom team (all codex)

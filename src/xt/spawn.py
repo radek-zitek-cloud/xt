@@ -10,7 +10,7 @@ from .alerts import Alerts
 from .herdr import HerdrError
 from .context import Ctx
 from .paths import XtError
-from .team import HUMAN, SYSTEM
+from .team import ALWAYS, HUMAN, SYSTEM, schedule_text
 from .watch import set_expected
 
 PRECEDENCE = """\
@@ -183,6 +183,7 @@ class Approvals:
     def add(self, req: dict) -> int:
         if req.get("kind") == "schedule":
             what = (f"{req['requester']} asks to wake {req['name']} every {req['every']} when idle"
+                    + (f" between {req['between']}" if req.get("between") and req["between"] != ALWAYS else "")
                     + (f" ({req['message']})" if req.get("message") else "")
                     + ": each wake-up is a billed agent turn.")
         else:
@@ -270,10 +271,10 @@ def decide(ctx: Ctx, req_id: int, approve: bool) -> str:
     req = Approvals(ctx).pop(req_id)
     if req.get("kind") == "schedule":
         if approve:
-            ctx.team.set_schedule(req["name"], req["every"], req.get("message"))
+            ctx.team.set_schedule(req["name"], req["every"], req.get("message"), req.get("between"))
             ctx.team.save()
             ctx.reload_team()
-            result = f"{req['name']} is now woken every {req['every']} when idle"
+            result = f"{req['name']} is now woken {schedule_text(ctx.team.agent(req['name']))} when idle"
         else:
             result = f"schedule for {req['name']} denied"
     elif approve:

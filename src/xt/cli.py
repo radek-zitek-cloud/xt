@@ -11,7 +11,7 @@ from .dispatch import Queue, done_recipient, send
 from .ledger import AGENT_TYPES
 from .paths import Paths, XtError, find_root
 from .spawn import Approvals, decide, request_spawn, retire, stop
-from .team import HUMAN
+from .team import ALWAYS, HUMAN, parse_window, schedule_text
 
 
 def _who(args) -> str:
@@ -82,17 +82,22 @@ def cmd_schedule(args) -> None:
             raise XtError(f"the shortest schedule an agent may request is {floor}m (policy "
                           f"min_wake_minutes); ask the human if it really needs to be more often")
         if ctx.team.policy("schedule_approval"):
+            if args.between and args.between != ALWAYS:
+                parse_window(args.between)
             rid = Approvals(ctx).add({"kind": "schedule", "requester": who, "name": args.name,
-                                      "every": args.every, "message": args.message})
+                                      "every": args.every, "message": args.message,
+                                      "between": args.between})
             print(f"approval #{rid} requested from the human; you'll get a message when it's decided")
             return
-    ctx.team.set_schedule(args.name, None if off else args.every, args.message)
+    ctx.team.set_schedule(args.name, None if off else args.every, args.message, args.between)
     ctx.team.save()
+    ctx.reload_team()
     if off:
         print(f"{args.name}: no scheduled wake-ups")
     else:
-        print(f"{args.name}: woken every {args.every} when idle (by the supervisor)"
-              + (f": {args.message}" if args.message else ""))
+        a = ctx.team.agent(args.name)
+        print(f"{args.name}: woken {schedule_text(a)} when idle (by the supervisor)"
+              + (f": {a.wake_message}" if a.wake_message else ""))
 
 
 def cmd_down(args) -> None:
@@ -191,7 +196,9 @@ def cmd_inbox(args) -> None:
         print("  (none)")
     print("Pending approvals:")
     for rid, r in approvals.items():
-        what = (f"wake {r['name']} every {r['every']}" if r.get("kind") == "schedule"
+        what = (f"wake {r['name']} every {r['every']}"
+                + (f" between {r['between']}" if r.get("between") and r["between"] != ALWAYS else "")
+                if r.get("kind") == "schedule"
                 else f"spawn {r['name']} ({r['role']}, {r['harness']})")
         print(f"  #{rid} {r['requester']} → {what}  xt approve {rid} | xt deny {rid}")
     if not approvals:
@@ -300,7 +307,10 @@ def build_parser() -> argparse.ArgumentParser:
              "wake an agent periodically when idle (e.g. a monitor): xt schedule <name> 30m | off")
     sp.add_argument("name")
     sp.add_argument("every", metavar="interval|off", help="like 90s, 30m, 2h, 1d; or off")
-    sp.add_argument("--message", help="what the agent should do on each wake-up")
+    sp.add_argument("--message", help="what the agent should do on each wake-up (left out: keep the current one)")
+    sp.add_argument("--between", metavar="HH:MM-HH:MM",
+                    help="only wake within this local-time window, e.g. 05:00-21:00 (may wrap midnight; "
+                         "'always' removes it; left out: keep the current one)")
 
     sp = add("down", cmd_down, "stop every running agent and the supervisor (human only)")
     sp.add_argument("--keep-supervisor", action="store_true", help="stop the agents only")

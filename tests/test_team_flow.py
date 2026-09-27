@@ -365,3 +365,101 @@ def test_scheduled_wakeups(ctx, monkeypatch):
     ctx.herdr.live["scout"].status = "idle"
     sup.tick(now=10_000 + 200 * 60)
     assert sum("check the feeds" in t for _, t in ctx.herdr.prompts) == 1
+
+
+def test_wake_window_parsing():
+    import datetime as dt
+
+    from xt.paths import XtError as E
+    from xt.team import in_window, normalise_window
+
+    assert normalise_window(" 5:00 - 21:00 ") == "05:00-21:00"
+    for bad in ("5-21", "25:00-06:00", "06:00-06:00", "00:00-24:00", "07:61-08:00"):
+        with pytest.raises(E):
+            normalise_window(bad)
+    at = lambda h, m=0: dt.datetime(2026, 9, 27, h, m)
+    assert in_window(None, at(3))
+    assert in_window("05:00-21:00", at(5)) and in_window("05:00-21:00", at(20, 59))
+    assert not in_window("05:00-21:00", at(21)) and not in_window("05:00-21:00", at(4, 59))
+    assert in_window("22:00-06:00", at(23)) and in_window("22:00-06:00", at(2))
+    assert not in_window("22:00-06:00", at(12))
+    assert in_window("06:00-24:00", at(23, 59))
+
+
+def test_wakes_only_inside_the_window(ctx, monkeypatch):
+    import datetime as dt
+    import io
+    import sys
+    import time
+
+    from xt import cli
+
+    add_member(ctx, "scout")
+    ctx.herdr.add("scout")
+    ctx.herdr.add("lead")
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+
+    monkeypatch.setattr(sys, "stdin", Tty())
+    p = cli.build_parser()
+    # the human sets a schedule, then adds a window without repeating the message
+    cli.cmd_schedule(p.parse_args(["schedule", "scout", "60m", "--message", "check the feeds"]))
+    cli.cmd_schedule(p.parse_args(["schedule", "scout", "60m", "--between", "5:00-21:00"]))
+    ctx.reload_team()
+    scout = ctx.team.agent("scout")
+    assert (scout.wake_every, scout.wake_between, scout.wake_message) == ("60m", "05:00-21:00", "check the feeds")
+    assert "woken every 60m, 05:00-21:00" in brief.build(ctx, "lead")
+
+    local = lambda h, m=0: time.mktime(dt.datetime(2026, 9, 27, h, m).timetuple())
+    wakes = lambda: sum("check the feeds" in t for _, t in ctx.herdr.prompts)
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.tick(now=local(19, 30))  # first sight: the clock starts
+    sup.tick(now=local(20, 31))
+    assert wakes() == 1 and "(schedule: every 60m, 05:00-21:00)" in ctx.herdr.last_prompt("scout")
+    for h in (21, 22, 23):  # overdue, but outside the window: no wake-ups all night
+        ctx.herdr.live["scout"].status = "idle"
+        sup.tick(now=local(h, 45))
+    ctx.herdr.live["scout"].status = "idle"
+    sup.tick(now=local(4, 59) + 86400)
+    assert wakes() == 1
+    sup.tick(now=local(5, 0) + 86400)  # the window opens: one wake-up, not one per missed hour
+    ctx.herdr.live["scout"].status = "idle"
+    sup.tick(now=local(5, 3) + 86400)
+    assert wakes() == 2
+
+    cli.cmd_schedule(p.parse_args(["schedule", "scout", "60m", "--between", "always"]))
+    ctx.reload_team()
+    assert ctx.team.agent("scout").wake_between is None
+    assert ctx.team.agent("scout").wake_message == "check the feeds"
+
+
+def test_agent_schedule_request_carries_the_window(ctx, monkeypatch):
+    import io
+    import sys
+
+    from xt import cli
+    from xt.paths import XtError as E
+
+    add_member(ctx, "scout")
+    ctx.herdr.add("lead")
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+
+    class NoTty(io.StringIO):
+        def isatty(self):
+            return False
+
+    monkeypatch.setattr(sys, "stdin", NoTty())
+    p = cli.build_parser()
+    with pytest.raises(E, match="isn't like 05:00-21:00"):
+        cli.cmd_schedule(p.parse_args(["schedule", "scout", "60m", "--between", "nights", "--as", "lead"]))
+    cli.cmd_schedule(p.parse_args(["schedule", "scout", "60m", "--between", "05:00-21:00", "--as", "lead"]))
+    (rid, req), = Approvals(ctx).pending().items()
+    appr = [m for m in ctx.ledger.messages() if m["type"] == "approval"][-1]
+    assert "every 60m when idle between 05:00-21:00" in appr["body"]
+    decide(ctx, int(rid), approve=True)
+    ctx.reload_team()
+    assert ctx.team.agent("scout").wake_between == "05:00-21:00"
+    assert "now woken every 60m, 05:00-21:00" in ctx.herdr.last_prompt("lead")

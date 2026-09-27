@@ -85,7 +85,9 @@ several agents need the same know-how, or the same instructions keep recurring i
   so give them a schedule: `xt schedule <name> 30m --message "what to do each time" --as lead`. The
   supervisor wakes them when idle. Every wake-up is a billed agent turn, so choose the longest
   interval that serves the goal: there's a minimum (`min_wake_minutes`, 15 by default) and, by
-  default, the human approves each schedule, like a spawn. Explain why in a report to the liaison. Their findings still come to you; new work only starts under a
+  default, the human approves each schedule, like a spawn. If the goal asks for quiet hours, add a
+  window instead of having the agent skip runs itself (skipped runs are still billed turns):
+  `--between 05:00-21:00` (local time). Explain why in a report to the liaison. Their findings still come to you; new work only starts under a
   goal (ask the liaison, or act within a standing goal that allows it).
 
 ## Keeping the team repo useful

@@ -14,7 +14,7 @@ from .dispatch import Queue, drain, send
 from .herdr import DELIVERABLE
 from .jobs import Jobs, run_pending
 from .paths import XtError
-from .team import HUMAN, SYSTEM, parse_interval
+from .team import HUMAN, SYSTEM, in_window, parse_interval, schedule_text
 
 TICK = 3
 NUDGES_BEFORE_ALERT = 2
@@ -123,7 +123,9 @@ class Supervisor:
     def wake_scheduled(self, live: dict, now: float) -> None:
         """Send a `wake` to agents whose schedule is due, only when they're idle and have nothing
         queued, so a wake-up never interrupts work. The clock starts when a schedule is first seen,
-        so restarting the supervisor doesn't wake everyone at once."""
+        so restarting the supervisor doesn't wake everyone at once. Outside an agent's
+        `wake_between` window nobody is woken; when the window opens, an overdue agent gets one
+        wake-up, not one per missed interval."""
         path = self.ctx.paths.state / "wakes.json"
         last = json.loads(path.read_text()) if path.exists() else {}
         queued = {i["to"] for i in Queue(self.ctx).pending()}
@@ -140,13 +142,14 @@ class Supervisor:
                 continue
             agent = live.get(a.name)
             if now - last[a.name] < parse_interval(a.wake_every) or agent is None \
-                    or agent.status not in DELIVERABLE or a.name in queued:
+                    or agent.status not in DELIVERABLE or a.name in queued \
+                    or not in_window(a.wake_between, dt.datetime.fromtimestamp(now)):
                 continue
             body = (a.wake_message or "Scheduled wake-up: do your role's periodic duty, report anything "
                     "worth reporting to the agent you report to, then stop.")
             try:
-                send(self.ctx, SYSTEM, a.name, "wake", f"{body}\n(schedule: every {a.wake_every})")
-                self.say(f"woke {a.name} (every {a.wake_every})")
+                send(self.ctx, SYSTEM, a.name, "wake", f"{body}\n(schedule: {schedule_text(a)})")
+                self.say(f"woke {a.name} ({schedule_text(a)})")
             except XtError as e:
                 self.say(f"wake-up for {a.name} failed: {e}")
             last[a.name] = now
