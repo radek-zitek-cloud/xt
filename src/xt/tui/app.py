@@ -10,6 +10,7 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, OptionList, Static
 from textual.widgets.option_list import Option
 
+from .. import __version__
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
@@ -180,7 +181,7 @@ class XtTui(App):
 
     def compose(self) -> ComposeResult:
         topbar = Static(id="topbar")
-        topbar.border_title = "Status"
+        topbar.border_title = f"Status─xt {__version__}"
         yield topbar
         with Horizontal(id="main"):
             with Vertical(id="left"):

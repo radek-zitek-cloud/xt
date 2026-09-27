@@ -6,6 +6,8 @@ import pytest
 from xt.cli import _who, build_parser
 from xt.paths import XtError
 
+from .conftest import REPO
+
 
 class _Stdin(io.StringIO):
     def __init__(self, tty: bool):
@@ -56,3 +58,16 @@ def test_brief_only_for_yourself_or_your_reports(ctx, monkeypatch, capsys):
 def test_send_defaults_to_report():
     a = build_parser().parse_args(["send", "lead", "--as", "carol", "hello", "there"])
     assert (a.to, a.type, a.body, a.as_) == ("lead", "report", ["hello", "there"], "carol")
+
+
+def test_version_comes_from_pyproject(capsys):
+    import tomllib
+
+    from xt import __version__
+    from xt.cli import main
+
+    expected = tomllib.loads((REPO / "pyproject.toml").read_text())["project"]["version"]
+    assert __version__ == expected
+    with pytest.raises(SystemExit):
+        main(["--version"])
+    assert capsys.readouterr().out.strip() == f"xt {expected}"

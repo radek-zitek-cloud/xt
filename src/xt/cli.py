@@ -1,6 +1,7 @@
 import argparse
 import sys
 
+from . import __version__
 from . import brief as brief_mod
 from . import goals
 from .adapters import load_adapters
@@ -161,7 +162,7 @@ def cmd_status(args) -> None:
     ctx = Ctx.load()
     live = ctx.herdr.agents()
     items = ctx.ledger.open_items()
-    print(f"team {ctx.team.name} · session {ctx.team.session}")
+    print(f"team {ctx.team.name} · session {ctx.team.session} · xt {__version__}")
     for a in ctx.team.agents():
         if a.kind == HUMAN:
             continue
@@ -274,6 +275,7 @@ def cmd_tui(args) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="xt", description="Harness-agnostic hierarchical agent teams on Herdr.")
+    p.add_argument("--version", action="version", version=f"xt {__version__}")
     p.set_defaults(func=cmd_default)
     sub = p.add_subparsers(dest="cmd")
 

@@ -75,6 +75,41 @@ notes) is committed in your repo.
 `.agents/skills` and `.claude/skills` are symlinks to `skills/`, so codex, pi and claude also
 discover team skills natively.
 
+## Versioning
+
+xt uses [semantic versioning](https://semver.org/); `xt --version` prints the version, and
+[CHANGELOG.md](CHANGELOG.md) lists every release with an **Upgrading** note for running teams.
+
+A change is **breaking** when a team has to change its own files or its agents would behave
+differently: the CLI (commands, flags), the `team.toml` format, the message protocol
+(`protocol.md`, message types, the envelope), the ledger and `.xt/` state formats, the harness
+adapter format, and the shipped `roles/lead.md` and `roles/liaison.md`.
+
+While xt is `0.x`, a breaking change or a notable feature raises the minor version (0.1 → 0.2) and a
+fix raises the patch version (0.1.0 → 0.1.1). `1.0.0` comes once `team.toml` and the protocol are
+stable.
+
+**Following releases instead of `main`:** `git pull upstream main` gets the latest code. To stay on
+a release, merge its tag instead:
+
+```sh
+git fetch upstream --tags
+git merge v0.1.0
+```
+
+Either way, read the release's Upgrading note in CHANGELOG.md; restarting the team (`xt down`, then
+`xt`) makes running agents and the supervisor pick up the new code and instructions.
+
+## Releasing
+
+1. Move the `[Unreleased]` entries in CHANGELOG.md under a new `## [X.Y.Z] — YYYY-MM-DD` heading,
+   with an **Upgrading** note.
+2. Set `version = "X.Y.Z"` in `pyproject.toml`, run `uv lock` and `uv run pytest`.
+3. Commit (`Release vX.Y.Z`), tag it `git tag -a vX.Y.Z -m "xt vX.Y.Z"`, and push both:
+   `git push origin main vX.Y.Z`.
+4. Create the GitHub release from the tag with that version's changelog section as its notes:
+   `gh release create vX.Y.Z --title "xt vX.Y.Z" --notes-file <section>`.
+
 ## Development
 
 ```sh
