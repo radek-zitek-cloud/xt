@@ -172,9 +172,25 @@ instead of working around them silently.
   so the whole team sat idle for about ten minutes until he wondered why. Another card.
 
 Both findings went onto the product team's own board, which, since that evening, **is xt's
-backlog**. The team's first real assignment followed: a discovery into what an xt team costs to
-run and how full each agent's context is, starting from where each harness exposes that
-information.
+backlog**.
+
+**The first real assignment: a discovery.** Radek picked the first question to explore: *what does
+an xt team cost to run, and how full is each agent's context?* In about half an hour the PM read
+the public documentation of seven harnesses, published a research page, and drafted a spec. The
+decisions only Radek could make reached him one at a time as questions in his inbox, each
+answered in a sentence from the TUI or the liaison's pane: tokens are the base measure; dollars
+are always shown as an estimate; the subscription allowance is shown where a harness exposes it,
+once, because it belongs to the account and not to an agent; no budgets until there's real data.
+Where documentation wasn't enough, Claude ran read-only checks on the machine (with Radek's OK,
+and two tiny test turns) and reported field names only. The spec came back "for review"; Radek
+approved it in two steps, the smaller one first.
+
+The evening's lessons were about the team's manners, not its skill. Seven questions in fifteen
+minutes was too many, so Radek set a boundary: technical details are the team's to decide and
+record, only product choices come to him. The finished spec's cards had been left in the wrong
+column, because the board's own convention said the review column "may" be used. That became a
+"must", and since then every correction from Radek goes into the lead's lessons file, with the
+rule that allowed it fixed. The first three entries were written the same night.
 
 You can watch it work in its public space: **[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**.
 This page will grow as that story unfolds.
