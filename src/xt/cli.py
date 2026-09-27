@@ -62,6 +62,24 @@ def cmd_up(args) -> None:
         print(line)
 
 
+def cmd_schedule(args) -> None:
+    ctx = Ctx.load()
+    who = _who(args)
+    target = ctx.team.agent(args.name)
+    if target is None or target.kind == HUMAN:
+        raise XtError(f"no agent named {args.name!r}")
+    if who != HUMAN and target.reports_to != who:
+        raise XtError(f"only {target.reports_to} (its lead) or the human can schedule {args.name}")
+    off = args.every.lower() in ("off", "none", "0")
+    ctx.team.set_schedule(args.name, None if off else args.every, args.message)
+    ctx.team.save()
+    if off:
+        print(f"{args.name}: no scheduled wake-ups")
+    else:
+        print(f"{args.name}: woken every {args.every} when idle (by the supervisor)"
+              + (f": {args.message}" if args.message else ""))
+
+
 def cmd_down(args) -> None:
     if _who(args) != HUMAN:
         raise XtError("only the human takes the team down")
@@ -259,6 +277,12 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-commit", action="store_true")
 
     add("up", cmd_up, "start the supervisor and liaison (and the lead if goals are open)")
+
+    sp = add("schedule", cmd_schedule,
+             "wake an agent periodically when idle (e.g. a monitor): xt schedule <name> 30m | off")
+    sp.add_argument("name")
+    sp.add_argument("every", metavar="interval|off", help="like 90s, 30m, 2h, 1d; or off")
+    sp.add_argument("--message", help="what the agent should do on each wake-up")
 
     sp = add("down", cmd_down, "stop every running agent and the supervisor (human only)")
     sp.add_argument("--keep-supervisor", action="store_true", help="stop the agents only")

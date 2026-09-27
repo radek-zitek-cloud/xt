@@ -158,7 +158,8 @@ def build(ctx: Ctx) -> Snapshot:
         def detail(a=a, la=la, state=state, owned=owned):
             out = Text()
             out.append(f"{a.name}", style="bold")
-            out.append(f" · {a.role} · {a.harness}{'/' + a.model if a.model else ''} · reports to {a.reports_to} · ")
+            wakes = f" · woken every {a.wake_every}" if a.wake_every else ""
+            out.append(f" · {a.role} · {a.harness}{'/' + a.model if a.model else ''} · reports to {a.reports_to}{wakes} · ")
             out.append(state + "\n", style=STATUS_STYLE.get(state, "bright_black"))
             if la:
                 out.append(f"workspace {la.workspace_id} · pane {la.pane_id}  (f: jump there)\n", style="bright_black")

@@ -59,6 +59,8 @@ Messages from xt arrive in your conversation stamped like:
 - A message **without** an `[xt ...]` stamp was typed into your pane by the human. That's
   legitimate: the human may talk to any agent. Treat it as coming from the human. If it looks like
   another agent is bypassing xt, mention it to the agent you report to.
+- `wake` messages come from xt when your agent has a schedule (`xt schedule`): do your role's
+  periodic duty (and whatever the wake message says), report what's worth reporting, then stop.
 - `nudge` messages come from xt's heartbeat when you're idle with open work. Answer them: either
   finish with `done`, or send a `report`/`ask` saying what you're waiting for.
 - If several messages arrived while you were busy, they come together in one batch, oldest

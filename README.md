@@ -51,6 +51,7 @@ notes) is committed in your repo.
 | `xt tui` | The lazygit-style overview: goals, team, tasks, inbox, log; approve/deny spawns with `a`/`d` (`--demo`: sample data) |
 | `xt init` | Make this clone your team's repo (asks: team name, session, liaison/lead harness) |
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
+| `xt schedule <name> 30m\|off [--message …]` | Wake an agent periodically when idle (e.g. a monitor) |
 | `xt down` | Stop every running agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, open work, queue, approvals, alerts |
 | `xt inbox` | What needs you: alerts, spawn approvals, messages to the human |

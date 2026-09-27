@@ -44,7 +44,8 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         la = live.get(a.name)
         state = la.status if la else "not running"
         model = f"/{a.model}" if a.model else ""
-        out.append(f"- {a.name} ({a.role}, {a.harness}{model}, reports to {a.reports_to}): {state}")
+        wakes = f", woken every {a.wake_every}" if a.wake_every else ""
+        out.append(f"- {a.name} ({a.role}, {a.harness}{model}, reports to {a.reports_to}{wakes}): {state}")
 
     items = ctx.ledger.open_items()
     if name and name not in (HUMAN,) and ctx.team.agent(name) and ctx.team.agent(name).role not in ("lead", "liaison"):

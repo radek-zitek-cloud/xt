@@ -14,7 +14,7 @@ from .dispatch import Queue, drain, send
 from .herdr import DELIVERABLE
 from .jobs import Jobs, run_pending
 from .paths import XtError
-from .team import HUMAN, SYSTEM
+from .team import HUMAN, SYSTEM, parse_interval
 
 TICK = 3
 NUDGES_BEFORE_ALERT = 2
@@ -76,6 +76,7 @@ class Supervisor:
         if now - self.last_heartbeat >= 60 * int(self.ctx.team.policy("heartbeat_minutes")):
             self.last_heartbeat = now
             self.heartbeat(live)
+        self.wake_scheduled(live, now)
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
             for line in self.ctx.ledger.rotate(
@@ -118,6 +119,40 @@ class Supervisor:
             day = dt.date.today().isoformat()
             if self.alerts.raise_(f"volume:{day}", f"today's message log is over {limit // 1048576} MB — probably a message loop"):
                 self.say("alert: log volume")
+
+    def wake_scheduled(self, live: dict, now: float) -> None:
+        """Send a `wake` to agents whose schedule is due, only when they're idle and have nothing
+        queued, so a wake-up never interrupts work. The clock starts when a schedule is first seen,
+        so restarting the supervisor doesn't wake everyone at once."""
+        path = self.ctx.paths.state / "wakes.json"
+        last = json.loads(path.read_text()) if path.exists() else {}
+        queued = {i["to"] for i in Queue(self.ctx).pending()}
+        changed = False
+        for a in self.ctx.team.agents():
+            if not (a.wake_every and a.active):
+                if a.name in last:
+                    del last[a.name]
+                    changed = True
+                continue
+            if a.name not in last:
+                last[a.name] = now
+                changed = True
+                continue
+            agent = live.get(a.name)
+            if now - last[a.name] < parse_interval(a.wake_every) or agent is None \
+                    or agent.status not in DELIVERABLE or a.name in queued:
+                continue
+            body = (a.wake_message or "Scheduled wake-up: do your role's periodic duty, report anything "
+                    "worth reporting to the agent you report to, then stop.")
+            try:
+                send(self.ctx, SYSTEM, a.name, "wake", f"{body}\n(schedule: every {a.wake_every})")
+                self.say(f"woke {a.name} (every {a.wake_every})")
+            except XtError as e:
+                self.say(f"wake-up for {a.name} failed: {e}")
+            last[a.name] = now
+            changed = True
+        if changed:
+            path.write_text(json.dumps(last))
 
     def _nudges(self) -> dict:
         return json.loads(self.nudges_path.read_text()) if self.nudges_path.exists() else {}

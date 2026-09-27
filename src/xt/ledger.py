@@ -17,7 +17,7 @@ from typing import Iterator
 from .paths import Paths, XtError
 
 AGENT_TYPES = ("goal", "task", "ask", "report", "done", "note")
-SYSTEM_TYPES = ("alert", "approval", "nudge", "system")
+SYSTEM_TYPES = ("alert", "approval", "nudge", "system", "wake")
 OPENING = ("goal", "task")
 
 

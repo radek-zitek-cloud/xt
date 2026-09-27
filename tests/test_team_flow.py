@@ -303,3 +303,53 @@ def test_tui_X_stops_every_running_agent(ctx):
             assert ctx.herdr.live == {}
 
     asyncio.run(run())
+
+
+def test_scheduled_wakeups(ctx, monkeypatch):
+    import io
+    import sys
+
+    from xt import cli
+    from xt.paths import XtError as E
+
+    add_member(ctx, "scout")
+    ctx.herdr.add("scout")
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+
+    class NoTty(io.StringIO):
+        def isatty(self):
+            return False
+
+    monkeypatch.setattr(sys, "stdin", NoTty())
+    p = cli.build_parser()
+    with pytest.raises(E, match="only lead"):
+        cli.cmd_schedule(p.parse_args(["schedule", "scout", "30m", "--as", "liaison"]))
+    with pytest.raises(E, match="isn't like"):
+        cli.cmd_schedule(p.parse_args(["schedule", "scout", "soon", "--as", "lead"]))
+    cli.cmd_schedule(p.parse_args(["schedule", "scout", "30m", "--message", "check the feeds", "--as", "lead"]))
+    ctx.reload_team()
+    assert ctx.team.agent("scout").wake_every == "30m"
+    assert "woken every 30m" in brief.build(ctx, "lead")
+
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.tick(now=10_000)  # first sight: the clock starts, nobody is woken
+    assert not any("check the feeds" in t for _, t in ctx.herdr.prompts)
+    sup.tick(now=10_000 + 29 * 60)  # not due yet
+    assert not any("check the feeds" in t for _, t in ctx.herdr.prompts)
+    ctx.herdr.live["scout"].status = "working"
+    sup.tick(now=10_000 + 31 * 60)  # due, but busy: wait
+    assert not any("check the feeds" in t for _, t in ctx.herdr.prompts)
+    ctx.herdr.live["scout"].status = "idle"
+    sup.tick(now=10_000 + 32 * 60)  # due and idle: wake
+    wake = ctx.herdr.last_prompt("scout")
+    assert "wake from:xt" in wake and "check the feeds" in wake
+    ctx.herdr.live["scout"].status = "idle"
+    sup.tick(now=10_000 + 40 * 60)  # just woken: not again until 30 minutes later
+    assert sum("check the feeds" in t for _, t in ctx.herdr.prompts) == 1
+
+    cli.cmd_schedule(p.parse_args(["schedule", "scout", "off", "--as", "lead"]))
+    ctx.reload_team()
+    assert ctx.team.agent("scout").wake_every is None
+    ctx.herdr.live["scout"].status = "idle"
+    sup.tick(now=10_000 + 200 * 60)
+    assert sum("check the feeds" in t for _, t in ctx.herdr.prompts) == 1

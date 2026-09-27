@@ -22,6 +22,8 @@ class Agent:
     reports_to: str | None
     status: str
     kind: str = "agent"
+    wake_every: str | None = None
+    wake_message: str | None = None
 
     @property
     def active(self) -> bool:
@@ -73,6 +75,8 @@ class Team:
                     reports_to=a.get("reports_to"),
                     status=str(a.get("status", "active")),
                     kind=str(a.get("kind", "agent")),
+                    wake_every=a.get("wake_every") or None,
+                    wake_message=a.get("wake_message") or None,
                 )
             )
         return out
@@ -110,6 +114,19 @@ class Team:
             del t["model"]
         t["reports_to"] = reports_to
         t["status"] = "active"
+
+    def set_schedule(self, name: str, every: str | None, message: str | None) -> None:
+        t = self._table(name)
+        if t is None:
+            raise XtError(f"no agent named {name!r} in team.toml")
+        for key in ("wake_every", "wake_message"):
+            if key in t:
+                del t[key]
+        if every:
+            parse_interval(every)
+            t["wake_every"] = every
+            if message:
+                t["wake_message"] = message
 
     def set_status(self, name: str, status: str) -> None:
         t = self._table(name)
@@ -165,3 +182,13 @@ status = "active"
 
 {agent_block("lead", "lead", lead, "liaison")}
 """
+
+
+def parse_interval(text: str) -> int:
+    """'90s', '30m', '2h', '1d' -> seconds."""
+    import re
+
+    m = re.fullmatch(r"\s*(\d+)\s*([smhd])\s*", text or "")
+    if not m or int(m.group(1)) == 0:
+        raise XtError(f"interval {text!r} isn't like 90s, 30m, 2h or 1d")
+    return int(m.group(1)) * {"s": 1, "m": 60, "h": 3600, "d": 86400}[m.group(2)]

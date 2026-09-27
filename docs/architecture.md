@@ -64,7 +64,8 @@ come from upstream and aren't edited by the team, so upstream merges rarely conf
 [policy]    spawn_approval, max_agents, heartbeat_minutes
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [defaults]  liaison / lead harness (and optional model)
-[[agent]]   name, role, harness, model?, reports_to, status (active | retired)
+[[agent]]   name, role, harness, model?, reports_to, status (active | retired),
+            wake_every? (e.g. "30m"), wake_message? (set with `xt schedule`)
 ```
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
@@ -156,9 +157,14 @@ briefs. `xt log` gives the full history.
    - an expected agent missing (crashed, or closed outside xt);
    - goals open but the lead not running (and no job starting it).
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
-7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
+7. **Scheduled wake-ups**: an agent with `wake_every` gets a `wake` message (its `wake_message`)
+   when the interval has passed and it's idle with nothing queued, so it never interrupts work. The
+   clock starts when the supervisor first sees the schedule. Set with `xt schedule` by the human or
+   the agent's lead; this is how a periodic role like a monitor works, since agents only act when
+   prompted.
+8. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
    gets a `nudge`; after two unanswered nudges the human gets an alert instead.
-8. **Rotation**, hourly.
+9. **Rotation**, hourly.
 
 It **alerts, it never repairs**: no automatic restarts. A crash is a bug to look at.
 

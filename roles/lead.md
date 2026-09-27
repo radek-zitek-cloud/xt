@@ -81,6 +81,10 @@ several agents need the same know-how, or the same instructions keep recurring i
 - When a goal is complete: `xt done <goal id> --as lead "summary + where the results are"`. It
   goes to the liaison, who tells the human.
 - Retire agents the goal no longer needs: `xt retire <name> --as lead`.
+- **Periodic roles** (a monitor watching sources, a daily check): agents act only when prompted,
+  so give them a schedule: `xt schedule <name> 30m --message "what to do each time" --as lead`. The
+  supervisor wakes them when idle. Their findings still come to you; new work only starts under a
+  goal (ask the liaison, or act within a standing goal that allows it).
 
 ## Keeping the team repo useful
 
