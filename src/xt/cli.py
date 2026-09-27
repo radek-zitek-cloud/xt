@@ -71,6 +71,20 @@ def cmd_schedule(args) -> None:
     if who != HUMAN and target.reports_to != who:
         raise XtError(f"only {target.reports_to} (its lead) or the human can schedule {args.name}")
     off = args.every.lower() in ("off", "none", "0")
+    if not off and who != HUMAN:
+        # Each wake-up is a billed agent turn: agents get a floor and (by default) the human's approval.
+        from .spawn import Approvals
+        from .team import parse_interval
+
+        floor = int(ctx.team.policy("min_wake_minutes"))
+        if parse_interval(args.every) < floor * 60:
+            raise XtError(f"the shortest schedule an agent may request is {floor}m (policy "
+                          f"min_wake_minutes); ask the human if it really needs to be more often")
+        if ctx.team.policy("schedule_approval"):
+            rid = Approvals(ctx).add({"kind": "schedule", "requester": who, "name": args.name,
+                                      "every": args.every, "message": args.message})
+            print(f"approval #{rid} requested from the human; you'll get a message when it's decided")
+            return
     ctx.team.set_schedule(args.name, None if off else args.every, args.message)
     ctx.team.save()
     if off:
@@ -176,7 +190,9 @@ def cmd_inbox(args) -> None:
         print("  (none)")
     print("Pending approvals:")
     for rid, r in approvals.items():
-        print(f"  #{rid} {r['requester']} → spawn {r['name']} ({r['role']}, {r['harness']})  xt approve {rid} | xt deny {rid}")
+        what = (f"wake {r['name']} every {r['every']}" if r.get("kind") == "schedule"
+                else f"spawn {r['name']} ({r['role']}, {r['harness']})")
+        print(f"  #{rid} {r['requester']} → {what}  xt approve {rid} | xt deny {rid}")
     if not approvals:
         print("  (none)")
     print("Recent messages to you:")

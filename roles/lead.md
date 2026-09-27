@@ -83,7 +83,9 @@ several agents need the same know-how, or the same instructions keep recurring i
 - Retire agents the goal no longer needs: `xt retire <name> --as lead`.
 - **Periodic roles** (a monitor watching sources, a daily check): agents act only when prompted,
   so give them a schedule: `xt schedule <name> 30m --message "what to do each time" --as lead`. The
-  supervisor wakes them when idle. Their findings still come to you; new work only starts under a
+  supervisor wakes them when idle. Every wake-up is a billed agent turn, so choose the longest
+  interval that serves the goal: there's a minimum (`min_wake_minutes`, 15 by default) and, by
+  default, the human approves each schedule, like a spawn. Explain why in a report to the liaison. Their findings still come to you; new work only starts under a
   goal (ask the liaison, or act within a standing goal that allows it).
 
 ## Keeping the team repo useful

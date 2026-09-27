@@ -213,6 +213,26 @@ def build(ctx: Ctx) -> Snapshot:
     # Inbox: what needs the human
     inbox_rows = []
     for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
+        if r.get("kind") == "schedule":
+            def sdetail(rid=rid, r=r):
+                out = Text()
+                out.append(f"Approval #{rid}: {r['requester']} asks to wake ", style="bold")
+                out.append(r["name"], style="bold yellow")
+                out.append(f" every {r['every']} when idle\n")
+                if r.get("message"):
+                    out.append(f"on each wake-up: {r['message']}\n")
+                out.append("each wake-up is a billed agent turn · a approve · d deny\n", style="bright_black")
+                agent = ctx.team.agent(r["name"])
+                if agent and agent.role:
+                    out.append(_heading(f"its role: roles/{agent.role}.md"))
+                    out.append_text(_file_text(ctx, f"roles/{agent.role}.md"))
+                return out
+
+            inbox_rows.append(Row(f"approval:{rid}", _t(("? ", "yellow"), f"#{rid} wake {r['name']} ",
+                                                        (f"every {r['every']}", "bright_black")),
+                                  sdetail, "approval", {"id": int(rid)}))
+            continue
+
         def detail(rid=rid, r=r):
             out = Text()
             out.append(f"Approval #{rid}: {r['requester']} asks to spawn ", style="bold")

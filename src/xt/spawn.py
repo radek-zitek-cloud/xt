@@ -181,14 +181,19 @@ class Approvals:
             return self._load()
 
     def add(self, req: dict) -> int:
+        if req.get("kind") == "schedule":
+            what = (f"{req['requester']} asks to wake {req['name']} every {req['every']} when idle"
+                    + (f" ({req['message']})" if req.get("message") else "")
+                    + ": each wake-up is a billed agent turn.")
+        else:
+            what = (f"{req['requester']} asks to spawn {req['name']} as {req['role']} on {req['harness']}"
+                    + (f" ({req['model']})" if req.get("model") else "")
+                    + f", reporting to {req['reports_to']}.")
         msg = self.ctx.ledger.append(
             SYSTEM,
             HUMAN,
             "approval",
-            f"{req['requester']} asks to spawn {req['name']} as {req['role']} on {req['harness']}"
-            + (f" ({req['model']})" if req.get("model") else "")
-            + f", reporting to {req['reports_to']}. Approve: xt approve {{id}}; deny: xt deny {{id}} "
-            "(or a / d on it in the TUI's Inbox)",
+            what + " Approve: xt approve {id}; deny: xt deny {id} (or a / d on it in the TUI's Inbox)",
             fill_id=True,
         )
         with self.ctx.ledger.lock():
@@ -263,7 +268,15 @@ def execute_spawn(ctx: Ctx, req: dict) -> str:
 
 def decide(ctx: Ctx, req_id: int, approve: bool) -> str:
     req = Approvals(ctx).pop(req_id)
-    if approve:
+    if req.get("kind") == "schedule":
+        if approve:
+            ctx.team.set_schedule(req["name"], req["every"], req.get("message"))
+            ctx.team.save()
+            ctx.reload_team()
+            result = f"{req['name']} is now woken every {req['every']} when idle"
+        else:
+            result = f"schedule for {req['name']} denied"
+    elif approve:
         result = execute_spawn(ctx, req)
     else:
         result = f"spawn of {req['name']} denied"

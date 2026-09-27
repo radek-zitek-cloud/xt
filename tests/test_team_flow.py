@@ -314,6 +314,7 @@ def test_scheduled_wakeups(ctx, monkeypatch):
 
     add_member(ctx, "scout")
     ctx.herdr.add("scout")
+    ctx.herdr.add("lead")
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
 
     class NoTty(io.StringIO):
@@ -326,9 +327,20 @@ def test_scheduled_wakeups(ctx, monkeypatch):
         cli.cmd_schedule(p.parse_args(["schedule", "scout", "30m", "--as", "liaison"]))
     with pytest.raises(E, match="isn't like"):
         cli.cmd_schedule(p.parse_args(["schedule", "scout", "soon", "--as", "lead"]))
+    with pytest.raises(E, match="shortest schedule an agent may request is 15m"):
+        cli.cmd_schedule(p.parse_args(["schedule", "scout", "5m", "--as", "lead"]))
     cli.cmd_schedule(p.parse_args(["schedule", "scout", "30m", "--message", "check the feeds", "--as", "lead"]))
     ctx.reload_team()
+    assert ctx.team.agent("scout").wake_every is None  # waits for the human
+    (rid, req), = Approvals(ctx).pending().items()
+    assert req["kind"] == "schedule"
+    appr = [m for m in ctx.ledger.messages() if m["type"] == "approval"][-1]
+    assert "wake scout every 30m" in appr["body"] and f"xt approve {rid}" in appr["body"]
+    assert "wake scout every 30m" in brief.build(ctx, "liaison")
+    decide(ctx, int(rid), approve=True)
+    ctx.reload_team()
     assert ctx.team.agent("scout").wake_every == "30m"
+    assert "now woken every 30m" in ctx.herdr.last_prompt("lead")
     assert "woken every 30m" in brief.build(ctx, "lead")
 
     sup = Supervisor(ctx, out=lambda s: None)

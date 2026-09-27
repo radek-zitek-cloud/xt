@@ -10,7 +10,8 @@ HUMAN = "human"
 SYSTEM = "xt"
 
 LOG_DEFAULTS = {"raw_days": 30, "delete_after_days": 0, "daily_alert_mb": 5, "message_max_kb": 4}
-POLICY_DEFAULTS = {"spawn_approval": True, "max_agents": 8, "heartbeat_minutes": 15}
+POLICY_DEFAULTS = {"spawn_approval": True, "max_agents": 8, "heartbeat_minutes": 15,
+                   "schedule_approval": True, "min_wake_minutes": 15}
 
 
 @dataclass
@@ -160,6 +161,8 @@ created = {dt.date.today()}
 spawn_approval = {str(spawn_approval).lower()}          # lead's spawns wait for human approval
 max_agents = 8                    # soft cap; beyond it the lead must ask the human first
 heartbeat_minutes = 15            # supervisor checks for silent agents this often
+schedule_approval = true          # an agent's `xt schedule` waits for human approval (each wake-up costs)
+min_wake_minutes = 15             # shortest schedule an agent may request; only the human goes lower
 
 [log]
 raw_days = 30                     # keep daily jsonl files uncompressed this long

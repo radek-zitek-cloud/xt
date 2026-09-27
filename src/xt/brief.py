@@ -91,7 +91,9 @@ def waiting_on_human(ctx: Ctx) -> list[str]:
     alerts = Alerts(ctx).active()
     out = [f"\n## Waiting on the human ({len(approvals)} approvals, {len(alerts)} alerts)"]
     for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
-        out.append(f"- approval #{rid}: {r['requester']} asks to spawn {r['name']} ({r['role']}, {r['harness']})")
+        what = (f"wake {r['name']} every {r['every']}" if r.get("kind") == "schedule"
+                else f"spawn {r['name']} ({r['role']}, {r['harness']})")
+        out.append(f"- approval #{rid}: {r['requester']} asks to {what}")
     if approvals:
         ids = " ".join(sorted(approvals, key=int))
         out.append(f"  → the human approves with `xt approve {ids}` (or `a` on each in the TUI's Inbox), "

@@ -61,7 +61,7 @@ come from upstream and aren't edited by the team, so upstream merges rarely conf
 
 ```toml
 [team]      name, session (the Herdr session this team lives in)
-[policy]    spawn_approval, max_agents, heartbeat_minutes
+[policy]    spawn_approval, max_agents, heartbeat_minutes, schedule_approval, min_wake_minutes
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [defaults]  liaison / lead harness (and optional model)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
@@ -160,7 +160,10 @@ briefs. `xt log` gives the full history.
 7. **Scheduled wake-ups**: an agent with `wake_every` gets a `wake` message (its `wake_message`)
    when the interval has passed and it's idle with nothing queued, so it never interrupts work. The
    clock starts when the supervisor first sees the schedule. Set with `xt schedule` by the human or
-   the agent's lead; this is how a periodic role like a monitor works, since agents only act when
+   the agent's lead. Each wake-up is a billed agent turn, so a lead's schedule is refused below
+   `min_wake_minutes` (default 15) and, with `schedule_approval` (default on), waits in the human's
+   Inbox like a spawn; the human sets any interval directly, and switching a schedule off needs no
+   approval; this is how a periodic role like a monitor works, since agents only act when
    prompted.
 8. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
    gets a `nudge`; after two unanswered nudges the human gets an alert instead.
