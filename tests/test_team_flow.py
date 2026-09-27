@@ -228,3 +228,38 @@ def test_brief_for_member_shows_only_its_work(ctx):
     b = brief.build(ctx, "carol")
     assert "carol's task" in b and "dave's task" not in b
     assert "dave's task" in brief.build(ctx, "lead")
+
+
+def test_approval_message_carries_its_real_id_and_the_liaison_sees_it(ctx):
+    ctx.herdr.add("lead")
+    (ctx.paths.roles / "coder.md").write_text("# Role: coder\n")
+    request_spawn(ctx, "lead", "carol", "claude", None, "coder", None)
+    request_spawn(ctx, "lead", "dora", "claude", None, "coder", None)
+    ids = sorted(Approvals(ctx).pending(), key=int)
+    msgs = {str(m["id"]): m for m in ctx.ledger.messages() if m["type"] == "approval"}
+    for rid in ids:
+        assert f"xt approve {rid}" in msgs[rid]["body"] and "<id>" not in msgs[rid]["body"]
+    b = brief.build(ctx, "liaison")
+    assert "Waiting on the human (2 approvals" in b and f"xt approve {' '.join(ids)}" in b
+    assert "Waiting on the human" not in brief.build(ctx, "lead")
+
+
+def test_approve_several_ids_at_once(ctx, monkeypatch, capsys):
+    import io
+    import sys
+
+    from xt import cli
+
+    class Tty(io.StringIO):
+        def isatty(self):
+            return True
+
+    ctx.herdr.add("lead")
+    (ctx.paths.roles / "coder.md").write_text("# Role: coder\n")
+    request_spawn(ctx, "lead", "carol", "claude", None, "coder", None)
+    request_spawn(ctx, "lead", "dora", "claude", None, "coder", None)
+    ids = [int(i) for i in Approvals(ctx).pending()]
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    monkeypatch.setattr(sys, "stdin", Tty())
+    cli.cmd_approve(cli.build_parser().parse_args(["approve", *map(str, ids)]), True)
+    assert {"carol", "dora"} <= set(ctx.herdr.live) and not Approvals(ctx).pending()

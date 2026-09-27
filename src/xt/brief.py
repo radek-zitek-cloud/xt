@@ -64,6 +64,10 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         out.append(f"\n## Goal drafts ({len(drafts)})")
         out += [f"- {d.relative_to(ctx.paths.root)}" for d in drafts] or ["(none)"]
 
+    agent = ctx.team.agent(name) if name else None
+    if name is None or name == HUMAN or (agent and agent.role == "liaison"):
+        out += waiting_on_human(ctx)
+
     recent = [m for m in ctx.ledger.messages(since_days=1)]
     cutoff = (now - dt.timedelta(hours=24)).isoformat(timespec="seconds")
     recent = [m for m in recent if m["ts"] >= cutoff]
@@ -75,3 +79,24 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     out += [_line(m) for m in recent] or ["(none)"]
     out.append(f"\nFull history: {ctx.paths.xt_bin} log --help")
     return "\n".join(out)
+
+
+def waiting_on_human(ctx: Ctx) -> list[str]:
+    """What only the human can resolve, with the exact commands, so the liaison can pass it on."""
+    from .alerts import Alerts
+    from .spawn import Approvals
+
+    approvals = Approvals(ctx).pending()
+    alerts = Alerts(ctx).active()
+    out = [f"\n## Waiting on the human ({len(approvals)} approvals, {len(alerts)} alerts)"]
+    for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
+        out.append(f"- approval #{rid}: {r['requester']} asks to spawn {r['name']} ({r['role']}, {r['harness']})")
+    if approvals:
+        ids = " ".join(sorted(approvals, key=int))
+        out.append(f"  → the human approves with `xt approve {ids}` (or `a` on each in the TUI's Inbox), "
+                   f"or denies with `xt deny <id>`")
+    for key, a in sorted(alerts.items(), key=lambda kv: kv[1].get("id", 0)):
+        out.append(f"- alert: {a['text']}  (clear: `xt clear {key}`, or `c` in the TUI's Inbox)")
+    if not approvals and not alerts:
+        out.append("(nothing)")
+    return out

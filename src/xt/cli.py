@@ -168,7 +168,12 @@ def cmd_clear(args) -> None:
 def cmd_approve(args, approve: bool = True) -> None:
     if _who(args) != HUMAN:
         raise XtError("only the human approves spawns")
-    print(decide(Ctx.load(), args.id, approve))
+    ctx = Ctx.load()
+    for rid in args.ids:
+        try:
+            print(f"#{rid}: {decide(ctx, rid, approve)}")
+        except XtError as e:
+            print(f"#{rid}: {e}")
 
 
 def cmd_spawn(args) -> None:
@@ -278,10 +283,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("clear", cmd_clear, "dismiss an alert")
     sp.add_argument("key")
 
-    sp = add("approve", lambda a: cmd_approve(a, True), "approve a pending spawn")
-    sp.add_argument("id", type=int)
-    sp = add("deny", lambda a: cmd_approve(a, False), "deny a pending spawn")
-    sp.add_argument("id", type=int)
+    sp = add("approve", lambda a: cmd_approve(a, True), "approve pending spawns (one or more ids)")
+    sp.add_argument("ids", type=int, nargs="+", metavar="id")
+    sp = add("deny", lambda a: cmd_approve(a, False), "deny pending spawns (one or more ids)")
+    sp.add_argument("ids", type=int, nargs="+", metavar="id")
 
     sp = add("spawn", cmd_spawn, "start an agent (new: needs --harness and --role; existing: restarts it)")
     sp.add_argument("name")

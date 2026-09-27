@@ -93,14 +93,19 @@ class Ledger:
         with self.lock():
             self._write_snapshot(self._rebuild())
 
-    def append(self, sender: str, to: str, mtype: str, body: str, ref: int | None = None) -> dict:
+    def append(self, sender: str, to: str, mtype: str, body: str, ref: int | None = None,
+               fill_id: bool = False) -> dict:
+        """Log a message. With fill_id, "{id}" in the body becomes the message's own id."""
         if mtype not in AGENT_TYPES + SYSTEM_TYPES:
             raise XtError(f"unknown message type {mtype!r}")
         with self.lock():
             snap = self._read_snapshot()
             ts = self.clock()
+            new_id = snap.get("seq", 0) + 1
+            if fill_id:
+                body = body.replace("{id}", str(new_id))
             msg = {
-                "id": snap.get("seq", 0) + 1,
+                "id": new_id,
                 "ts": ts.isoformat(timespec="seconds"),
                 "type": mtype,
                 "from": sender,

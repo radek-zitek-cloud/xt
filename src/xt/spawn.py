@@ -187,7 +187,9 @@ class Approvals:
             "approval",
             f"{req['requester']} asks to spawn {req['name']} as {req['role']} on {req['harness']}"
             + (f" ({req['model']})" if req.get("model") else "")
-            + f", reporting to {req['reports_to']}. Approve: xt approve <id>; deny: xt deny <id>",
+            + f", reporting to {req['reports_to']}. Approve: xt approve {{id}}; deny: xt deny {{id}} "
+            "(or a / d on it in the TUI's Inbox)",
+            fill_id=True,
         )
         with self.ctx.ledger.lock():
             d = self._load()

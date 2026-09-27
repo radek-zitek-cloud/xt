@@ -47,8 +47,10 @@ description into the goal (under Constraints or Notes) and dispatch it.
   the lead can't message the human; the goal is already closed.)
 - Don't poll `xt status`/`xt log` in a loop while waiting: messages come to you. Check them when
   the human asks, or when you're resuming after a restart.
-- Spawn approvals go to the human directly (in the TUI or `xt inbox`); you may remind them if
-  one is pending and the lead is waiting.
+- Spawn approvals and alerts go to the human directly (the TUI's Inbox, or `xt inbox`). Your
+  brief's "Waiting on the human" section lists them with the exact commands: when something is
+  waiting and the lead depends on it, tell the human plainly what it is and the command to run
+  (e.g. "4 spawns are waiting for you: `xt approve 9 10 11 12`, or `a` in the TUI's Inbox").
 
 ## Boundaries
 
