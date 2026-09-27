@@ -177,7 +177,9 @@ class XtTui(App):
         self.status = ""
 
     def compose(self) -> ComposeResult:
-        yield Static(id="topbar")
+        topbar = Static(id="topbar")
+        topbar.border_title = "Status"
+        yield topbar
         with Horizontal(id="main"):
             with Vertical(id="left"):
                 for i, title in enumerate(PANELS, start=1):

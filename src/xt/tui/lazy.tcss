@@ -78,10 +78,13 @@ OptionList > .option-list--option-hover {
     padding: 0;
 }
 
+/* Status pane on top: same thin frame as the panels, title in the border, never focused. */
 #topbar {
-    height: 1;
+    height: 3;
     background: ansi_default;
-    padding: 0 1;
+    border: solid ansi_bright_black;
+    border-title-color: ansi_default;
+    padding: 0;
 }
 
 #hints {
