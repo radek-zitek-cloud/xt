@@ -164,3 +164,19 @@ def test_U_starts_every_stopped_agent(ctx):
                 assert name in ctx.herdr.live, name
 
     asyncio.run(run())
+
+
+def test_moving_past_the_ends_of_a_list_does_nothing():
+    async def run():
+        app = XtTui(demo_snapshot)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.press("2")  # Team: 3 rows
+            p = app.panel(2)
+            await pilot.press("k", "up")
+            await pilot.pause()
+            assert p.highlighted == 0  # no wrap to the bottom
+            await pilot.press("j", "j", "j", "j", "down")
+            await pilot.pause()
+            assert p.highlighted == 2 and p.border_subtitle == "3 of 3"  # no wrap to the top
+
+    asyncio.run(run())
