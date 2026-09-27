@@ -44,6 +44,17 @@ class Panel(OptionList):
         n = len(self.rows)
         self.border_subtitle = f"{(self.highlighted or 0) + 1 if n else 0} of {n}"
 
+    # Moving past the first or last item does nothing (Textual's OptionList wraps around by default).
+    def action_cursor_down(self) -> None:
+        if self.highlighted is not None and self.highlighted >= self.option_count - 1:
+            return
+        super().action_cursor_down()
+
+    def action_cursor_up(self) -> None:
+        if self.highlighted is not None and self.highlighted <= 0:
+            return
+        super().action_cursor_up()
+
 
 class Prompt(ModalScreen[str | None]):
     BINDINGS = [Binding("escape", "cancel", show=False)]
