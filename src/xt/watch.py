@@ -65,6 +65,20 @@ def set_expected(ctx: Ctx, name: str, present: bool) -> None:
         f.write_text(json.dumps(sorted(names)))
 
 
+def stopped(ctx: Ctx) -> set[str]:
+    """Agents the human stopped on purpose (`xt stop`, `xt down`, `x` in the TUI) and nobody has
+    started since: not running is what the human wants, so nothing alerts about it."""
+    f = ctx.paths.state / "stopped.json"
+    return set(json.loads(f.read_text())) if f.exists() else set()
+
+
+def set_stopped(ctx: Ctx, name: str, present: bool) -> None:
+    with ctx.ledger.lock():
+        names = stopped(ctx)
+        (names.add if present else names.discard)(name)
+        (ctx.paths.state / "stopped.json").write_text(json.dumps(sorted(names)))
+
+
 class Supervisor:
     def __init__(self, ctx: Ctx, out=print):
         self.ctx = ctx
@@ -122,7 +136,8 @@ class Supervisor:
         goals_open = any(i["type"] == "goal" for i in self.ctx.ledger.open_items())
         lead = team.lead_of_role("lead")
         starting = {j["args"].get("name") for j in Jobs(self.ctx).pending() if j["kind"] in ("start", "spawn")}
-        if lead and goals_open and lead.name not in live and lead.name not in missing and lead.name not in starting:
+        if lead and goals_open and lead.name not in live and lead.name not in missing \
+                and lead.name not in starting and lead.name not in stopped(self.ctx):
             keep.add(f"missing:{lead.name}")
             if self.alerts.raise_(f"missing:{lead.name}", f"{lead.name} is not running but goals are open — `xt up`"):
                 self.say(f"alert: {lead.name} not running, goals open")
@@ -218,17 +233,21 @@ class Supervisor:
         now = self.ctx.ledger.clock()
         open_ids = set()
         waiting = waiting_on_human(self.ctx)
-        for item in self.ctx.ledger.open_items():
+        items = self.ctx.ledger.open_items()
+        # an owner whose item has open subtasks is waiting on its reports, not stuck
+        delegated = {i["goal"] for i in items if i.get("goal") is not None and i["type"] == "task"}
+        for item in items:
             key = str(item["id"])
             open_ids.add(key)
             owner = item["owner"]
-            if owner == HUMAN or owner in queued or item["id"] in waiting:
+            if owner == HUMAN or owner in queued or item["id"] in waiting or item["id"] in delegated:
                 continue
             agent = live.get(owner)
             if agent is None or agent.status not in DELIVERABLE:
                 continue
+            # quiet since the owner last worked on it, or since it opened if it never has
             reported = item.get("last_from_owner")
-            if reported and now - dt.datetime.fromisoformat(reported) < period:
+            if now - dt.datetime.fromisoformat(reported or item["opened"]) < period:
                 continue
             state = nudges.get(key, {"count": 0, "last": None})
             if reported and state["last"] and reported > state["last"]:

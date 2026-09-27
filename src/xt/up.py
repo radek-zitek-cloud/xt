@@ -49,23 +49,26 @@ def up(ctx: Ctx) -> list[str]:
 
 
 def down(ctx: Ctx, keep_supervisor: bool = False) -> list[str]:
-    """Stop the whole team cleanly: every running agent the way `xt stop` does (so the next
-    `xt up` raises no false "crashed" alerts), then the supervisor and its workspace."""
+    """Stop the whole team cleanly: the supervisor and its workspace first (so no tick sees a
+    half-stopped team and raises false alerts), then every running agent the way `xt stop` does
+    (so the next `xt up` raises no false "crashed" alerts)."""
+    from .spawn import stop
+
+    out = []
+    if not keep_supervisor:
+        out += _stop_supervisor(ctx)
+    live = ctx.herdr.agents()
+    agents = [stop(ctx, a.name) for a in ctx.team.agents() if a.kind != "human" and a.name in live]
+    out += agents or ["no agents were running"]
+    return out
+
+
+def _stop_supervisor(ctx: Ctx) -> list[str]:
     import os
     import signal
     import time
 
-    from .spawn import stop
-
     out = []
-    live = ctx.herdr.agents()
-    for a in ctx.team.agents():
-        if a.kind != "human" and a.name in live:
-            out.append(stop(ctx, a.name))
-    if not out:
-        out.append("no agents were running")
-    if keep_supervisor:
-        return out
     pid = watch_pid(ctx)
     if pid:
         os.kill(pid, signal.SIGINT)

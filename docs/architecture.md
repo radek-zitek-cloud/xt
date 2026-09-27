@@ -55,7 +55,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `goals/drafts/*.md`, `goals/<slug>.md`: goal briefs | `state/jobs.json`: Herdr work requested by agents |
 | `members/<name>/`: per-agent notes (`notes.md`) and work files | `state/approvals.json`: hires and schedules waiting for the human |
 | whatever the team produces (e.g. `output/`) | `state/live.json`: the supervisor's latest `agent list` |
-| | `state/alerts.json`, `expected.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
+| | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
 `roles/liaison.md`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
@@ -173,12 +173,14 @@ memory. Agents may read their own brief and their reports' briefs. `xt log` give
 5. **Check agents** and raise alerts once each, clearing them when resolved:
    - an agent blocked (usually an approval prompt in its pane);
    - an expected agent missing (crashed, or closed outside xt);
-   - goals open but the lead not running (and no job starting it).
+   - goals open but the lead not running (no job starting it, and not stopped by the human).
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
-7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
-   gets a `nudge`; after two unanswered nudges the human gets an alert instead. Items waiting on
-   an open question to the human (the question refers to the item, or to a message about it, up to
-   four hops) are not nudged.
+7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item it hasn't worked on for
+   that long (no report or ask about it, no task sent under it; a new item counts from when it
+   opened) gets a `nudge`; after two unanswered nudges the human gets an alert instead. Not nudged:
+   an item with open subtasks (its owner is waiting on its reports, who get nudged themselves), and
+   items waiting on an open question to the human (the question refers to the item, or to a message
+   about it, up to four hops).
 8. **Scheduled wake-ups**: an agent with `wake_every` gets a `wake` message (its `wake_message`)
    when the interval has passed and it's idle with nothing queued, so a wake-up never interrupts
    work. The clock starts when the supervisor first sees the schedule and is kept in
@@ -240,8 +242,8 @@ when Herdr is unreachable. The human's own commands still act directly.
   `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
 - `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM]`.
 - `xt stop <name>` (close without retiring), `xt spawn <name>` (restart), `xt retire <name>`,
-  `xt down` (stop every agent and the supervisor cleanly, so the next `xt up` raises no false
-  "crashed" alerts; `herdr session stop` bypasses xt and does leave them).
+  `xt down` (stop the supervisor, then every agent, cleanly, so neither the last tick nor the next
+  `xt up` raises false alerts; `herdr session stop` bypasses xt and does leave them).
 
 ## Harnesses
 

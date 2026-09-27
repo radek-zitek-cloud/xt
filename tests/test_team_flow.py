@@ -3,6 +3,7 @@ import pytest
 from xt import brief, goals
 from xt.alerts import Alerts
 from xt.context import Ctx
+from xt.dispatch import drain
 from xt.ledger import Ledger
 from xt.paths import XtError
 from xt.spawn import Approvals, decide, request_spawn, retire
@@ -465,3 +466,88 @@ def test_agent_schedule_request_carries_the_window(ctx, monkeypatch):
     ctx.reload_team()
     assert ctx.team.agent("scout").wake_between == "05:00-21:00"
     assert "now woken every 60m, 05:00-21:00" in ctx.herdr.last_prompt("lead")
+
+
+def test_down_stops_the_supervisor_before_the_agents(ctx, monkeypatch):
+    from xt import spawn as spawn_mod
+    from xt import up as up_mod
+    from xt.up import down
+
+    ctx.herdr.add("liaison")
+    order = []
+    monkeypatch.setattr(up_mod, "_stop_supervisor", lambda c: order.append("supervisor") or ["supervisor stopped"])
+    real_stop = spawn_mod.stop
+    monkeypatch.setattr(spawn_mod, "stop", lambda c, n: order.append(n) or real_stop(c, n))
+    out = down(ctx)
+    assert order == ["supervisor", "liaison"] and out == ["supervisor stopped", "stopped liaison"]
+
+
+def test_no_lead_alert_when_the_human_stopped_the_lead_with_goals_open(ctx):
+    from xt.alerts import Alerts
+    from xt.dispatch import send
+    from xt.spawn import stop
+    from xt.up import down
+
+    ctx.herdr.add("liaison")
+    ctx.herdr.add("lead")
+    send(ctx, "human", "lead", "goal", "Keep the newsroom running")
+    down(ctx, keep_supervisor=True)  # agents only; the supervisor keeps ticking
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.tick(now=0)
+    assert "missing:lead" not in Alerts(ctx).active()
+    # a lead that isn't running for any other reason while goals are open still alerts
+    from xt.watch import set_stopped
+
+    set_stopped(ctx, "lead", False)
+    sup.tick(now=3)
+    assert "missing:lead" in Alerts(ctx).active()
+
+
+def test_heartbeat_leaves_a_working_lead_alone(ctx):
+    """Run 5 (#242, #295): the lead was nudged minutes after a goal opened while its tasks ran."""
+    from xt.dispatch import send
+
+    add_member(ctx, "carol")
+    for a in ("liaison", "lead", "carol"):
+        ctx.herdr.add(a)
+    sup = Supervisor(ctx, out=lambda s: None)
+
+    def settle():  # the supervisor delivers what's queued; everyone finishes their turn
+        drain(ctx)
+        for a in ctx.herdr.live.values():
+            a.status = "idle"
+
+    nudges = lambda to: [m for m in ctx.ledger.messages() if m["type"] == "nudge" and m["to"] == to]
+
+    goal, _ = send(ctx, "liaison", "lead", "goal", "Write an article")
+    settle()
+    ctx.ledger.clock.advance(minutes=7)
+    sup.heartbeat(ctx.herdr.agents())
+    assert nudges("lead") == []  # a new goal is not a silent one
+
+    task, _ = send(ctx, "lead", "carol", "task", "Research it", goal["id"])
+    assert ctx.ledger.item(goal["id"])["last_from_owner"] == task["ts"]  # delegating counts
+    settle()
+    ctx.ledger.clock.advance(minutes=40)
+    sup.heartbeat(ctx.herdr.agents())
+    assert nudges("lead") == []  # waiting on carol's open task, not stuck
+    assert len(nudges("carol")) == 1  # the one who is quiet gets the nudge
+
+    send(ctx, "carol", "lead", "done", "Brief ready", task["id"])
+    settle()
+    ctx.ledger.clock.advance(minutes=20)
+    sup.heartbeat(ctx.herdr.agents())
+    assert len(nudges("lead")) == 1  # now the lead really is quiet on its goal
+
+
+def test_heartbeat_still_nudges_a_goal_never_touched(ctx):
+    from xt.dispatch import send
+
+    for a in ("liaison", "lead"):
+        ctx.herdr.add(a)
+    send(ctx, "liaison", "lead", "goal", "Write an article")
+    drain(ctx)
+    ctx.herdr.live["lead"].status = "idle"
+    ctx.ledger.clock.advance(minutes=20)
+    Supervisor(ctx, out=lambda s: None).heartbeat(ctx.herdr.agents())
+    assert any(m["type"] == "nudge" and m["to"] == "lead" for m in ctx.ledger.messages())

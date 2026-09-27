@@ -66,6 +66,10 @@ class Ledger:
         items = snap.setdefault("open", {})
         ref = str(msg["ref"]) if msg.get("ref") is not None else None
         if msg["type"] in OPENING:
+            parent = items.get(ref) if ref else None
+            if parent and msg["from"] == parent["owner"]:
+                # delegating work under a goal is its owner working on it
+                parent["last_activity"] = parent["last_from_owner"] = msg["ts"]
             items[str(msg["id"])] = {
                 "id": msg["id"],
                 "type": msg["type"],

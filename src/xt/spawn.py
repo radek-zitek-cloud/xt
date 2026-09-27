@@ -11,7 +11,7 @@ from .herdr import HerdrError
 from .context import Ctx
 from .paths import XtError
 from .team import ALWAYS, HUMAN, SYSTEM, schedule_text
-from .watch import set_expected
+from .watch import set_expected, set_stopped
 
 PRECEDENCE = """\
 PRECEDENCE: for everything about this team — who you are, who you talk to, how you send and
@@ -69,6 +69,7 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         ctx.herdr.close_workspace(workspace)
         raise
     set_expected(ctx, name, True)
+    set_stopped(ctx, name, False)
     answered += answer_startup_dialogs(ctx, adapter, pane)
     for dialog in answered:
         ctx.ledger.append(SYSTEM, HUMAN, "system", f"answered {a.harness}'s '{dialog}' dialog for {name}")
@@ -310,6 +311,7 @@ def retire_now(ctx: Ctx, requester: str, name: str) -> str:
     """Close the agent's workspace and mark it retired (the human, or the supervisor for a job)."""
     live = ctx.herdr.agents().get(name)
     set_expected(ctx, name, False)
+    set_stopped(ctx, name, False)
     if live:
         ctx.herdr.close_workspace(live.workspace_id)
     ctx.team.set_status(name, "retired")
@@ -323,6 +325,7 @@ def stop(ctx: Ctx, name: str) -> str:
     """Close an agent's workspace without changing the roster (it can be started again)."""
     live = ctx.herdr.agents().get(name)
     set_expected(ctx, name, False)
+    set_stopped(ctx, name, True)
     if not live:
         return f"{name} isn't running"
     ctx.herdr.close_workspace(live.workspace_id)

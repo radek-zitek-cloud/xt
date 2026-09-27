@@ -9,6 +9,25 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-09-27
+
+### Fixed
+
+- **The heartbeat nudged a lead that was working.** A goal whose owner hadn't reported on it yet
+  was nudged at the first heartbeat however new it was, and sending tasks under a goal didn't
+  count as working on it; in the newsroom run the lead was nudged 7–9 minutes into goals whose
+  tasks were running, and spent a turn each time saying so. Now a new item counts from when it
+  opened, a task sent under a goal counts as the owner's activity, and an item with open subtasks
+  isn't nudged at all (the subtasks' owners are, if they go quiet).
+- **`xt down` raised a false "lead is not running but goals are open" alert.** It stopped the
+  agents first and the supervisor last, so a tick in between saw the lead gone. It now stops the
+  supervisor first. An agent the human stopped (`xt stop`, `x`/`X` in the TUI, `xt down
+  --keep-supervisor`) no longer triggers that alert until it's started again.
+
+### Upgrading
+
+- Restart the team (`xt down`, then `xt`) so the supervisor runs the new code. Nothing else changes.
+
 ### Changed
 
 - README rewritten for new readers: what working with a team looks like, how a team works, the
