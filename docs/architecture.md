@@ -1,8 +1,8 @@
 # xt architecture: how it works
 
 What the code does as of **v0.7.0** (2026-09-27), after five real runs with a newsroom team and
-the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); the
-[README](../README.md) is the user's guide.
+the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the
+[user guide](user-guide.md).
 
 ## In one paragraph
 

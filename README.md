@@ -8,7 +8,8 @@ approvals, recovery), so an agent only needs a shell and a prompt.
 
 **Status:** 0.x, early but in daily use (current release: see [CHANGELOG.md](CHANGELOG.md)). The pilot team is a six-agent newsroom that hires its
 own scout, finds stories in RSS feeds every hour, and researches, writes, fact-checks and publishes
-articles. Most runs so far used Codex for every agent. How it works in detail:
+articles. Most runs so far used Codex for every agent. **Using it day to day:
+[docs/user-guide.md](docs/user-guide.md)** (lifecycles and every command); how it works inside:
 [docs/architecture.md](docs/architecture.md).
 
 ![The newsroom pilot team in Herdr: the liaison's pane on the left, asking which story to write next; the xt TUI on the right with goals, team, tasks, inbox, log and a goal brief in the detail pane](docs/screen.png)
@@ -113,6 +114,9 @@ bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
 `xt tui --demo` shows sample data.
 
 ## Commands
+
+The [user guide](docs/user-guide.md#command-reference) describes each one, with its TUI
+equivalent and when you'd use it.
 
 | Command | What it does |
 |---|---|

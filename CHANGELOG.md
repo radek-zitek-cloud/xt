@@ -9,6 +9,20 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.7.1] — 2026-09-27
+
+### Added
+
+- **User guide** ([docs/user-guide.md](docs/user-guide.md)): the typical lifecycles (a new team,
+  the first goal, hiring, day to day, periodic work, changing course, updating, pausing and
+  resuming, when something goes wrong, shrinking the team, memory and recovery, ending a team) and
+  a reference for every command with who uses it, its TUI equivalent and when it's useful. Linked
+  from the README and the architecture doc.
+
+### Upgrading
+
+- Nothing to do: documentation only.
+
 ## [0.7.0] — 2026-09-27
 
 ### Added
