@@ -19,6 +19,7 @@ from .paths import Paths, XtError
 AGENT_TYPES = ("goal", "task", "ask", "report", "done", "note")
 SYSTEM_TYPES = ("alert", "approval", "nudge", "system", "wake")
 OPENING = ("goal", "task")
+HUMAN = "human"  # same as team.HUMAN (not imported, to keep the ledger free of team logic)
 
 
 def now() -> dt.datetime:
@@ -76,8 +77,25 @@ class Ledger:
                 "last_activity": msg["ts"],
                 "last_from_owner": None,
             }
+        elif msg["type"] == "ask" and msg["to"] == HUMAN:
+            # A question for the human stays open (in their Inbox) until they answer it (any
+            # message from them with --ref to it) or the asker closes it with `done`.
+            items[str(msg["id"])] = {
+                "id": msg["id"],
+                "type": "ask",
+                "title": title_of(msg["body"]),
+                "owner": HUMAN,
+                "opener": msg["from"],
+                "goal": None,
+                "about": msg.get("ref"),
+                "opened": msg["ts"],
+                "last_activity": msg["ts"],
+                "last_from_owner": None,
+            }
         elif msg["type"] == "done" and ref in items:
             del items[ref]
+        elif ref in items and items[ref]["type"] == "ask" and msg["from"] == items[ref]["owner"]:
+            del items[ref]  # the human answered
         elif ref in items:
             items[ref]["last_activity"] = msg["ts"]
             if msg["from"] == items[ref]["owner"]:
@@ -119,6 +137,10 @@ class Ledger:
             self._apply(snap, msg)
             self._write_snapshot(snap)
         return msg
+
+    def last_id(self) -> int:
+        with self.lock():
+            return self._read_snapshot().get("seq", 0)
 
     def open_items(self) -> list[dict]:
         with self.lock():

@@ -29,7 +29,7 @@ xt send <to> --as <you> --type <type> [--ref <id>] "text"
 |---|---|
 | `goal` | What the human wants. Only the liaison sends goals, only to the lead. |
 | `task` | A unit of work, sent down to someone who reports to you. Opens a ledger item you own the follow-up of. `--ref <goal id>` ties it to its goal. |
-| `ask` | A question, up or down. |
+| `ask` | A question, up or down. The liaison's `ask` to the human stays **open** in the human's Inbox until the human answers it (their reply has `--ref` to it) or the liaison closes it with `done`. |
 | `report` | Progress, results, answers. Use `--ref` to say what it's about. |
 | `done` | Closes an open goal or task you own. **It is your final report**: put the summary and where the result is in it. `xt done <id> --as <you> "summary"` sends it to the right agent. |
 | `note` | `xt note --as <you> "..."`: records something in the ledger for yourself (a decision, what the human said). Not delivered to anyone. |

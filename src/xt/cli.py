@@ -127,6 +127,19 @@ def cmd_done(args) -> None:
     print(f"#{msg['id']} done for #{args.id} → {to}: {status}")
 
 
+def cmd_answer(args) -> None:
+    ctx = Ctx.load()
+    who = _who(args)
+    item = ctx.ledger.item(args.id)
+    if item is None or item["type"] != "ask":
+        raise XtError(f"#{args.id} is not an open question (see `xt inbox`)")
+    if who != item["owner"]:
+        raise XtError(f"#{args.id} is a question for {item['owner']}, not {who}")
+    body = " ".join(args.body) if args.body else sys.stdin.read()
+    msg, status = send(ctx, who, item["opener"], "report", body, args.id)
+    print(f"#{msg['id']} answer to #{args.id} → {item['opener']}: {status}")
+
+
 def cmd_note(args) -> None:
     ctx = Ctx.load()
     body = " ".join(args.body) if args.body else sys.stdin.read()
@@ -179,7 +192,9 @@ def cmd_status(args) -> None:
 
     q = Queue(ctx).pending()
     jobs = Jobs(ctx).pending()
-    print(f"open goals/tasks: {len(items)} · queued messages: {len(q)} · jobs: {len(jobs)} · "
+    questions = sum(1 for i in items if i["type"] == "ask")
+    print(f"open goals/tasks: {len(items) - questions} · questions for the human: {questions} · "
+          f"queued messages: {len(q)} · jobs: {len(jobs)} · "
           f"pending approvals: {len(Approvals(ctx).pending())} · alerts: {len(Alerts(ctx).active())}")
     if (q or jobs) and not watch_pid(ctx):
         print("the supervisor isn't running: queued messages and jobs wait for it (`xt up`)")
@@ -189,6 +204,12 @@ def cmd_inbox(args) -> None:
     ctx = Ctx.load()
     alerts = Alerts(ctx).active()
     approvals = Approvals(ctx).pending()
+    questions = [i for i in ctx.ledger.open_items() if i["type"] == "ask"]
+    print("Questions for you:")
+    for q in questions:
+        print(f"  #{q['id']} {q['opened'][5:16]} from {q['opener']}: {q['title']}  (xt answer {q['id']} \"...\")")
+    if not questions:
+        print("  (none)")
     print("Alerts:")
     for k, a in alerts.items():
         print(f"  #{a['id']} {a['ts'][5:16]} {a['text']}  (clear: xt clear {k})")
@@ -324,6 +345,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("done", cmd_done, "close an open goal or task you own (reports to whoever opened it)")
     sp.add_argument("id", type=int)
     sp.add_argument("body", nargs="*")
+
+    sp = add("answer", cmd_answer, "answer a question the liaison asked you (see `xt inbox`)")
+    sp.add_argument("id", type=int)
+    sp.add_argument("body", nargs="*", help="your answer (or stdin)")
 
     sp = add("note", cmd_note, "log a note in the ledger for yourself (not delivered to anyone)")
     sp.add_argument("--ref", type=int, help="goal/task/message id this is about")

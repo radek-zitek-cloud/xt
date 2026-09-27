@@ -9,6 +9,38 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-27
+
+### Added
+
+- **Questions for the human.** The liaison sends every decision it needs as
+  `xt send human --type ask --ref <what it's about>`. It becomes an open item owned by the human:
+  first in the TUI's Inbox (with how long it has waited), in `xt inbox`, in `xt status`, and in the
+  "Waiting on the human" section of the liaison's **and the lead's** brief. The human answers with
+  `xt answer <id> "..."` or `s` on it in the TUI; the answer reaches the liaison as a report with
+  `--ref` to the question, which closes it. The liaison closes a question itself (`xt done`) when
+  the human answered in its pane or the question is superseded.
+- **No nudges while waiting on the human.** The heartbeat leaves alone any open item that an open
+  question refers to (directly, or through the messages it is about).
+- **Notifications.** The supervisor runs a command for each new question, approval request and
+  alert for the human: `[notify]` in `team.toml` with `enabled`, `command` (default
+  `notify-send --app-name=xt {title} {body}`; any command with `{title}`/`{body}`, e.g.
+  `curl -s -d {body} ntfy.sh/<topic>` for a phone) and an optional `quiet` window such as
+  `"21:00-07:00"`.
+- Liaison and lead roles and the protocol describe questions.
+
+### Changed
+
+- The lead's brief now includes "Waiting on the human", so it knows what's pending and since when.
+
+### Upgrading
+
+- Restart the team (`xt down`, then `xt`) so the supervisor runs the new code and the liaison and
+  lead get their updated roles.
+- Notifications are on by default with `notify-send`. To change or silence them, add a `[notify]`
+  section to `team.toml` (new teams get one from `xt init`), e.g. `quiet = "21:00-07:00"` or
+  `enabled = false`.
+
 ## [0.2.0] — 2026-09-27
 
 ### Added

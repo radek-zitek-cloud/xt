@@ -14,7 +14,7 @@ from .. import __version__
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
-HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send · f jump · u/U start · x/X stop · h help · q quit"
+HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send/answer · f jump · u/U start · x/X stop · h help · q quit"
 
 
 class Panel(OptionList):
@@ -122,7 +122,7 @@ class Help(ModalScreen[None]):
         ("X", "stop every running agent (asks y/n; the supervisor keeps running)"),
         ("f", "switch Herdr to the selected agent's workspace"),
         ("Anywhere", ""),
-        ("s", "send a message to the liaison"),
+        ("s", "answer the question selected in Inbox; anywhere else: send a message to the liaison"),
         ("r", "refresh now (it also refreshes every 2 s)"),
         ("h / ?", "this help"),
         ("q", "quit"),
@@ -327,18 +327,28 @@ class XtTui(App):
             self.refresh_data()
 
     def action_send(self) -> None:
+        """s: answer the question selected in the Inbox, otherwise send a message to the liaison."""
         if not self._need_live():
             return
+        row = self._selected("question")
+        question = row.data if row else None
 
         def done(text: str | None) -> None:
             if text and text.strip():
                 try:
-                    self.set_status(self.actions.send_to_liaison(text))
+                    if question:
+                        self.set_status(self.actions.answer(question["id"], text))
+                    else:
+                        self.set_status(self.actions.send_to_liaison(text))
                 except Exception as e:
                     self.set_status(f"send failed: {e}")
                 self.refresh_data()
 
-        self.push_screen(Prompt("Send to the liaison", "enter send · esc cancel"), done)
+        if question:
+            self.push_screen(Prompt(f"Answer question #{question['id']} from {question['opener']}",
+                                    "enter send · esc cancel"), done)
+        else:
+            self.push_screen(Prompt("Send to the liaison", "enter send · esc cancel"), done)
 
     def _run_bg(self, label: str, fn) -> None:
         """Run a slow action (starting agents takes seconds) without freezing the screen."""
@@ -463,6 +473,16 @@ class LiveActions:
             raise RuntimeError("no liaison in team.toml")
         msg, status = send(self.ctx, HUMAN, liaison.name, "ask", text)
         return f"#{msg['id']} to {liaison.name}: {status}"
+
+    def answer(self, qid: int, text: str) -> str:
+        from ..dispatch import send
+        from ..team import HUMAN
+
+        item = self.ctx.ledger.item(qid)
+        if item is None or item["type"] != "ask":
+            raise RuntimeError(f"#{qid} is no longer an open question")
+        msg, status = send(self.ctx, HUMAN, item["opener"], "report", text, qid)
+        return f"#{msg['id']} answer to #{qid} → {item['opener']}: {status}"
 
     def jump(self, workspace_id: str) -> None:
         self.ctx.herdr.focus_workspace(workspace_id)

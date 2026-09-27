@@ -47,7 +47,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
         out.append(f"- {a.name} ({a.role}, {a.harness}{model}, reports to {a.reports_to}{wakes}): {state}")
 
-    items = ctx.ledger.open_items()
+    items = [i for i in ctx.ledger.open_items() if i["type"] != "ask"]  # questions: see below
     if name and name not in (HUMAN,) and ctx.team.agent(name) and ctx.team.agent(name).role not in ("lead", "liaison"):
         items = [i for i in items if i["owner"] == name or i["opener"] == name]
     out.append(f"\n## Open goals and tasks ({len(items)})")
@@ -66,7 +66,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         out += [f"- {d.relative_to(ctx.paths.root)}" for d in drafts] or ["(none)"]
 
     agent = ctx.team.agent(name) if name else None
-    if name is None or name == HUMAN or (agent and agent.role == "liaison"):
+    if name is None or name == HUMAN or (agent and agent.role in ("liaison", "lead")):
         out += waiting_on_human(ctx)
 
     recent = [m for m in ctx.ledger.messages(since_days=1)]
@@ -89,7 +89,18 @@ def waiting_on_human(ctx: Ctx) -> list[str]:
 
     approvals = Approvals(ctx).pending()
     alerts = Alerts(ctx).active()
-    out = [f"\n## Waiting on the human ({len(approvals)} approvals, {len(alerts)} alerts)"]
+    questions = [i for i in ctx.ledger.open_items() if i["type"] == "ask"]
+    now = ctx.ledger.clock()
+    out = [f"\n## Waiting on the human ({len(questions)} questions, {len(approvals)} approvals, "
+           f"{len(alerts)} alerts)"]
+    for q in questions:
+        about = f" (about #{q['about']})" if q.get("about") is not None else ""
+        out.append(f"- question #{q['id']} from {q['opener']}{about}, waiting {_age(q['opened'], now)}: {q['title']}")
+    if questions:
+        out.append("  → the human answers with `xt answer <id> \"...\"` (or `s` on it in the TUI's Inbox); "
+                   "the answer reaches the asker as a report with --ref to the question. If the human "
+                   "answers some other way, or the question is no longer needed, the asker closes it: "
+                   "`xt done <id> --as <asker> \"why\"`. Work that waits on an open question is not nudged.")
     for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
         what = (f"wake {r['name']} every {r['every']}" if r.get("kind") == "schedule"
                 else f"spawn {r['name']} ({r['role']}, {r['harness']})")
@@ -100,6 +111,6 @@ def waiting_on_human(ctx: Ctx) -> list[str]:
                    f"or denies with `xt deny <id>`")
     for key, a in sorted(alerts.items(), key=lambda kv: kv[1].get("id", 0)):
         out.append(f"- alert: {a['text']}  (clear: `xt clear {key}`, or `c` in the TUI's Inbox)")
-    if not approvals and not alerts:
+    if not approvals and not alerts and not questions:
         out.append("(nothing)")
     return out

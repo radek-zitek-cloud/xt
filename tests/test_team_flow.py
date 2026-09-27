@@ -240,8 +240,10 @@ def test_approval_message_carries_its_real_id_and_the_liaison_sees_it(ctx):
     for rid in ids:
         assert f"xt approve {rid}" in msgs[rid]["body"] and "<id>" not in msgs[rid]["body"]
     b = brief.build(ctx, "liaison")
-    assert "Waiting on the human (2 approvals" in b and f"xt approve {' '.join(ids)}" in b
-    assert "Waiting on the human" not in brief.build(ctx, "lead")
+    assert "Waiting on the human (0 questions, 2 approvals" in b and f"xt approve {' '.join(ids)}" in b
+    assert "Waiting on the human" in brief.build(ctx, "lead")  # so it knows what's pending
+    add_member(ctx, "carol")
+    assert "Waiting on the human" not in brief.build(ctx, "carol")
 
 
 def test_approve_several_ids_at_once(ctx, monkeypatch, capsys):

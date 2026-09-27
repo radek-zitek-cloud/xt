@@ -10,6 +10,7 @@ HUMAN = "human"
 SYSTEM = "xt"
 
 LOG_DEFAULTS = {"raw_days": 30, "delete_after_days": 0, "daily_alert_mb": 5, "message_max_kb": 4}
+NOTIFY_DEFAULTS = {"enabled": True, "command": "notify-send --app-name=xt {title} {body}", "quiet": ""}
 POLICY_DEFAULTS = {"spawn_approval": True, "max_agents": 8, "heartbeat_minutes": 15,
                    "schedule_approval": True, "min_wake_minutes": 15}
 
@@ -58,6 +59,9 @@ class Team:
 
     def policy(self, key: str):
         return self.doc.get("policy", {}).get(key, POLICY_DEFAULTS[key])
+
+    def notify_setting(self, key: str):
+        return self.doc.get("notify", {}).get(key, NOTIFY_DEFAULTS[key])
 
     def log_setting(self, key: str):
         return self.doc.get("log", {}).get(key, LOG_DEFAULTS[key])
@@ -181,6 +185,11 @@ raw_days = 30                     # keep daily jsonl files uncompressed this lon
 delete_after_days = 0             # 0 = never delete archived logs
 daily_alert_mb = 5                # supervisor alerts above this (probable message loop)
 message_max_kb = 4                # larger payloads go in files, referenced by path
+
+[notify]                          # the supervisor tells the human about questions, approvals and alerts
+enabled = true
+command = "notify-send --app-name=xt {{title}} {{body}}"   # e.g. "curl -s -d {{body}} ntfy.sh/<topic>"
+quiet = ""                        # local-time window with no notifications, e.g. "21:00-07:00"
 
 [defaults]                        # used when xt starts these without an explicit choice
 liaison = {{ {harness_line(liaison)} }}

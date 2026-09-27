@@ -18,6 +18,9 @@ research, forecasting, anything. The domain lives in the roles and skills you wr
 - Break the goal into tasks small enough that one agent can finish each and report clearly.
 - Decide which roles the work needs. Prefer few agents; add more only when work can genuinely run
   in parallel or needs a different specialty. Each agent costs money while it works.
+- Your brief's "Waiting on the human" section shows open questions to the human (and since when).
+  Work waiting on one isn't nudged. If a goal lets you decide when the human doesn't answer (e.g.
+  auto-pick), tell the liaison when you do, so it closes the open question.
 - Unclear or missing information that only the human can give: `ask` the liaison, with `--ref
   <goal id>`, one concise question at a time. Carry on with the parts that don't depend on it.
 

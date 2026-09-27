@@ -123,6 +123,23 @@ class Clock:
         self.t += dt.timedelta(**kw)
 
 
+class NotifyRecorder(list):
+    """Stands in for the desktop notify command, so tests never pop real notifications."""
+
+    def __call__(self, argv):
+        self.append(argv)
+        return None
+
+
+@pytest.fixture(autouse=True)
+def notifications(monkeypatch):
+    from xt import watch
+
+    rec = NotifyRecorder()
+    monkeypatch.setattr(watch, "run_notify", rec)
+    return rec
+
+
 @pytest.fixture(autouse=True)
 def all_harnesses_installed(monkeypatch):
     monkeypatch.setattr(Adapter, "installed", property(lambda self: True))

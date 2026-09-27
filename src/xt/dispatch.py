@@ -166,6 +166,8 @@ def done_recipient(team: Team, sender: str, item: dict) -> str:
     """Whoever opened the item, if the sender may message them; otherwise up the sender's chain
     (e.g. a goal the human dispatched directly: the lead reports done to the liaison)."""
     opener = item["opener"]
+    if item["type"] == "ask" and sender == opener:
+        return item["owner"]  # the asker withdraws its question: tell the human
     if sender == HUMAN or may_send(team, sender, opener, "done"):
         return opener
     s = team.agent(sender)
@@ -198,8 +200,9 @@ def send(
             raise XtError("a done message needs --ref <open goal or task id>")
         item = ctx.ledger.item(ref)
         if item is None:
-            raise XtError(f"#{ref} is not an open goal or task")
-        if item["owner"] != sender and sender != HUMAN:
+            raise XtError(f"#{ref} is not an open goal, task or question")
+        asker = item["type"] == "ask" and item["opener"] == sender
+        if item["owner"] != sender and sender != HUMAN and not asker:
             raise XtError(f"#{ref} is owned by {item['owner']}, not {sender}")
         expected = done_recipient(ctx.team, sender, item)
         if to != expected and sender != HUMAN:
@@ -214,6 +217,23 @@ def send(
         close_leftover_tasks(ctx, ref)
     status = deliver_or_queue(ctx, msg) if deliver else "logged"
     return msg, status
+
+
+def waiting_on_human(ctx: Ctx) -> dict[int, int]:
+    """Open items that wait on an open question to the human: {item id: question id}. A question
+    counts for the item it refers to and for what that message refers to, a few hops up (the
+    liaison asks about the lead's report, which is about a goal)."""
+    out: dict[int, int] = {}
+    items = ctx.ledger.open_items()
+    open_ids = {i["id"] for i in items}
+    for q in (i for i in items if i["type"] == "ask"):
+        ref, hops = q.get("about"), 0
+        while ref is not None and hops < 4:
+            if ref in open_ids:
+                out.setdefault(ref, q["id"])
+            m = ctx.ledger.message(ref)
+            ref, hops = (m.get("ref") if m else None), hops + 1
+    return out
 
 
 def close_leftover_tasks(ctx: Ctx, goal_id: int) -> list[int]:

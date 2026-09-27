@@ -63,6 +63,7 @@ come from upstream and aren't edited by the team, so upstream merges rarely conf
 [team]      name, session (the Herdr session this team lives in)
 [policy]    spawn_approval, max_agents, heartbeat_minutes, schedule_approval, min_wake_minutes
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
+[notify]    enabled, command (e.g. "notify-send --app-name=xt {title} {body}"), quiet (e.g. "21:00-07:00")
 [defaults]  liaison / lead harness (and optional model)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
             wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"; set with `xt schedule`)
@@ -137,7 +138,9 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
 ## The ledger and recovery
 
 The message log is the ledger. Every message gets a sequential id; `goal`/`task` open an item with
-an owner; `done` closes it. `state/ledger.json` keeps the open items and can be rebuilt from the
+an owner; `done` closes it. An `ask` to the human (only the liaison can send one) opens a
+**question** owned by the human: it closes when the human replies with `--ref` to it (`xt answer`,
+or `s` in the TUI) or when the asker withdraws it with `done` (answered in the pane, or superseded). `state/ledger.json` keeps the open items and can be rebuilt from the
 log, so rotation never loses them. Logs are gzipped after 30 days and never deleted by default.
 
 `xt brief [--as name]` summarises the team, live state, open work, drafts, and recent messages in
@@ -167,8 +170,14 @@ briefs. `xt log` gives the full history.
    prompted. An optional `wake_between` window (local time, may wrap midnight) limits wake-ups to
    those hours; an agent that became due outside it gets a single wake-up when the window opens.
 8. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
-   gets a `nudge`; after two unanswered nudges the human gets an alert instead.
-9. **Rotation**, hourly.
+   gets a `nudge`; after two unanswered nudges the human gets an alert instead. Items waiting on
+   an open question to the human (the question refers to the item, or to a message about it, up to
+   four hops) are not nudged.
+9. **Notifications**: each new question, approval request or alert for the human runs the
+   `[notify]` command (default `notify-send`; any command with `{title}`/`{body}`, e.g. an ntfy
+   `curl`), except inside the `quiet` window. Counting starts when the supervisor first runs; what
+   arrives in quiet hours stays in the Inbox without a notification.
+10. **Rotation**, hourly.
 
 It **alerts, it never repairs**: no automatic restarts. A crash is a bug to look at.
 
@@ -198,8 +207,8 @@ when Herdr is unreachable. The human's own commands still act directly.
   legitimate).
 - `xt status`: roster × live state, open items, queue, jobs, approvals, alerts; warns if the
   supervisor isn't running.
-- `xt inbox`: alerts, pending approvals, messages to the human. `xt approve|deny <id>`,
-  `xt clear <alert>`.
+- `xt inbox`: questions for the human, alerts, pending approvals, messages to the human.
+  `xt answer <id> "..."`, `xt approve|deny <id>`, `xt clear <alert>`.
 - `xt stop <name>` (close without retiring), `xt spawn <name>` (restart), `xt retire <name>`,
   `xt down` (stop every agent and the supervisor cleanly, so the next `xt up` raises no false
   "crashed" alerts; `herdr session stop` bypasses xt and does leave them).
@@ -207,9 +216,9 @@ when Herdr is unreachable. The human's own commands still act directly.
   2 s. Five panels: **Goals** (open first, with task progress; detail shows the tasks and the goal
   brief), **Team** (live state; detail shows open work, recent messages and the last lines of the
   agent's screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox**
-  (pending spawn approvals, alerts, messages to the human), **Log** (newest first). Keys: `a`/`d`
+  (open questions first, then pending approvals, alerts, messages to the human), **Log** (newest first). Keys: `a`/`d`
   approve or deny the selected spawn (the detail pane shows the role brief the lead wrote; the spawn
-  runs in the background), `c` clears an alert, `s` messages the liaison, `f` switches Herdr to the
+  runs in the background), `c` clears an alert, `s` answers the selected question (anywhere else: messages the liaison), `f` switches Herdr to the
   selected agent's workspace, `u` starts the selected stopped agent, `U` starts every stopped
   agent, `x` stops the selected agent (it stays in the roster), `X` stops every running agent, `enter` reads the detail pane,
   `h`/`?` help. The team summary and the last action's result are on the top line; the bottom

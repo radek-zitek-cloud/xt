@@ -54,7 +54,8 @@ notes) is committed in your repo.
 | `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00]` | Wake an agent periodically when idle (e.g. a monitor), optionally only within local-time hours |
 | `xt down` | Stop every running agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, open work, queue, approvals, alerts |
-| `xt inbox` | What needs you: alerts, spawn approvals, messages to the human |
+| `xt inbox` | What needs you: questions, alerts, approvals, messages to the human |
+| `xt answer <id> "..."` | Answer a question the liaison asked you (or `s` on it in the TUI's Inbox) |
 | `xt approve <id>` / `xt deny <id>` | Decide a spawn the lead asked for |
 | `xt send <to> --type <t> "..."` | Send a message (agents add `--as <name>`) |
 | `xt done <id> "..."` | Close an open goal/task |

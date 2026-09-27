@@ -6,11 +6,14 @@ It alerts, it never repairs: a crashed agent is a bug to look at, not something 
 import datetime as dt
 import json
 import os
+import shlex
+import shutil
+import subprocess
 import time
 
 from .alerts import Alerts
 from .context import Ctx
-from .dispatch import Queue, drain, send
+from .dispatch import Queue, drain, send, waiting_on_human
 from .herdr import DELIVERABLE
 from .jobs import Jobs, run_pending
 from .paths import XtError
@@ -18,6 +21,18 @@ from .team import HUMAN, SYSTEM, in_window, parse_interval, schedule_text
 
 TICK = 3
 NUDGES_BEFORE_ALERT = 2
+NOTIFY_TYPES = {"ask": "question from {from_}", "approval": "approval needed", "alert": "alert"}
+
+
+def run_notify(argv: list[str]) -> str | None:
+    """Run the notify command; returns an error text, or None when it worked."""
+    if shutil.which(argv[0]) is None:
+        return f"{argv[0]} not found"
+    try:
+        r = subprocess.run(argv, capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return str(e)
+    return None if r.returncode == 0 else (r.stderr.strip() or f"exit {r.returncode}")[:200]
 
 
 def pid_alive(pid: int) -> bool:
@@ -58,6 +73,7 @@ class Supervisor:
         self.last_heartbeat = 0.0
         self.last_rotate = 0.0
         self.nudges_path = ctx.paths.state / "nudges.json"
+        self.notify_error: str | None = None
 
     def say(self, text: str) -> None:
         self.out(f"{dt.datetime.now():%H:%M:%S} {text}")
@@ -77,6 +93,7 @@ class Supervisor:
             self.last_heartbeat = now
             self.heartbeat(live)
         self.wake_scheduled(live, now)
+        self.notify_human(now)
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
             for line in self.ctx.ledger.rotate(
@@ -157,6 +174,40 @@ class Supervisor:
         if changed:
             path.write_text(json.dumps(last))
 
+    def notify_human(self, now: float) -> None:
+        """Tell the human, outside the notify quiet window, about each new question, approval
+        request and alert addressed to them. Counting starts when the supervisor first runs, so an
+        old backlog never floods the desktop; what arrives in quiet hours is not sent later (it's
+        in the Inbox)."""
+        path = self.ctx.paths.state / "notified.json"
+        seq = self.ctx.ledger.last_id()
+        if not path.exists():
+            path.write_text(json.dumps({"last": seq}))
+            return
+        last = json.loads(path.read_text()).get("last", 0)
+        if seq <= last:
+            return
+        team = self.ctx.team
+        quiet = team.notify_setting("quiet")
+        send_now = bool(team.notify_setting("enabled")) and not (
+            quiet and in_window(quiet, dt.datetime.fromtimestamp(now)))
+        if send_now:
+            for m in self.ctx.ledger.messages(since_days=1):
+                if m["id"] <= last or m["to"] != HUMAN or m["type"] not in NOTIFY_TYPES:
+                    continue
+                title = f"xt {team.name}: " + NOTIFY_TYPES[m["type"]].format(from_=m["from"])
+                body = " ".join(m["body"].split())
+                body = body if len(body) <= 180 else body[:179] + "…"
+                argv = [part.replace("{title}", title).replace("{body}", body)
+                        for part in shlex.split(str(team.notify_setting("command")))]
+                err = run_notify(argv) if argv else "empty notify command"
+                if err and err != self.notify_error:
+                    self.say(f"notification failed: {err} ([notify] in team.toml)")
+                elif not err:
+                    self.say(f"notified the human about #{m['id']}")
+                self.notify_error = err
+        path.write_text(json.dumps({"last": seq}))
+
     def _nudges(self) -> dict:
         return json.loads(self.nudges_path.read_text()) if self.nudges_path.exists() else {}
 
@@ -166,11 +217,12 @@ class Supervisor:
         period = dt.timedelta(minutes=int(self.ctx.team.policy("heartbeat_minutes")))
         now = self.ctx.ledger.clock()
         open_ids = set()
+        waiting = waiting_on_human(self.ctx)
         for item in self.ctx.ledger.open_items():
             key = str(item["id"])
             open_ids.add(key)
             owner = item["owner"]
-            if owner == HUMAN or owner in queued:
+            if owner == HUMAN or owner in queued or item["id"] in waiting:
                 continue
             agent = live.get(owner)
             if agent is None or agent.status not in DELIVERABLE:

@@ -210,8 +210,27 @@ def build(ctx: Ctx) -> Snapshot:
                                                    (f"  {age}", "yellow") if is_open else ("  ✓", "green")),
                              detail, "task", {"id": t["id"]}))
 
-    # Inbox: what needs the human
+    # Inbox: what needs the human; questions first, they're the only thing only the human can answer
     inbox_rows = []
+    questions = [i for i in open_items.values() if i["type"] == "ask"]
+    for q in questions:
+        def qdetail(q=q):
+            out = Text()
+            out.append(f"Question #{q['id']} from {q['opener']} · waiting {_age(q['opened'], now)}\n", style="bold yellow")
+            m = next((m for m in msgs if m["id"] == q["id"]), None)
+            out.append((m["body"] if m else q["title"]) + "\n")
+            out.append(f"\ns: answer (goes to {q['opener']}) · or answer in {q['opener']}'s pane\n", style="bright_black")
+            if q.get("about") is not None:
+                about = next((m for m in msgs if m["id"] == q["about"]), None)
+                if about:
+                    out.append(_heading(f"about #{q['about']}"))
+                    out.append_text(_msg_block(about))
+            return out
+
+        inbox_rows.append(Row(f"question:{q['id']}", _t(("? ", "bold yellow"), f"#{q['id']} {q['opener']}: ",
+                                                        _first_line(q["title"], 44),
+                                                        (f"  {_age(q['opened'], now)}", "yellow")),
+                              qdetail, "question", {"id": q["id"], "opener": q["opener"]}))
     for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
         if r.get("kind") == "schedule":
             def sdetail(rid=rid, r=r):
@@ -257,7 +276,8 @@ def build(ctx: Ctx) -> Snapshot:
 
         inbox_rows.append(Row(f"alert:{key}", _t(("⚠ ", "red"), _first_line(al["text"], 60)), detail, "alert",
                               {"key": key}))
-    to_human = [m for m in msgs if m["to"] == HUMAN and m["type"] not in ("system", "alert", "approval")][-10:]
+    to_human = [m for m in msgs if m["to"] == HUMAN and m["type"] not in ("system", "alert", "approval")
+                and m["id"] not in open_items][-10:]
     for m in reversed(to_human):
         inbox_rows.append(Row(f"msg:{m['id']}", _t(("✉ ", "cyan"), f"#{m['id']} {m['from']}: ",
                                                    _first_line(m["body"], 50)),
@@ -270,7 +290,8 @@ def build(ctx: Ctx) -> Snapshot:
                             lambda m=m: _msg_block(m), "message", {"id": m["id"]}))
 
     running = sum(1 for n in live if ctx.team.agent(n))
-    summary = (f"{ctx.team.name} · {running} running · {len(open_items)} open · "
+    summary = (f"{ctx.team.name} · {running} running · {len(open_items) - len(questions)} open · "
+               f"{len(questions)} question{'s' if len(questions) != 1 else ''} · "
                f"{len(approvals)} approval{'s' if len(approvals) != 1 else ''} · {len(alerts)} alert"
                f"{'s' if len(alerts) != 1 else ''} · {len(queued)} queued · {len(jobs)} jobs")
     return Snapshot(

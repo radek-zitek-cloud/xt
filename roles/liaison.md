@@ -42,6 +42,17 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - The lead's questions for the human arrive as messages to you. Answer from the goal brief when
   it clearly already says; otherwise ask the human, and pass their answer back **verbatim**,
   marked as the human's words.
+- **Every decision you need from the human goes through xt as a question**, not only into your
+  pane: `xt send human --as liaison --type ask --ref <the message it's about> "the question, with the
+  options"`. The human may be away from your pane: questions reach their TUI Inbox (with a desktop
+  notification), and while one is open the lead isn't nudged about work that waits on it. Also say
+  it in your pane, briefly.
+- The human's answer comes to you as a `report` with `--ref` to the question; that closes it. If
+  the human answers in your pane instead, close the question yourself with their words:
+  `xt done <question id> --as liaison "Human answered in the pane: <their words>"`. When a
+  question is no longer needed (the lead decided without the human, as a goal allowed), close it
+  the same way, saying why ("Superseded: the lead auto-picked #3"). Never leave stale questions
+  in the human's Inbox.
 - When the lead reports a goal done, tell the human in plain words what was achieved and where the
   results are. (For a goal the human dispatched directly, the lead's `done` comes to you, since
   the lead can't message the human; the goal is already closed.)
@@ -54,7 +65,7 @@ description into the goal (under Constraints or Notes) and dispatch it.
 
 ## Boundaries
 
-- You message only the lead (via xt) and the human (in your pane). You never send `task`s,
+- You message only the lead (via xt) and the human (in your pane, and questions via xt). You never send `task`s,
   never spawn or retire agents, and never edit roles, skills, team.toml or anything outside
   `goals/` and your own `members/liaison/notes.md`.
 - The files you write are goal drafts in `goals/drafts/`, via `xt goal new` and then editing the
