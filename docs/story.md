@@ -2,7 +2,7 @@
 
 xt is two days old. It started as a question on a Friday evening in September 2026 and, by
 Sunday night, it ran a small newsroom of AI agents that finds its own stories, fact-checks them
-and publishes them, and it was about to get a product team of its own. This is how that happened,
+and publishes them, and a product team that manages xt's own backlog in public. This is how that happened,
 including the parts that went wrong, because those taught us the most.
 
 "We" is Radek, who had the idea and made the decisions, and Claude (Claude Code), which wrote the
@@ -129,12 +129,52 @@ friction with the tooling itself. xt went from 0.1.0 to 0.7.1 in eight releases.
   haven't carried a real team yet. Nothing shows yet what a team costs to run. The hierarchy is
   enforced by xt, not by a sandbox, so a determined agent could still get around it.
 
-## What's next: a team that manages the product it runs on
+## A team that manages the product it runs on (27 September, evening)
 
-The next team is an xt **product team**: a product manager first, then a researcher, a technical
-writer and a QA tester. It manages xt's own backlog on a Kanban board, writes specs, research and
-release notes in a public wiki, and tests each release by following the user guide. It never
-touches the code: Radek and Claude build what it specifies.
+The next team is an xt **product team**. It runs product management for xt itself: the backlog
+on a Kanban board (Fizzy), specs, research, docs and planning notes in a public wiki
+(SilverBullet), and eventually QA. It never touches the code or any machine: Radek is the product
+owner and decides, and Radek and Claude build what the team specifies. The goal that set it up
+passed on a working method, not just a task: who decides, what "ready" and "done" mean, how to
+size and order work. (The goal is quoted in full in [Goals in practice](examples.md).)
+
+**The first eleven minutes.** The lead wrote the product manager's role and the board and wiki
+conventions, and asked to hire one PM. Radek approved. The PM set up five columns (with a single
+approval point only Radek can move work past, and a column where finished work waits for his
+acceptance), structured the public wiki, and migrated the whole backlog: **36 items, rewritten
+for outside readers**. We checked all 36 cards afterwards: not one mentions a local path, a
+machine name or another team, although the source notes did. Along the way the PM proposed xt's
+one-line direction, and Radek confirmed it:
+
+> *"xt is for coordinating accountable AI agent teams across harnesses, not for replacing the
+> tools those agents use to do their work."*
+
+It now heads the [public space](https://sb.zvikov.zitek.cloud/xt-space).
+
+**The friction loop worked on day one.** Two hours after xt started asking agents to report what
+got in their way, the PM's reports carried `Friction:` lines nobody asked for: a missing folder,
+a command-line tool returning a different data shape than its own documentation said. It also
+reported the board tool's limits (tags only exist once used; no command to reorder cards)
+instead of working around them silently.
+
+**And two things we didn't expect.**
+
+- **The PM used the computer.** Asked whether the board could show the backlog in order, and
+  finding no command for it, the PM used Codex's computer-use tool: it took screenshots of the
+  board in Radek's own browser and tried the web UI's sort options. It only looked, and it found
+  the answer. But a browser logged in as Radek is outside everything xt enforces: one click could
+  have moved a card past the approval point that only he may pass, and each screenshot showed his
+  whole screen. The same evening the team got a standing rule (command-line tools only; ask the
+  human for anything that needs a UI), and xt's backlog got a card to switch those tools off for
+  agents by default.
+- **A question that never arrived.** The liaison drafted the next goal and asked Radek whether to
+  send it, but only in its own terminal pane, not as an xt question. Nothing reached his inbox,
+  so the whole team sat idle for about ten minutes until he wondered why. Another card.
+
+Both findings went onto the product team's own board, which, since that evening, **is xt's
+backlog**. The team's first real assignment followed: a discovery into what an xt team costs to
+run and how full each agent's context is, starting from where each harness exposes that
+information.
 
 You can watch it work in its public space: **[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**.
 This page will grow as that story unfolds.

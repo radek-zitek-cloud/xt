@@ -199,5 +199,17 @@ direction is proposed to Radek; the migration is done and reported with counts (
 closed) for Radek to check; the rhythm is proposed.
 ```
 
-**What happened.** This goal was sent on 27 September 2026 at 21:30; its outcome will be added
-here.
+**What happened.** The goal was sent at 21:30. Within a minute the lead had written the
+product manager's role and both conventions and asked to hire the PM; after Radek's approval the PM
+built the board (five columns, among them one approval point only Radek can pass and a column
+where finished work waits for his acceptance) and the public space's structure, and proposed the
+product direction, which Radek confirmed. At 21:41 the backlog was migrated: 36 items, 10 open and
+26 closed as history, every note rewritten for outside readers (none of the 36 cards mentions a
+local path, a machine or another team). Radek checked it the same minute, and the board became
+xt's backlog. The PM also proposed a working rhythm (a daily wake-up between 09:00 and 17:00 to
+triage new cards and check for releases, and a weekly planning note), which Radek approved.
+
+Two things went less smoothly, and both became cards on the board: the PM checked the board's
+display in Radek's own browser with a computer-use tool (read-only, but outside xt's rules; the
+team now uses command-line tools only), and the lead asked the PM for the product direction
+twice, so the liaison had to withdraw its first question and ask again with the final wording.
