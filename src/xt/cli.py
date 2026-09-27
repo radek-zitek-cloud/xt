@@ -40,7 +40,10 @@ def cmd_default(args) -> None:
         if not paths.team_toml.exists():
             return
     cmd_up(args)
-    print("\n(the TUI isn't built yet — use `xt status`, `xt inbox`, and talk to the liaison in its Herdr pane)")
+    if sys.stdin.isatty():
+        from .tui.app import run_live
+
+        run_live()
 
 
 def cmd_init(args) -> None:
@@ -211,11 +214,14 @@ def cmd_watch(args) -> None:
 
 
 def cmd_tui(args) -> None:
-    if not args.demo:
-        raise XtError("the TUI is a look-and-feel spike so far — try `xt tui --demo`; use `xt status` and `xt inbox`")
-    from .tui.app import run_demo
+    from .tui.app import run_demo, run_live
 
-    run_demo()
+    if args.demo:
+        run_demo()
+        return
+    if not sys.stdin.isatty():
+        raise XtError("the TUI needs a terminal")
+    run_live()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -303,7 +309,7 @@ def build_parser() -> argparse.ArgumentParser:
         gp.add_argument("--as", dest="as_", metavar="NAME", default=argparse.SUPPRESS)
 
     add("watch", cmd_watch, "run the supervisor (xt up starts it in its own pane)")
-    sp = add("tui", cmd_tui, "the lazygit-style overview (spike: --demo)")
+    sp = add("tui", cmd_tui, "the lazygit-style overview of the team (--demo: static sample data)")
     sp.add_argument("--demo", action="store_true", help="show the look-and-feel spike with demo data")
     return p
 

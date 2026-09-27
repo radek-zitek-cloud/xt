@@ -8,8 +8,8 @@ supervisor, recovery), so agents only need a shell and a prompt.
 
 **How it works:** [docs/architecture.md](docs/architecture.md).
 
-**Status:** early build (v0.1). CLI, dispatcher, ledger, supervisor, and roles are in place; the
-lazygit-style TUI is next. Design and history live in the lab repo (`cross-talk/design.md`).
+**Status:** early build (v0.1). CLI, dispatcher, ledger, supervisor, roles and the lazygit-style
+TUI are in place. Design and history live in the lab repo (`cross-talk/design.md`).
 
 ## Prerequisites
 
@@ -47,7 +47,8 @@ notes) is committed in your repo.
 
 | Command | What it does |
 |---|---|
-| `xt` | Set up if needed, then `xt up` |
+| `xt` | Set up if needed, `xt up`, then open the TUI |
+| `xt tui` | The lazygit-style overview: goals, team, tasks, inbox, log; approve/deny spawns with `a`/`d` (`--demo`: sample data) |
 | `xt init` | Make this clone your team's repo (asks: team name, session, liaison/lead harness) |
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt status` | Team, live state, open work, queue, approvals, alerts |

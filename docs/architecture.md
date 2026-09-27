@@ -191,7 +191,15 @@ when Herdr is unreachable. The human's own commands still act directly.
 - `xt inbox`: alerts, pending approvals, messages to the human. `xt approve|deny <id>`,
   `xt clear <alert>`.
 - `xt stop <name>` (close without retiring), `xt spawn <name>` (restart), `xt retire <name>`.
-- `xt tui --demo`: the lazygit-style TUI, a look-and-feel spike on demo data so far.
+- `xt tui` (also what bare `xt` opens after `xt up`): the lazygit-style overview, refreshed every
+  2 s. Five panels: **Goals** (open first, with task progress; detail shows the tasks and the goal
+  brief), **Team** (live state; detail shows open work, recent messages and the last lines of the
+  agent's screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox**
+  (pending spawn approvals, alerts, messages to the human), **Log** (newest first). Keys: `a`/`d`
+  approve or deny the selected spawn (the detail pane shows the role brief the lead wrote; the spawn
+  runs in the background), `c` clears an alert, `s` messages the liaison, `f` switches Herdr to the
+  selected agent's workspace, `enter` reads the detail pane, `?` help. `xt tui --demo` shows sample
+  data.
 
 ## Harnesses
 
@@ -221,7 +229,7 @@ their trust dialog is what saves it.
   agent's name with `--as`. The envelope and the log make it visible; nothing prevents it.
 - **The `--as human` terminal guard** is verified for non-interactive codex and claude shells, not
   for every harness.
-- **Not built yet:** the real TUI (only the demo), bypass detection, ping-pong loop detection
+- **Not built yet:** bypass detection, ping-pong loop detection
   (only the daily-volume alert), `xt config`.
 - **Latency.** Agents' messages and jobs wait for the next supervisor tick (up to ~3 s), and
   nothing moves if the supervisor isn't running (`xt status` warns).
