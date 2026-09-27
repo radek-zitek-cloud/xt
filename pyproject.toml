@@ -3,6 +3,8 @@ name = "xt"
 version = "0.1.0"
 description = "Harness-agnostic hierarchical agent teams on top of Herdr"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.12"
 dependencies = [
     "tomlkit>=0.13",

@@ -80,3 +80,7 @@ discover team skills natively.
 ```sh
 uv sync && uv run pytest
 ```
+
+## License
+
+MIT, see [LICENSE](LICENSE).

@@ -74,7 +74,7 @@ Runtime facts such as pane ids never go in `team.toml`.
 ## Starting a team
 
 `bin/xt-clone.sh <team>`:
-1. Clones xt from GitHub (via `gh` for the private repo), runs `mise trust`.
+1. Clones xt from GitHub (with `gh` when it's logged in, otherwise plain `git clone`), runs `mise trust`.
 2. `xt init`: checks prerequisites; asks for liaison and lead harness/model (codex recommended),
    and whether spawns need approval; renames `origin` to `upstream`; writes `team.toml` and the team
    folders; commits.
