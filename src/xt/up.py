@@ -46,3 +46,37 @@ def up(ctx: Ctx) -> list[str]:
             note = " — was running before; find out why it stopped" if a.name in exp else ""
             out.append(f"member: {a.name} not running{note}; `xt spawn {a.name}` starts it again")
     return out
+
+
+def down(ctx: Ctx, keep_supervisor: bool = False) -> list[str]:
+    """Stop the whole team cleanly: every running agent the way `xt stop` does (so the next
+    `xt up` raises no false "crashed" alerts), then the supervisor and its workspace."""
+    import os
+    import signal
+    import time
+
+    from .spawn import stop
+
+    out = []
+    live = ctx.herdr.agents()
+    for a in ctx.team.agents():
+        if a.kind != "human" and a.name in live:
+            out.append(stop(ctx, a.name))
+    if not out:
+        out.append("no agents were running")
+    if keep_supervisor:
+        return out
+    pid = watch_pid(ctx)
+    if pid:
+        os.kill(pid, signal.SIGINT)
+        for _ in range(20):
+            if not watch_pid(ctx):
+                break
+            time.sleep(0.25)
+        out.append(f"supervisor stopped (pid {pid})")
+    label = f"{ctx.team.name}·watch"
+    for ws, lab in ctx.herdr.workspaces().items():
+        if lab == label:
+            ctx.herdr.close_workspace(ws)
+            out.append(f"closed the supervisor's workspace {ws}")
+    return out

@@ -62,6 +62,15 @@ def cmd_up(args) -> None:
         print(line)
 
 
+def cmd_down(args) -> None:
+    if _who(args) != HUMAN:
+        raise XtError("only the human takes the team down")
+    from .up import down
+
+    for line in down(Ctx.load(), keep_supervisor=args.keep_supervisor):
+        print(line)
+
+
 def cmd_send(args) -> None:
     ctx = Ctx.load()
     body = " ".join(args.body) if args.body else sys.stdin.read()
@@ -250,6 +259,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--no-commit", action="store_true")
 
     add("up", cmd_up, "start the supervisor and liaison (and the lead if goals are open)")
+
+    sp = add("down", cmd_down, "stop every running agent and the supervisor (human only)")
+    sp.add_argument("--keep-supervisor", action="store_true", help="stop the agents only")
 
     sp = add("send", cmd_send, "send a message through xt (the only sanctioned way agents talk)")
     sp.add_argument("to")

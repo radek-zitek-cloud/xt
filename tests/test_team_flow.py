@@ -263,3 +263,43 @@ def test_approve_several_ids_at_once(ctx, monkeypatch, capsys):
     monkeypatch.setattr(sys, "stdin", Tty())
     cli.cmd_approve(cli.build_parser().parse_args(["approve", *map(str, ids)]), True)
     assert {"carol", "dora"} <= set(ctx.herdr.live) and not Approvals(ctx).pending()
+
+
+def test_down_stops_everyone_cleanly_and_up_raises_no_false_alerts(ctx, monkeypatch):
+    from xt import up as up_mod
+    from xt.alerts import Alerts
+    from xt.up import down
+
+    add_member(ctx, "carol")
+    up(ctx)  # supervisor pane + liaison
+    request_spawn(ctx, "human", "carol", None, None, None, None)
+    assert {"liaison", "carol"} <= set(ctx.herdr.live)
+    monkeypatch.setattr(up_mod, "watch_pid", lambda c: None)  # no real supervisor process in tests
+    out = down(ctx)
+    assert ctx.herdr.live == {}
+    assert any("closed the supervisor's workspace" in line for line in out)
+    Supervisor(ctx, out=lambda s: None).tick(now=0)  # what the next supervisor sees
+    assert not any(k.startswith("missing:") for k in Alerts(ctx).active())
+
+
+def test_tui_X_stops_every_running_agent(ctx):
+    import asyncio
+
+    from xt.tui.app import Confirm, LiveActions, XtTui
+    from xt.tui.model import build
+
+    add_member(ctx, "carol")
+    for a in ("liaison", "carol"):
+        ctx.herdr.add(a)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("2", "X")
+            assert isinstance(app.screen, Confirm)
+            await pilot.press("y")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert ctx.herdr.live == {}
+
+    asyncio.run(run())

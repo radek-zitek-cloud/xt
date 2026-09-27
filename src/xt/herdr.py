@@ -117,6 +117,11 @@ class Herdr:
         pane = data["result"]["root_pane"]
         return pane["pane_id"], pane["workspace_id"]
 
+    def workspaces(self) -> dict[str, str]:
+        """workspace_id -> label"""
+        data = self._run("workspace", "list")
+        return {w["workspace_id"]: w.get("label", "") for w in data.get("result", {}).get("workspaces", [])}
+
     def close_workspace(self, workspace_id: str) -> None:
         self._run("workspace", "close", workspace_id)
 

@@ -13,7 +13,7 @@ from textual.widgets.option_list import Option
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
-HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send · f jump · u/U start · x stop · h help · q quit"
+HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send · f jump · u/U start · x/X stop · h help · q quit"
 
 
 class Panel(OptionList):
@@ -118,6 +118,7 @@ class Help(ModalScreen[None]):
         ("u", "start the selected stopped agent (existing role and harness)"),
         ("U", "start every stopped agent in the roster"),
         ("x", "stop the selected agent; it stays in the roster (asks y/n)"),
+        ("X", "stop every running agent (asks y/n; the supervisor keeps running)"),
         ("f", "switch Herdr to the selected agent's workspace"),
         ("Anywhere", ""),
         ("s", "send a message to the liaison"),
@@ -165,6 +166,7 @@ class XtTui(App):
         Binding("u", "start_agent", show=False),
         Binding("U", "start_all", show=False),
         Binding("x", "stop_agent", show=False),
+        Binding("X", "stop_all", show=False),
         *[Binding(str(i), f"panel({i})", show=False) for i in range(1, 6)],
     ]
 
@@ -402,6 +404,21 @@ class XtTui(App):
 
         self.push_screen(Confirm(f"Stop {name}", f"Stop {name}? Its workspace closes; it stays in the "
                                                  f"roster and `u` starts it again."), go)
+
+    def action_stop_all(self) -> None:
+        if not self._need_live():
+            return
+        names = [r.data["name"] for r in self.panel(2).rows if r.kind == "agent" and r.data.get("running")]
+        if not names:
+            self.set_status("no agents are running")
+            return
+
+        def go(ok: bool | None) -> None:
+            if ok:
+                self._run_bg(f"stopping {', '.join(names)}…", lambda: "; ".join(self.actions.stop(n) for n in names))
+
+        self.push_screen(Confirm("Stop all", f"Stop {len(names)} running agents: {', '.join(names)}? They stay in "
+                                             f"the roster; U starts them again."), go)
 
     def action_jump(self) -> None:
         row = self._selected("agent")

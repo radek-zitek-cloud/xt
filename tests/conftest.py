@@ -21,7 +21,7 @@ class FakeHerdr:
     def __init__(self):
         self.live: dict[str, LiveAgent] = {}
         self.prompts: list[tuple[str, str]] = []
-        self.workspaces: list[str] = []
+        self.created: list[str] = []
         self.closed: list[str] = []
         self.pane_runs: list[tuple[str, str]] = []
         self.started: list[tuple[str, str, list[str]]] = []
@@ -33,6 +33,7 @@ class FakeHerdr:
         self.screens: dict[str, list[str]] = {}
         self.keys: list[tuple[str, tuple]] = []
         self.snapshots: list = []
+        self.labels: dict[str, str] = {}
 
     def check_session(self):
         pass
@@ -76,9 +77,13 @@ class FakeHerdr:
                     a.status = "idle"
 
     def create_workspace(self, cwd, label):
-        ws = f"w{len(self.workspaces) + 1}"
-        self.workspaces.append(ws)
+        ws = f"w{len(self.created) + 1}"
+        self.created.append(ws)
+        self.labels[ws] = label
         return f"{ws}:p1", ws
+
+    def workspaces(self):
+        return {ws: lab for ws, lab in self.labels.items() if ws not in self.closed}
 
     def close_workspace(self, ws):
         self.closed.append(ws)
