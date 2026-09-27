@@ -6,10 +6,10 @@ goals for a **lead**, which designs and runs whatever team the work needs: a new
 an accounting desk. xt owns the coordination (messages, the ledger of open work, the supervisor,
 approvals, recovery), so an agent only needs a shell and a prompt.
 
-**Status:** v0.4.0, early but in daily use. The pilot team is a six-agent newsroom that hires its
+**Status:** 0.x, early but in daily use (current release: see [CHANGELOG.md](CHANGELOG.md)). The pilot team is a six-agent newsroom that hires its
 own scout, finds stories in RSS feeds every hour, and researches, writes, fact-checks and publishes
 articles. Most runs so far used Codex for every agent. How it works in detail:
-[docs/architecture.md](docs/architecture.md); what changed: [CHANGELOG.md](CHANGELOG.md).
+[docs/architecture.md](docs/architecture.md).
 
 ![The newsroom pilot team in Herdr: the liaison's pane on the left, asking which story to write next; the xt TUI on the right with goals, team, tasks, inbox, log and a goal brief in the detail pane](docs/screen.png)
 
@@ -203,7 +203,7 @@ stable.
 
 ```sh
 git fetch upstream --tags
-git merge v0.4.0
+git merge v0.5.0
 ```
 
 ## Releasing

@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.4.0** (2026-09-27), after five real runs with a newsroom team and
+What the code does as of **v0.5.0** (2026-09-27), after five real runs with a newsroom team and
 the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); the
 [README](../README.md) is the user's guide.
 
