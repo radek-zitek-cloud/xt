@@ -11,6 +11,12 @@ own scout, finds stories in RSS feeds every hour, and researches, writes, fact-c
 articles. Most runs so far used Codex for every agent. How it works in detail:
 [docs/architecture.md](docs/architecture.md); what changed: [CHANGELOG.md](CHANGELOG.md).
 
+![The newsroom pilot team in Herdr: the liaison's pane on the left, asking which story to write next; the xt TUI on the right with goals, team, tasks, inbox, log and a goal brief in the detail pane](docs/screen.png)
+
+*The newsroom pilot in Herdr: on the left the liaison asks which of the scout's stories to write
+next; on the right the xt TUI shows the goals, the team (all on Codex), tasks, inbox and log, with
+the scout goal's brief in the detail pane.*
+
 ## What working with a team looks like
 
 1. You tell the liaison, in its Herdr pane, what you want. It shapes that into a goal with you and
