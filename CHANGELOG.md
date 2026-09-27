@@ -9,6 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+### Changed
+
+- README rewritten for new readers: what working with a team looks like, how a team works, the
+  TUI keys, configuration, updating a team, and known limits.
+
 ## [0.4.0] — 2026-09-27
 
 ### Added
