@@ -88,13 +88,16 @@ come with `git pull upstream main` (see [Updating a team](#updating-a-team)).
 
 ## The TUI
 
-`xt` (or `xt tui`) opens a lazygit-style view, refreshed every 2 seconds: **Goals**, **Team**,
-**Tasks**, **Inbox** and **Log** panels with a detail pane, the team summary on top and key hints
-at the bottom.
+`xt` (or `xt tui`) opens a lazygit-style view, refreshed every 2 seconds: **Goals** (with goal
+drafts the liaison is still shaping), **Team**, **Tasks**, **Inbox** and **Log** panels on the left,
+the detail pane on the right with the **Supervisor** panel under it (what `xt watch` did:
+deliveries, wake-ups, nudges, notifications, alerts), the team summary on top and key hints at the
+bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
 
 | Key | What it does |
 |---|---|
-| `1`–`5`, `tab`, `j`/`k`, `enter` | Switch panels, move, read the detail |
+| `1`–`6`, `tab`, `j`/`k`, `enter` | Switch panels, move, read the detail |
+| `/` | Filter the focused panel by text (empty clears it) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
 | `s` | Answer the selected question (Inbox); anywhere else, message the liaison |
 | `c` | Clear the selected alert |
@@ -123,7 +126,7 @@ at the bottom.
 | `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent |
 | `xt send <to> --type <t> "..."`, `xt done <id> "..."`, `xt note "..."` | Messages, closing work, notes (agents add `--as <name>`) |
 | `xt goal new\|dispatch\|list` | Goal drafts and dispatch (normally the liaison does this) |
-| `xt brief [name]`, `xt log` | Recovery summary and full message history |
+| `xt brief [name]`, `xt log` | Recovery summary and full message history (`xt log --watch`: the supervisor's events) |
 | `xt harnesses` | Installed harnesses and their known limits |
 | `xt watch` | The supervisor loop (`xt up` runs it in its own pane) |
 | `xt --version` | The xt version |

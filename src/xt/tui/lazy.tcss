@@ -16,9 +16,20 @@ Screen {
     min-width: 30;
 }
 
-/* lazygit-style: the focused panel on the left grows, the others shrink. */
-#left > .panel:focus {
-    height: 3fr;
+/* Fixed sizes: moving focus never shifts the layout; the focused panel shows only by colour.
+   Sizes follow how much each panel usually holds. */
+#panel-1 { height: 2fr; }  /* Goals */
+#panel-2 { height: 3fr; }  /* Team */
+#panel-3 { height: 3fr; }  /* Tasks */
+#panel-4 { height: 2fr; }  /* Inbox */
+#panel-5 { height: 3fr; }  /* Log */
+
+#right {
+    width: 1fr;
+}
+
+#panel-6 {                 /* Supervisor, under the detail pane */
+    height: 10;
 }
 
 .panel {
@@ -41,7 +52,7 @@ Screen {
 }
 
 #detail {
-    width: 1fr;
+    height: 1fr;
 }
 
 /* Lists: one line per item, never wrapped (cut with …; the detail pane has the rest),

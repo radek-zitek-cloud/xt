@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.5.0** (2026-09-27), after five real runs with a newsroom team and
+What the code does as of **v0.6.0** (2026-09-27), after five real runs with a newsroom team and
 the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); the
 [README](../README.md) is the user's guide.
 
@@ -55,6 +55,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `goals/drafts/*.md`, `goals/<slug>.md`: goal briefs | `state/jobs.json`: Herdr work requested by agents |
 | `members/<name>/`: per-agent notes (`notes.md`) and work files | `state/approvals.json`: hires and schedules waiting for the human |
 | whatever the team produces (e.g. `output/`) | `state/live.json`: the supervisor's latest `agent list` |
+| | `state/watch.log` (+ `watch.log.1`): the supervisor's events, rotated at 512 KB |
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
@@ -198,6 +199,9 @@ memory. Agents may read their own brief and their reports' briefs. `xt log` give
    arrives in quiet hours stays in the Inbox without a notification.
 10. **Rotation**, hourly.
 
+Every event the supervisor prints in its pane is also appended to `state/watch.log`, which the
+TUI's Supervisor panel and `xt log --watch` show.
+
 It **alerts, it never repairs**: no automatic restarts. A crash is a bug to look at.
 
 ### Why agents never call Herdr
@@ -228,12 +232,13 @@ when Herdr is unreachable. The human's own commands still act directly.
 
 - Talk to the liaison in its Herdr pane (or type into any agent's pane: that's unstamped and
   legitimate).
-- `xt tui` (also what bare `xt` opens after `xt up`), refreshed every 2 s. Five panels: **Goals**
-  (open first, with task progress; detail shows the tasks and the goal brief), **Team** (live
+- `xt tui` (also what bare `xt` opens after `xt up`), refreshed every 2 s. Six panels of fixed
+  size (focus shows only by frame colour; `/` filters the focused one): **Goals** (drafts, then
+  open goals with task progress; detail shows the tasks and the goal brief, or the draft), **Team** (live
   state and schedules; detail shows open work, recent messages and the last lines of the agent's
   screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox** (open
-  questions first, then pending approvals, alerts, messages to the human), **Log** (newest first).
-  The Status pane on top shows the team summary and the last action's result; the bottom line is
+  questions first, then pending approvals, alerts, messages to the human), **Log** (newest first),
+  and **Supervisor** under the detail pane (the supervisor's events, newest first). The Status pane on top shows the team summary and the last action's result; the bottom line is
   key hints; `h` lists every key (the README has the table). Slow actions (starting agents) run in
   the background. `xt tui --demo` shows sample data.
 - `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; warns if

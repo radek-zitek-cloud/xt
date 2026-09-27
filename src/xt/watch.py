@@ -21,6 +21,7 @@ from .team import HUMAN, SYSTEM, in_window, parse_interval, schedule_text
 
 TICK = 3
 NUDGES_BEFORE_ALERT = 2
+WATCH_LOG_MAX = 512 * 1024  # .xt/state/watch.log is rotated to watch.log.1 beyond this
 NOTIFY_TYPES = {"ask": "question from {from_}", "approval": "approval needed", "alert": "alert"}
 
 
@@ -41,6 +42,15 @@ def pid_alive(pid: int) -> bool:
         return True
     except OSError:
         return False
+
+
+def watch_log(ctx: Ctx, limit: int = 200) -> list[str]:
+    """The supervisor's latest events, oldest first: "YYYY-MM-DD HH:MM:SS text" lines."""
+    lines: list[str] = []
+    for f in (ctx.paths.state / "watch.log.1", ctx.paths.state / "watch.log"):
+        if f.exists():
+            lines += f.read_text(errors="replace").splitlines()
+    return lines[-limit:]
 
 
 def watch_pid(ctx: Ctx) -> int | None:
@@ -90,7 +100,18 @@ class Supervisor:
         self.notify_error: str | None = None
 
     def say(self, text: str) -> None:
-        self.out(f"{dt.datetime.now():%H:%M:%S} {text}")
+        """Print an event in the supervisor's pane and keep it in .xt/state/watch.log (the TUI's
+        Supervisor panel and `xt log --watch` read it)."""
+        now = dt.datetime.now()
+        self.out(f"{now:%H:%M:%S} {text}")
+        path = self.ctx.paths.state / "watch.log"
+        try:
+            if path.exists() and path.stat().st_size > WATCH_LOG_MAX:
+                path.replace(path.with_name("watch.log.1"))
+            with open(path, "a") as fh:
+                fh.write(f"{now:%Y-%m-%d %H:%M:%S} {' '.join(text.split())}\n")
+        except OSError:
+            pass  # the pane still shows it; a full disk must not stop the supervisor
 
     def tick(self, now: float | None = None) -> None:
         now = now if now is not None else time.time()

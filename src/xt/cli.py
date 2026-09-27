@@ -160,6 +160,12 @@ def cmd_brief(args) -> None:
 
 def cmd_log(args) -> None:
     ctx = Ctx.load()
+    if args.watch:
+        from .watch import watch_log
+
+        lines = watch_log(ctx, args.limit)
+        print("\n".join(lines) if lines else "(no supervisor events yet)")
+        return
     n = 0
     for m in ctx.ledger.messages(since_days=args.since):
         if args.member and args.member not in (m["from"], m["to"]):
@@ -362,6 +368,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--id", type=int)
     sp.add_argument("--type")
     sp.add_argument("--since", type=int, metavar="DAYS")
+    sp.add_argument("--watch", action="store_true", help="the supervisor's events instead of messages")
+    sp.add_argument("--limit", type=int, default=50, help="with --watch: how many recent events")
 
     add("status", cmd_status, "one-shot team status")
 

@@ -97,7 +97,7 @@ def test_h_opens_help_listing_every_key(ctx):
             await pilot.press("h")
             assert isinstance(app.screen, Help)
             keys = " ".join(k for k, _ in Help.KEYS)
-            for k in ("a / d", "c", "u", "U", "x", "f", "s", "r", "h / ?", "q", "1-5", "enter", "esc"):
+            for k in ("a / d", "c", "u", "U", "x", "f", "s", "r", "h / ?", "q", "1-6", "/", "R", "enter", "esc"):
                 assert k in keys
             await pilot.press("h")  # h closes it again
             assert not isinstance(app.screen, Help)
@@ -227,3 +227,60 @@ def test_R_retires_the_selected_member_but_not_the_lead(ctx):
             assert ctx.team.agent("carol").status == "retired"
 
     asyncio.run(run())
+
+
+def test_panels_keep_their_size_when_focus_moves():
+    async def run():
+        app = XtTui(demo_snapshot)
+        async with app.run_test(size=(140, 45)) as pilot:
+            sizes = lambda: [app.panel(i).size for i in range(1, 7)]
+            before = sizes()
+            for key in ("3", "5", "6", "2"):
+                await pilot.press(key)
+                await pilot.pause()
+                assert sizes() == before
+
+    asyncio.run(run())
+
+
+def test_slash_filters_the_focused_panel():
+    async def run():
+        app = XtTui(demo_snapshot)
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("2", "slash")
+            assert isinstance(app.screen, Prompt)
+            await pilot.press(*"dave", "enter")
+            await pilot.pause()
+            names = [r.data.get("name") for r in app.panel(2).rows]
+            assert names == ["dave"] and "/dave" in app.panel(2).border_subtitle
+            await pilot.press("slash", "enter")  # empty clears
+            await pilot.pause()
+            assert len(app.panel(2).rows) == 3 and "/" not in app.panel(2).border_subtitle
+
+    asyncio.run(run())
+
+
+def test_supervisor_panel_and_goal_drafts(ctx):
+    from xt.watch import Supervisor
+
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.say("woke scout (every 60m)")
+    sup.say("notification failed: notify-send not found ([notify] in team.toml)")
+    ctx.paths.drafts.mkdir(parents=True, exist_ok=True)
+    (ctx.paths.drafts / "weekly-digest.md").write_text("# Weekly digest\nA draft goal.\n")
+    snap = build(ctx)
+    events = [r.text.plain for r in snap.panels["Supervisor"]]
+    assert "notification failed" in events[0] and "woke scout" in events[1]  # newest first
+    drafts = [r for r in snap.panels["Goals"] if r.kind == "draft"]
+    assert drafts and drafts[0].text.plain.startswith("✎ weekly-digest")
+    assert "A draft goal." in drafts[0].detail().plain
+
+
+def test_xt_log_watch_prints_supervisor_events(ctx, monkeypatch, capsys):
+    from xt import cli
+    from xt.watch import Supervisor
+
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    Supervisor(ctx, out=lambda s: None).say("delivered #5 to lead")
+    cli.cmd_log(cli.build_parser().parse_args(["log", "--watch"]))
+    assert "delivered #5 to lead" in capsys.readouterr().out

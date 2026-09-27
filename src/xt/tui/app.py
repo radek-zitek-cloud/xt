@@ -14,7 +14,7 @@ from .. import __version__
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
-HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send/answer · f jump · u/U start · x/X stop · R retire · h help · q quit"
+HINTS = "h help · q quit · 1-6 panels · j/k move · enter read · / filter · a/d approve/deny · s send/answer · c clear · f jump · u/U start · x/X stop · R retire"
 
 
 class Panel(OptionList):
@@ -22,11 +22,22 @@ class Panel(OptionList):
         super().__init__(id=f"panel-{number}", classes="panel")
         self.title = title
         self.rows: list[Row] = []
+        self.all_rows: list[Row] = []
+        self.filter = ""
         self.border_title = f"[{number}]─{title}"
 
+    def set_filter(self, text: str) -> None:
+        self.filter = text.strip()
+        self.set_rows(self.all_rows)
+
     def set_rows(self, rows: list[Row]) -> None:
-        """Replace rows, keeping the selection on the same item when it still exists."""
+        """Replace rows (only those matching the filter, if any), keeping the selection on the
+        same item when it still exists."""
         keep = self.current.key if self.current else None
+        self.all_rows = rows
+        if self.filter:
+            needle = self.filter.lower()
+            rows = [r for r in rows if needle in r.text.plain.lower()]
         self.rows = rows
         self.clear_options()
         self.add_options([Option(r.text) for r in rows])
@@ -43,7 +54,8 @@ class Panel(OptionList):
 
     def update_subtitle(self) -> None:
         n = len(self.rows)
-        self.border_subtitle = f"{(self.highlighted or 0) + 1 if n else 0} of {n}"
+        pos = f"{(self.highlighted or 0) + 1 if n else 0} of {n}"
+        self.border_subtitle = f"/{self.filter} · {pos}" if self.filter else pos
 
     # Moving past the first or last item does nothing (Textual's OptionList wraps around by default).
     def action_cursor_down(self) -> None:
@@ -106,11 +118,12 @@ class Help(ModalScreen[None]):
 
     KEYS = [
         ("Move", ""),
-        ("1-5", "jump to a panel: Goals, Team, Tasks, Inbox, Log"),
+        ("1-6", "jump to a panel: Goals, Team, Tasks, Inbox, Log, Supervisor"),
         ("tab / l", "next panel"),
         ("shift+tab", "previous panel"),
         ("j / k", "down / up (in the detail pane: scroll)"),
         ("enter", "read the detail pane"),
+        ("/", "filter the focused panel (empty clears it)"),
         ("esc", "back from the detail pane to the panels"),
         ("Inbox (4)", ""),
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
@@ -170,7 +183,8 @@ class XtTui(App):
         Binding("x", "stop_agent", show=False),
         Binding("X", "stop_all", show=False),
         Binding("R", "retire_agent", show=False),
-        *[Binding(str(i), f"panel({i})", show=False) for i in range(1, 6)],
+        Binding("slash", "filter", show=False),
+        *[Binding(str(i), f"panel({i})", show=False) for i in range(1, len(PANELS) + 1)],
     ]
 
     def __init__(self, source: Callable[[], Snapshot], actions=None):
@@ -187,12 +201,15 @@ class XtTui(App):
         yield topbar
         with Horizontal(id="main"):
             with Vertical(id="left"):
-                for i, title in enumerate(PANELS, start=1):
+                for i, title in enumerate(PANELS[:-1], start=1):
                     yield Panel(title, i)
-            detail = VerticalScroll(id="detail", classes="panel")
-            detail.border_title = "Detail"
-            with detail:
-                yield Static(id="detail-body")
+            with Vertical(id="right"):
+                detail = VerticalScroll(id="detail", classes="panel")
+                detail.border_title = "Detail"
+                with detail:
+                    yield Static(id="detail-body")
+                # like lazygit's command log: what the supervisor did, under the detail pane
+                yield Panel(PANELS[-1], len(PANELS))
         yield Static(id="hints")
 
     def on_mount(self) -> None:
@@ -275,6 +292,18 @@ class XtTui(App):
 
     def action_help(self) -> None:
         self.push_screen(Help())
+
+    def action_filter(self) -> None:
+        panel = self.panel(self.last_panel)
+
+        def done(text: str | None) -> None:
+            if text is not None:
+                panel.set_filter(text)
+                panel.focus()
+                self.set_status(f"{panel.title}: showing rows with “{panel.filter}”" if panel.filter
+                                else f"{panel.title}: filter cleared")
+
+        self.push_screen(Prompt(f"Filter {panel.title}", "enter apply · empty clears · esc cancel"), done)
 
     def action_refresh(self) -> None:
         self.refresh_data()
@@ -557,6 +586,8 @@ def demo_snapshot() -> Snapshot:
     return Snapshot(
         panels={
             "Goals": [
+                _row("dq", _t(("✎ ", "cyan"), "quarterly-report", ("  draft", "cyan")),
+                     "draft · goals/drafts/quarterly-report.md", "draft"),
                 _row("g3", _t(("#3 ", "bright_black"), "weather forecasting team", ("  4/7", "yellow")),
                      "#3 weather forecasting team · open 2h\nbrief: goals/weather-team.md", "goal"),
                 _row("g5", _t(("#5 ", "bright_black"), "q3 close", ("  ✓", "green")), "#5 q3 close · done", "goal"),
@@ -579,6 +610,12 @@ def demo_snapshot() -> Snapshot:
                      "Approval #9: lead asks to spawn erin\n\nrole brief: …", "approval", id=9),
                 _row("al", _t(("⚠ ", "red"), "dave is blocked (usually an approval prompt)"),
                      "dave is blocked — f on dave in Team to jump there", "alert", key="blocked:dave"),
+            ],
+            "Supervisor": [
+                _row("s2", _t(("14:36 ", "bright_black"), "woke scout (every 60m, 05:00-21:00)"),
+                     "2026-09-27 14:36:02 woke scout (every 60m, 05:00-21:00)", "event"),
+                _row("s1", _t(("14:31 ", "bright_black"), "delivered #161 to lead"),
+                     "2026-09-27 14:31:36 delivered #161 to lead", "event"),
             ],
             "Log": [
                 _row("m47", _t(("#47 ", "bright_black"), ("report ", "cyan"), "liaison→human"),

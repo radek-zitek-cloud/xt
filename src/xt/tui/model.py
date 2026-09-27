@@ -19,7 +19,7 @@ from ..paths import XtError
 from ..spawn import Approvals
 from ..team import HUMAN, schedule_text
 
-PANELS = ("Goals", "Team", "Tasks", "Inbox", "Log")
+PANELS = ("Goals", "Team", "Tasks", "Inbox", "Log", "Supervisor")
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
@@ -113,10 +113,22 @@ def build(ctx: Ctx) -> Snapshot:
     def thread(item_id: int) -> list[dict]:
         return [m for m in msgs if m["id"] == item_id or m.get("ref") == item_id]
 
-    # Goals: open first, then recently closed
+    # Goals: drafts the liaison is still shaping, then open goals, then recently closed
+    goal_rows = []
+    drafts = sorted(ctx.paths.drafts.glob("*.md")) if ctx.paths.drafts.exists() else []
+    for d in drafts:
+        rel = str(d.relative_to(ctx.paths.root))
+
+        def ddetail(rel=rel):
+            out = Text()
+            out.append(f"draft · {rel} · not dispatched yet (the liaison shapes it with you)\n", style="bright_black")
+            out.append_text(_file_text(ctx, rel))
+            return out
+
+        goal_rows.append(Row(f"draft:{d.stem}", _t(("✎ ", "cyan"), d.stem, ("  draft", "cyan")), ddetail, "draft",
+                             {"path": rel}))
     goals = [m for m in msgs if m["type"] == "goal"]
     goals.sort(key=lambda g: (g["id"] not in open_items, -g["id"]))
-    goal_rows = []
     for g in goals:
         tasks = [m for m in msgs if m["type"] == "task" and m.get("ref") == g["id"]]
         done_tasks = sum(1 for t in tasks if t["id"] not in open_items)
@@ -294,7 +306,18 @@ def build(ctx: Ctx) -> Snapshot:
                f"{len(questions)} question{'s' if len(questions) != 1 else ''} · "
                f"{len(approvals)} approval{'s' if len(approvals) != 1 else ''} · {len(alerts)} alert"
                f"{'s' if len(alerts) != 1 else ''} · {len(queued)} queued · {len(jobs)} jobs")
+    # Supervisor: what xt watch did, newest first
+    from ..watch import watch_log
+
+    sup_rows = []
+    for n, line in enumerate(reversed(watch_log(ctx, 200))):
+        stamp, text = line[:19], line[20:]  # "YYYY-MM-DD HH:MM:SS text"
+        style = "red" if text.startswith(("alert", "error")) or "failed" in text else ""
+        sup_rows.append(Row(f"sup:{n}:{stamp}", _t((stamp[11:16] + " ", "bright_black"), (text, style)),
+                            lambda line=line: Text(line + "\n"), "event", {}))
+
     return Snapshot(
-        {"Goals": goal_rows, "Team": team_rows, "Tasks": task_rows, "Inbox": inbox_rows, "Log": log_rows},
+        {"Goals": goal_rows, "Team": team_rows, "Tasks": task_rows, "Inbox": inbox_rows, "Log": log_rows,
+         "Supervisor": sup_rows},
         summary,
     )

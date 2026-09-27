@@ -9,6 +9,30 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-27
+
+### Added
+
+- **Supervisor events in the TUI.** Everything `xt watch` does (deliveries, jobs, wake-ups,
+  nudges, notifications and their failures, alerts, errors) is also kept in
+  `.xt/state/watch.log` (rotated at 512 KB) and shown newest first in a new **Supervisor** panel
+  (`6`) under the detail pane; failures and alerts are red. `xt log --watch [--limit N]` prints them.
+- **Filter a panel with `/`:** type text to show only matching rows (the panel's subtitle shows the
+  filter); an empty filter clears it.
+- **Goal drafts in the Goals panel:** drafts the liaison is still shaping (`goals/drafts/`) are
+  listed first, marked `✎ … draft`; the detail shows the draft.
+
+### Changed
+
+- **Panels keep a fixed size.** The focused panel no longer grows (it made the layout shift on
+  every move); focus shows by frame colour only. Panel heights follow how much each usually holds.
+- The key hints start with `h help · q quit`, so they stay visible on narrow screens.
+
+### Upgrading
+
+- Restart the team (`xt down`, then `xt`) so the supervisor starts writing its event log; reopen
+  the TUI.
+
 ## [0.5.0] — 2026-09-27
 
 ### Fixed
@@ -24,16 +48,16 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
   supervisor first. An agent the human stopped (`xt stop`, `x`/`X` in the TUI, `xt down
   --keep-supervisor`) no longer triggers that alert until it's started again.
 
-### Upgrading
-
-- Restart the team (`xt down`, then `xt`) so the supervisor runs the new code. Nothing else changes.
-
 ### Changed
 
 - README rewritten for new readers: what working with a team looks like, how a team works, the
   TUI keys, configuration, updating a team, and known limits.
 - docs/architecture.md brought up to date with v0.4.0: questions for the human, notifications,
   quiet hours, the TUI, codex's network sandbox, state files, and known gaps.
+
+### Upgrading
+
+- Restart the team (`xt down`, then `xt`) so the supervisor runs the new code. Nothing else changes.
 
 ## [0.4.0] — 2026-09-27
 
