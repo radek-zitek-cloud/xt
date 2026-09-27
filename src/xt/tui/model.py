@@ -183,7 +183,8 @@ def build(ctx: Ctx) -> Snapshot:
 
         team_rows.append(Row(f"agent:{a.name}", _t(dot, f" {a.name:<11} ", (f"{a.harness or '':<7}", "bright_black"),
                                                    (f"{state}", STATUS_STYLE.get(state, "bright_black"))),
-                             detail, "agent", {"name": a.name, "workspace": la.workspace_id if la else None}))
+                             detail, "agent", {"name": a.name, "workspace": la.workspace_id if la else None,
+                                               "running": la is not None, "active": a.active}))
 
     # Tasks: open first, then the last few closed
     tasks = [m for m in msgs if m["type"] == "task"]

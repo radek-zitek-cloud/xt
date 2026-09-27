@@ -198,7 +198,10 @@ when Herdr is unreachable. The human's own commands still act directly.
   (pending spawn approvals, alerts, messages to the human), **Log** (newest first). Keys: `a`/`d`
   approve or deny the selected spawn (the detail pane shows the role brief the lead wrote; the spawn
   runs in the background), `c` clears an alert, `s` messages the liaison, `f` switches Herdr to the
-  selected agent's workspace, `enter` reads the detail pane, `?` help. `xt tui --demo` shows sample
+  selected agent's workspace, `u` starts the selected stopped agent, `U` starts every stopped
+  agent, `x` stops the selected agent (it stays in the roster), `enter` reads the detail pane,
+  `h`/`?` help. The team summary and the last action's result are on the top line; the bottom
+  line is key hints. `xt tui --demo` shows sample
   data.
 
 ## Harnesses

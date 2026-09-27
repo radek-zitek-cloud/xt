@@ -75,6 +75,12 @@ OptionList > .option-list--option-hover {
     padding: 0;
 }
 
+#topbar {
+    height: 1;
+    background: ansi_default;
+    padding: 0 1;
+}
+
 #hints {
     height: 1;
     background: ansi_default;
@@ -98,6 +104,10 @@ ModalScreen {
     border-title-style: bold;
     border-subtitle-color: ansi_bright_black;
     padding: 0 1;
+}
+
+.popup.help {
+    width: 84;
 }
 
 .popup Input {

@@ -13,7 +13,7 @@ from textual.widgets.option_list import Option
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
-HINTS = "1-5 panels · j/k move · enter read · a approve · d deny · c clear · s send · f jump · ? help · q quit"
+HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send · f jump · u/U start · x stop · h help · q quit"
 
 
 class Panel(OptionList):
@@ -90,25 +90,44 @@ class Confirm(ModalScreen[bool]):
 
 
 class Help(ModalScreen[None]):
-    BINDINGS = [Binding("escape,q,question_mark", "close", show=False)]
+    BINDINGS = [Binding("escape,q,h,question_mark", "close", show=False)]
+
+    KEYS = [
+        ("Move", ""),
+        ("1-5", "jump to a panel: Goals, Team, Tasks, Inbox, Log"),
+        ("tab / l", "next panel"),
+        ("shift+tab", "previous panel"),
+        ("j / k", "down / up (in the detail pane: scroll)"),
+        ("enter", "read the detail pane"),
+        ("esc", "back from the detail pane to the panels"),
+        ("Inbox (4)", ""),
+        ("a / d", "approve / deny the selected spawn (asks y/n)"),
+        ("c", "clear the selected alert"),
+        ("Team (2)", ""),
+        ("u", "start the selected stopped agent (existing role and harness)"),
+        ("U", "start every stopped agent in the roster"),
+        ("x", "stop the selected agent; it stays in the roster (asks y/n)"),
+        ("f", "switch Herdr to the selected agent's workspace"),
+        ("Anywhere", ""),
+        ("s", "send a message to the liaison"),
+        ("r", "refresh now (it also refreshes every 2 s)"),
+        ("h / ?", "this help"),
+        ("q", "quit"),
+    ]
 
     def compose(self) -> ComposeResult:
-        box = Vertical(classes="popup")
-        box.border_title = "Keybindings"
+        box = Vertical(classes="popup help")
+        box.border_title = "Keys"
         box.border_subtitle = "esc to close"
+        text = Text()
+        for key, what in self.KEYS:
+            if not what:
+                text.append(f"\n{key}\n" if text else f"{key}\n", style="bold")
+            else:
+                text.append(f"  {key:<11}", style="green")
+                text.append(what + "\n")
         with box:
-            yield Static(
-                "1-5       jump to panel (Goals, Team, Tasks, Inbox, Log)\n"
-                "tab h/l   next/previous panel\n"
-                "j/k       move\n"
-                "enter     read the detail pane (j/k scroll, esc back)\n"
-                "a / d     approve / deny the selected spawn (Inbox)\n"
-                "c         clear the selected alert (Inbox)\n"
-                "s         send a message to the liaison\n"
-                "f         jump to the selected agent's Herdr workspace (Team)\n"
-                "r         refresh now\n"
-                "q         quit"
-            )
+            yield Static(text)
 
     def action_close(self) -> None:
         self.dismiss(None)
@@ -119,9 +138,9 @@ class XtTui(App):
     TITLE = "xt"
     BINDINGS = [
         Binding("q", "quit", show=False),
-        Binding("question_mark", "help", show=False),
+        Binding("h,question_mark", "help", show=False),
         Binding("tab,l", "focus_next", show=False),
-        Binding("shift+tab,h", "focus_previous", show=False),
+        Binding("shift+tab", "focus_previous", show=False),
         Binding("j", "cursor('down')", show=False),
         Binding("k", "cursor('up')", show=False),
         Binding("enter", "read", show=False),
@@ -132,6 +151,9 @@ class XtTui(App):
         Binding("s", "send", show=False),
         Binding("f", "jump", show=False),
         Binding("r", "refresh", show=False),
+        Binding("u", "start_agent", show=False),
+        Binding("U", "start_all", show=False),
+        Binding("x", "stop_agent", show=False),
         *[Binding(str(i), f"panel({i})", show=False) for i in range(1, 6)],
     ]
 
@@ -144,6 +166,7 @@ class XtTui(App):
         self.status = ""
 
     def compose(self) -> ComposeResult:
+        yield Static(id="topbar")
         with Horizontal(id="main"):
             with Vertical(id="left"):
                 for i, title in enumerate(PANELS, start=1):
@@ -192,14 +215,14 @@ class XtTui(App):
         self.render_hints()
 
     def render_hints(self) -> None:
-        line = Text()
-        if self.summary:
-            line.append(self.summary, style="bright_black")
-            line.append("  │  ", style="bright_black")
+        """Team summary and the latest action's result go on top; the bottom line is keys only."""
+        top = Text(no_wrap=True, overflow="ellipsis")
+        top.append(self.summary or "xt", style="bold")
         if self.status:
-            line.append(self.status + "  │  ", style="yellow")
-        line.append(HINTS)
-        self.query_one("#hints", Static).update(line)
+            top.append("  │  ", style="bright_black")
+            top.append(self.status, style="yellow")
+        self.query_one("#topbar", Static).update(top)
+        self.query_one("#hints", Static).update(Text(HINTS, no_wrap=True, overflow="ellipsis"))
 
     # --- navigation -------------------------------------------------------------------------
 
@@ -301,6 +324,72 @@ class XtTui(App):
 
         self.push_screen(Prompt("Send to the liaison", "enter send · esc cancel"), done)
 
+    def _run_bg(self, label: str, fn) -> None:
+        """Run a slow action (starting agents takes seconds) without freezing the screen."""
+        self.set_status(label)
+
+        def work() -> None:
+            try:
+                result = fn()
+            except Exception as e:
+                result = f"failed: {e}"
+            self.call_from_thread(self.set_status, result)
+            self.call_from_thread(self.refresh_data)
+
+        self.run_worker(work, thread=True, exclusive=False)
+
+    def action_start_agent(self) -> None:
+        row = self._selected("agent")
+        if row is None:
+            self.set_status("select an agent in Team (2) first")
+            return
+        if not self._need_live():
+            return
+        name = row.data["name"]
+        if row.data.get("running"):
+            self.set_status(f"{name} is already running")
+            return
+        if not row.data.get("active", True):
+            self.set_status(f"{name} is retired")
+            return
+        self._run_bg(f"starting {name}… (a few seconds)", lambda: self.actions.start(name))
+
+    def action_start_all(self) -> None:
+        if not self._need_live():
+            return
+        panel = self.panel(2)
+        names = [r.data["name"] for r in panel.rows
+                 if r.kind == "agent" and not r.data.get("running") and r.data.get("active", True)]
+        if not names:
+            self.set_status("every agent in the roster is already running")
+            return
+
+        def go(ok: bool | None) -> None:
+            if ok:
+                self._run_bg(f"starting {', '.join(names)}… (a few seconds each)",
+                             lambda: "; ".join(self.actions.start(n) for n in names))
+
+        self.push_screen(Confirm("Start all", f"Start {len(names)} stopped agents: {', '.join(names)}?"), go)
+
+    def action_stop_agent(self) -> None:
+        row = self._selected("agent")
+        if row is None:
+            self.set_status("select an agent in Team (2) first")
+            return
+        if not self._need_live():
+            return
+        name = row.data["name"]
+        if not row.data.get("running"):
+            self.set_status(f"{name} isn't running")
+            return
+
+        def go(ok: bool | None) -> None:
+            if ok:
+                self._run_bg(f"stopping {name}…", lambda: self.actions.stop(name))
+
+        self.push_screen(Confirm(f"Stop {name}", f"Stop {name}? Its workspace closes; it stays in the "
+                                                 f"roster and `u` starts it again."), go)
+
     def action_jump(self) -> None:
         row = self._selected("agent")
         if row is None:
@@ -346,6 +435,18 @@ class LiveActions:
 
     def jump(self, workspace_id: str) -> None:
         self.ctx.herdr.focus_workspace(workspace_id)
+
+    def start(self, name: str) -> str:
+        from ..spawn import request_spawn
+        from ..team import HUMAN
+
+        self.ctx.reload_team()
+        return request_spawn(self.ctx, HUMAN, name, None, None, None, None)
+
+    def stop(self, name: str) -> str:
+        from ..spawn import stop
+
+        return stop(self.ctx, name)
 
 
 def run_live() -> None:

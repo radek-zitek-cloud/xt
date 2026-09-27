@@ -88,3 +88,79 @@ def test_send_to_liaison_from_the_tui(ctx):
             assert "hello" in ctx.herdr.last_prompt("liaison")
 
     asyncio.run(run())
+
+
+def test_h_opens_help_listing_every_key(ctx):
+    async def run():
+        app = XtTui(demo_snapshot)
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("h")
+            assert isinstance(app.screen, Help)
+            keys = " ".join(k for k, _ in Help.KEYS)
+            for k in ("a / d", "c", "u", "U", "x", "f", "s", "r", "h / ?", "q", "1-5", "enter", "esc"):
+                assert k in keys
+            await pilot.press("h")  # h closes it again
+            assert not isinstance(app.screen, Help)
+
+    asyncio.run(run())
+
+
+def test_summary_sits_on_top_and_keys_at_the_bottom(ctx):
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.pause()
+            top = str(app.query_one("#topbar").render())
+            bottom = str(app.query_one("#hints").render())
+            assert ctx.team.name in top and "running" in top
+            assert "h help" in bottom and "running" not in bottom
+
+    asyncio.run(run())
+
+
+def test_u_starts_a_stopped_agent_and_x_stops_it(ctx):
+    add_member(ctx, "carol", role="researcher")
+    ctx.herdr.add("liaison")
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("2")
+            names = [r.data["name"] for r in app.panel(2).rows]
+            app.panel(2).highlighted = names.index("carol")
+            await pilot.pause()
+            await pilot.press("u")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert "carol" in ctx.herdr.live
+            assert "You are **carol**" in ctx.herdr.last_prompt("carol")
+            app.panel(2).highlighted = names.index("carol")
+            await pilot.press("x")
+            assert isinstance(app.screen, Confirm)
+            await pilot.press("y")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert "carol" not in ctx.herdr.live
+            ctx.reload_team()
+            assert ctx.team.agent("carol").active  # stopped, not retired
+
+    asyncio.run(run())
+
+
+def test_U_starts_every_stopped_agent(ctx):
+    add_member(ctx, "carol", role="researcher")
+    add_member(ctx, "dave", role="researcher")
+    ctx.herdr.add("liaison")
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("2", "U")
+            assert isinstance(app.screen, Confirm)
+            await pilot.press("y")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            for name in ("lead", "carol", "dave"):
+                assert name in ctx.herdr.live, name
+
+    asyncio.run(run())
