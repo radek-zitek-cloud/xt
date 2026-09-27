@@ -88,7 +88,8 @@ Messages from xt arrive in your conversation stamped like:
 - The team repo is the team's **home**, not its workspace. Do the actual work (code, documents,
   data) in the locations your task names, by absolute path.
 - In the team repo you may write: your own `members/<you>/notes.md`, and (lead only) `roles/`,
-  `skills/` and `team.toml` via `xt spawn`/`xt retire`. Never edit xt's own files (`bin/`, `src/`,
+  `skills/` and `team.toml` via `xt spawn`/`xt retire`. Don't commit to the team repo unless the
+  human asks or your role makes it a duty. Never edit xt's own files (`bin/`, `src/`,
   `protocol.md`, `harnesses/`, `roles/lead.md`, `roles/liaison.md`); they come from upstream.
 
 ## 7. Skills

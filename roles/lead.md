@@ -54,6 +54,16 @@ Handoffs: who it works with (always via you) and what it hands over.
 Write a skill (`skills/<name>/SKILL.md`, with `name:` and `description:` front matter) when
 several agents need the same know-how, or the same instructions keep recurring in tasks.
 
+### Rules worth writing into the roles you design
+
+- **Approved means delivered, exactly.** When one role approves another's work (an editor, a
+  reviewer, a checker), what is approved must be exactly what gets delivered. Producers keep internal
+  notes and comments out of deliverables (put them in a separate file), the approver rejects a
+  deliverable that still contains them, and any change after approval goes back to the approver.
+- **Source standards** for research-heavy work: prefer original sources (the publisher, the agency,
+  the official record); use a copy republished by someone else only when the original can't be
+  reached, and then say so explicitly in the output.
+
 ## Running the work
 
 - Send tasks with `xt send <member> --type task --ref <goal id> --as lead "..."`: what to do,
@@ -63,6 +73,10 @@ several agents need the same know-how, or the same instructions keep recurring i
   through it.
 - **Sequential by default.** Run tasks in parallel only when they touch separate files or data.
   Confirm before widening scope.
+- **Re-reviews reuse the open task.** When you send work back for another round (a revision, a
+  re-check), refer to the task that's still open (`xt send <member> --type ask --ref <task id>`)
+  instead of opening a new task, so each piece of work has one task. When you close a goal, xt
+  closes any task still open under it.
 - Integrate results yourself; check that "done" really means done before closing the goal.
 - When a goal is complete: `xt done <goal id> --as lead "summary + where the results are"`. It
   goes to the liaison, who tells the human.
@@ -71,6 +85,6 @@ several agents need the same know-how, or the same instructions keep recurring i
 ## Keeping the team repo useful
 
 - `members/lead/notes.md`: decisions, plans and state worth surviving a restart.
-- Roles and skills you write are team assets. Keep them accurate as you learn. You may commit
-  them (and `team.toml` changes xt made) to the team repo with clear messages. Never edit xt's own
+- Roles and skills you write are team assets. Keep them accurate as you learn. Don't commit to the
+  team repo unless the human asks or a role you were given makes it a duty. Never edit xt's own
   files (`bin/`, `src/`, `protocol.md`, `harnesses/`, `roles/lead.md`, `roles/liaison.md`).

@@ -208,9 +208,24 @@ def send(
         item = ctx.ledger.item(ref)
         if item is None or item["type"] != "goal":
             raise XtError(f"--ref for a task must be an open goal id; #{ref} isn't one")
+    closing_goal = mtype == "done" and ctx.ledger.item(ref) and ctx.ledger.item(ref)["type"] == "goal"
     msg = ctx.ledger.append(sender, to, mtype, body, ref)
+    if closing_goal:
+        close_leftover_tasks(ctx, ref)
     status = deliver_or_queue(ctx, msg) if deliver else "logged"
     return msg, status
+
+
+def close_leftover_tasks(ctx: Ctx, goal_id: int) -> list[int]:
+    """A goal is done, so any task still open under it is finished or superseded (e.g. a first
+    review task left open after a re-review). Close them in the ledger with a note; nobody is woken."""
+    closed = []
+    for item in ctx.ledger.open_items():
+        if item["type"] == "task" and item.get("goal") == goal_id:
+            ctx.ledger.append(SYSTEM, item["owner"], "done",
+                              f"Closed automatically: goal #{goal_id} is done.", item["id"])
+            closed.append(item["id"])
+    return closed
 
 
 def drain(ctx: Ctx) -> list[str]:

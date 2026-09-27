@@ -139,3 +139,19 @@ def test_messages_to_human_are_not_delivered_via_herdr(ctx):
     ctx.herdr.add("liaison")
     _, status = send(ctx, "liaison", "human", "report", "hello human")
     assert "human" in status and ctx.herdr.prompts == []
+
+
+def test_closing_a_goal_closes_its_leftover_tasks(ctx):
+    add_member(ctx, "carol")
+    for a in ("liaison", "lead", "carol"):
+        ctx.herdr.add(a)
+    g, _ = send(ctx, "liaison", "lead", "goal", "a goal")
+    first, _ = send(ctx, "lead", "carol", "task", "review v1", ref=g["id"])
+    second, _ = send(ctx, "lead", "carol", "task", "review v2", ref=g["id"])
+    send(ctx, "carol", "lead", "done", "v2 approved", ref=second["id"])
+    assert ctx.ledger.item(first["id"]) is not None  # the superseded first review is still open
+    send(ctx, "lead", "liaison", "done", "goal finished", ref=g["id"])
+    assert ctx.ledger.open_items() == []
+    auto = [m for m in ctx.ledger.messages() if m["from"] == "xt" and m["type"] == "done"]
+    assert [m["ref"] for m in auto] == [first["id"]] and "goal #" in auto[0]["body"]
+    assert all("review v1" not in t for _, t in ctx.herdr.prompts[-1:])  # nobody woken for it
