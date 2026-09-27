@@ -1,44 +1,46 @@
 # xt architecture: how it works
 
-State of xt as built and tested on 2026-09-26 (after three real runs and the fixes they led to).
-The design history and the reasons behind each decision live in the lab repo (`cross-talk/design.md`
-and its worklog); this document describes what the code does now.
+What the code does as of **v0.4.0** (2026-09-27), after five real runs with a newsroom team and
+the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); the
+[README](../README.md) is the user's guide.
 
 ## In one paragraph
 
-xt runs a hierarchical team of coding agents, each in its own [Herdr](https://herdr.dev) workspace,
-in any harness Herdr supports (claude, codex, pi, ...). The human talks to one agent, the
+xt runs a hierarchical team of AI agents, each in its own [Herdr](https://herdr.dev) workspace, in
+any harness Herdr supports (claude, codex, pi, ...). The human talks to one agent, the
 **liaison**. The liaison turns requests into **goals** for the **lead**. The lead designs the team,
-writes its roles, and gets members spawned and tasked. Agents never talk to each other directly
-and never call Herdr themselves. They run `xt` commands that only write files in the team's repo.
-A **supervisor** process (`xt watch`) does everything that touches Herdr: delivering messages,
-starting and stopping agents, watching liveness, and alerting the human. The team's whole state
-(roster, roles, skills, goals, the message log) is in the repo, so any agent can lose its memory
-and recover.
+writes its roles and skills, and gets members hired and tasked. Agents never talk to each other
+directly and never call Herdr themselves: they run `xt` commands that only write files in the team's
+repo. A **supervisor** process (`xt watch`) does everything that touches Herdr or the human's
+desktop: delivering messages, starting and stopping agents, waking scheduled agents, watching
+liveness, and alerting and notifying the human. The team's whole state (roster, roles, skills,
+goals, the message log) is in the repo, so any agent can lose its memory and recover.
 
 ## The pieces
 
 ```
  human ──(types in its pane)──▶ liaison ──goal──▶ lead ──task──▶ members
-   │                               ▲                ▲               │
-   │ xt status / inbox / approve   └───── report / done ─────────────┘
-   ▼
+   ▲  │                            │  ▲             ▲               │
+   │  │ xt tui / inbox / answer /  │  └──── report / done ──────────┘
+   │  │ approve / status           │ question (ask to the human)
+   │  ▼                            ▼
  ┌─────────────── team repo (a clone of xt, owned by the user) ───────────────┐
  │ team.toml  roles/  skills/  goals/  members/        .xt/ (runtime, ignored) │
- │   log/*.jsonl (message log = ledger)   state/ queue, jobs, alerts, live …   │
+ │   log/*.jsonl (message log = ledger)   state/ queue, jobs, approvals, …    │
  └──────────────────────────────▲───────────────────────────────▲──────────────┘
           agents' `xt …` commands│ write files only               │ reads/writes
                                  │                    ┌───────────┴───────────┐
-                                 │                    │ xt watch (supervisor) │── Herdr CLI ──▶ Herdr
-                                 │                    └───────────────────────┘   (--session <team>)
+   desktop notifications ◀───────┼────────────────────│ xt watch (supervisor) │── Herdr CLI ──▶ Herdr
+   (questions, approvals, alerts)│                    └───────────────────────┘   (--session <team>)
 ```
 
 | Piece | What it is |
 |---|---|
-| **Herdr** | The only real prerequisite. Runs the terminal panes, starts harnesses (`agent start --kind`), tells xt each agent's state (idle, working, blocked, done), and injects prompts. Every xt call is `herdr --session <team session> …`, so xt never depends on inherited `HERDR_*` environment variables. |
+| **Herdr** | Runs the terminal panes, starts harnesses (`agent start --kind`), tells xt each agent's state (idle, working, blocked, done), and injects prompts. Every xt call is `herdr --session <team session> …`, so xt never depends on inherited `HERDR_*` environment variables. |
 | **`bin/xt`** | Launcher. Runs the repo's own `.venv` (re-synced from `uv.lock` when that changes), and keeps uv's cache inside the repo, since some sandboxes can't write `~/.cache`. |
-| **`xt` CLI** (`src/xt/`) | Python, run through uv. Commands for the human and for agents. |
-| **Supervisor** (`xt watch`) | A long-running loop in its own Herdr workspace. The only part of xt that calls Herdr on agents' behalf. |
+| **`xt` CLI** (`src/xt/`) | Python, run through uv. Commands for the human and for agents; `xt --version` prints the version from `pyproject.toml`. |
+| **Supervisor** (`xt watch`) | A long-running loop in its own Herdr workspace. The only part of xt that calls Herdr on agents' behalf, and the one that notifies the human. |
+| **TUI** (`xt tui`, bare `xt`) | The human's lazygit-style view and controls (Textual). |
 | **Harness adapters** (`harnesses/*.toml`) | Per harness: Herdr kind, start arguments, model flag, startup dialogs to answer, known limits. |
 | **Team repo** | A clone of xt that `xt init` turns into the user's own repo (`origin` renamed `upstream`, so `git pull upstream main` brings xt updates). |
 | **mise** | Puts `bin/` on PATH inside the repo and provides uv. |
@@ -48,14 +50,16 @@ and recover.
 | Committed (the team's durable state) | Runtime, gitignored (`.xt/`) |
 |---|---|
 | `team.toml`: roster and settings | `log/YYYY-MM-DD.jsonl`: the message log (append-only); `log/archive/` gzipped old days |
-| `roles/<role>.md`: role briefs (`lead` and `liaison` ship; the lead writes the rest) | `state/ledger.json`: id counter + open goals/tasks (rebuildable from the log) |
+| `roles/<role>.md`: role briefs (`lead` and `liaison` ship; the lead writes the rest) | `state/ledger.json`: id counter + open goals, tasks and questions (rebuildable from the log) |
 | `skills/<name>/SKILL.md`: team skills (`.agents/skills` and `.claude/skills` link here) | `state/queue.json`: messages waiting for delivery |
 | `goals/drafts/*.md`, `goals/<slug>.md`: goal briefs | `state/jobs.json`: Herdr work requested by agents |
-| `members/<name>/notes.md`: durable per-agent notes | `state/live.json`: the supervisor's latest `agent list` |
-| `protocol.md`: the protocol every agent follows | `state/alerts.json`, `approvals.json`, `expected.json`, `nudges.json`, `watch.pid` |
+| `members/<name>/`: per-agent notes (`notes.md`) and work files | `state/approvals.json`: hires and schedules waiting for the human |
+| whatever the team produces (e.g. `output/`) | `state/live.json`: the supervisor's latest `agent list` |
+| | `state/alerts.json`, `expected.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
 
-xt's own files (`bin/`, `src/`, `protocol.md`, `harnesses/`, `roles/lead.md`, `roles/liaison.md`)
-come from upstream and aren't edited by the team, so upstream merges rarely conflict.
+xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
+`roles/liaison.md`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
+upstream and aren't edited by the team, so upstream merges rarely conflict.
 
 ### `team.toml`
 
@@ -70,15 +74,15 @@ come from upstream and aren't edited by the team, so upstream merges rarely conf
 ```
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
-Runtime facts such as pane ids never go in `team.toml`.
+Runtime facts such as pane ids never go in `team.toml`. A section left out uses xt's defaults.
 
 ## Starting a team
 
 `bin/xt-clone.sh <team>`:
 1. Clones xt from GitHub (with `gh` when it's logged in, otherwise plain `git clone`), runs `mise trust`.
-2. `xt init`: checks prerequisites; asks for liaison and lead harness/model (codex recommended),
-   and whether spawns need approval; renames `origin` to `upstream`; writes `team.toml` and the team
-   folders; commits.
+2. `xt init`: checks prerequisites; asks for the team name and Herdr session, the liaison's and
+   lead's harness and model (codex recommended), and whether hires need approval; renames `origin`
+   to `upstream`; writes `team.toml` and the team folders; commits.
 3. Starts the team's Herdr session headless if needed (`herdr --session <team> server`).
 4. `xt up`: starts the supervisor workspace and the liaison. The lead starts only when the first
    goal is dispatched.
@@ -109,6 +113,9 @@ supervisor, never inside an agent's shell.
    a plain assistant.)
 5. The agent is added to the "expected" set, so the supervisor can tell a crash from a stop.
 
+An agent keeps the instructions of its first prompt until it's restarted, so a team picks up
+changed roles or a new xt version only after a restart (`xt down`, then `xt`).
+
 ## Messages
 
 Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt done <id>`).
@@ -117,10 +124,11 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
 |---|---|
 | `goal` | What the human wants; liaison → lead only. Opens a ledger item. |
 | `task` | A unit of work, sent down the chain; `--ref <goal>`. Opens a ledger item. |
-| `ask`, `report` | Questions and progress, up or down. |
-| `done` | Closes an open item; the owner's final report. Goes to whoever opened it, or up the sender's chain if it can't reach them (e.g. a goal the human dispatched directly). |
+| `ask` | A question, up or down. An `ask` to the human (only the liaison can send one) opens a **question** item, see below. |
+| `report` | Progress, results, answers; `--ref` says what it's about. |
+| `done` | Closes an open item; the owner's final report. Goes to whoever opened it, or up the sender's chain if it can't reach them (e.g. a goal the human dispatched directly). The asker may also close its own question. |
 | `note` | Logged for the sender only, never delivered (the liaison records what the human said this way). |
-| `system`, `alert`, `approval`, `nudge` | From xt itself. |
+| `system`, `alert`, `approval`, `nudge`, `wake` | From xt itself. |
 
 - **Policy:** a sender may message its `reports_to` and its own reports; the human may message
   anyone. Only the liaison (or human) opens goals; tasks go downward only; the liaison can't spawn
@@ -132,21 +140,28 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
 - **Delivery:** an agent's `xt send` only appends to the log and the queue. The supervisor delivers
   when the recipient is idle: **everything queued for it in one prompt**, oldest first, with
   messages about since-closed items marked *stale*. Messages from the human (and the supervisor's
-  own) are delivered directly if the recipient is idle. Messages to the human appear in
-  `xt inbox`.
+  own) are delivered directly if the recipient is idle. Messages to the human are never typed
+  anywhere: they appear in the TUI's Inbox and `xt inbox`, and questions, approvals and alerts
+  also trigger a notification.
 
 ## The ledger and recovery
 
 The message log is the ledger. Every message gets a sequential id; `goal`/`task` open an item with
-an owner; `done` closes it. An `ask` to the human (only the liaison can send one) opens a
-**question** owned by the human: it closes when the human replies with `--ref` to it (`xt answer`,
-or `s` in the TUI) or when the asker withdraws it with `done` (answered in the pane, or superseded). `state/ledger.json` keeps the open items and can be rebuilt from the
+an owner; `done` closes it. `state/ledger.json` keeps the open items and can be rebuilt from the
 log, so rotation never loses them. Logs are gzipped after 30 days and never deleted by default.
 
-`xt brief [--as name]` summarises the team, live state, open work, drafts, and recent messages in
-about 2k tokens. Every first prompt includes it, and any agent runs it after a restart or context
-loss; nothing depends on an agent's own memory. Agents may read their own brief and their reports'
-briefs. `xt log` gives the full history.
+**Questions for the human.** When the liaison needs a decision, it sends
+`xt send human --type ask --ref <what it's about>`. That opens a question owned by the human. It
+closes when the human replies with `--ref` to it (`xt answer <id>`, or `s` on it in the TUI; the
+answer reaches the liaison as a `report`), or when the liaison withdraws it with `done` (the human
+answered in its pane, or the question was superseded, e.g. by a lead's auto-pick). Open questions
+show first in the Inbox with their age, in `xt inbox` and `xt status`, and in the brief.
+
+`xt brief [name]` summarises the team (with schedules), live state, open work, drafts and recent
+messages in about 2k tokens; the liaison's and lead's briefs add **Waiting on the human** (open
+questions, pending approvals and alerts, with the exact commands). Every first prompt includes the
+brief, and any agent runs it after a restart or context loss; nothing depends on an agent's own
+memory. Agents may read their own brief and their reports' briefs. `xt log` gives the full history.
 
 ## The supervisor, one tick every 3 seconds
 
@@ -160,19 +175,21 @@ briefs. `xt log` gives the full history.
    - an expected agent missing (crashed, or closed outside xt);
    - goals open but the lead not running (and no job starting it).
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
-7. **Scheduled wake-ups**: an agent with `wake_every` gets a `wake` message (its `wake_message`)
-   when the interval has passed and it's idle with nothing queued, so it never interrupts work. The
-   clock starts when the supervisor first sees the schedule. Set with `xt schedule` by the human or
-   the agent's lead. Each wake-up is a billed agent turn, so a lead's schedule is refused below
-   `min_wake_minutes` (default 15) and, with `schedule_approval` (default on), waits in the human's
-   Inbox like a spawn; the human sets any interval directly, and switching a schedule off needs no
-   approval; this is how a periodic role like a monitor works, since agents only act when
-   prompted. An optional `wake_between` window (local time, may wrap midnight) limits wake-ups to
-   those hours; an agent that became due outside it gets a single wake-up when the window opens.
-8. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
+7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item with no recent report
    gets a `nudge`; after two unanswered nudges the human gets an alert instead. Items waiting on
    an open question to the human (the question refers to the item, or to a message about it, up to
    four hops) are not nudged.
+8. **Scheduled wake-ups**: an agent with `wake_every` gets a `wake` message (its `wake_message`)
+   when the interval has passed and it's idle with nothing queued, so a wake-up never interrupts
+   work. The clock starts when the supervisor first sees the schedule and is kept in
+   `state/wakes.json`, so restarting the supervisor doesn't reset it. An optional `wake_between`
+   window (local time, may wrap midnight) limits wake-ups to those hours; an agent that became due
+   outside it gets a single wake-up when the window opens. Schedules are set with `xt schedule` by
+   the human or the agent's lead. Each wake-up is a billed agent turn, so a lead's schedule is
+   refused below `min_wake_minutes` (default 15) and, with `schedule_approval` (default on), waits
+   in the human's Inbox like a hire; the human sets any schedule directly, and switching one off
+   needs no approval. This is how a periodic role like a monitor or a scout works, since agents
+   only act when prompted.
 9. **Notifications**: each new question, approval request or alert for the human runs the
    `[notify]` command (default `notify-send`; any command with `{title}`/`{body}`, e.g. an ntfy
    `curl`), except inside the `quiet` window. Counting starts when the supervisor first runs; what
@@ -196,35 +213,35 @@ when Herdr is unreachable. The human's own commands still act directly.
 2. The liaison reads the draft back; on the human's go, `xt goal dispatch <slug>` freezes it as
    `goals/<slug>.md` and sends a `goal` to the lead. If the lead isn't running, the supervisor
    starts it, and the goal is in its first brief.
-3. The lead plans, writes role briefs into `roles/`, and requests spawns. With `spawn_approval` on
-   (default), the human approves each with `xt approve <id>`. The supervisor starts the agents.
-4. The lead sends `task`s; members report and `done` them; the lead integrates and sends `done` for
-   the goal to the liaison, who tells the human.
+3. The lead plans, writes role briefs into `roles/` and skills into `skills/`, and requests hires
+   (and schedules for periodic roles). With approvals on (the default), each waits for the human
+   (`xt approve <id>…`, or `a` in the TUI's Inbox). The supervisor starts the agents.
+4. The lead sends `task`s; members report and `done` them. Decisions only the human can make go up
+   to the liaison, which asks them as questions.
+5. The lead integrates, makes sure anything that keeps running after the goal is described in
+   roles or skills (not in the goal brief), and sends `done` for the goal to the liaison, who
+   tells the human. Tasks still open under the goal are closed with it.
 
 ## The human's controls
 
 - Talk to the liaison in its Herdr pane (or type into any agent's pane: that's unstamped and
   legitimate).
-- `xt status`: roster × live state, open items, queue, jobs, approvals, alerts; warns if the
-  supervisor isn't running.
-- `xt inbox`: questions for the human, alerts, pending approvals, messages to the human.
-  `xt answer <id> "..."`, `xt approve|deny <id>`, `xt clear <alert>`.
+- `xt tui` (also what bare `xt` opens after `xt up`), refreshed every 2 s. Five panels: **Goals**
+  (open first, with task progress; detail shows the tasks and the goal brief), **Team** (live
+  state and schedules; detail shows open work, recent messages and the last lines of the agent's
+  screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox** (open
+  questions first, then pending approvals, alerts, messages to the human), **Log** (newest first).
+  The Status pane on top shows the team summary and the last action's result; the bottom line is
+  key hints; `h` lists every key (the README has the table). Slow actions (starting agents) run in
+  the background. `xt tui --demo` shows sample data.
+- `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; warns if
+  the supervisor isn't running.
+- `xt inbox`: questions, alerts, pending approvals, messages to the human. `xt answer <id> "..."`,
+  `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
+- `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM]`.
 - `xt stop <name>` (close without retiring), `xt spawn <name>` (restart), `xt retire <name>`,
   `xt down` (stop every agent and the supervisor cleanly, so the next `xt up` raises no false
   "crashed" alerts; `herdr session stop` bypasses xt and does leave them).
-- `xt tui` (also what bare `xt` opens after `xt up`): the lazygit-style overview, refreshed every
-  2 s. Five panels: **Goals** (open first, with task progress; detail shows the tasks and the goal
-  brief), **Team** (live state; detail shows open work, recent messages and the last lines of the
-  agent's screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox**
-  (open questions first, then pending approvals, alerts, messages to the human), **Log** (newest first). Keys: `a`/`d`
-  approve or deny the selected spawn (the detail pane shows the role brief the lead wrote; the spawn
-  runs in the background), `c` clears an alert, `s` answers the selected question (anywhere else: messages the liaison), `f` switches Herdr to the
-  selected agent's workspace, `u` starts the selected stopped agent, `U` starts every stopped
-  agent, `x` stops the selected agent (it stays in the roster), `X` stops every running agent, `R` retires
-  the selected member (not the liaison or lead), `enter` reads the detail pane,
-  `h`/`?` help. The team summary and the last action's result are on the top line; the bottom
-  line is key hints. `xt tui --demo` shows sample
-  data.
 
 ## Harnesses
 
@@ -232,21 +249,24 @@ when Herdr is unreachable. The human's own commands still act directly.
 |---|---|---|---|
 | Startup dialog | "Is this a project you created or one you trust?" → `down`, `enter` | "Trust this folder?" → `enter` | none (started with `-a`) |
 | Repo skills found via | `.claude/skills` → `skills/` | `.agents/skills` → `skills/` | `.agents/skills` → `skills/` (needs trust, hence `-a`) |
-| Shell sandbox | none by default | blocks Herdr's socket (so agents never call Herdr) | none |
+| Shell sandbox | none by default | blocks Herdr's socket (so agents never call Herdr) and the network: a fetch needs an escalation, which Codex's reviewer (or the human) approves | none |
 | Other limits | a Herdr server started from inside Claude Code passes `CLAUDE_CODE_CHILD_SESSION` to its agents (transcript saving off) | shell runs in one shared machine-wide daemon; per-pane env doesn't reach it | `-a` also trusts project `.pi/` config for the run |
 
 Verified live on 2026-09-26: a codex liaison, a claude liaison, and a pi member each started in
 a fresh folder with their prompt landing; a codex liaison dispatched a goal from its sandbox and
-the supervisor started the lead, which completed it.
+the supervisor started the lead, which completed it. On 2026-09-27 codex agents fetched RSS feeds
+and published to a web service through escalations that Codex's reviewer approved without the
+human. All full team runs so far used codex for every agent.
 
 ## Coexisting with the user's setup
 
 Agents run on a real user's machine, with global instructions, skills, plugins and memory. xt
 doesn't need a clean room. The first prompt states that the xt protocol wins for team
 coordination only; the protocol is self-contained; skills the team relies on live in its repo;
-anything from the user's own setup is optional. xt never writes to user-level skill folders. It
-does add a trust entry for the team folder in codex's and claude's config, because answering
-their trust dialog is what saves it.
+anything from the user's own setup is optional (a team may use a user-level skill, such as one for
+publishing, when a goal says so). xt never writes to user-level skill folders. It does add a trust
+entry for the team folder in codex's and claude's config, because answering their trust dialog is
+what saves it.
 
 ## Known gaps
 
@@ -254,7 +274,10 @@ their trust dialog is what saves it.
   agent's name with `--as`. The envelope and the log make it visible; nothing prevents it.
 - **The `--as human` terminal guard** is verified for non-interactive codex and claude shells, not
   for every harness.
-- **Not built yet:** bypass detection, ping-pong loop detection
-  (only the daily-volume alert), `xt config`.
+- **Instructions age.** Running agents keep their first prompt's instructions until restarted.
+- **No usage view.** Nothing shows what an agent, goal or team costs, or how full an agent's
+  context is; there's no `xt reset` for an agent's context yet.
+- **Not built yet:** bypass detection, ping-pong loop detection (only the daily-volume alert),
+  `xt config`.
 - **Latency.** Agents' messages and jobs wait for the next supervisor tick (up to ~3 s), and
   nothing moves if the supervisor isn't running (`xt status` warns).
