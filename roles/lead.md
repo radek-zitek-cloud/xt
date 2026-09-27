@@ -92,6 +92,12 @@ several agents need the same know-how, or the same instructions keep recurring i
   window instead of having the agent skip runs itself (skipped runs are still billed turns):
   `--between 05:00-21:00` (local time). Explain why in a report to the liaison. Their findings still come to you; new work only starts under a
   goal (ask the liaison, or act within a standing goal that allows it).
+- **Ongoing duties outlive their goal**, so write them where they last. Before you close a goal
+  that leaves something running (a schedule, a recurring check, a standing rule like "auto-pick
+  if the human doesn't answer"), make sure the agent's role (`roles/<role>.md`) or a skill it reads
+  fully describes the duty, and point its `--message` at that file, never at the goal brief (your
+  own standing duties go in `members/lead/notes.md`). Goal briefs are history once the goal is
+  done; roles, skills and notes are the team's standing instructions.
 
 ## Keeping the team repo useful
 

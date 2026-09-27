@@ -14,7 +14,7 @@ from .. import __version__
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
-HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send/answer · f jump · u/U start · x/X stop · h help · q quit"
+HINTS = "1-5 panels · j/k move · enter read · a/d approve/deny · c clear · s send/answer · f jump · u/U start · x/X stop · R retire · h help · q quit"
 
 
 class Panel(OptionList):
@@ -120,6 +120,7 @@ class Help(ModalScreen[None]):
         ("U", "start every stopped agent in the roster"),
         ("x", "stop the selected agent; it stays in the roster (asks y/n)"),
         ("X", "stop every running agent (asks y/n; the supervisor keeps running)"),
+        ("R", "retire the selected agent: it leaves the roster (asks y/n; not the liaison or lead)"),
         ("f", "switch Herdr to the selected agent's workspace"),
         ("Anywhere", ""),
         ("s", "answer the question selected in Inbox; anywhere else: send a message to the liaison"),
@@ -168,6 +169,7 @@ class XtTui(App):
         Binding("U", "start_all", show=False),
         Binding("x", "stop_agent", show=False),
         Binding("X", "stop_all", show=False),
+        Binding("R", "retire_agent", show=False),
         *[Binding(str(i), f"panel({i})", show=False) for i in range(1, 6)],
     ]
 
@@ -431,6 +433,29 @@ class XtTui(App):
         self.push_screen(Confirm("Stop all", f"Stop {len(names)} running agents: {', '.join(names)}? They stay in "
                                              f"the roster; U starts them again."), go)
 
+    def action_retire_agent(self) -> None:
+        row = self._selected("agent")
+        if row is None:
+            self.set_status("select an agent in Team (2) first")
+            return
+        if not self._need_live():
+            return
+        name = row.data["name"]
+        if not row.data.get("active", True):
+            self.set_status(f"{name} is already retired")
+            return
+        if row.data.get("role") in ("liaison", "lead"):
+            self.set_status(f"the {row.data['role']} can't be retired from the TUI; the team needs it")
+            return
+
+        def go(ok: bool | None) -> None:
+            if ok:
+                self._run_bg(f"retiring {name}…", lambda: self.actions.retire(name))
+
+        self.push_screen(Confirm(f"Retire {name}", f"Retire {name}? Its workspace closes and it leaves the "
+                                                   f"roster (marked retired in team.toml). Bringing it back "
+                                                   f"takes a new spawn."), go)
+
     def action_jump(self) -> None:
         row = self._selected("agent")
         if row is None:
@@ -498,6 +523,12 @@ class LiveActions:
         from ..spawn import stop
 
         return stop(self.ctx, name)
+
+    def retire(self, name: str) -> str:
+        from ..spawn import retire
+        from ..team import HUMAN
+
+        return retire(self.ctx, HUMAN, name)
 
 
 def run_live() -> None:

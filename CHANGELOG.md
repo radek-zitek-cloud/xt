@@ -9,6 +9,23 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-27
+
+### Added
+
+- **Retire from the TUI:** `R` on a member in the Team panel retires it after a y/n confirmation
+  (workspace closed, marked retired in `team.toml`). The liaison and lead can't be retired this
+  way; `xt retire` still can.
+- **Lead rule: ongoing duties outlive their goal.** Before closing a goal that leaves something
+  running (a schedule, a recurring check, a standing rule), the lead makes sure the agent's role or
+  a skill fully describes it and points the wake message there, never at the goal brief; its own
+  standing duties go in `members/lead/notes.md`.
+
+### Upgrading
+
+- Restart the team (`xt down`, then `xt`) so the lead gets its updated role. Existing wake messages
+  that point at a goal brief keep working; ask the lead to move them if you like.
+
 ## [0.3.0] — 2026-09-27
 
 ### Added

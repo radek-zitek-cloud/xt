@@ -198,3 +198,32 @@ def test_long_rows_stay_on_one_line():
             assert len(app.panel(1)._lines) == 3  # one line per item, no wrapping
 
     asyncio.run(run())
+
+
+def test_R_retires_the_selected_member_but_not_the_lead(ctx):
+    add_member(ctx, "carol", role="researcher")
+    ctx.herdr.add("carol")
+    ctx.herdr.add("lead")
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("2")
+            names = [r.data["name"] for r in app.panel(2).rows]
+            app.panel(2).highlighted = names.index("lead")
+            await pilot.pause()
+            await pilot.press("R")
+            assert "can't be retired" in app.status and not isinstance(app.screen, Confirm)
+            app.panel(2).highlighted = names.index("carol")
+            await pilot.pause()
+            await pilot.press("R")
+            assert isinstance(app.screen, Confirm)
+            await pilot.press("y")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert "retired carol" in app.status
+            assert "carol" not in ctx.herdr.live
+            ctx.reload_team()
+            assert ctx.team.agent("carol").status == "retired"
+
+    asyncio.run(run())

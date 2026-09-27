@@ -48,7 +48,7 @@ notes) is committed in your repo.
 | Command | What it does |
 |---|---|
 | `xt` | Set up if needed, `xt up`, then open the TUI |
-| `xt tui` | The lazygit-style overview: goals, team, tasks, inbox, log; approve/deny spawns with `a`/`d` (`--demo`: sample data) |
+| `xt tui` | The lazygit-style overview: goals, team, tasks, inbox, log; approve/deny with `a`/`d`, answer questions with `s`, start/stop/retire agents with `u`/`x`/`R` (`h`: all keys; `--demo`: sample data) |
 | `xt init` | Make this clone your team's repo (asks: team name, session, liaison/lead harness) |
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00]` | Wake an agent periodically when idle (e.g. a monitor), optionally only within local-time hours |
