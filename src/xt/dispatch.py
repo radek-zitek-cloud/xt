@@ -182,10 +182,15 @@ def send(
     body = body.strip()
     if not body:
         raise XtError("empty message")
-    if mtype == "note":
+    if mtype in ("note", "friction"):
         s = ctx.team.agent(sender)
         if sender != SYSTEM and (s is None or not s.active):
             raise XtError(f"sender {sender!r} is not an active member of this team")
+        if mtype == "friction":
+            # feedback about xt or the harness: goes straight to the human's Inbox (outside the
+            # reporting chain, since it's about the tooling, not the work), never typed into a pane
+            msg = ctx.ledger.append(sender, HUMAN, "friction", body, ref)
+            return msg, "logged for the human (xt/harness feedback, in their Inbox)"
         msg = ctx.ledger.append(sender, sender, "note", body, ref)
         return msg, "noted (logged, not delivered)"
     check_policy(ctx.team, sender, to, mtype)

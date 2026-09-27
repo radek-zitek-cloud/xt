@@ -17,7 +17,7 @@ from ..dispatch import Queue
 from ..jobs import Jobs
 from ..paths import XtError
 from ..spawn import Approvals
-from ..team import HUMAN, schedule_text
+from ..team import HUMAN, harness_model, schedule_text
 
 PANELS = ("Goals", "Team", "Tasks", "Inbox", "Log", "Supervisor")
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
@@ -171,7 +171,7 @@ def build(ctx: Ctx) -> Snapshot:
             out = Text()
             out.append(f"{a.name}", style="bold")
             wakes = f" · woken {schedule_text(a)}" if a.wake_every else ""
-            out.append(f" · {a.role} · {a.harness}{'/' + a.model if a.model else ''} · reports to {a.reports_to}{wakes} · ")
+            out.append(f" · {a.role} · {harness_model(a.harness, a.model)} · reports to {a.reports_to}{wakes} · ")
             out.append(state + "\n", style=STATUS_STYLE.get(state, "bright_black"))
             if la:
                 out.append(f"workspace {la.workspace_id} · pane {la.pane_id}  (f: jump there)\n", style="bright_black")
@@ -194,7 +194,8 @@ def build(ctx: Ctx) -> Snapshot:
                     out.append("(couldn't read the pane)\n", style="bright_black")
             return out
 
-        team_rows.append(Row(f"agent:{a.name}", _t(dot, f" {a.name:<11} ", (f"{a.harness or '':<7}", "bright_black"),
+        team_rows.append(Row(f"agent:{a.name}", _t(dot, f" {a.name:<11} ",
+                                                   (f"{harness_model(a.harness, a.model):<16} ", "bright_black"),
                                                    (f"{state}", STATUS_STYLE.get(state, "bright_black"))),
                              detail, "agent", {"name": a.name, "workspace": la.workspace_id if la else None,
                                                "running": la is not None, "active": a.active, "role": a.role}))
@@ -268,7 +269,7 @@ def build(ctx: Ctx) -> Snapshot:
             out = Text()
             out.append(f"Approval #{rid}: {r['requester']} asks to spawn ", style="bold")
             out.append(f"{r['name']}", style="bold yellow")
-            out.append(f"\nrole {r['role']} · harness {r['harness']}{'/' + r['model'] if r.get('model') else ''}"
+            out.append(f"\nrole {r['role']} · {harness_model(r['harness'], r.get('model'))}"
                        f" · reports to {r['reports_to']}\n")
             out.append("a approve · d deny\n", style="bright_black")
             out.append(_heading(f"role brief: roles/{r['role']}.md"))
@@ -276,7 +277,8 @@ def build(ctx: Ctx) -> Snapshot:
             return out
 
         inbox_rows.append(Row(f"approval:{rid}", _t(("? ", "yellow"), f"#{rid} spawn {r['name']} ",
-                                                    (f"({r['role']}, {r['harness']})", "bright_black")),
+                                                    (f"({r['role']}, {harness_model(r['harness'], r.get('model'))})",
+                                                     "bright_black")),
                               detail, "approval", {"id": int(rid)}))
     for key, al in sorted(alerts.items(), key=lambda kv: kv[1].get("id", 0)):
         def detail(key=key, al=al):
@@ -288,7 +290,11 @@ def build(ctx: Ctx) -> Snapshot:
 
         inbox_rows.append(Row(f"alert:{key}", _t(("⚠ ", "red"), _first_line(al["text"], 60)), detail, "alert",
                               {"key": key}))
-    to_human = [m for m in msgs if m["to"] == HUMAN and m["type"] not in ("system", "alert", "approval")
+    for m in [m for m in msgs if m["type"] == "friction"][-10:][::-1]:
+        inbox_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "magenta"), f"#{m['id']} {m['from']}: ",
+                                                        _first_line(m["body"], 50)),
+                              lambda m=m: _msg_block(m), "friction", {"id": m["id"]}))
+    to_human = [m for m in msgs if m["to"] == HUMAN and m["type"] not in ("system", "alert", "approval", "friction")
                 and m["id"] not in open_items][-10:]
     for m in reversed(to_human):
         inbox_rows.append(Row(f"msg:{m['id']}", _t(("✉ ", "cyan"), f"#{m['id']} {m['from']}: ",

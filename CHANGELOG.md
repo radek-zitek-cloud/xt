@@ -9,6 +9,36 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-09-27
+
+### Added
+
+- **Reflection loop.** The protocol asks every agent to add one `Friction: …; cost: …; fix: …`
+  line to a `done` or report when something got in the way (and never "no issues"). The lead's
+  role: make small, clear fixes to the team's roles and skills and record them in
+  `members/lead/lessons.md` (flagging friction that comes back), send bigger changes to the human
+  as proposals, summarise a goal's friction in its `done`, and prune now and then.
+- **`xt friction "..."`:** a new message type for problems with xt or a harness. It goes to the
+  human's Inbox (✱ in the TUI, its own section in `xt inbox`), outside the reporting chain, and is
+  never typed into a pane.
+- **`xt restart <name>…` / `xt restart --all`:** restart agents with fresh instructions; `--all`
+  restarts the supervisor and every running agent and brings the team back as it was. It's now
+  the upgrade path after `git pull upstream main`.
+- **Bare `xt approve`** lists what's waiting, with the commands (and one to approve them all).
+- **Harness and model everywhere:** Team rows and detail, approvals (TUI, `xt approve`,
+  `xt inbox`, the brief) and `xt status` show `harness/model` (`codex/default` when no model is set).
+
+### Changed
+
+- **Standing rules:** the liaison may dispatch a goal the lead asks for under a standing rule the
+  human set (e.g. an auto-pick) without a read-back, naming the rule and telling the human
+  afterwards; the lead's role says work under such a rule still needs a goal.
+
+### Upgrading
+
+- `git pull upstream main`, then `xt restart --all` (on 0.6.0 and earlier, `xt down` then `xt`,
+  since `restart` doesn't exist yet). The new roles and protocol reach agents only after a restart.
+
 ## [0.6.0] — 2026-09-27
 
 ### Added

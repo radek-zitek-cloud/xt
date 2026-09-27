@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.6.0** (2026-09-27), after five real runs with a newsroom team and
+What the code does as of **v0.7.0** (2026-09-27), after five real runs with a newsroom team and
 the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); the
 [README](../README.md) is the user's guide.
 
@@ -129,6 +129,7 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
 | `report` | Progress, results, answers; `--ref` says what it's about. |
 | `done` | Closes an open item; the owner's final report. Goes to whoever opened it, or up the sender's chain if it can't reach them (e.g. a goal the human dispatched directly). The asker may also close its own question. |
 | `note` | Logged for the sender only, never delivered (the liaison records what the human said this way). |
+| `friction` | Any agent's feedback about xt or its harness (`xt friction`): logged to the human, shown in the Inbox and `xt inbox`, never delivered to a pane, outside the reporting chain. |
 | `system`, `alert`, `approval`, `nudge`, `wake` | From xt itself. |
 
 - **Policy:** a sender may message its `reports_to` and its own reports; the human may message
@@ -228,6 +229,16 @@ when Herdr is unreachable. The human's own commands still act directly.
    roles or skills (not in the goal brief), and sends `done` for the goal to the liaison, who
    tells the human. Tasks still open under the goal are closed with it.
 
+**Standing rules.** When the human sets a rule that lets the team act without them (e.g. an
+auto-pick when they don't answer), the lead asks the liaison for a goal under that rule, and the
+liaison dispatches it without a read-back, naming the rule, and tells the human afterwards.
+
+**Friction.** Agents add one `Friction:` line to a `done` or report when something got in the way
+(never "no issues"). The lead makes small, clear fixes to its team's roles and skills, records
+them in `members/lead/lessons.md` (and flags friction that comes back), sends bigger changes to
+the human as proposals, and summarises a goal's friction in its `done`. Friction with xt or a
+harness goes to the human with `xt friction`.
+
 ## The human's controls
 
 - Talk to the liaison in its Herdr pane (or type into any agent's pane: that's unstamped and
@@ -246,7 +257,9 @@ when Herdr is unreachable. The human's own commands still act directly.
 - `xt inbox`: questions, alerts, pending approvals, messages to the human. `xt answer <id> "..."`,
   `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
 - `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM]`.
-- `xt stop <name>` (close without retiring), `xt spawn <name>` (restart), `xt retire <name>`,
+- `xt restart <name>…` (stop and start with fresh instructions) and `xt restart --all` (the
+  supervisor and every running agent: the upgrade path), `xt stop <name>` (close without
+  retiring), `xt spawn <name>`, `xt retire <name>`,
   `xt down` (stop the supervisor, then every agent, cleanly, so neither the last tick nor the next
   `xt up` raises false alerts; `herdr session stop` bypasses xt and does leave them).
 

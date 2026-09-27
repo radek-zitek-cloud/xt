@@ -98,6 +98,24 @@ several agents need the same know-how, or the same instructions keep recurring i
   fully describes the duty, and point its `--message` at that file, never at the goal brief (your
   own standing duties go in `members/lead/notes.md`). Goal briefs are history once the goal is
   done; roles, skills and notes are the team's standing instructions.
+- **Work under a standing rule still needs a goal.** When a rule the human set lets you start work
+  without them (e.g. an auto-pick), ask the liaison to dispatch a goal for it, naming the rule;
+  the liaison dispatches those without a read-back. Tasks always refer to a goal.
+
+## Improving the team (friction)
+
+- Members add a `Friction:` line to a `done` or report when something got in the way. Act on it:
+  when the fix is small and clear (a role or skill that was unclear or wrong, a missing step), make
+  it yourself in the team's roles or skills, and record it in `members/lead/lessons.md`: the date,
+  what happened (with the message id), what you changed, and where. Before recording, check
+  lessons.md: if the same friction came back, say so, because the earlier fix didn't work.
+- Bigger changes (a policy, a new agent, anything that costs more, anything the human decided)
+  are proposals: send them to the liaison as a `report`, for the human to decide.
+- When you close a goal, put its friction and what you changed in two or three lines at the end of
+  your `done`. No separate retrospective.
+- Now and then (when lessons.md has grown, or when the human asks), prune: merge rules that say the
+  same thing, drop ones that no longer apply, and report what you pruned.
+- Problems with xt or a harness aren't yours to fix: send them with `xt friction --as lead`.
 
 ## Keeping the team repo useful
 

@@ -33,6 +33,7 @@ xt send <to> --as <you> --type <type> [--ref <id>] "text"
 | `report` | Progress, results, answers. Use `--ref` to say what it's about. |
 | `done` | Closes an open goal or task you own. **It is your final report**: put the summary and where the result is in it. `xt done <id> --as <you> "summary"` sends it to the right agent. |
 | `note` | `xt note --as <you> "..."`: records something in the ledger for yourself (a decision, what the human said). Not delivered to anyone. |
+| `friction` | `xt friction --as <you> "..."`: a problem with **xt itself or your harness** (a command refused something reasonable, a sandbox blocked you, a dialog got in the way). Goes to the human's Inbox as feedback on the tooling; not delivered to any pane, and not part of the reporting chain. |
 
 - **One message per thing.** When you finish, send only `done`, not a `report` followed by a
   `done`. Don't repeat a message you already sent, and don't send acknowledgements ("got it",
@@ -74,6 +75,11 @@ Messages from xt arrive in your conversation stamped like:
 - When you finish a task: `xt done <task id> --as <you> "what was done, where the result is"`.
 - If you get more work than you can handle, or the task is unclear, `ask` the agent that gave it
   to you. Don't guess, and don't expand the scope on your own.
+- **Report friction, briefly, when there was some.** If something actually got in the way of a task
+  (an instruction was unclear or wrong, a source or tool failed, you needed a workaround), add one
+  line to your `done` or report: `Friction: <what happened>; cost: <what it cost>; fix: <a
+  suggestion>`. No friction, no line: never write "no issues". If the problem is with xt or your
+  harness rather than the team's work, also send it with `xt friction`.
 
 ## 5. Memory and recovery
 

@@ -168,7 +168,7 @@ def test_brief_falls_back_to_the_supervisors_snapshot_when_herdr_is_unreachable(
     h._run = blocked
     assert h.agents()["liaison"].status == "working"
     c = Ctx(paths, Team.load(paths.team_toml), Ledger(paths, clock=clock), h)
-    assert "liaison (liaison, codex, reports to human): working" in brief.build(c, "liaison")
+    assert "liaison (liaison, codex/default, reports to human): working" in brief.build(c, "liaison")
 
 
 def test_supervisor_alerts_on_crash_and_blocked(ctx, clock):

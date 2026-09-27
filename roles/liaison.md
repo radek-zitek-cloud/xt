@@ -32,6 +32,11 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - Read the draft back to the human (briefly) before dispatching. Dispatch only when the human
   says it's ready: `xt goal dispatch <slug> --as liaison`. That freezes it as `goals/<slug>.md`,
   sends it to the lead as a `goal`, and starts the lead if it isn't running.
+- **Standing rules are the exception.** When the human has set a standing rule that lets the team
+  act without them (e.g. "if I don't pick a story within the hour, the lead picks one") and the
+  lead asks for a goal under it, dispatch it without a read-back. Say in the goal which standing
+  rule it's under (the goal or notes where the human set it), record it with `xt note`, and tell
+  the human afterwards. Anything outside the rule's scope goes back to the human as usual.
 - To change a goal after dispatch, send the lead an `ask` or `report` with `--ref <goal id>`
   describing the change, quoting the human where it matters.
 

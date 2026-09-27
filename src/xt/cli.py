@@ -10,8 +10,8 @@ from .context import Ctx
 from .dispatch import Queue, done_recipient, send
 from .ledger import AGENT_TYPES
 from .paths import Paths, XtError, find_root
-from .spawn import Approvals, decide, request_spawn, retire, stop
-from .team import ALWAYS, HUMAN, parse_window, schedule_text
+from .spawn import Approvals, approval_what, decide, request_spawn, retire, stop
+from .team import ALWAYS, HUMAN, harness_model, parse_window, schedule_text
 
 
 def _who(args) -> str:
@@ -140,6 +140,13 @@ def cmd_answer(args) -> None:
     print(f"#{msg['id']} answer to #{args.id} → {item['opener']}: {status}")
 
 
+def cmd_friction(args) -> None:
+    ctx = Ctx.load()
+    body = " ".join(args.body) if args.body else sys.stdin.read()
+    msg, status = send(ctx, _who(args), HUMAN, "friction", body, args.ref)
+    print(f"#{msg['id']} friction: {status}")
+
+
 def cmd_note(args) -> None:
     ctx = Ctx.load()
     body = " ".join(args.body) if args.body else sys.stdin.read()
@@ -192,7 +199,7 @@ def cmd_status(args) -> None:
             continue
         state = live[a.name].status if a.name in live else ("not running" if a.active else "retired")
         mine = sum(1 for i in items if i["owner"] == a.name)
-        print(f"  {a.name:<12} {a.role or '':<12} {a.harness or '':<7} {state:<12} open:{mine}")
+        print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} open:{mine}")
     from .jobs import Jobs
     from .watch import watch_pid
 
@@ -204,6 +211,17 @@ def cmd_status(args) -> None:
           f"pending approvals: {len(Approvals(ctx).pending())} · alerts: {len(Alerts(ctx).active())}")
     if (q or jobs) and not watch_pid(ctx):
         print("the supervisor isn't running: queued messages and jobs wait for it (`xt up`)")
+
+
+def cmd_restart(args) -> None:
+    if _who(args) != HUMAN:
+        raise XtError("only the human restarts agents")
+    from .up import restart
+
+    if bool(args.names) == args.all:
+        raise XtError("name the agents to restart, or pass --all (the whole team and the supervisor)")
+    for line in restart(Ctx.load(), args.names, args.all):
+        print(line)
 
 
 def cmd_inbox(args) -> None:
@@ -223,15 +241,18 @@ def cmd_inbox(args) -> None:
         print("  (none)")
     print("Pending approvals:")
     for rid, r in approvals.items():
-        what = (f"wake {r['name']} every {r['every']}"
-                + (f" between {r['between']}" if r.get("between") and r["between"] != ALWAYS else "")
-                if r.get("kind") == "schedule"
-                else f"spawn {r['name']} ({r['role']}, {r['harness']})")
-        print(f"  #{rid} {r['requester']} → {what}  xt approve {rid} | xt deny {rid}")
+        print(f"  #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
     if not approvals:
         print("  (none)")
+    recent_all = [m for m in ctx.ledger.messages(since_days=args.days) if m["to"] == HUMAN]
+    friction = [m for m in recent_all if m["type"] == "friction"]
+    print("Friction reported about xt or a harness:")
+    for m in friction[-args.limit:]:
+        print(f"  #{m['id']} {m['ts'][5:16]} {m['from']}: {' '.join(m['body'].split())[:160]}")
+    if not friction:
+        print("  (none)")
     print("Recent messages to you:")
-    recent = [m for m in ctx.ledger.messages(since_days=args.days) if m["to"] == HUMAN and m["type"] not in ("system",)]
+    recent = [m for m in recent_all if m["type"] not in ("system", "friction")]
     for m in recent[-args.limit:]:
         print(f"  #{m['id']} {m['ts'][5:16]} {m['type']} from {m['from']}: {' '.join(m['body'].split())[:160]}")
     if not recent:
@@ -247,6 +268,15 @@ def cmd_approve(args, approve: bool = True) -> None:
     if _who(args) != HUMAN:
         raise XtError("only the human approves spawns")
     ctx = Ctx.load()
+    if not args.ids:  # no ids: show what's waiting, with the commands
+        pending = Approvals(ctx).pending()
+        if not pending:
+            print("nothing is waiting for your approval")
+        for rid, r in sorted(pending.items(), key=lambda kv: int(kv[0])):
+            print(f"#{rid} {r['requester']} → {approval_what(r)}  (xt approve {rid} | xt deny {rid})")
+        if len(pending) > 1:
+            print(f"all of them: xt {'approve' if approve else 'deny'} {' '.join(sorted(pending, key=int))}")
+        return
     for rid in args.ids:
         try:
             print(f"#{rid}: {decide(ctx, rid, approve)}")
@@ -356,6 +386,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("id", type=int)
     sp.add_argument("body", nargs="*", help="your answer (or stdin)")
 
+    sp = add("friction", cmd_friction,
+             "report friction with xt or your harness to the human (not delivered to anyone's pane)")
+    sp.add_argument("--ref", type=int, help="the message it happened with, if any")
+    sp.add_argument("body", nargs="*", help="what happened, what it cost, a suggested fix (or stdin)")
+
     sp = add("note", cmd_note, "log a note in the ledger for yourself (not delivered to anyone)")
     sp.add_argument("--ref", type=int, help="goal/task/message id this is about")
     sp.add_argument("body", nargs="*")
@@ -380,10 +415,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("clear", cmd_clear, "dismiss an alert")
     sp.add_argument("key")
 
-    sp = add("approve", lambda a: cmd_approve(a, True), "approve pending spawns (one or more ids)")
-    sp.add_argument("ids", type=int, nargs="+", metavar="id")
-    sp = add("deny", lambda a: cmd_approve(a, False), "deny pending spawns (one or more ids)")
-    sp.add_argument("ids", type=int, nargs="+", metavar="id")
+    sp = add("approve", lambda a: cmd_approve(a, True),
+             "approve pending hires and schedules (one or more ids; none: list what's waiting)")
+    sp.add_argument("ids", type=int, nargs="*", metavar="id")
+    sp = add("deny", lambda a: cmd_approve(a, False), "deny pending hires and schedules (one or more ids)")
+    sp.add_argument("ids", type=int, nargs="*", metavar="id")
 
     sp = add("spawn", cmd_spawn, "start an agent (new: needs --harness and --role; existing: restarts it)")
     sp.add_argument("name")
@@ -394,6 +430,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("retire", cmd_retire, "close an agent's workspace and mark it retired")
     sp.add_argument("name")
+    sp = add("restart", cmd_restart,
+             "restart agents with fresh instructions (after an update): names, or --all for the "
+             "whole team and the supervisor (human only)")
+    sp.add_argument("names", nargs="*", metavar="name")
+    sp.add_argument("--all", action="store_true")
+
     sp = add("stop", cmd_stop, "close an agent's workspace, keep it in the roster (human only)")
     sp.add_argument("name")
 

@@ -16,7 +16,7 @@ from typing import Iterator
 
 from .paths import Paths, XtError
 
-AGENT_TYPES = ("goal", "task", "ask", "report", "done", "note")
+AGENT_TYPES = ("goal", "task", "ask", "report", "done", "note", "friction")
 SYSTEM_TYPES = ("alert", "approval", "nudge", "system", "wake")
 OPENING = ("goal", "task")
 HUMAN = "human"  # same as team.HUMAN (not imported, to keep the ledger free of team logic)

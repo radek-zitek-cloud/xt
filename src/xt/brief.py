@@ -3,7 +3,7 @@
 import datetime as dt
 
 from .context import Ctx
-from .team import HUMAN, schedule_text
+from .team import HUMAN, harness_model, schedule_text
 
 MAX_ITEMS = 50
 RECENT = 20
@@ -43,9 +43,8 @@ def build(ctx: Ctx, name: str | None = None) -> str:
             continue
         la = live.get(a.name)
         state = la.status if la else "not running"
-        model = f"/{a.model}" if a.model else ""
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
-        out.append(f"- {a.name} ({a.role}, {a.harness}{model}, reports to {a.reports_to}{wakes}): {state}")
+        out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}): {state}")
 
     items = [i for i in ctx.ledger.open_items() if i["type"] != "ask"]  # questions: see below
     if name and name not in (HUMAN,) and ctx.team.agent(name) and ctx.team.agent(name).role not in ("lead", "liaison"):
@@ -85,7 +84,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
 def waiting_on_human(ctx: Ctx) -> list[str]:
     """What only the human can resolve, with the exact commands, so the liaison can pass it on."""
     from .alerts import Alerts
-    from .spawn import Approvals
+    from .spawn import Approvals, approval_what
 
     approvals = Approvals(ctx).pending()
     alerts = Alerts(ctx).active()
@@ -102,9 +101,7 @@ def waiting_on_human(ctx: Ctx) -> list[str]:
                    "answers some other way, or the question is no longer needed, the asker closes it: "
                    "`xt done <id> --as <asker> \"why\"`. Work that waits on an open question is not nudged.")
     for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
-        what = (f"wake {r['name']} every {r['every']}" if r.get("kind") == "schedule"
-                else f"spawn {r['name']} ({r['role']}, {r['harness']})")
-        out.append(f"- approval #{rid}: {r['requester']} asks to {what}")
+        out.append(f"- approval #{rid}: {r['requester']} asks to {approval_what(r)}")
     if approvals:
         ids = " ".join(sorted(approvals, key=int))
         out.append(f"  → the human approves with `xt approve {ids}` (or `a` on each in the TUI's Inbox), "

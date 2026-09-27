@@ -10,7 +10,7 @@ from .alerts import Alerts
 from .herdr import HerdrError
 from .context import Ctx
 from .paths import XtError
-from .team import ALWAYS, HUMAN, SYSTEM, schedule_text
+from .team import ALWAYS, HUMAN, SYSTEM, harness_model, schedule_text
 from .watch import set_expected, set_stopped
 
 PRECEDENCE = """\
@@ -266,6 +266,14 @@ def execute_spawn(ctx: Ctx, req: dict) -> str:
     ctx.reload_team()
     ws = do_spawn(ctx, req["name"])
     return f"spawned {req['name']} in workspace {ws}"
+
+
+def approval_what(r: dict) -> str:
+    """One line for a pending approval: `wake scout every 60m between …` / `spawn carol (role, harness/model)`."""
+    if r.get("kind") == "schedule":
+        return (f"wake {r['name']} every {r['every']}"
+                + (f" between {r['between']}" if r.get("between") and r["between"] != ALWAYS else ""))
+    return f"spawn {r['name']} ({r['role']}, {harness_model(r['harness'], r.get('model'))})"
 
 
 def decide(ctx: Ctx, req_id: int, approve: bool) -> str:

@@ -63,6 +63,36 @@ def down(ctx: Ctx, keep_supervisor: bool = False) -> list[str]:
     return out
 
 
+def restart(ctx: Ctx, names: list[str], everyone: bool = False) -> list[str]:
+    """Stop and start agents so they pick up new instructions (a changed role, a new xt version).
+    With everyone: the whole team the way `xt down` + `xt up` would, then every agent that was
+    running before starts again, so the team comes back as it was."""
+    from .spawn import stop
+    from .team import HUMAN
+
+    if everyone:
+        live = ctx.herdr.agents()
+        was_running = [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.name in live]
+        out = down(ctx) + up(ctx)
+        live = ctx.herdr.agents()
+        for name in was_running:
+            if name not in live:
+                out.append(f"member: started {name} again in workspace {do_spawn(ctx, name)}")
+        return out
+    out = []
+    for name in names:
+        a = ctx.team.agent(name)
+        if a is None or a.kind == HUMAN:
+            out.append(f"{name}: no such agent")
+            continue
+        if not a.active:
+            out.append(f"{name} is retired")
+            continue
+        stop(ctx, name)
+        out.append(f"restarted {name} in workspace {do_spawn(ctx, name)}")
+    return out
+
+
 def _stop_supervisor(ctx: Ctx) -> list[str]:
     import os
     import signal

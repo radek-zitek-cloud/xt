@@ -242,6 +242,11 @@ def in_window(window: str | None, when: dt.datetime) -> bool:
     return start <= t < end if start < end else (t >= start or t < end)
 
 
+def harness_model(harness: str | None, model: str | None) -> str:
+    """'codex/default' or 'claude/opus': which harness and model an agent runs on."""
+    return f"{harness or '?'}/{model or 'default'}"
+
+
 def schedule_text(a: "Agent") -> str:
     """'every 60m, 05:00-21:00' for displays; '' when the agent has no schedule."""
     if not a.wake_every:
