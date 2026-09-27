@@ -9,6 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+### Added
+
+- [docs/story.md](docs/story.md): how xt came to be, for people who find the repo (linked from the
+  top of the README).
+
 ## [0.7.1] — 2026-09-27
 
 ### Added

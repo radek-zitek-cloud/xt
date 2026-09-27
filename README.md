@@ -6,6 +6,9 @@ goals for a **lead**, which designs and runs whatever team the work needs: a new
 an accounting desk. xt owns the coordination (messages, the ledger of open work, the supervisor,
 approvals, recovery), so an agent only needs a shell and a prompt.
 
+**New here?** Read [the story so far](docs/story.md): how xt came to be in two days, what broke
+and what we learned.
+
 **Status:** 0.x, early but in daily use (current release: see [CHANGELOG.md](CHANGELOG.md)). The pilot team is a six-agent newsroom that hires its
 own scout, finds stories in RSS feeds every hour, and researches, writes, fact-checks and publishes
 articles. Most runs so far used Codex for every agent. **Using it day to day:
