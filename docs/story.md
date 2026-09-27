@@ -185,7 +185,7 @@ Where documentation wasn't enough, Claude ran read-only checks on the machine (w
 and two tiny test turns) and reported field names only. The spec came back "for review"; Radek
 approved it in two steps, the smaller one first.
 
-The evening's lessons were about the team's manners, not its skill. Seven questions in fifteen
+The evening's lessons were about the team's manners, not its skill. Seven questions in under twenty
 minutes was too many, so Radek set a boundary: technical details are the team's to decide and
 record, only product choices come to him. The finished spec's cards had been left in the wrong
 column, because the board's own convention said the review column "may" be used. That became a
