@@ -205,7 +205,7 @@ built the board (five columns, among them one approval point only Radek can pass
 where finished work waits for his acceptance) and the public space's structure, and proposed the
 product direction, which Radek confirmed. At 21:41 the backlog was migrated: 36 items, 10 open and
 26 closed as history, every note rewritten for outside readers (none of the 36 cards mentions a
-local path, a machine or another team). Radek checked it the same minute, and the board became
+local path, a machine or another team). Radek checked it a minute later, and the board became
 xt's backlog. The PM also proposed a working rhythm (a daily wake-up between 09:00 and 17:00 to
 triage new cards and check for releases, and a weekly planning note), which Radek approved.
 
