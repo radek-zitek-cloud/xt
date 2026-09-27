@@ -180,3 +180,21 @@ def test_moving_past_the_ends_of_a_list_does_nothing():
             assert p.highlighted == 2 and p.border_subtitle == "3 of 3"  # no wrap to the top
 
     asyncio.run(run())
+
+
+def test_long_rows_stay_on_one_line():
+    from rich.text import Text
+
+    from xt.tui.model import PANELS, Row, Snapshot
+
+    def src():
+        rows = [Row(f"r{i}", Text(f"#{i} " + "word " * 100), lambda: Text("detail"), "message") for i in range(3)]
+        return Snapshot({p: list(rows) for p in PANELS}, "summary")
+
+    async def run():
+        app = XtTui(src)
+        async with app.run_test(size=(100, 40)) as pilot:
+            await pilot.pause()
+            assert len(app.panel(1)._lines) == 3  # one line per item, no wrapping
+
+    asyncio.run(run())

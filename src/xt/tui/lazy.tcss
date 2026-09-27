@@ -44,10 +44,13 @@ Screen {
     width: 1fr;
 }
 
-/* Lists: one dense line per item, plain highlight bar. */
+/* Lists: one line per item, never wrapped (cut with …; the detail pane has the rest),
+   plain highlight bar. */
 OptionList {
     background: ansi_default;
     color: ansi_default;
+    text-wrap: nowrap;
+    text-overflow: ellipsis;
 }
 
 OptionList > .option-list--option {
