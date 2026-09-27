@@ -1,0 +1,203 @@
+# Goals in practice
+
+Three real goals, word for word, as they were sent to xt teams in September 2026. Together they
+show what the [story](story.md) means by "write outcomes, not steps": what a goal looks like, how
+a team reads it, and how a plain-language goal fixes a rule the team followed too faithfully.
+
+Each goal was typed into the team's **liaison** by Claude on Radek's behalf, which is why they
+start with "From Claude, on Radek's behalf". The liaison turned each into a goal brief for the
+**lead**, which planned the work and ran the team. Two details were redacted: a local file path
+and an internal board id.
+
+- [1. Hire a scout](#1-hire-a-scout-the-newsroom-finds-its-own-stories): outcomes only; the
+  team designed the solution
+- [2. Correct the auto-pick rule](#2-correct-the-auto-pick-rule-fixing-what-the-team-did-exactly-right):
+  fixing a rule the team followed exactly
+- [3. Set up the xt product team](#3-set-up-the-xt-product-team-a-team-with-a-working-method):
+  a new team, with a working method passed on as part of the goal
+
+## 1. Hire a scout: the newsroom finds its own stories
+
+**Context.** A newsroom team of six agents (a lead, a researcher, an author, an editor and a
+publisher, plus the liaison) had so far written articles on request. This goal asked it to find
+its own stories from news feeds, without the human in the loop for every choice.
+
+**What to notice.** The goal says *what* the scout must achieve (never re-evaluate a seen item,
+survive losing its memory, stay cheap) and explicitly leaves the design to the team: "How to
+achieve this is the team's design." It also states the no-answer policy (auto-pick) and its
+limits (quiet hours, a daily cap), and says when the goal is done, so it doesn't stay open
+forever.
+
+```
+From Claude, on Radek's behalf. Radek authorized this goal and approves dispatching it to the lead without a read-back. Please pass it on in full, including the feed list.
+
+Goal: make the newsroom find its own stories. Hire a scout that checks news feeds every hour and proposes topics; the newsroom writes and publishes the ones picked.
+
+The scout
+- A new agent, `scout`, reporting to the lead. Its only job is finding and ranking topics; it never writes articles.
+- Woken every 60 minutes by an xt schedule (`xt schedule`). The spawn and the schedule both need Radek's approval; ask for them the usual way.
+- Sources: these RSS feeds only. No scraping of web pages; the researchers still open the articles when they work a topic.
+  - ČTK: https://www.ceskenoviny.cz/sluzby/rss/zpravy.php
+  - ČT24: https://ct24.ceskatelevize.cz/rss/hlavni-zpravy
+  - iROZHLAS: https://www.irozhlas.cz/rss/irozhlas
+  - BBC World: https://feeds.bbci.co.uk/news/world/rss.xml
+  - Euronews: https://www.euronews.com/rss
+  - ECB press releases: https://www.ecb.europa.eu/rss/press.html
+  - ČNB press releases: https://www.cnb.cz/cs/.content/rss-feed/rss-feed_tz.rss
+  - Ars Technica: https://feeds.arstechnica.com/arstechnica/index
+  - Hacker News: https://news.ycombinator.com/rss
+- Only new or changed items: the scout must never re-evaluate a feed item it has already seen, only new items and ones that changed. This must survive the scout losing its memory (restart, context reset), and each hourly run must stay cheap. It also keeps track of topics already proposed or covered, and raises one again only for a real new development, marked as an update. How to achieve this is the team's design.
+- Fetching feeds needs network access, so an escalation. Justify it honestly (reading the team's news feeds); if one is refused or waits for Radek, report it; don't get around it.
+- If a run finds nothing worth proposing, it says so in one line and stops.
+
+Batches and picking
+- Each run with something worth writing sends the lead a batch of 2–3 ranked topics: headline, why it matters, source items, suggested language. The lead forwards it to the liaison, which asks Radek to pick.
+- If Radek hasn't picked from a batch by the time the next batch arrives, the lead picks the top topic of the new batch itself and the newsroom writes it. Topics from the unpicked batch are dropped, not queued.
+- A pick by Radek always wins, whenever it comes.
+
+Writing
+- Czech topics are written in Czech, everything else in English. Balanced, general public, about 500 words, through the newsroom's usual workflow (skills/article-workflow/SKILL.md): research → author → editor → publisher, including publishing to SilverBullet.
+- Two researchers can work in parallel, so a picked topic doesn't wait behind another one. Hiring the second researcher needs Radek's approval too.
+
+Limits
+- No scout runs between 21:00 and 05:00 (xt still wakes the scout hourly; at night it answers "quiet hours" in one line and stops).
+- At most 6 auto-picked articles a day; after that, only Radek's picks.
+
+Done when: the scout is hired, scheduled, and its first run has worked (a batch reached Radek, or a one-line "nothing worth proposing"), and the lead reports how the scout avoids re-reading seen items (what it built, where it keeps state). Then close this goal. From then on the scout runs on its schedule, and each picked topic (Radek's or auto-picked) becomes its own task.
+```
+
+**What happened.** In about three minutes the lead wrote the scout's role, a skill and a small
+feed scanner: it keeps a fingerprint of every item it has seen, skips feeds that haven't changed
+(HTTP cache headers), and marks a batch as seen only after it has been delivered, so a crash loses
+nothing. That was a better design than the one we had in mind. The first run read 251 items and
+proposed three topics; the next hourly run read only the 19 new ones. The human picked a topic,
+and the article was published 19 minutes after the goal was sent. Hiring the scout, a second
+researcher and the hourly schedule each waited for the human's approval.
+
+## 2. Correct the auto-pick rule: fixing what the team did exactly right
+
+**Context.** Goal 1 said: if the human hasn't picked when the next batch arrives, "the lead picks
+the top topic of the new batch". The lead did exactly that, and also sent the same new batch to
+the human to decide, so the human's choice would have come after the writing started, and the
+batch he'd had a full hour to consider was thrown away. The mistake was in the goal, not in the
+team.
+
+**What to notice.** The correction explains *why* the old rule was wrong, gives the new rule in
+full, says what to do right now with the work in progress, and says where the rule must be written
+down so it outlives the goal (the lead's notes and the scout's skill, not the goal brief).
+
+```
+From Claude, on Radek's behalf. Radek authorized this goal and approves dispatching it to the lead without a read-back. Please pass it on in full.
+
+Goal: correct the standing auto-pick rule for scout batches. The current rule (goal #161's brief: "the lead picks the top topic of the new batch") is wrong: it auto-picks from the batch that was just sent to Radek, so his choice from that batch comes after writing has started, and the batch he had a whole hour to decide on is thrown away.
+
+Correct rule, replacing the old one from now on:
+- Every batch goes to Radek for a decision, as now.
+- When a new batch arrives and the previous batch is still unpicked, the lead auto-picks the top topic of the PREVIOUS batch, and the new batch goes to Radek for his decision. Every batch gets an hour for Radek, then an auto-pick if he didn't choose.
+- Skip a topic that has gone stale or is already covered or in progress, and take the next one from the same batch. If none is still worth writing, no auto-pick.
+- A pick by Radek always wins, whenever it arrives. The limit of six auto-picks a day stays.
+
+Right now: let the RAF Fairford article (#202) finish; it counts as today's first auto-pick. The 16:36 batch is Radek's to decide. If he hasn't picked when the 17:36 batch arrives, auto-pick from the 16:36 batch under the new rule (Fairford is already covered, so the next topic).
+
+Where the rule lives: this is a standing duty, so write it into members/lead/notes.md and wherever the scout workflow is described (skills/rss-scout/SKILL.md or roles/scout.md), not only in a goal brief. The scout's wake message currently points at goals/scheduled-story-scout.md; point it at the scout's skill or role instead (that change is a schedule change, so it will need Radek's approval).
+
+Liaison: tell Radek in plain words that the 16:36 batch is open for him to pick (topics 2 and 3; topic 1 is already being written).
+
+Done when: the rule is written in those files, the wake message points at the skill or role, and the lead reports the changed lines.
+```
+
+**What happened.** About a minute later the lead reported the rule rewritten in its notes, the
+scout's skill and the scout's role, and asked to point the scout's hourly wake-up message at the
+skill instead of the old goal (a schedule change, so it waited for the human's approval). At the
+next batch it auto-picked from the previous, unanswered one, as intended. When the human later
+answered a batch with "none", the lead recorded it as a decision; a one-line follow-up goal made
+that explicit too: a pass is a decision, never overridden by an auto-pick.
+
+## 3. Set up the xt product team: a team with a working method
+
+**Context.** A new team, whose job is product management for xt itself: the backlog on a Kanban
+board (Fizzy), specs, research, documentation and release notes in a public wiki (SilverBullet).
+It never touches the code or any machine; Radek and Claude build what it specifies.
+
+**What to notice.** Most of the goal is a *working method*: who decides (the human is the product
+owner), what "ready" and "done" mean, how items are ordered and sized. A lead can't guess a
+discipline the human wants followed, so it's passed on as part of the goal. The board's design is
+left to the team, within three constraints, one of them a single approval point that only the
+human can move work past. Because the wiki is public, the goal says what must never appear in it.
+Tool quirks the team would otherwise stumble on (a token the sandbox can't reach) are stated up
+front.
+
+```
+From Claude, on Radek's behalf. Radek authorized this goal and approves dispatching it to the lead
+without a read-back. Please pass it on in full: the working method below is part of the goal.
+
+GOAL: SET UP THE XT PRODUCT TEAM
+
+Purpose. This team runs product management for xt (https://github.com/radek-zitek-cloud/xt, the
+tool this team itself runs on): backlog, discovery and specs, research, documentation, release
+notes and, later, QA. The team never changes xt's code, its repo or any machine; Radek and Claude
+build what the team specifies. Radek is the product owner.
+
+Tools
+- Fizzy board "xt Board" (id <board id>), via the `fizzy` CLI. Its token is in the
+  system keyring, which your sandbox cannot reach: every fizzy command needs an escalation, even
+  read-only ones ("auth_required" inside the sandbox means exactly that, not a missing token).
+- SilverBullet space "xt Space", via the user's `silverbullet` skill with `--space xt`. It needs
+  the network, so escalate too. Follow the skill's rules: plain Markdown, one line per paragraph,
+  paths end in `.md`, links as wikilinks, read before you rewrite, never --force.
+- Justify escalations honestly. No secrets on cards or pages.
+
+Public. xt Space is public: anyone on the internet can read it, and it is linked from xt's
+README. Write every page, card and comment for an outside reader. Never include personal
+information, local paths (/home/...), hostnames or machine names, anything about other teams or
+systems beyond xt itself, or secrets. When you migrate the backlog, rewrite each note for that
+reader instead of copying it (the source mentions internal runs, paths and other teams).
+
+Working method (the PM's discipline; put it in the PM's role and the skills)
+- Roles. Radek is the product owner: he decides what gets built and in which order, approves
+  items as ready, and accepts them as done. The PM runs the backlog for him: collects, clarifies,
+  sizes and orders items, and proposes; it doesn't decide. Radek and Claude are the delivery team.
+- Discovery before delivery. Discovery answers "is this worth doing, and what exactly?" and ends
+  in a spec page; delivery is building it.
+- Definition of Ready: a clear problem, acceptance criteria ("done when…"), a size, a linked spec
+  when it's more than trivial, and Radek's approval. Definition of Done: built, tested, documented
+  (user guide and changelog), released.
+- One ordered list: the top is what comes next. Order by value against size (impact, confidence,
+  size); keep it simple. The PM proposes the order, Radek confirms it.
+- Item types as tags: feature, bug, chore, docs, research, idea. Size 0-9 as a tag `size:N`
+  (0 trivial, 9 massive change). Velocity = the sum of sizes of cards closed per week.
+- Discussions go on the cards as comments, so the reasoning stays with the item. Every spec page
+  links to its card and every card to its page.
+- Fizzy moves cards untouched for 30 days to "Not now". Fine for ideas; make sure it never
+  buries a committed item (use golden cards for the committed top of the list).
+
+What to build
+1. The board. Design the columns yourselves, within these constraints: discovery and delivery
+   are visibly separate; there is one approval point that only Radek moves cards past (nothing is
+   built before it); the number of cards being built at once is limited. Create the columns and
+   tags on xt Board. Write the conventions as skill `skills/xt-board/SKILL.md` (columns and what
+   each means, tags, card template, who moves what, "search before you create").
+2. The space. Structure xt Space with an index and sections for specs, research, docs, releases
+   and planning notes, with page templates. Write the conventions as skill `skills/xt-space/SKILL.md`.
+3. Hire a product manager (only the PM for now; more roles later, each with Radek's approval).
+   Its role describes the working method above.
+4. Product direction. As its first step, the PM proposes a one-line product direction ("xt is
+   for …, not for …") and asks Radek to confirm it.
+5. Migrate the backlog from the project's backlog file (backlog.md in the lab repo) (read it; don't edit it): one
+   card per item, keeping its number in the title (e.g. "#30 Harness coverage…"), its size, type
+   and notes (rewritten for the public, see above). Open items go in the right columns; done
+   items go in as closed cards so velocity history is kept; watching and decided items as closed
+   cards with a note. The migration is checked by Radek before the board becomes the backlog;
+   until then backlog.md stays the truth.
+6. Propose a rhythm for Radek's approval (schedules need it): daily triage of new cards; a
+   weekly planning note as a page in xt Space (proposed order, what's ready, velocity, stale
+   items), announced to Radek with its link through the liaison; a check when a new xt release
+   tag appears. Use quiet hours (--between) for anything scheduled.
+
+Done when: the columns and tags exist; both skills are written; the PM is hired; the product
+direction is proposed to Radek; the migration is done and reported with counts (open, done,
+closed) for Radek to check; the rhythm is proposed.
+```
+
+**What happened.** This goal was sent on 27 September 2026 at 21:30; its outcome will be added
+here.

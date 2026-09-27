@@ -118,6 +118,7 @@ friction with the tooling itself. xt went from 0.1.0 to 0.7.1 in eight releases.
   lost contexts.
 - **Write outcomes, not steps.** When a goal said *what* and *why* (survive memory loss, stay
   cheap), agents chose good designs. When a goal was precise but wrong, they followed it exactly.
+  Three real goals, word for word, are in [Goals in practice](examples.md).
 - **Agents route around friction silently.** They hit a refused command, an unreachable page, a
   wrong link, worked around it and moved on. Every such lesson was found by a human reading the
   log afterwards. xt now asks agents to report friction in one line, and the lead to act on it.
@@ -141,6 +142,7 @@ This page will grow as that story unfolds.
 ## Read more
 
 - [README](../README.md): what xt is and how to install it
+- [Goals in practice](examples.md): three real goals, word for word, and what the teams did with them
 - [User guide](user-guide.md): working with a team day to day, and every command
 - [Architecture](architecture.md): how xt works inside
 - [Changelog](../CHANGELOG.md): every release

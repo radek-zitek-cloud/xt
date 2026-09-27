@@ -7,7 +7,8 @@ an accounting desk. xt owns the coordination (messages, the ledger of open work,
 approvals, recovery), so an agent only needs a shell and a prompt.
 
 **New here?** Read [the story so far](docs/story.md): how xt came to be in two days, what broke
-and what we learned.
+and what we learned; and [Goals in practice](docs/examples.md): real goals given to teams, word
+for word.
 
 **Status:** 0.x, early but in daily use (current release: see [CHANGELOG.md](CHANGELOG.md)). The pilot team is a six-agent newsroom that hires its
 own scout, finds stories in RSS feeds every hour, and researches, writes, fact-checks and publishes
