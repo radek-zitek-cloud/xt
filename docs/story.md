@@ -219,8 +219,40 @@ published article came to about 15 million tokens, roughly $3.26. On a subscript
 a bill, and the Codex allowance showed 20% of the week used, but it's the baseline the team's next
 card, budgets, was waiting for.
 
-Both cards now wait in the board's "Ready for acceptance" column until Radek has seen them running
-and closes them: the product owner accepts, the builder doesn't.
+Radek accepted both before upgrading, and the upgrade itself found the builder's own mistake: in
+0.9.0 the usage recorder only read sessions since each agent's last start, so the restart of an
+upgrade would have dropped everything before it. A patch release fixed it half an hour later, with
+a test proven to fail on the old code.
+
+**A batch, and a second role (28 September, late morning).** Asked to prepare the next delivery,
+the product manager wrote nine specs in about ten minutes, each with testable "done when"
+criteria and a size, and proposed a release of ten points in the confirmed order. Only one spec
+carried a question for Radek, and it caught a contradiction in a card Claude had written. Radek
+approved the batch with one card added.
+
+That made the imbalance visible: the team was really one agent. The product manager specified,
+Claude built and verified its own work, and Radek accepted on Claude's word; most of the good
+cards came from someone reading the running teams' logs. So the team hired a **quality analyst**:
+it checks every delivery against its spec, criterion by criterion, in a clean copy of the published
+code, and marks what it could only verify after an upgrade as blocked rather than passed; once a day
+it reviews its own team's logs and usage for anomalies and files them as cards. It reads only its
+own team: other teams don't exist for it. Radek accepts; the analyst never does.
+
+Two design decisions came out of that conversation. Waking the analyst on a timer costs a model
+turn each time, even when nothing happened; but the supervisor must stay generic and know nothing
+about releases or boards. The answer is a card for schedules with a team-defined probe: the
+supervisor runs a cheap command and wakes the agent only when its output changes, and because that
+command runs with the operator's rights, the human approves the exact command. And Claude could
+tell the team "this card is ready for acceptance" as part of every release, but Radek said no:
+that is one step from putting the builder on the team. For now Claude proposes each such message
+and waits for his confirmation; making the builder a team member, perhaps with Claude Code as its
+harness, is an experiment for later, on purpose rather than by drift.
+
+Minutes after its hire, the new analyst's schedule produced the lead's first real friction report:
+it couldn't see when the analyst would first wake up. It named the cost and pointed at the card
+that already fixes it, instead of filing a duplicate.
+
+Both cards now sit in Done. The next batch is waiting in "Ready to build".
 
 You can watch it work in its public space: **[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**.
 This page will grow as that story unfolds.
