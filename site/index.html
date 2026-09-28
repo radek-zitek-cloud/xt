@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>xt: accountable AI agent teams across harnesses</title>
+<meta name="description" content="xt runs persistent teams of Claude Code, Codex and pi agents. They work on their own; you approve, decide and correct, and every step is on record. Open source, MIT.">
+<meta property="og:title" content="xt: accountable AI agent teams across harnesses">
+<meta property="og:description" content="Persistent, named AI agents in a hierarchy, with approvals, a ledger, schedules, independent QA and cost you can see. Open source, MIT.">
+<meta property="og:image" content="assets/screen.jpg">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2304070c'/%3E%3Cpath d='M9 9l14 14M23 9L9 23' stroke='%238cc8f5' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav" aria-label="Main">
+  <a class="logo" href="./">
+    <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="#0d1622" stroke="#26364c"/><path d="M9 9l14 14M23 9L9 23" stroke="#8cc8f5" stroke-width="3.2" stroke-linecap="round"/></svg>
+    xt
+  </a>
+  <div class="nav-links">
+    <a href="#how">How it works</a>
+    <a href="#can">Capabilities</a>
+    <a href="#teams">Live teams</a>
+    <a href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/story.md">Story</a>
+    <a href="https://sb.zvikov.zitek.cloud/xt-space">Backlog</a>
+  </div>
+  <a class="btn" href="https://github.com/radek-zitek-cloud/xt">GitHub</a>
+</nav>
+
+<header class="hero">
+  <div class="grid-bg"></div>
+  <div class="wrap">
+    <div class="eyebrow">open source · MIT · v0.11.0</div>
+    <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
+    <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You approve, decide and correct, and every step is on record.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/radek-zitek-cloud/xt#quick-start">Get started</a>
+      <a class="btn" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/story.md">Read how it was built</a>
+    </div>
+    <div class="install"><b>$</b> sh xt-clone.sh my-team <span>&nbsp;# clone, init, start the team, open the TUI</span></div>
+  </div>
+</header>
+
+<section id="how">
+  <div class="wrap">
+    <div class="section-title">
+      <h2>Coordination is xt's job.<br><span class="plain">The work is the agents'.</span></h2>
+      <p>An agent only needs a shell and a prompt. xt owns everything around it: who talks to whom, what is open, what it costs, and what needs you.</p>
+    </div>
+
+    <div class="row">
+      <div class="copy">
+        <h3>Organize</h3>
+        <p class="sub">A hierarchy, not a mesh. You talk to one agent; it talks to the lead; the lead runs the team.</p>
+        <ul>
+          <li><b>Liaison</b> turns what you want into goals, reads them back to you and asks you only real decisions.</li>
+          <li><b>Lead</b> designs the team the work needs, writes roles and skills, and asks to hire.</li>
+          <li><b>Members</b> each run in their own terminal and report up. <code class="mono">xt send</code> refuses anything outside the chain.</li>
+        </ul>
+        <div class="pills">
+          <a class="pill arrow" href="https://github.com/radek-zitek-cloud/xt/blob/main/protocol.md">Protocol</a>
+          <a class="pill arrow" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/architecture.md">Architecture</a>
+        </div>
+      </div>
+      <div class="frame"><div class="frame-inner">
+        <svg viewBox="0 0 640 400" role="img" aria-label="Hierarchy: you and the liaison, the lead, three members; the supervisor delivers every message and writes the ledger.">
+          <defs>
+            <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="#6f9bc2"/></marker>
+          </defs>
+          <rect x="16" y="14" width="126" height="30" rx="15" class="d-tag"/><text x="79" y="34" text-anchor="middle" class="d-t3">xt team</text>
+          <rect x="16" y="56" width="440" height="330" rx="12" class="d-dash"/>
+          <!-- you -->
+          <rect x="176" y="18" width="120" height="34" rx="6" fill="#eef6fd"/><text x="236" y="40" text-anchor="middle" class="d-t">you</text>
+          <!-- liaison -->
+          <rect x="176" y="96" width="120" height="34" rx="6" class="d-box"/><text x="236" y="118" text-anchor="middle" class="d-t">liaison</text>
+          <!-- lead -->
+          <rect x="176" y="186" width="120" height="34" rx="6" class="d-box"/><text x="236" y="208" text-anchor="middle" class="d-t">lead</text>
+          <!-- members -->
+          <rect x="40" y="290" width="118" height="34" rx="6" class="d-box"/><text x="99" y="312" text-anchor="middle" class="d-t">researcher</text>
+          <rect x="177" y="290" width="118" height="34" rx="6" class="d-box"/><text x="236" y="312" text-anchor="middle" class="d-t">author</text>
+          <rect x="314" y="290" width="118" height="34" rx="6" class="d-box"/><text x="373" y="312" text-anchor="middle" class="d-t">editor</text>
+          <text x="236" y="352" text-anchor="middle" class="d-t2">claude · codex · pi, one terminal each</text>
+          <!-- chain -->
+          <path d="M236 54 V94" class="d-line" marker-end="url(#ar)" marker-start="url(#ar)"/>
+          <text x="244" y="78" class="d-t2">goals, questions</text>
+          <path d="M236 132 V184" class="d-line" marker-end="url(#ar)" marker-start="url(#ar)"/>
+          <text x="244" y="162" class="d-t2">goals, reports</text>
+          <path d="M236 222 V250 H99 V288" class="d-line" marker-end="url(#ar)"/>
+          <path d="M236 250 V288" class="d-line" marker-end="url(#ar)"/>
+          <path d="M236 250 H373 V288" class="d-line" marker-end="url(#ar)"/>
+          <text x="244" y="244" class="d-t2">tasks</text>
+          <!-- supervisor + ledger -->
+          <rect x="492" y="120" width="132" height="64" rx="8" class="d-box-dim"/>
+          <text x="558" y="146" text-anchor="middle" class="d-t3">supervisor</text>
+          <text x="558" y="166" text-anchor="middle" class="d-t2">delivers · wakes</text>
+          <rect x="492" y="220" width="132" height="64" rx="8" class="d-box-dim"/>
+          <text x="558" y="246" text-anchor="middle" class="d-t3">ledger</text>
+          <text x="558" y="266" text-anchor="middle" class="d-t2">every message</text>
+          <path d="M558 186 V218" class="d-line" marker-end="url(#ar)"/>
+          <path d="M456 150 H490" class="d-dash"/>
+        </svg>
+      </div></div>
+    </div>
+
+    <div class="row flip">
+      <div class="copy">
+        <h3>Decide</h3>
+        <p class="sub">The team runs without you watching. You are needed only for decisions.</p>
+        <ul>
+          <li><b>Approvals:</b> every hire and every schedule waits for your yes.</li>
+          <li><b>One Inbox</b> for questions, approvals and alerts, in the TUI or <code class="mono">xt inbox</code>, with a desktop notification.</li>
+          <li><b>Standing rules</b> instead of step-by-step instructions: "if I don't answer within the hour, pick the top story yourself, at most six a day".</li>
+          <li><b>Corrections become rules:</b> a correction from you is recorded as a lesson, and the rule that allowed the mistake is fixed.</li>
+        </ul>
+      </div>
+      <div class="frame"><div class="frame-inner">
+        <div class="log"><span class="t">05:00:01</span> <span class="a">wake</span>  scout   hourly scan, 9 feeds, 52 new items
+<span class="t">05:01</span>    <span class="a">ask</span>   liaison→you  Which story should the team pursue?
+<span class="t">06:01</span>    <span class="w">rule</span>  lead    no answer in an hour: auto-pick 1/6
+<span class="t">06:15</span>    <span class="g">done</span>  lead    published, editor-approved, 489 words
+<span class="t">07:48</span>    <span class="a">pick</span>  you     story 3 (your pick goes first)
+<span class="t">13:01</span>    <span class="w">rule</span>  lead    auto-pick 6/6, no more today</div>
+        <div class="caption">A day of the newsroom team, from its ledger (28 September 2026)</div>
+      </div></div>
+    </div>
+
+    <div class="row">
+      <div class="copy">
+        <h3>Verify</h3>
+        <p class="sub">Independent quality checks, release candidates, acceptance against the spec.</p>
+        <ul>
+          <li><b>A quality analyst agent</b> checks every delivery criterion by criterion, in a clean copy of the code.</li>
+          <li><b>Candidates first:</b> a release starts as <code class="mono">-rc1</code>; production stays on the accepted version until every card passes.</li>
+          <li><b>Evidence from the ledger:</b> "delivered exactly once" is proven from the records, not taken on trust.</li>
+        </ul>
+        <div class="pills">
+          <a class="pill arrow" href="https://github.com/radek-zitek-cloud/xt/releases">Releases</a>
+          <a class="pill arrow" href="https://sb.zvikov.zitek.cloud/xt-space">Specs &amp; planning</a>
+        </div>
+      </div>
+      <div class="frame"><div class="frame-inner">
+        <div class="log"><span class="t">v0.11.0-rc1</span>  <span class="w">NOT ACCEPTED</span>
+  #103  <span class="w">FAIL</span>  an agent passed as the human from a PTY shell
+  #101  <span class="w">FAIL</span>  a named connector opt-in exposed every app
+  #106  <span class="g">PASS</span>  #98 <span class="g">PASS</span>  #102 blocked on an owner check
+<span class="t">v0.11.0-rc2</span>  fixes both, the analyst repeats its probe
+  #103  <span class="g">PASS</span>  #101 <span class="g">PASS</span>  #102 <span class="g">PASS</span>
+<span class="t">v0.11.0</span>      <span class="g">ACCEPTED</span>  same code as rc2, version only</div>
+        <div class="caption">The first release candidate: two real bugs, caught by the team's own analyst</div>
+      </div></div>
+    </div>
+
+    <div class="row flip">
+      <div class="copy">
+        <h3>Measure &amp; bound</h3>
+        <p class="sub">Know what each agent holds and costs. Keep it inside the lines.</p>
+        <ul>
+          <li><b>Context per agent</b> (<code class="mono">~211k/258k</code>, yellow at 70%, red at 85%), tokens and estimated cost per turn and per goal, subscription allowance per week.</li>
+          <li><b>No desktop or browser control</b> for agents, and none of your account connectors (mail, files, calendar) unless you opt one in.</li>
+          <li><b>Survives restarts:</b> <code class="mono">xt down</code> and <code class="mono">xt restart --all</code> bring back the team that was running; agents recover from files and a brief, not from memory.</li>
+        </ul>
+      </div>
+      <div class="frame"><div class="frame-inner" style="padding:10px">
+        <img class="shot" src="assets/screen.jpg" alt="The xt TUI next to a liaison's pane in Herdr: goals, team, tasks, inbox, log and supervisor panels" loading="lazy" width="1600" height="880">
+      </div><div class="caption">The TUI (right) beside the liaison's pane in Herdr</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="can">
+  <div class="wrap">
+    <div class="section-title">
+      <h2>What xt can do</h2>
+      <p>Each of these has been shown in real runs, not only in tests.</p>
+    </div>
+    <div class="grid">
+      <div class="cell"><div class="k">01</div><h4>Persistent, named agents</h4><p>A liaison, a lead and members, each in its own workspace, working while you're away.</p></div>
+      <div class="cell"><div class="k">02</div><h4>You decide, they deliver</h4><p>Questions wait in one Inbox with a notification. You never have to watch a pane.</p></div>
+      <div class="cell"><div class="k">03</div><h4>A supervisor and a ledger</h4><p>Every message is delivered and logged. Nothing gets lost, and every step can be audited.</p></div>
+      <div class="cell"><div class="k">04</div><h4>Goals, read back first</h4><p>The liaison reads a goal back to you, lets you revise it, and dispatches it exactly once.</p></div>
+      <div class="cell"><div class="k">05</div><h4>Schedules</h4><p>Daily wakes at a set local time, hourly scouts, quiet hours that hold to the second.</p></div>
+      <div class="cell"><div class="k">06</div><h4>Autonomy within rules</h4><p>A newsroom picked and published stories when you didn't answer, and stopped at its daily limit.</p></div>
+      <div class="cell"><div class="k">07</div><h4>Corrections become rules</h4><p>Recorded lessons and a regular rules review keep the team's rules consistent and short.</p></div>
+      <div class="cell"><div class="k">08</div><h4>A product team for xt itself</h4><p>A PM and a quality analyst run xt's backlog, specs and releases in public. Only you pass the gates.</p></div>
+      <div class="cell"><div class="k">09</div><h4>Independent acceptance</h4><p>Every card is checked against its spec. A final PASS closes it; anything else waits for you.</p></div>
+      <div class="cell"><div class="k">10</div><h4>Context and cost you can see</h4><p>Per agent, per turn, per goal, and the week's subscription allowance.</p></div>
+      <div class="cell"><div class="k">11</div><h4>Restarts without loss</h4><p>The team that was running comes back, and each agent picks up from its brief.</p></div>
+      <div class="cell"><div class="k">12</div><h4>Agents in bounds</h4><p>No desktop, browser or account connectors by default, and no posing as the human.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="teams">
+  <div class="wrap">
+    <div class="section-title">
+      <h2>Two teams run on it every day</h2>
+      <p>Not demos: both work from the same ledger and rules you'd use.</p>
+    </div>
+    <div class="teams">
+      <div class="team">
+        <div class="tag">● newsroom</div>
+        <h4>Finds, checks and publishes news</h4>
+        <p>A scout reads nine news feeds every hour and proposes stories; a researcher, an author, an editor and a publisher take the chosen one to a published article, every claim sourced.</p>
+        <div class="stats">
+          <div class="stat"><div class="n">19 min</div><div class="l">first brief to published article</div></div>
+          <div class="stat"><div class="n">8</div><div class="l">articles on 28 Sep, 6 picked by the team</div></div>
+          <div class="stat"><div class="n">6/6</div><div class="l">daily auto-pick limit, held</div></div>
+        </div>
+      </div>
+      <div class="team">
+        <div class="tag">● product team</div>
+        <h4>Runs the development of xt itself</h4>
+        <p>A product manager specifies and plans; a quality analyst accepts or rejects each delivery; the human owns the approval points; the code is built outside the team.</p>
+        <div class="stats">
+          <div class="stat"><div class="n">13</div><div class="l">cards specified, built and accepted in a day</div></div>
+          <div class="stat"><div class="n">2</div><div class="l">real bugs caught in a release candidate</div></div>
+          <div class="stat"><div class="n">~$37</div><div class="l">its busiest day, at API list prices</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="limits">
+  <div class="wrap">
+    <div class="section-title">
+      <h2 class="plain" style="color:var(--text)">Honest limits</h2>
+      <p>xt is 0.x and a few days old. This is what it doesn't do yet.</p>
+    </div>
+    <ul class="limits">
+      <li>Tested on Linux only, with Herdr. Most runs used Codex for every agent; the Claude Code and pi adapters have seen little real use.</li>
+      <li>The hierarchy is enforced by xt, not by a sandbox. A determined agent could still reach around it through its shell.</li>
+      <li>Costs are estimates from public list prices, not bills. No budgets yet.</li>
+      <li>Command-line tools that hold your credentials are ordinary programs to a harness; xt can't switch them off.</li>
+    </ul>
+  </div>
+</section>
+
+<div class="closing">
+  <div class="wrap">
+    <blockquote>xt is for coordinating <span>accountable AI agent teams</span> across harnesses, not for replacing the tools those agents use to do their work.</blockquote>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/radek-zitek-cloud/xt#quick-start">Get started</a>
+      <a class="btn" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/user-guide.md">User guide</a>
+      <a class="btn" href="https://sb.zvikov.zitek.cloud/xt-space">Public backlog</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <div class="wrap">
+    <div>
+      <a href="https://github.com/radek-zitek-cloud/xt">GitHub</a>
+      <a href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/story.md">Story</a>
+      <a href="https://github.com/radek-zitek-cloud/xt/blob/main/CHANGELOG.md">Changelog</a>
+      <a href="https://sb.zvikov.zitek.cloud/xt-space">xt Space</a>
+    </div>
+    <div>MIT licensed · built by Radek Zítek with Claude</div>
+  </div>
+</footer>
+
+</body>
+</html>
