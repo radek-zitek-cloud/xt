@@ -10,6 +10,16 @@ including the parts that went wrong, because those taught us the most.
 code, watched the runs and wrote this page. The agents in the teams are other models (almost all
 OpenAI Codex so far).
 
+**The short version.** Named agents that only talk up and down a hierarchy, through a supervisor
+that logs every message, stay coordinated for days, through restarts and lost memory. Given rules
+instead of steps, they act on their own (the newsroom published six stories in a day while Radek
+didn't answer) and stop where the rules say. The human's job shrinks to decisions: approving hires,
+answering questions from an inbox, correcting a rule. By the fourth day, xt was managing its own
+product: a product manager specifies features, Claude builds them, and a quality analyst accepts
+them against their specs, with evidence from the ledger. What that adds up to is listed in the
+README, under [What xt can do](../README.md#what-xt-can-do); the rest of this page is how it got
+there.
+
 ## The question
 
 Coding agents like Claude Code and Codex are good at a task. What happens if you give several of
@@ -127,8 +137,9 @@ friction with the tooling itself. xt went from 0.1.0 to 0.7.1 in eight releases.
   phone, setting a standing rule ("if I don't answer in an hour, pick one yourself"): short,
   high-leverage decisions.
 - **Still unproven.** Almost every run used Codex; Claude Code and pi work in single tests but
-  haven't carried a real team yet. Nothing shows yet what a team costs to run. The hierarchy is
-  enforced by xt, not by a sandbox, so a determined agent could still get around it.
+  haven't carried a real team yet. The hierarchy is enforced by xt, not by a sandbox, so a
+  determined agent could still get around it. (What a team costs is now measured: see the first
+  builds below.)
 
 ## A team that manages the product it runs on (27 September, evening)
 
@@ -252,10 +263,62 @@ Minutes after its hire, the new analyst's schedule produced the lead's first rea
 it couldn't see when the analyst would first wake up. It named the cost and pointed at the card
 that already fixes it, instead of filing a duplicate.
 
-Both cards now sit in Done. The next batch is waiting in "Ready to build".
+## The first acceptance round (28 September, afternoon)
 
-You can watch it work in its public space: **[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**.
-This page will grow as that story unfolds.
+The batch, eight small cards, was built in under an hour and released as v0.10.0. Then came a
+problem of recursion: the team that accepts xt's releases runs on xt. To check a release it has to
+be upgraded to it, so production runs code nobody has accepted yet. For an experiment that's fine;
+for anything real it isn't, so it became a card: release candidates, a staging team and rollback.
+
+**Six minutes, and a fail.** The quality analyst checked all eight cards in a clean copy of the
+published code: three passed, four were blocked on things only a human could observe (two TUI
+dialogs, a live restart, a question answered in a particular way), and one **failed**. The card
+said agents must be unable to use desktop or browser tools, "verified live", and for Claude Code
+the builder had only shipped partial coverage. The verdict was fair. A live check followed: an
+agent started with xt's flags had 87 tools and none of them could drive a desktop or a browser, so
+the card passed on evidence. But the same check found something nobody had asked about: agents
+inherit the account's connectors to mail, file storage and calendar, able to act as the operator.
+That became the next card.
+
+**The human as the instrument.** For the blocked cards the analyst needed Radek's observations,
+and it wouldn't accept "works as expected": five lines typed and re-read? Esc sends nothing? Ctrl+S
+sends exactly once? Its insistence on one check nobody had done, sending a message outside an
+Inbox question, turned out to point at a real problem. Three of Radek's messages to the team that
+day had never arrived: with a question selected, the send key answers it instead of messaging the
+team, and nothing says so. And the command line refused his heredocs, because the check that
+keeps agents from posing as the human looked at the wrong thing. Two more cards, both found by
+using the product, not by testing it.
+
+**Rules, fixed in the open.** The afternoon was mostly about the team's rules, one correction at a
+time:
+
+- A final PASS counts as acceptance, and the lead closes the card; anything else waits for Radek.
+  Four cards closed within minutes of that rule, the dialog card after one more round, and the
+  last two after a real restart and a deliberately revised goal.
+- Recording a decision Radek already made needs no read-back, and the analyst proves from the
+  ledger what it can before asking him.
+- The weekly planning note had gone stale; now whoever closes a card updates it, and each card's
+  state appears once, in one table.
+- A release is defined before it's built: a page per release, from *Planned* to *Accepted*, with
+  the cards tagged on the board. v0.10.0 got its page after the fact.
+- Every week, and whenever Radek asks, the analyst reviews all the rules for contradictions,
+  duplicates and bloat, and the lead consolidates them. The first review shrank two roles by a
+  third and found a gap in xt's own protocol.
+
+Not every check was enough. The release page, verified by reading it back through the wiki's
+API, turned out not to open in a browser: the wiki read the dots in "v0.10.0" as a file extension.
+Agents here have no browser, on purpose, so "it renders" now needs a human to look.
+
+**What it cost.** By mid-afternoon the product team's heaviest day so far had come to about $18
+at list prices, and about a third of the week's subscription allowance. On a subscription it's no
+bill, but the allowance is the real limit, and the number that tells you when to slow down.
+
+The newsroom, meanwhile, spent the day on its own: eight articles, two of them Radek's picks and
+six auto-picked, and at the sixth it stopped, as its rule says. Then it was switched off to save
+the allowance.
+
+You can watch the product team work in its public space:
+**[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**. This page will grow as that story unfolds.
 
 ## Read more
 

@@ -6,13 +6,14 @@ goals for a **lead**, which designs and runs whatever team the work needs: a new
 an accounting desk. xt owns the coordination (messages, the ledger of open work, the supervisor,
 approvals, recovery), so an agent only needs a shell and a prompt.
 
-**New here?** Read [the story so far](docs/story.md): how xt came to be in two days, what broke
+**New here?** Start with [What xt can do](#what-xt-can-do). Then read [the story so far](docs/story.md): how xt came to be in a few days, what broke
 and what we learned; and [Goals in practice](docs/examples.md): real goals given to teams, word
 for word.
 
-**Status:** 0.x, early but in daily use (current release: see [CHANGELOG.md](CHANGELOG.md)). The pilot team is a six-agent newsroom that hires its
+**Status:** 0.x, early but in daily use (current release: see [CHANGELOG.md](CHANGELOG.md)). Two teams run on it: a six-agent newsroom that hires its
 own scout, finds stories in RSS feeds every hour, and researches, writes, fact-checks and publishes
-articles. Most runs so far used Codex for every agent. **Using it day to day:
+articles; and a product team (a product manager and a quality analyst) that runs xt's own backlog
+and accepts its releases. Most runs so far used Codex for every agent. **Using it day to day:
 [docs/user-guide.md](docs/user-guide.md)** (lifecycles and every command); how it works inside:
 [docs/architecture.md](docs/architecture.md).
 
@@ -21,6 +22,38 @@ articles. Most runs so far used Codex for every agent. **Using it day to day:
 *The newsroom pilot in Herdr: on the left the liaison asks which of the scout's stories to write
 next; on the right the xt TUI shows the goals, the team (all on Codex), tasks, inbox and log, with
 the scout goal's brief in the detail pane.*
+
+## What xt can do
+
+Each of these has been shown in real runs, not only in tests (v0.10.0). The story behind each one
+is in [the story so far](docs/story.md).
+
+- **Run persistent, named agents with roles.** A liaison, a lead and members, each in its own
+  workspace, keep working while you're away. Codex has carried every real team so far; adapters for
+  Claude Code and pi exist.
+- **Keep you to decisions only.** Questions wait in one Inbox (TUI or `xt inbox`) with a desktop
+  notification; you never have to watch an agent's pane.
+- **Deliver every message through a supervisor, with a ledger.** Nothing is lost, and every step
+  can be audited later: the quality analyst accepts work partly on evidence from the ledger.
+- **Work in goals, read back before dispatch.** The liaison reads a goal back to you, lets you
+  revise it, and dispatches it exactly once.
+- **Run on schedules.** Daily wakes at a fixed local time, hourly scouts, quiet hours that hold.
+- **Act on its own within rules you set.** The newsroom picked and published stories when you
+  didn't answer within an hour, let your own picks go first, and stopped at its limit of six a day.
+- **Learn from corrections.** A correction from you becomes a recorded lesson and a fixed rule, and
+  a regular rules review keeps the rules consistent and short.
+- **Manage its own product.** A product team runs xt's backlog on a Kanban board with public specs
+  and release pages; only you pass the approval points.
+- **Accept work independently.** A quality analyst checks each delivered card against its spec,
+  criterion by criterion; a final PASS closes the card, anything else waits for you.
+- **Show context and cost.** How full each agent's context is, tokens and estimated cost per turn,
+  and how much of the subscription allowance the week has used.
+- **Survive restarts.** `xt down` then `xt restart --all` brings back the team that was running;
+  agents recover from files and a brief, not from memory.
+- **Keep agents in bounds.** No desktop or browser control for agents; public output stays free of
+  private details.
+
+What it can't do yet is in [Known limits](#known-limits).
 
 ## What working with a team looks like
 
@@ -189,8 +222,10 @@ git pull upstream main         # or merge a release tag, see Versioning
 xt restart --all               # supervisor and every running agent, with the new code and instructions
 ```
 
-Running agents keep the instructions they started with, so restart after every update (`xt down`,
-then `xt`, does the same but leaves the members stopped). Read the
+Running agents keep the instructions they started with, so restart after every update. If you
+prefer to stop the team first, `xt down`, update, then `xt restart --all` brings back exactly the
+agents that were running (from 0.10.0 on; an older `xt down` records nothing, so start them with
+`xt` and then `U` in the TUI). Read the
 **Upgrading** note of each new release in [CHANGELOG.md](CHANGELOG.md) for anything else to do.
 
 ## Known limits
