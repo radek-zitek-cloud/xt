@@ -1,8 +1,9 @@
 # How xt came to be: the story so far
 
-xt is two days old. It started as a question on a Friday evening in September 2026 and, by
-Sunday night, it ran a small newsroom of AI agents that finds its own stories, fact-checks them
-and publishes them, and a product team that manages xt's own backlog in public. This is how that happened,
+xt is three days old. It started as a question on a Friday evening in September 2026. By Sunday
+night it ran a small newsroom of AI agents that finds its own stories, fact-checks them and
+publishes them, and a product team that manages xt's own backlog in public. On Monday morning the
+first features that team specified were built and released. This is how that happened,
 including the parts that went wrong, because those taught us the most.
 
 "We" is Radek, who had the idea and made the decisions, and Claude (Claude Code), which wrote the
@@ -191,6 +192,35 @@ record, only product choices come to him. The finished spec's cards had been lef
 column, because the board's own convention said the review column "may" be used. That became a
 "must", and since then every correction from Radek goes into the lead's lessons file, with the
 rule that allowed it fixed. The first three entries were written the same night.
+
+**The first builds (28 September, morning).** Overnight the newsroom ran on its own. Quiet
+hours held to the second (no wake-ups between 21:00 and 05:00, the first one at 05:00:01), and
+twice before breakfast the lead picked the top story of a batch Radek hadn't answered and got it
+researched, written, fact-checked and published within fifteen minutes. The only slip: two
+questions left in Radek's inbox after their batches had been auto-picked. It went straight into the
+lessons file as a rule.
+
+Then the product team's approval point was used for real. Radek moved the two specified cards to
+"Ready to build", and Claude built them in the order the spec set, one release each, within about
+two hours:
+
+- **v0.8.0, context per agent.** xt links each agent to its harness's own session log (by the
+  first prompt it sent, among logs written since the agent last started) and shows how full its
+  conversation is, e.g. `~211k/258k`, turning yellow at 70% and red at 85%. The first reading was
+  telling: the newsroom's lead, after a day and a night of stories, sat at 82%.
+- **v0.9.0, usage and estimated cost.** Every model call is recorded (counters only), attributed
+  to the goal it served and priced from the providers' public list prices, always labelled "est."
+  Calls made on an agent's behalf, such as Codex's automatic reviewer, are counted separately,
+  and a model without a public price stays "unpriced" instead of counting as free.
+
+For the first time the newsroom has numbers. By nine in the morning it had used about 64 million
+tokens that day, almost all of it cheap cached input, for an estimated $18.57 at list prices. One
+published article came to about 15 million tokens, roughly $3.26. On a subscription none of that is
+a bill, and the Codex allowance showed 20% of the week used, but it's the baseline the team's next
+card, budgets, was waiting for.
+
+Both cards now wait in the board's "Ready for acceptance" column until Radek has seen them running
+and closes them: the product owner accepts, the builder doesn't.
 
 You can watch it work in its public space: **[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**.
 This page will grow as that story unfolds.
