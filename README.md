@@ -276,10 +276,11 @@ upgrades to check a release never runs code presented as final that nobody accep
    (`git push origin main vX.Y.Z-rcN`) and create a **pre-release** from the tag with that
    section as its notes: `gh release create vX.Y.Z-rcN --prerelease --title "xt vX.Y.Z-rcN" --notes-file <section>`.
 4. If acceptance finds a problem, fix it and release `-rcN+1` the same way.
-5. When every card in it is accepted, release the accepted code as final: rename the heading to
-   `## [X.Y.Z]`, set `version = "X.Y.Z"`, `uv lock`, commit (`Release vX.Y.Z`), tag `vX.Y.Z`, push,
-   and `gh release create vX.Y.Z` (not a pre-release). Nothing else changes between the accepted
-   candidate and the final release.
+5. When every card in it is accepted, release the accepted code as final: add a `## [X.Y.Z]`
+   heading above the candidates' entries saying which candidate it is, set `version = "X.Y.Z"`,
+   `uv lock`, commit (`Release vX.Y.Z`), tag `vX.Y.Z`, push, and `gh release create vX.Y.Z` (not a
+   pre-release). Nothing else changes between the accepted candidate and the final release, which
+   `git diff vX.Y.Z-rcN vX.Y.Z` shows.
 
 ## Development
 

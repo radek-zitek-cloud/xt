@@ -317,6 +317,40 @@ The newsroom, meanwhile, spent the day on its own: eight articles, two of them R
 six auto-picked, and at the sixth it stopped, as its rule says. Then it was switched off to save
 the allowance.
 
+## The first release candidate (28 September, evening)
+
+The next release was the first one planned before it was built: a page for it on the wiki at
+*Planned*, five cards tagged on the board, the composition approved by Radek. Claude built it in
+under half an hour, checked the riskiest parts live in all three harnesses, and tagged it
+v0.11.0. Radek's question came a minute later: *shouldn't that have been a release candidate?*
+Nobody had pulled it yet, so it became **v0.11.0-rc1**, a pre-release, and xt's release procedure
+changed: every release starts as a candidate and becomes final only once it's accepted, from the
+same code.
+
+Production stayed on the accepted version. The candidate was checked beside it: the quality
+analyst cloned the candidate into a scratch directory and made a throwaway team there, and Radek
+ran the candidate's TUI and command line against the live team's files, which the old supervisor
+went on delivering.
+
+**The analyst found two real failures.** One card promised that an agent can't pose as the human.
+From its own shell, in the pseudo-terminal mode Codex offers, the analyst did exactly that (in its
+scratch team, not the real one), and then measured why: the check had trusted a terminal on standard
+input, and Codex's sandbox hid the process tree the second safeguard relied on. The other card let
+a Codex agent opt in to one named connector but switched on all of them. Both verdicts were fair,
+and both had passed the builder's own live checks, which had tested the cases the builder thought
+of. Within about ten minutes of the verdict **rc2** required a real controlling terminal and refused the Codex opt-in;
+the analyst repeated its probe, now refused, and passed both cards. Radek's own checks of the TUI
+went through the same analyst, which kept asking until every criterion had an observation behind
+it.
+
+At 16:30 **v0.11.0** was tagged from the accepted code, differing from rc2 only in its version
+number and changelog, and the team upgraded to it. After the restart every agent carried the marker the first
+card needed and started without the connectors the second one removes.
+
+Two candidates, one release, and a quality gate that caught its builder twice in an afternoon. The
+team spent about $37 of list-price tokens that day, on a subscription that still had two thirds
+of its week left.
+
 You can watch the product team work in its public space:
 **[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**. This page will grow as that story unfolds.
 
