@@ -17,6 +17,7 @@ import glob
 import json
 import os
 import re
+import time
 import tomllib
 from dataclasses import dataclass, field
 
@@ -26,6 +27,7 @@ from .team import HUMAN
 from . import usage
 
 READ_LIMIT = 8 * 1024 * 1024  # per log per pass, so a huge backlog is read over a few passes
+LOOKBACK_DAYS = 2  # usage: logs of the agent's earlier sessions too (a restart must not drop them)
 
 
 def local_today() -> dt.date:
@@ -137,11 +139,12 @@ PARSERS = {"codex": _codex, "claude": _claude, "pi": _pi}
 # --- which logs belong to an agent ----------------------------------------------------------------
 
 
-def agent_logs(ctx: Ctx, adapter, name: str, since: float | None) -> list[tuple[str, bool]]:
-    """(path, auxiliary) for every log of this agent written since it started: its main session
-    and, for Codex, the reviewer sub-sessions that carry its first prompt."""
+def agent_logs(ctx: Ctx, adapter, name: str, since: float) -> list[tuple[str, bool]]:
+    """(path, auxiliary) for every log of this agent modified since `since`: its sessions (the
+    current one and earlier ones, e.g. before a restart) and, for Codex, the reviewer sub-sessions
+    that carry its first prompt. Read positions keep each log from being counted twice."""
     marker = usage._marker_re(name, ctx.team.name)
-    floor = (since or 0) - 120
+    floor = since
     out = []
     for path in glob.glob(os.path.expanduser(adapter.sessions or "")):
         try:
@@ -252,7 +255,7 @@ def tokens(rec: dict) -> int:
 def record(ctx: Ctx) -> int:
     """Read new turns from every active agent's session logs; returns how many were recorded."""
     adapters = load_adapters(ctx.paths)
-    starts = usage.last_starts(ctx)
+    lookback = time.time() - LOOKBACK_DAYS * 86400
     offsets_path = ctx.paths.state / "usage_offsets.json"
     try:
         offsets = json.loads(offsets_path.read_text()) if offsets_path.exists() else {}
@@ -272,7 +275,7 @@ def record(ctx: Ctx) -> int:
         adapter = adapters.get(a.harness or "")
         if adapter is None or adapter.session_format not in PARSERS:
             continue
-        for path, aux in agent_logs(ctx, adapter, a.name, starts.get(a.name)):
+        for path, aux in agent_logs(ctx, adapter, a.name, lookback):
             st = offsets.get(path, {"offset": 0})
             try:
                 lines, st["offset"] = _new_lines(path, st.get("offset", 0))

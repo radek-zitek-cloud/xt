@@ -162,3 +162,24 @@ def test_usage_shows_in_status_brief_tui_and_not_in_member_briefs(ctx, fake_home
     assert "today 101k/est.$0.05" in snap.summary and "codex 13% of 7d" in snap.summary
     lead = next(r for r in snap.panels["Team"] if r.data["name"] == "lead")
     assert "usage today: 101k tokens, est. $0.05" in lead.detail().plain
+
+
+def test_usage_from_before_a_restart_is_still_recorded(ctx, fake_home):
+    """An upgrade restarts every agent: the sessions they used before must still be counted."""
+    request_spawn(ctx, "human", "liaison", None, None, None, None)
+    codex_log(fake_home, ctx, "liaison", [("2026-09-28T07:00:00Z", 1000, 0, 10)])  # before the restart
+    old = fake_home / ".codex/sessions/2026/09/28/rollout-liaison-m.jsonl"
+    old = old.rename(old.with_name("rollout-liaison-old.jsonl"))
+    ctx.ledger.clock.advance(hours=30)  # the restart is much later than that session
+    import os
+    import time
+
+    last_written = ctx.ledger.clock().timestamp() - 3600  # written an hour before the restart,
+    assert time.time() - last_written < 2 * 86400  # but within the last two days
+    os.utime(old, (last_written, last_written))
+    from xt.up import restart
+
+    restart(ctx, ["liaison"])
+    codex_log(fake_home, ctx, "liaison", [("2026-09-28T09:00:00Z", 2000, 0, 20)])  # the new session
+    assert turns.record(ctx) == 2
+    assert turns.record(ctx) == 0

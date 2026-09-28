@@ -9,6 +9,21 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-09-28
+
+### Fixed
+
+- **Usage from before a restart was never recorded.** The usage recorder only read session logs
+  written since each agent's last start, so the `xt restart --all` of an upgrade dropped everything
+  the agents had used before it. It now reads each agent's logs from the last two days (still
+  identified by the agent's own first prompt; read positions prevent double counting). Context per
+  agent still follows the current session only. The 0.9.0 upgrade note wrongly said earlier usage
+  would be included.
+
+### Upgrading
+
+- `git pull upstream main`, then `xt restart --all`. The first pass records the last two days.
+
 ## [0.9.0] — 2026-09-28
 
 ### Added
@@ -28,8 +43,7 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ### Upgrading
 
-- `git pull upstream main`, then `xt restart --all`. Usage is recorded from the moment the new
-  supervisor runs, including what the agents did since they were last started.
+- `git pull upstream main`, then `xt restart --all`. (Use 0.9.1: in 0.9.0 the restart dropped earlier usage.)
 
 ## [0.8.0] — 2026-09-28
 
