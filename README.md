@@ -129,7 +129,7 @@ equivalent and when you'd use it.
 | `xt init` | Make this clone your team's repo (asks: team name, session, liaison/lead harness and model, hire approval) |
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
-| `xt status` | Team, live state, context per agent, open work, questions, queue, approvals, alerts |
+| `xt status` | Team, live state, context and today's usage per agent, team usage and allowance, open work, questions, queue, approvals, alerts |
 | `xt inbox` | What needs you: questions, alerts, approvals, recent messages |
 | `xt answer <id> "..."` | Answer a question the liaison asked you |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |
@@ -174,7 +174,7 @@ never go in `team.toml`.
 
 | xt's own (from upstream) | Your team's (committed in your repo) | Runtime (gitignored) |
 |---|---|---|
-| `bin/`, `src/`, `tests/`, `pyproject.toml`, `uv.lock`, `mise.toml` | `team.toml` (roster, settings) | `.xt/log/` message log = ledger |
+| `bin/`, `src/`, `tests/`, `pyproject.toml`, `uv.lock`, `mise.toml`, `prices.toml` | `team.toml` (roster, settings) | `.xt/log/` message log = ledger; `.xt/usage/` per-turn usage |
 | `protocol.md`, `harnesses/`, `docs/` | `roles/*` written by the lead | `.xt/state/` queue, jobs, approvals, alerts, snapshots |
 | `roles/lead.md`, `roles/liaison.md` | `skills/*`, `goals/`, `members/<name>/`, outputs | `.xt/cache/` |
 
@@ -200,7 +200,7 @@ then `xt`, does the same but leaves the members stopped). Read the
   still reach other panes through its shell.
 - Codex runs agents with network access off; anything an agent fetches needs an escalation that
   Codex's reviewer (or you) approves.
-- No view of cost or context size yet (on the roadmap).
+- Costs are estimates from public list prices (`prices.toml`), not bills; no budgets yet.
 
 ## Versioning
 

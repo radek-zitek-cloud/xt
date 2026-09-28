@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.8.0** (2026-09-28), after five real runs with a newsroom team and
+What the code does as of **v0.9.0** (2026-09-28), after five real runs with a newsroom team and
 the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the
 [user guide](user-guide.md).
 
@@ -57,10 +57,11 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | whatever the team produces (e.g. `output/`) | `state/live.json`: the supervisor's latest `agent list` |
 | | `state/watch.log` (+ `watch.log.1`): the supervisor's events, rotated at 512 KB |
 | | `state/sessions.json`: which harness session log belongs to which agent (per start); `state/model_windows.json`: pi's model windows, cached a day |
+| | `usage/YYYY-MM-DD.jsonl`: per-turn usage records; `state/usage_offsets.json`, `state/allowance.json` |
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
-`roles/liaison.md`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
+`roles/liaison.md`, `prices.toml`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
 upstream and aren't edited by the team, so upstream merges rarely conflict.
 
 ### `team.toml`
@@ -162,6 +163,22 @@ output tokens, skipping subagent turns; window from the adapter's table), pi's m
 (window from `pi --list-models`, cached a day). Only counters are read. Anything missing is
 reported as unknown, never guessed. The TUI's Team panel and agent detail, `xt status` and the
 lead's and liaison's briefs show it; members' briefs don't.
+
+## Usage and cost
+
+`src/xt/turns.py` records per-turn usage. About once a minute the supervisor reads the new lines
+of every active agent's logs: its main session and, for Codex, the automatic-reviewer ("guardian")
+sub-sessions that carry its first prompt, recorded as auxiliary (Claude's subagent turns too).
+Each model call becomes one record in `.xt/usage/YYYY-MM-DD.jsonl` (the local day it completed):
+agent, harness, model, input / cached / cache-write / output tokens, auxiliary or not, the goal,
+and an estimate. Read positions are kept in `state/usage_offsets.json`; repeated counts (Codex)
+and repeated message ids (Claude logs one API message per content block) aren't counted twice.
+A turn belongs to the goal of the latest message the agent sent or received before it (following
+tasks and `--ref`s up to the goal); scheduled work outside any goal has none. Estimates use
+`prices.toml` (public list prices with their source and date) or pi's own per-message cost; a
+model without a price leaves its tokens unpriced. The latest account allowance a harness reports
+(Codex `rate_limits`) is kept in `state/allowance.json` and shown once per harness. Totals are
+added up on read: today per agent and team, and per goal over its lifetime.
 
 ## The ledger and recovery
 
@@ -312,9 +329,9 @@ what saves it.
 - **The `--as human` terminal guard** is verified for non-interactive codex and claude shells, not
   for every harness.
 - **Instructions age.** Running agents keep their first prompt's instructions until restarted.
-- **No cost view yet.** Context per agent is shown (v0.8.0); tokens and estimated cost per agent,
-  goal and team are next (card #17 on the product board). There's no `xt reset` yet; `xt restart
-  <name>` gives an agent a fresh session.
+- **Estimates, not bills.** Dollar figures come from public list prices; subscriptions, discounts
+  and long-context tiers aren't reflected. No budgets or alerts on usage yet (card #92). There's
+  no `xt reset` yet; `xt restart <name>` gives an agent a fresh session.
 - **Not built yet:** bypass detection, ping-pong loop detection (only the daily-volume alert),
   `xt config`.
 - **Latency.** Agents' messages and jobs wait for the next supervisor tick (up to ~3 s), and

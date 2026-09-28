@@ -194,17 +194,19 @@ def cmd_status(args) -> None:
     live = ctx.herdr.agents()
     items = ctx.ledger.open_items()
     print(f"team {ctx.team.name} · session {ctx.team.session} · xt {__version__}")
-    from . import usage
+    from . import turns, usage
 
     contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
+    spend = turns.today(ctx)
     for a in ctx.team.agents():
         if a.kind == HUMAN:
             continue
         state = live[a.name].status if a.name in live else ("not running" if a.active else "retired")
         mine = sum(1 for i in items if i["owner"] == a.name)
         ctx_txt = usage.compact(contexts[a.name]) if a.name in contexts else ""
+        today_txt = turns.fmt_short(spend.agents_today[a.name]) if a.name in spend.agents_today else "—"
         print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} "
-              f"open:{mine:<3} context:{ctx_txt}")
+              f"open:{mine:<3} context:{ctx_txt:<12} today:{today_txt}")
     from .jobs import Jobs
     from .watch import watch_pid
 
@@ -214,6 +216,9 @@ def cmd_status(args) -> None:
     print(f"open goals/tasks: {len(items) - questions} · questions for the human: {questions} · "
           f"queued messages: {len(q)} · jobs: {len(jobs)} · "
           f"pending approvals: {len(Approvals(ctx).pending())} · alerts: {len(Alerts(ctx).active())}")
+    print(f"team usage today: {turns.fmt(spend.team_today)}")
+    for line in turns.allowance_lines(ctx):
+        print(f"allowance: {line}")
     if (q or jobs) and not watch_pid(ctx):
         print("the supervisor isn't running: queued messages and jobs wait for it (`xt up`)")
 

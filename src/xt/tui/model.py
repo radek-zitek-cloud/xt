@@ -141,6 +141,9 @@ def build(ctx: Ctx) -> Snapshot:
                        style="bright_black")
             out.append("open\n" if is_open else "done\n", style="yellow" if is_open else "green")
             out.append(_first_line(g["body"], 200) + "\n", style="bold")
+            from .. import turns as _turns
+
+            out.append(f"usage: {_turns.fmt(_turns.goal_totals(ctx, g['id'], g['ts']))}\n")
             brief = re.search(r"Brief:\s*(\S+\.md)", g["body"])
             out.append(_heading("tasks"))
             for t in tasks:
@@ -158,8 +161,9 @@ def build(ctx: Ctx) -> Snapshot:
                                                     mark), detail, "goal", {"id": g["id"]}))
 
     # Team: roster with live state and context
-    from .. import usage
+    from .. import turns, usage
 
+    spend = turns.today(ctx)
     contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
     team_rows = []
     for a in ctx.team.agents():
@@ -182,6 +186,8 @@ def build(ctx: Ctx) -> Snapshot:
                 out.append(f"workspace {la.workspace_id} · pane {la.pane_id}  (f: jump there)\n", style="bright_black")
             if ctxr is not None:
                 out.append(usage.describe(ctxr, now) + "\n", style="" if ctxr.known else "bright_black")
+            mine_today = spend.agents_today.get(a.name)
+            out.append(f"usage today: {turns.fmt(mine_today) if mine_today else 'none recorded'}\n")
             out.append(_heading(f"open work ({len(owned)})"))
             for i in owned:
                 out.append(f"#{i['id']} {i['type']} {_age(i['opened'], now)}  {i['title']}\n")
@@ -321,7 +327,10 @@ def build(ctx: Ctx) -> Snapshot:
     summary = (f"{ctx.team.name} · {running} running · {len(open_items) - len(questions)} open · "
                f"{len(questions)} question{'s' if len(questions) != 1 else ''} · "
                f"{len(approvals)} approval{'s' if len(approvals) != 1 else ''} · {len(alerts)} alert"
-               f"{'s' if len(alerts) != 1 else ''} · {len(queued)} queued · {len(jobs)} jobs")
+               f"{'s' if len(alerts) != 1 else ''} · {len(queued)} queued · {len(jobs)} jobs · "
+               f"today {turns.fmt_short(spend.team_today)}")
+    for line in turns.allowance_lines(ctx):
+        summary += " · " + line.replace(" (account-wide)", "")
     # Supervisor: what xt watch did, newest first
     from ..watch import watch_log
 

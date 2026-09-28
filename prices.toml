@@ -1,0 +1,23 @@
+# Public list prices in USD per million tokens, used only for estimates that xt always labels
+# "est.". They are not what you pay on a subscription or a negotiated plan. A model that isn't
+# listed here gets no estimate (its tokens are shown as unpriced), never a guess. pi reports its
+# own cost per message and doesn't need an entry.
+#
+# Fields: input, cached_input (Codex), cache_write_5m / cache_write_1h / cache_read (Claude),
+# output; plus where the price comes from and when it was checked.
+
+[models."gpt-6-sol"]
+input = 2.00
+cached_input = 0.20
+output = 10.00
+source = "https://developers.openai.com/api/docs/pricing (standard, short context)"
+checked = 2026-09-28
+
+[models."claude-opus-5-5"]
+input = 4.00
+cache_write_5m = 5.00
+cache_write_1h = 8.00
+cache_read = 0.20
+output = 20.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+checked = 2026-09-28

@@ -9,6 +9,28 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-09-28
+
+### Added
+
+- **Usage and estimated cost** (product board card #17, second step of the xt product team's
+  spec): the supervisor records every model call from the agents' session logs once a minute
+  (counters only) into `.xt/usage/YYYY-MM-DD.jsonl`, attributed to the goal the agent was working
+  on and counted on the local day it completed. Shown as tokens and "est." USD: today's team
+  total in the Status pane and `xt status`, each agent's day in its detail and `xt status`, each
+  goal's total in its detail, the team's day in the lead's and liaison's briefs (not members').
+- **Estimates from public list prices** in the new `prices.toml` (gpt-6-sol and Claude Opus 5.5,
+  with source and date), or pi's own cost. A model without a price stays "unpriced", never zero.
+- **Auxiliary calls counted separately:** Codex's automatic-reviewer sessions and Claude subagent
+  turns.
+- **Account allowance:** where a harness reports it (Codex), the Status pane and `xt status` show
+  it once per harness, e.g. "codex 20% of 7d, resets Sat 19:24 (account-wide)".
+
+### Upgrading
+
+- `git pull upstream main`, then `xt restart --all`. Usage is recorded from the moment the new
+  supervisor runs, including what the agents did since they were last started.
+
 ## [0.8.0] — 2026-09-28
 
 ### Added

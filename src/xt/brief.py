@@ -54,6 +54,10 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
         cx = f", context {usage.compact(contexts[a.name])}" if a.name in contexts and contexts[a.name].known else ""
         out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}): {state}")
+    if show_context:
+        from . import turns
+
+        out.append(f"Team usage today: {turns.fmt(turns.today(ctx).team_today)}")
 
     items = [i for i in ctx.ledger.open_items() if i["type"] != "ask"]  # questions: see below
     if name and name not in (HUMAN,) and ctx.team.agent(name) and ctx.team.agent(name).role not in ("lead", "liaison"):

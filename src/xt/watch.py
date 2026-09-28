@@ -22,6 +22,7 @@ from .team import HUMAN, SYSTEM, in_window, parse_interval, schedule_text
 TICK = 3
 NUDGES_BEFORE_ALERT = 2
 WATCH_LOG_MAX = 512 * 1024  # .xt/state/watch.log is rotated to watch.log.1 beyond this
+USAGE_EVERY = 60  # seconds between reads of the agents' session logs for per-turn usage
 NOTIFY_TYPES = {"ask": "question from {from_}", "approval": "approval needed", "alert": "alert"}
 
 
@@ -96,6 +97,8 @@ class Supervisor:
         self.alerts = Alerts(ctx)
         self.last_heartbeat = 0.0
         self.last_rotate = 0.0
+        self.last_usage = 0.0
+        self.usage_error: str | None = None
         self.nudges_path = ctx.paths.state / "nudges.json"
         self.notify_error: str | None = None
 
@@ -129,6 +132,9 @@ class Supervisor:
             self.heartbeat(live)
         self.wake_scheduled(live, now)
         self.notify_human(now)
+        if now - self.last_usage >= USAGE_EVERY:
+            self.last_usage = now
+            self.record_usage()
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
             for line in self.ctx.ledger.rotate(
@@ -243,6 +249,20 @@ class Supervisor:
                     self.say(f"notified the human about #{m['id']}")
                 self.notify_error = err
         path.write_text(json.dumps({"last": seq}))
+
+    def record_usage(self) -> None:
+        """Per-turn usage from the agents' session logs (see turns.py); a harness changing its log
+        format must never stop the supervisor, so failures are reported once and skipped."""
+        from . import turns
+
+        try:
+            turns.record(self.ctx)
+            self.usage_error = None
+        except Exception as e:  # noqa: BLE001
+            msg = f"usage recording failed: {type(e).__name__}: {e}"
+            if msg != self.usage_error:
+                self.say(msg)
+            self.usage_error = msg
 
     def _nudges(self) -> dict:
         return json.loads(self.nudges_path.read_text()) if self.nudges_path.exists() else {}

@@ -179,6 +179,18 @@ agent to its log by its first prompt, so a restarted agent starts again from its
 window isn't known for that model; `—` means nothing is recorded yet. Supported: Codex, Claude
 Code, pi.
 
+**What does the team cost?** The supervisor records every model call from the agents' session
+logs (once a minute; counters only) and attributes it to the goal the agent was working on. You
+see tokens and an estimate in dollars: today's team total in the Status pane and `xt status`,
+each agent's day in its detail, each goal's total in its detail, and the team's day in the lead's
+and liaison's briefs. The estimate uses public list prices from `prices.toml` (or pi's own cost)
+and is always labelled "est.": on a subscription you don't pay per token, and nothing here is a
+bill. Tokens of a model with no listed price are shown as unpriced, never as zero; calls made on
+an agent's behalf (Codex's automatic reviewer, Claude subagents) are counted and shown as
+auxiliary. Where a harness reports your account's allowance (Codex: percent of its window and
+when it resets), the Status pane and `xt status` show it once per harness. To price another
+model, add it to `prices.toml` with its source.
+
 ### 12. Ending a team
 
 `xt down`, then remove the team's Herdr session (`herdr session stop <team>`; only after `xt down`)
@@ -253,7 +265,8 @@ a confused or heavy agent a clean session.
 ### `xt status`
 
 `xt status` — one screen: every agent with its role, `harness/model`, live state, open work and
-context (e.g. `~211k/258k`);
+context (e.g. `~211k/258k`) and today's usage; today's team total and, where reported, the
+account allowance;
 counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts; a
 warning if the supervisor isn't running. **Use it** for a quick look without the TUI (e.g. over
 ssh), or in scripts.

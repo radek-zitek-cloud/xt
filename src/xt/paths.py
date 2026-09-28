@@ -60,6 +60,15 @@ class Paths:
         return self.runtime / "state"
 
     @property
+    def usage(self) -> Path:
+        """Per-turn usage records, one JSONL file per local day."""
+        return self.runtime / "usage"
+
+    @property
+    def prices(self) -> Path:
+        return self.root / "prices.toml"
+
+    @property
     def xt_bin(self) -> Path:
         return self.root / "bin" / "xt"
 
