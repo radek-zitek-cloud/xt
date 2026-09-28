@@ -141,6 +141,15 @@ def notifications(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def fake_home(tmp_path, monkeypatch):
+    """Harness session logs are read from ~ (e.g. ~/.codex/sessions): never the real ones in tests."""
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    return home
+
+
+@pytest.fixture(autouse=True)
 def all_harnesses_installed(monkeypatch):
     monkeypatch.setattr(Adapter, "installed", property(lambda self: True))
     monkeypatch.setattr(spawn, "RETRY_DELAY", 0)

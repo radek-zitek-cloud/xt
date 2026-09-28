@@ -170,6 +170,15 @@ for that: the ledger, the goal briefs, the roles, skills and each agent's
 from them (every first prompt includes it). If an agent seems confused or its context is heavy,
 `xt restart <name>` gives it a clean session that starts from its brief.
 
+**How full is an agent's context?** The Team panel shows it per agent (`~211k/258k`: tokens in
+the conversation after its latest turn, out of the model's window), yellow from 70% and red from
+85%; the agent's detail, `xt status` and the lead's and liaison's briefs show it too. xt reads it
+from the harness's own session log (only the counters, never the conversation) and links each
+agent to its log by its first prompt, so a restarted agent starts again from its new session. A
+`~` means approximate (Codex reports the latest turn's usage, not a live figure); `?` means the
+window isn't known for that model; `—` means nothing is recorded yet. Supported: Codex, Claude
+Code, pi.
+
 ### 12. Ending a team
 
 `xt down`, then remove the team's Herdr session (`herdr session stop <team>`; only after `xt down`)
@@ -243,7 +252,8 @@ a confused or heavy agent a clean session.
 
 ### `xt status`
 
-`xt status` — one screen: every agent with its role, `harness/model`, live state and open work;
+`xt status` — one screen: every agent with its role, `harness/model`, live state, open work and
+context (e.g. `~211k/258k`);
 counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts; a
 warning if the supervisor isn't running. **Use it** for a quick look without the TUI (e.g. over
 ssh), or in scripts.

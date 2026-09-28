@@ -9,3 +9,8 @@ summary = "pi: lightweight, many model providers; reads repo skills via .agents/
 limits = [
   "-a also trusts project .pi settings and extensions for the run: don't keep a .pi/ dir you don't mean",
 ]
+
+# Context usage: usage per assistant message in the session log; windows from `pi --list-models`
+# (cached by xt for a day), or this table ("provider/model" = tokens) to override.
+sessions = "~/.pi/agent/sessions/*/*.jsonl"
+session_format = "pi"

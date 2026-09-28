@@ -9,12 +9,25 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-09-28
+
 ### Added
 
-- [docs/story.md](docs/story.md): how xt came to be, for people who find the repo (linked from the
-  top of the README).
-- [docs/examples.md](docs/examples.md): three real goals, word for word (the scout, the auto-pick
-  correction, the product team), each with its context and what the team did.
+- **Context per agent** (product board card #25, specified by the xt product team): how full each
+  agent's conversation is, e.g. `~211k/258k`, in the TUI's Team rows (yellow from 70%, red from
+  85%) and agent detail, in `xt status`, and in the lead's and liaison's briefs (not members').
+  Read from each harness's own session log (counters only, never the conversation) for Codex,
+  Claude Code and pi. Each agent is linked to its session by its first prompt, among logs written
+  since xt last started it; the link is kept in `.xt/state/sessions.json`. `~` marks approximate
+  figures (Codex's latest turn), `?` an unknown window, `—` nothing recorded yet.
+- Harness adapters gain `sessions`, `session_format` and `[context_windows]`.
+- [docs/story.md](docs/story.md), how xt came to be (linked from the top of the README), and
+  [docs/examples.md](docs/examples.md), three real goals word for word with what the teams did.
+
+### Upgrading
+
+- `git pull upstream main`, then `xt restart --all`. Context appears as soon as an agent has taken
+  a turn; agents started before the upgrade are found too.
 
 ## [0.7.1] — 2026-09-27
 

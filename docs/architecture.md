@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.7.0** (2026-09-27), after five real runs with a newsroom team and
+What the code does as of **v0.8.0** (2026-09-28), after five real runs with a newsroom team and
 the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the
 [user guide](user-guide.md).
 
@@ -56,6 +56,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `members/<name>/`: per-agent notes (`notes.md`) and work files | `state/approvals.json`: hires and schedules waiting for the human |
 | whatever the team produces (e.g. `output/`) | `state/live.json`: the supervisor's latest `agent list` |
 | | `state/watch.log` (+ `watch.log.1`): the supervisor's events, rotated at 512 KB |
+| | `state/sessions.json`: which harness session log belongs to which agent (per start); `state/model_windows.json`: pi's model windows, cached a day |
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
@@ -145,6 +146,22 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
   own) are delivered directly if the recipient is idle. Messages to the human are never typed
   anywhere: they appear in the TUI's Inbox and `xt inbox`, and questions, approvals and alerts
   also trigger a notification.
+
+## Context per agent
+
+`src/xt/usage.py` reads how full each agent's conversation is from its harness's own session log.
+Each harness adapter declares where its logs are (`sessions`, a glob under `~`), their
+`session_format` (`codex`, `claude`, `pi`) and, where the log doesn't state it, `context_windows`
+per model. An agent is linked to its log by its first prompt ("You are **name**, an agent in the
+xt team "team""), looking only at logs written since xt last started it (the ledger's `started …`
+entry), so a restart moves it to the new session; Codex's "guardian" sub-sessions (its automatic
+reviewer) repeat the prompt and are skipped. The link is kept in `state/sessions.json`. From the
+log's tail xt takes the latest usage record: Codex's `token_count` (latest turn's total out of
+`model_context_window`, marked approximate), Claude Code's `message.usage` (input, cache and
+output tokens, skipping subagent turns; window from the adapter's table), pi's message `usage`
+(window from `pi --list-models`, cached a day). Only counters are read. Anything missing is
+reported as unknown, never guessed. The TUI's Team panel and agent detail, `xt status` and the
+lead's and liaison's briefs show it; members' briefs don't.
 
 ## The ledger and recovery
 
@@ -295,8 +312,9 @@ what saves it.
 - **The `--as human` terminal guard** is verified for non-interactive codex and claude shells, not
   for every harness.
 - **Instructions age.** Running agents keep their first prompt's instructions until restarted.
-- **No usage view.** Nothing shows what an agent, goal or team costs, or how full an agent's
-  context is; there's no `xt reset` for an agent's context yet.
+- **No cost view yet.** Context per agent is shown (v0.8.0); tokens and estimated cost per agent,
+  goal and team are next (card #17 on the product board). There's no `xt reset` yet; `xt restart
+  <name>` gives an agent a fresh session.
 - **Not built yet:** bypass detection, ping-pong loop detection (only the daily-volume alert),
   `xt config`.
 - **Latency.** Agents' messages and jobs wait for the next supervisor tick (up to ~3 s), and

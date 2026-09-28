@@ -10,9 +10,17 @@ limits = [
   "First start in a new folder asks whether you trust it; xt answers it",
 ]
 
+# Context usage: message.usage per turn in the project's session log; the log doesn't state the
+# model's window, so it comes from this table (checked with `claude -p --output-format json`).
+sessions = "~/.claude/projects/*/*.jsonl"
+session_format = "claude"
+
 # Claude Code's folder-trust question on first start in a new directory (wording has varied
 # between versions). "No, exit" is preselected, so move down to "Yes, I trust this folder" first.
 [[startup_dialogs]]
 name = "folder trust"
 match = ["Do you trust the files in this folder?", "Is this a project you created or one you trust"]
 keys = ["down", "enter"]
+
+[context_windows]
+"claude-opus-5-5" = 1000000

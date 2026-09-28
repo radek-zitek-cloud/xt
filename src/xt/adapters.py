@@ -18,6 +18,11 @@ class Adapter:
     limits: list[str] = field(default_factory=list)
     # Dialogs the harness may show before it takes input: [{"match": [...], "keys": [...]}]
     startup_dialogs: list[dict] = field(default_factory=list)
+    # Where the harness keeps its session logs (a glob, ~ allowed) and their format, so xt can
+    # read an agent's context usage; windows for models whose logs don't state it.
+    sessions: str | None = None
+    session_format: str | None = None
+    context_windows: dict[str, int] = field(default_factory=dict)
 
     @property
     def installed(self) -> bool:
@@ -52,6 +57,9 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
                 }
                 for dlg in d.get("startup_dialogs", [])
             ],
+            sessions=d.get("sessions"),
+            session_format=d.get("session_format"),
+            context_windows={k: int(v) for k, v in d.get("context_windows", {}).items()},
         )
     return out
 

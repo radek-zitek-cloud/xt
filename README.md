@@ -97,7 +97,8 @@ come with `git pull upstream main` (see [Updating a team](#updating-a-team)).
 ## The TUI
 
 `xt` (or `xt tui`) opens a lazygit-style view, refreshed every 2 seconds: **Goals** (with goal
-drafts the liaison is still shaping), **Team**, **Tasks**, **Inbox** and **Log** panels on the left,
+drafts the liaison is still shaping), **Team** (with each agent's context, e.g. `~211k/258k`),
+**Tasks**, **Inbox** and **Log** panels on the left,
 the detail pane on the right with the **Supervisor** panel under it (what `xt watch` did:
 deliveries, wake-ups, nudges, notifications, alerts), the team summary on top and key hints at the
 bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
@@ -128,7 +129,7 @@ equivalent and when you'd use it.
 | `xt init` | Make this clone your team's repo (asks: team name, session, liaison/lead harness and model, hire approval) |
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
-| `xt status` | Team, live state, open work, questions, queue, approvals, alerts |
+| `xt status` | Team, live state, context per agent, open work, questions, queue, approvals, alerts |
 | `xt inbox` | What needs you: questions, alerts, approvals, recent messages |
 | `xt answer <id> "..."` | Answer a question the liaison asked you |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |

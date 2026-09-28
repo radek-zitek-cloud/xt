@@ -194,12 +194,17 @@ def cmd_status(args) -> None:
     live = ctx.herdr.agents()
     items = ctx.ledger.open_items()
     print(f"team {ctx.team.name} · session {ctx.team.session} · xt {__version__}")
+    from . import usage
+
+    contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
     for a in ctx.team.agents():
         if a.kind == HUMAN:
             continue
         state = live[a.name].status if a.name in live else ("not running" if a.active else "retired")
         mine = sum(1 for i in items if i["owner"] == a.name)
-        print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} open:{mine}")
+        ctx_txt = usage.compact(contexts[a.name]) if a.name in contexts else ""
+        print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} "
+              f"open:{mine:<3} context:{ctx_txt}")
     from .jobs import Jobs
     from .watch import watch_pid
 

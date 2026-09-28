@@ -10,6 +10,11 @@ limits = [
   "First start in a new folder asks 'Trust this folder?' (not skippable with -c); xt answers it",
 ]
 
+# Context usage: the session log's token_count events carry the latest turn's usage and the
+# model's context window (the figure is the latest turn, so xt marks it approximate).
+sessions = "~/.codex/sessions/*/*/*/rollout-*.jsonl"
+session_format = "codex"
+
 # Answered by xt before the first prompt. Running xt in a team repo is the human's consent to
 # trust it; codex saves the decision itself. Without this, the first prompt is typed into the
 # dialog and lost (it happened to the liaison in both of the first two real runs).

@@ -157,7 +157,10 @@ def build(ctx: Ctx) -> Snapshot:
         goal_rows.append(Row(f"goal:{g['id']}", _t((f"#{g['id']} ", "bright_black"), _first_line(g["body"], 60),
                                                     mark), detail, "goal", {"id": g["id"]}))
 
-    # Team: roster with live state
+    # Team: roster with live state and context
+    from .. import usage
+
+    contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
     team_rows = []
     for a in ctx.team.agents():
         if a.kind == HUMAN:
@@ -167,7 +170,9 @@ def build(ctx: Ctx) -> Snapshot:
         dot = ("●", STATUS_STYLE.get(state, "bright_black")) if la else ("○", "bright_black")
         owned = [i for i in open_items.values() if i["owner"] == a.name]
 
-        def detail(a=a, la=la, state=state, owned=owned):
+        ctxr = contexts.get(a.name)
+
+        def detail(a=a, la=la, state=state, owned=owned, ctxr=ctxr):
             out = Text()
             out.append(f"{a.name}", style="bold")
             wakes = f" · woken {schedule_text(a)}" if a.wake_every else ""
@@ -175,6 +180,8 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(state + "\n", style=STATUS_STYLE.get(state, "bright_black"))
             if la:
                 out.append(f"workspace {la.workspace_id} · pane {la.pane_id}  (f: jump there)\n", style="bright_black")
+            if ctxr is not None:
+                out.append(usage.describe(ctxr, now) + "\n", style="" if ctxr.known else "bright_black")
             out.append(_heading(f"open work ({len(owned)})"))
             for i in owned:
                 out.append(f"#{i['id']} {i['type']} {_age(i['opened'], now)}  {i['title']}\n")
@@ -194,8 +201,11 @@ def build(ctx: Ctx) -> Snapshot:
                     out.append("(couldn't read the pane)\n", style="bright_black")
             return out
 
+        pct = ctxr.used / ctxr.window if ctxr and ctxr.known and ctxr.window else 0
         team_rows.append(Row(f"agent:{a.name}", _t(dot, f" {a.name:<11} ",
                                                    (f"{harness_model(a.harness, a.model):<16} ", "bright_black"),
+                                                   (f"{usage.compact(ctxr) if ctxr else '':<11} ",
+                                                    "red" if pct >= 0.85 else "yellow" if pct >= 0.7 else "bright_black"),
                                                    (f"{state}", STATUS_STYLE.get(state, "bright_black"))),
                              detail, "agent", {"name": a.name, "workspace": la.workspace_id if la else None,
                                                "running": la is not None, "active": a.active, "role": a.role}))

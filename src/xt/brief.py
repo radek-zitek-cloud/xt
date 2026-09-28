@@ -38,13 +38,22 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         out[0] += f" — for {name}"
 
     out.append("\n## Team")
+    viewer = ctx.team.agent(name) if name else None
+    # context usage is for whoever decides about resets: the human, the lead and the liaison
+    show_context = name is None or name == HUMAN or (viewer is not None and viewer.role in ("lead", "liaison"))
+    contexts = {}
+    if show_context:
+        from . import usage
+
+        contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
     for a in ctx.team.agents():
         if a.kind == HUMAN or not a.active:
             continue
         la = live.get(a.name)
         state = la.status if la else "not running"
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
-        out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}): {state}")
+        cx = f", context {usage.compact(contexts[a.name])}" if a.name in contexts and contexts[a.name].known else ""
+        out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}): {state}")
 
     items = [i for i in ctx.ledger.open_items() if i["type"] != "ask"]  # questions: see below
     if name and name not in (HUMAN,) and ctx.team.agent(name) and ctx.team.agent(name).role not in ("lead", "liaison"):
