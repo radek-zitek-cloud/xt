@@ -351,8 +351,29 @@ Two candidates, one release, and a quality gate that caught its builder twice in
 team spent about $37 of list-price tokens that day, on a subscription that still had two thirds
 of its week left.
 
-You can watch the product team work in its public space:
-**[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**. This page will grow as that story unfolds.
+## Where the story goes from here (28 September, night)
+
+The evening was about the team's own house rules. Every card on the board is now either
+*product* (a change to xt itself, built and released) or *team* (a change to this team's own rules,
+approved by Radek and never part of a release); the release-candidate card had mixed the two and was
+split. Candidates will be checked in a throwaway staging team with one agent, which Radek or Claude
+starts, because agents can't start teams. Questions to Radek now come with what they mean for him,
+two or three options and a recommendation. And v0.12.0 was planned before a line of it was written:
+showing which xt version a team really runs, choosing a version and rolling back, resetting an
+agent's context safely, and clearer restart output.
+
+It had been the busiest day so far: about 220 million tokens on the product team alone, 40% of a
+week's subscription allowance in one day. The next days will be slower, on purpose.
+
+**The story will continue, but this page is already long enough.** From here on it happens in the
+open, where the team works:
+
+- the **[xt Board](https://app.fizzy.do/6278243/public/boards/ACtg1YZftWXG8FB3vT2nF5hY)**: every
+  card, what's being built and what was accepted;
+- the **[xt Space](https://sb.zvikov.zitek.cloud/xt-space)**: specifications, planning notes and
+  one page per release, from *Planned* to *Accepted*;
+- the **[releases](https://github.com/radek-zitek-cloud/xt/releases)** and the
+  [changelog](../CHANGELOG.md).
 
 ## Read more
 
