@@ -45,7 +45,7 @@ def test_agents_never_call_herdr_the_supervisor_delivers(ctx):
     text = ctx.herdr.last_prompt("carol")
     assert text.startswith(f"[xt #{msg['id']} task from:lead to:carol]\nparse the file")
     assert f"--as carol --type report --ref {msg['id']}" in text
-    assert f"--type done --ref {msg['id']}" in text
+    assert f"done {msg['id']} --as carol <<'XT_END'" in text
 
 
 def test_queued_messages_are_delivered_as_one_batch(ctx):

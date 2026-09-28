@@ -22,8 +22,16 @@ absolute path of `xt`. Use exactly that path, and always pass `--as <your name>`
 ## 2. Sending messages
 
 ```
-xt send <to> --as <you> --type <type> [--ref <id>] "text"
+xt send <to> --as <you> --type <type> [--ref <id>] <<'XT_END'
+the text, exactly as written: `backticks`, $(…), quotes and several lines are all fine
+XT_END
 ```
+
+**Always pass the text this way**, on standard input in a heredoc whose end word is quoted
+(`<<'XT_END'`). Text in a quoted argument (`"…"`) goes through your shell first: backticks and
+`$(…)` in it are *run* as commands, and their output replaces your words. The same form works for
+`xt done`, `xt answer`, `xt note` and `xt friction`. The reply hint under each message you receive
+shows it.
 
 | Type | Meaning |
 |---|---|
@@ -31,9 +39,9 @@ xt send <to> --as <you> --type <type> [--ref <id>] "text"
 | `task` | A unit of work, sent down to someone who reports to you. Opens a ledger item you own the follow-up of. `--ref <goal id>` ties it to its goal. |
 | `ask` | A question, up or down. The liaison's `ask` to the human stays **open** in the human's Inbox until the human answers it (their reply has `--ref` to it) or the liaison closes it with `done`. |
 | `report` | Progress, results, answers. Use `--ref` to say what it's about. |
-| `done` | Closes an open goal or task you own. **It is your final report**: put the summary and where the result is in it. `xt done <id> --as <you> "summary"` sends it to the right agent. |
-| `note` | `xt note --as <you> "..."`: records something in the ledger for yourself (a decision, what the human said). Not delivered to anyone. |
-| `friction` | `xt friction --as <you> "..."`: a problem with **xt itself or your harness** (a command refused something reasonable, a sandbox blocked you, a dialog got in the way). Goes to the human's Inbox as feedback on the tooling; not delivered to any pane, and not part of the reporting chain. |
+| `done` | Closes an open goal or task you own. **It is your final report**: put the summary and where the result is in it. `xt done <id> --as <you> <<'XT_END'` (then the summary and `XT_END`) sends it to the right agent. |
+| `note` | `xt note --as <you>` (text on stdin, as above): records something in the ledger for yourself (a decision, what the human said). Not delivered to anyone. |
+| `friction` | `xt friction --as <you>` (text on stdin, as above): a problem with **xt itself or your harness** (a command refused something reasonable, a sandbox blocked you, a dialog got in the way). Goes to the human's Inbox as feedback on the tooling; not delivered to any pane, and not part of the reporting chain. |
 
 - **One message per thing.** When you finish, send only `done`, not a `report` followed by a
   `done`. Don't repeat a message you already sent, and don't send acknowledgements ("got it",
@@ -101,12 +109,18 @@ Messages from xt arrive in your conversation stamped like:
   human asks or your role makes it a duty. Never edit xt's own files (`bin/`, `src/`,
   `protocol.md`, `harnesses/`, `roles/lead.md`, `roles/liaison.md`); they come from upstream.
 
-## 7. No desktop or browser control
+## 7. No desktop or browser control, no account connectors
 
 Don't drive the desktop or a web browser, even to look (computer-use, browser-control or
 screenshot tools). They act in the human's own logged-in sessions, outside xt's rules, and show
 their whole screen. Work through command-line tools and skills; if something can only be done or
 checked in a UI, say so and ask the human. xt switches these tools off where the harness allows it.
+
+The same goes for the human's **account connectors** (mail, file storage, calendar and similar
+services reached through your harness): they act as the human. xt starts agents without them
+unless the human opted a named connector in for you (team.toml); don't use one you weren't given,
+and don't use a command-line tool that holds the human's credentials for such a service unless
+your role or task says so.
 
 ## 8. Skills
 

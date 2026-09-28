@@ -11,6 +11,13 @@ args = [
 ]
 desktop_tools = "blocked"
 desktop_tools_note = "computer-use server and browser features off for this session; checked 2026-09-28"
+# The operator's account connectors (card #101): Codex "apps" (ChatGPT connectors such as
+# Google Drive or Calendar) are switched off for xt's sessions; an agent with `connectors = [...]`
+# in team.toml gets the apps feature back, as a whole (Codex can't pick single apps per session).
+connectors = "blocked"
+connectors_note = "apps (ChatGPT connectors) off unless opted in; an opt-in enables every installed app; CLIs holding your credentials aren't covered"
+connector_block_args = ["-c", "features.apps=false"]
+connector_style = "codex-apps"
 model_flag = "--model"
 summary = "OpenAI Codex CLI: recommended for the liaison and lead; reads repo skills via .agents/skills"
 limits = [

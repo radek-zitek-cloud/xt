@@ -1,5 +1,5 @@
 import datetime as dt
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import tomlkit
@@ -28,6 +28,7 @@ class Agent:
     wake_message: str | None = None
     wake_between: str | None = None  # "05:00-21:00": local-time window for wake-ups; None = any time
     wake_at: str | None = None  # "09:30": for daily (or longer) schedules, the local time to wake
+    connectors: list[str] = field(default_factory=list)  # account connectors opted in (card #101)
 
     @property
     def active(self) -> bool:
@@ -86,6 +87,7 @@ class Team:
                     wake_message=a.get("wake_message") or None,
                     wake_between=a.get("wake_between") or None,
                     wake_at=a.get("wake_at") or None,
+                    connectors=[str(c) for c in a.get("connectors", [])],
                 )
             )
         return out

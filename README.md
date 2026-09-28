@@ -50,8 +50,8 @@ is in [the story so far](docs/story.md).
   and how much of the subscription allowance the week has used.
 - **Survive restarts.** `xt down` then `xt restart --all` brings back the team that was running;
   agents recover from files and a brief, not from memory.
-- **Keep agents in bounds.** No desktop or browser control for agents; public output stays free of
-  private details.
+- **Keep agents in bounds.** No desktop or browser control and none of your account connectors
+  (mail, files, calendar) unless you opt one in; public output stays free of private details.
 
 What it can't do yet is in [Known limits](#known-limits).
 
@@ -142,7 +142,8 @@ bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
 | `1`–`6`, `tab`, `j`/`k`, `enter` | Switch panels, move, read the detail |
 | `/` | Filter the focused panel by text (empty clears it) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
-| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. In the dialog, enter starts a new line and ctrl+s sends |
+| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says which (`s answer #288` or `s/S message liaison`). In the dialog, enter starts a new line and ctrl+s sends |
+| `S` | Always message the liaison, even with a question selected |
 | `c` | Clear the selected alert |
 | `f` | Switch Herdr to the selected agent's workspace |
 | `u` / `U` | Start the selected stopped agent / every stopped agent |
@@ -200,9 +201,10 @@ quiet = ""                  # e.g. "21:00-07:00": no notifications then
 raw_days = 30               # then gzipped; delete_after_days = 0 keeps them forever
 ```
 
-Each `[[agent]]` has `name`, `role`, `harness`, optional `model`, `reports_to`, `status`, and an
-optional schedule (`wake_every`, `wake_message`, `wake_between`). Runtime facts such as pane ids
-never go in `team.toml`.
+Each `[[agent]]` has `name`, `role`, `harness`, optional `model`, `reports_to`, `status`, an
+optional schedule (`wake_every`, `wake_message`, `wake_between`, `wake_at`) and optional
+`connectors` (account connectors opted in for that agent; none by default). Runtime facts such as
+pane ids never go in `team.toml`.
 
 ## Layout
 
@@ -237,6 +239,8 @@ agents that were running (from 0.10.0 on; an older `xt down` records nothing, so
 - Codex runs agents with network access off; anything an agent fetches needs an escalation that
   Codex's reviewer (or you) approves.
 - Costs are estimates from public list prices (`prices.toml`), not bills; no budgets yet.
+- Account connectors are off for agents, but command-line tools that hold your credentials (a
+  mail CLI, say) are just programs to the harness: xt can't switch them off.
 
 ## Versioning
 

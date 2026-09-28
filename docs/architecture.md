@@ -138,9 +138,13 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
   anyone. Only the liaison (or human) opens goals; tasks go downward only; the liaison can't spawn
   or retire. Messages over 4 KB are refused (put payloads in files and send the path).
 - **Identity:** agents pass `--as <name>` (told in the first prompt). `--as human` works only from
-  a real terminal; agents' shell tools don't have one.
+  the human's own terminal: a process with a controlling terminal (stdin may be a heredoc or pipe),
+  no `XT_AGENT` in its environment (xt exports it in every agent's pane before the harness
+  starts) and no harness (claude, codex, pi) among its ancestors. Most agents' shell tools have no
+  terminal at all; Codex can run commands in a pseudo-terminal, which the other two signals catch.
 - **Envelope:** delivered text is stamped `[xt #42 task from:lead to:carol ref:#3]`, with a reply
-  hint. Unstamped text in a pane comes from the human typing there.
+  hint that passes the text on stdin in a quoted heredoc (`<<'XT_END'`), so the agent's shell leaves
+  backticks and `$(…)` alone. Unstamped text in a pane comes from the human typing there.
 - **Delivery:** an agent's `xt send` only appends to the log and the queue. The supervisor delivers
   when the recipient is idle: **everything queued for it in one prompt**, oldest first, with
   messages about since-closed items marked *stale*. Messages from the human (and the supervisor's
@@ -329,8 +333,11 @@ what saves it.
 
 - **Soft enforcement.** An agent can still call Herdr directly outside a sandbox, or claim another
   agent's name with `--as`. The envelope and the log make it visible; nothing prevents it.
-- **The `--as human` terminal guard** is verified for non-interactive codex and claude shells, not
-  for every harness.
+- **The `--as human` guard** is checked live for Claude Code's shell tool and Codex's normal and
+  pseudo-terminal commands (0.11.0), not for every harness or mode; an agent that deliberately
+  unsets `XT_AGENT` and escapes its harness's process tree would still pass.
+- **Credential-holding CLIs.** Account connectors are off for agents, but a command-line tool that
+  holds the operator's credentials (a mail CLI) is an ordinary program to the harness.
 - **Instructions age.** Running agents keep their first prompt's instructions until restarted.
 - **Estimates, not bills.** Dollar figures come from public list prices; subscriptions, discounts
   and long-context tiers aren't reflected. No budgets or alerts on usage yet (card #92). There's

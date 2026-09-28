@@ -1,5 +1,6 @@
 import argparse
 import datetime as dt
+import os
 import sys
 
 from . import __version__
@@ -11,7 +12,7 @@ from .context import Ctx
 from .dispatch import Queue, done_recipient, send
 from .ledger import AGENT_TYPES
 from .paths import Paths, XtError, find_root
-from .spawn import Approvals, approval_what, decide, request_spawn, retire, stop
+from .spawn import AGENT_ENV, Approvals, approval_what, decide, request_spawn, retire, stop
 from .team import ALWAYS, HUMAN, harness_model, parse_window, schedule_text
 
 
@@ -19,9 +20,9 @@ def _who(args) -> str:
     who = getattr(args, "as_", None)
     if who and who != HUMAN:
         return who
-    # Acting as the human needs a real terminal. Agents' shell tools don't run in one, so an
-    # agent can't simply claim `--as human` to skip approvals. Soft, but it closes the easy path.
-    if sys.stdin.isatty():
+    # Acting as the human needs the human's own terminal, so an agent can't simply claim
+    # `--as human` to skip approvals. Soft, but it closes the easy paths (card #103).
+    if human_terminal():
         return HUMAN
     if who == HUMAN:
         raise XtError(
@@ -30,6 +31,66 @@ def _who(args) -> str:
             "do, ask them (or the agent you report to) to do it."
         )
     raise XtError("pass --as <your name> (agents must always say who they are)")
+
+
+def _body(args, default: str = "") -> str:
+    """The message text: the arguments, or else standard input (a quoted heredoc keeps it exactly as
+    written, card #106). A terminal on stdin means nothing was piped in: don't wait for it."""
+    if args.body:
+        return " ".join(args.body)
+    if sys.stdin.isatty():
+        return default
+    return sys.stdin.read() or default
+
+
+def controlling_terminal() -> bool:
+    """Whether this process has a controlling terminal, even when stdin is a pipe or heredoc."""
+    try:
+        os.close(os.open("/dev/tty", os.O_RDWR))
+        return True
+    except OSError:
+        return False
+
+
+HARNESS_BINARIES = ("claude", "codex", "pi")
+
+
+def _ancestor_names():
+    """Names of this process's ancestors: each one's command name and its program's file name."""
+    pid = os.getppid()
+    while pid > 1:
+        try:
+            comm = open(f"/proc/{pid}/comm").read().strip()
+            argv = open(f"/proc/{pid}/cmdline", "rb").read().split(b"\0")
+            ppid = int(open(f"/proc/{pid}/stat").read().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            return
+        yield {comm, *(os.path.basename(a.decode(errors="replace")) for a in argv[:2] if a)}
+        pid = ppid
+
+
+def under_harness() -> bool:
+    """Whether an agent harness (Claude Code, Codex, pi) started this process, however its
+    environment was passed on: its shell tools, helpers and daemons all descend from it."""
+    return harness_in(_ancestor_names())
+
+
+def harness_in(chain) -> bool:
+    return any(n == b or n.startswith(b + "-") for names in chain for n in names for b in HARNESS_BINARIES)
+
+
+def human_terminal() -> bool:
+    """The human's own terminal: not inside an agent xt started, and attached to a terminal.
+
+    xt exports XT_AGENT in every agent's pane before its harness starts, so every shell the agent
+    opens carries it, including a Codex command run in a pseudo-terminal; and in case the
+    environment gets lost on the way (a shared daemon, a pooled shell), a harness among the
+    process's ancestors counts too. Claude Code's and pi's shell tools have no terminal at all.
+    The terminal check looks at the controlling terminal, not stdin, so the human can pipe a body
+    in (`xt send … <<'XT_END'`)."""
+    if os.environ.get(AGENT_ENV) or under_harness():
+        return False
+    return sys.stdin.isatty() or controlling_terminal()
 
 
 def cmd_default(args) -> None:
@@ -121,8 +182,7 @@ def cmd_down(args) -> None:
 
 def cmd_send(args) -> None:
     ctx = Ctx.load()
-    body = " ".join(args.body) if args.body else sys.stdin.read()
-    msg, status = send(ctx, _who(args), args.to, args.type, body, args.ref)
+    msg, status = send(ctx, _who(args), args.to, args.type, _body(args), args.ref)
     print(f"#{msg['id']} {msg['type']} → {msg['to']}: {status}")
 
 
@@ -133,7 +193,7 @@ def cmd_done(args) -> None:
     if item is None:
         raise XtError(f"#{args.id} is not an open goal or task")
     to = done_recipient(ctx.team, who, item)
-    msg, status = send(ctx, who, to, "done", " ".join(args.body) or "done", args.id)
+    msg, status = send(ctx, who, to, "done", _body(args, "done"), args.id)
     print(f"#{msg['id']} done for #{args.id} → {to}: {status}")
 
 
@@ -145,22 +205,19 @@ def cmd_answer(args) -> None:
         raise XtError(f"#{args.id} is not an open question (see `xt inbox`)")
     if who != item["owner"]:
         raise XtError(f"#{args.id} is a question for {item['owner']}, not {who}")
-    body = " ".join(args.body) if args.body else sys.stdin.read()
-    msg, status = send(ctx, who, item["opener"], "report", body, args.id)
+    msg, status = send(ctx, who, item["opener"], "report", _body(args), args.id)
     print(f"#{msg['id']} answer to #{args.id} → {item['opener']}: {status}")
 
 
 def cmd_friction(args) -> None:
     ctx = Ctx.load()
-    body = " ".join(args.body) if args.body else sys.stdin.read()
-    msg, status = send(ctx, _who(args), HUMAN, "friction", body, args.ref)
+    msg, status = send(ctx, _who(args), HUMAN, "friction", _body(args), args.ref)
     print(f"#{msg['id']} friction: {status}")
 
 
 def cmd_note(args) -> None:
     ctx = Ctx.load()
-    body = " ".join(args.body) if args.body else sys.stdin.read()
-    msg, status = send(ctx, _who(args), "", "note", body, args.ref)
+    msg, status = send(ctx, _who(args), "", "note", _body(args), args.ref)
     print(f"#{msg['id']} note: {status}")
 
 
@@ -334,6 +391,8 @@ def cmd_harnesses(args) -> None:
             print(f"   limit: {lim}")
         print(f"   desktop/browser tools for agents: {a.desktop_tools or 'not restricted'}"
               + (f" ({a.desktop_tools_note})" if a.desktop_tools_note else ""))
+        print(f"   account connectors for agents: {a.connectors or 'not restricted'}"
+              + (f" ({a.connectors_note})" if a.connectors_note else ""))
 
 
 def cmd_goal(args) -> None:

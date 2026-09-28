@@ -6,6 +6,7 @@ the row the human is looking at.
 
 import datetime as dt
 import re
+import textwrap
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -25,6 +26,64 @@ TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
               "system": "bright_black"}
 HISTORY_DAYS = 30
+CONTINUED = "↳ "
+
+
+def screen_lines(screen: str, keep: int = 25) -> list[tuple[str, int]]:
+    """The pane's last lines as the terminal shows them: blank lines dropped, a line repeated
+    several times in a row shown once with its count (card #98)."""
+    out: list[tuple[str, int]] = []
+    for ln in (ln.rstrip() for ln in screen.splitlines()):
+        if not ln.strip():
+            continue
+        if out and out[-1][0] == ln:
+            out[-1] = (ln, out[-1][1] + 1)
+        else:
+            out.append((ln, 1))
+    return out[-keep:]
+
+
+class ScreenPreview:
+    """Captured pane lines laid out at the detail pane's width: each captured line starts a new
+    line, and a line too long for the pane continues on indented lines marked ↳, so text is never
+    re-wrapped into ambiguous fragments and nothing is cut off."""
+
+    def __init__(self, lines: list[tuple[str, int]]):
+        self.lines = lines
+
+    @property
+    def plain(self) -> str:
+        return "".join(f"{ln}{f'  (×{n})' if n > 1 else ''}\n" for ln, n in self.lines)
+
+    def rows(self, width: int) -> list[str]:
+        out: list[str] = []
+        for ln, n in self.lines:
+            text = ln + (f"  (×{n})" if n > 1 else "")
+            # terminal layout padding (right-aligned tips, status bars) would push text off the pane
+            lead = text[: len(text) - len(text.lstrip())][:8]
+            text = lead + re.sub(r" {4,}", "   ", text.lstrip())
+            out += textwrap.wrap(text.lstrip(), width=max(width, 20), initial_indent=lead,
+                                 subsequent_indent=lead + "  " + CONTINUED, break_on_hyphens=False) or [lead]
+        return out
+
+    def __rich_console__(self, console, options):
+        for row in self.rows(options.max_width):
+            yield Text(row, style="bright_black", no_wrap=True, overflow="crop")
+
+
+class Detail:
+    """An agent's detail: its text, then its screen preview laid out at the pane's width."""
+
+    def __init__(self, text: Text, screen: ScreenPreview):
+        self.text, self.screen = text, screen
+
+    @property
+    def plain(self) -> str:
+        return self.text.plain + self.screen.plain
+
+    def __rich_console__(self, console, options):
+        yield self.text
+        yield self.screen
 
 
 @dataclass
@@ -197,6 +256,8 @@ def build(ctx: Ctx) -> Snapshot:
                 out.append(f"next wake-up: {dt.datetime.fromtimestamp(nxt):%a %d %b %H:%M}\n")
             mine_today = spend.agents_today.get(a.name)
             out.append(f"usage today: {turns.fmt(mine_today) if mine_today else 'none recorded'}\n")
+            if a.connectors:
+                out.append(f"account connectors (opted in): {', '.join(a.connectors)}\n", style="yellow")
             out.append(_heading(f"open work ({len(owned)})"))
             for i in owned:
                 out.append(f"#{i['id']} {i['type']} {_age(i['opened'], now)}  {i['title']}\n")
@@ -210,10 +271,10 @@ def build(ctx: Ctx) -> Snapshot:
                 out.append(_heading("screen (last lines)"))
                 try:
                     screen = ctx.herdr.read_pane(la.pane_id, lines=40)
-                    tail = [ln for ln in screen.splitlines() if ln.strip()][-25:]
-                    out.append("\n".join(tail) + "\n", style="bright_black")
                 except XtError:
                     out.append("(couldn't read the pane)\n", style="bright_black")
+                else:
+                    return Detail(out, ScreenPreview(screen_lines(screen)))
             return out
 
         if la is None:

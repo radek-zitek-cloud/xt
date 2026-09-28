@@ -14,7 +14,7 @@ from .. import __version__
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
-HINTS = "h help · q quit · 1-6 panels · j/k move · enter read · / filter · a/d approve/deny · s send/answer · c clear · f jump · u/U start · x/X stop · R retire"
+HINTS = "h help · q quit · 1-6 panels · j/k move · enter read · / filter · a/d approve/deny · c clear · f jump · u/U start · x/X stop · R retire"
 
 
 class Panel(OptionList):
@@ -166,7 +166,8 @@ class Help(ModalScreen[None]):
         ("f", "switch Herdr to the selected agent's workspace"),
         ("Anywhere", ""),
         ("s", "answer the question selected in Inbox; anywhere else: send a message to the liaison "
-              "(enter: new line, ctrl+s: send)"),
+              "(the key line says which; enter: new line, ctrl+s: send)"),
+        ("S", "always send a message to the liaison, even with a question selected"),
         ("r", "refresh now (it also refreshes every 2 s)"),
         ("h / ?", "this help"),
         ("q", "quit"),
@@ -206,6 +207,7 @@ class XtTui(App):
         Binding("d", "decide(False)", show=False),
         Binding("c", "clear_alert", show=False),
         Binding("s", "send", show=False),
+        Binding("S", "send_liaison", show=False),
         Binding("f", "jump", show=False),
         Binding("r", "refresh", show=False),
         Binding("u", "start_agent", show=False),
@@ -291,7 +293,18 @@ class XtTui(App):
         if self.status:
             top.append("\n" + self.status, style="yellow")
         self.query_one("#topbar", Static).update(top)
-        self.query_one("#hints", Static).update(Text(HINTS, no_wrap=True, overflow="ellipsis"))
+        self.query_one("#hints", Static).update(Text(f"{self.send_hint()} · {HINTS}", no_wrap=True,
+                                                     overflow="ellipsis"))
+
+    def send_hint(self) -> str:
+        """What s does right now (card #102): answer the selected question, or message the liaison."""
+        try:
+            row = self._selected("question")
+        except Exception:  # before the panels exist
+            row = None
+        if row:
+            return f"s answer #{row.data['id']} · S message liaison"
+        return "s/S message liaison"
 
     # --- navigation -------------------------------------------------------------------------
 
@@ -300,11 +313,13 @@ class XtTui(App):
             event.option_list.update_subtitle()
             if event.option_list is self.focused:
                 self.show_detail(event.option_list)
+                self.render_hints()
 
     def on_descendant_focus(self, event) -> None:
         if isinstance(event.widget, Panel):
             self.last_panel = int(event.widget.id.split("-")[1])
             self.show_detail(event.widget)
+            self.render_hints()
 
     def action_panel(self, n: int) -> None:
         self.panel(n).focus()
@@ -393,10 +408,16 @@ class XtTui(App):
 
     def action_send(self) -> None:
         """s: answer the question selected in the Inbox, otherwise send a message to the liaison."""
+        row = self._selected("question")
+        self._compose(row.data if row else None)
+
+    def action_send_liaison(self) -> None:
+        """S: always a message to the liaison, whatever is selected (card #102)."""
+        self._compose(None)
+
+    def _compose(self, question: dict | None) -> None:
         if not self._need_live():
             return
-        row = self._selected("question")
-        question = row.data if row else None
 
         def done(text: str | None) -> None:
             if text and text.strip():

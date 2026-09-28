@@ -69,7 +69,8 @@ several agents need the same know-how, or the same instructions keep recurring i
 
 ## Running the work
 
-- Send tasks with `xt send <member> --type task --ref <goal id> --as lead "..."`: what to do,
+- Send tasks with `xt send <member> --type task --ref <goal id> --as lead <<'XT_END'` (text, then
+  `XT_END`, as the protocol shows): what to do,
   where, what "done" means, what to report. Keep tasks small, and put long specs in a file.
 - **One owner per shared resource.** If several agents would touch the same repo, document, or
   dataset, give one of them ownership (e.g. one agent makes all git commits) and route changes

@@ -9,6 +9,48 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-09-28
+
+The second batch from the xt product team, and the first release planned before it was built (five
+cards, 8 points). Card numbers from here on are xt Board cards.
+
+### Added
+
+- **Agents start without your account connectors (card #101).** Claude Code agents start with
+  `--strict-mcp-config`, so no claude.ai connector (mail, drive, calendar…) and no plugin or user
+  MCP server loads; Codex agents start with their apps (ChatGPT connectors) switched off. Your own
+  sessions keep them. An agent that needs one gets it by name: `connectors = [...]` on its
+  `[[agent]]` in `team.toml`, then restart it (Claude Code: exactly those servers; Codex: its apps
+  as a whole). Adapters declare their coverage; `xt harnesses`, the start note and the agent's
+  detail show it. Command-line tools that hold your credentials aren't covered (Known limits).
+- **`S` in the TUI always messages the liaison (card #102),** even with a question selected, and
+  the key line now starts with what `s` will do (`s answer #288 · S message liaison`, or
+  `s/S message liaison`).
+
+### Changed
+
+- **Messages go on standard input, exactly as written (card #106).** The reply hint under each
+  delivered message, the protocol and the lead's role show `xt send … <<'XT_END'` … `XT_END`: text
+  in a quoted argument went through the agent's shell first, so backticks and `$(…)` in it were
+  run and their output replaced the words (it happened twice in one team). `xt done`, `xt note`
+  and `xt friction` now also take their text on stdin. Checked live with Claude Code, Codex and pi.
+- **You can pipe or heredoc a message body into xt (card #103).** xt now decides who is the human
+  by whether a command runs inside an agent's session (every agent xt starts has `XT_AGENT` set,
+  and a harness among a process's ancestors counts too) and whether it has a controlling terminal,
+  not by whether stdin is a terminal. This also closes a gap: a Codex agent running a command in a
+  pseudo-terminal passed the old check. New agent names must be lowercase letters, digits, `-`
+  and `_`.
+- **The agent detail's screen reads like the terminal (card #98):** each captured line starts on
+  its own line, a long one continues on indented `↳` lines instead of being re-wrapped mid-word,
+  blank lines are dropped and a line repeated in a row is shown once with `(×N)`.
+
+### Upgrading
+
+- `xt down`, `git pull upstream main`, `xt restart --all` (or pull, then `xt restart --all`).
+  **Restart every agent:** only agents started by 0.11.0 carry `XT_AGENT`, get the new reply
+  hints and protocol, and start without account connectors. If an agent needs a connector, add
+  `connectors = [...]` to it in `team.toml` before restarting.
+
 ## [0.10.0] — 2026-09-28
 
 The first batch specified by the xt product team (eight cards, 11 points).

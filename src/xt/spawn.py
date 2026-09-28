@@ -2,6 +2,8 @@
 
 import json
 import os
+import re
+import shlex
 import time
 
 from . import brief, skills
@@ -45,6 +47,9 @@ Run xt as `{xt}` (absolute path — don't rely on PATH). Always pass `--as {name
 Start now: follow your role's "on start" instructions. If you have nothing to do, say so briefly and stop."""
 
 
+AGENT_ENV = "XT_AGENT"  # set in every agent's pane: marks its shells as an agent's, never the human's
+
+
 def do_spawn(ctx: Ctx, name: str) -> str:
     """Start an agent already in team.toml: new workspace, harness start, first prompt."""
     a = ctx.team.agent(name)
@@ -56,9 +61,12 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         raise XtError(f"{name} is already running")
     adapter = get_adapter(ctx.paths, a.harness)
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
+    # Before the harness starts, so it and every shell it opens inherit it (card #103).
+    ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
     answered: list[str] = []
     try:
-        ctx.herdr.start_agent(name, adapter.herdr_kind, pane, adapter.start_args(a.model))
+        ctx.herdr.start_agent(name, adapter.herdr_kind, pane,
+                              adapter.start_args(a.model, a.connectors, str(ctx.paths.root)))
     except HerdrError as e:
         # Herdr refuses when the harness blocks at startup (e.g. claude's folder-trust question).
         # The agent is registered and blocked; answer the dialog and wait until it's ready.
@@ -76,6 +84,14 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     landed = send_first_prompt(ctx, name, pane, adapter, first_prompt(ctx, name))
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     ctx.ledger.append(SYSTEM, HUMAN, "system", f"started {name} ({a.role}, {a.harness}) in workspace {workspace}{note}")
+    if a.connectors:
+        ctx.ledger.append(SYSTEM, HUMAN, "system",
+                          f"{name}: account connectors opted in: {', '.join(a.connectors)}"
+                          + (f" ({adapter.connectors_note})" if adapter.connectors_note else ""))
+    elif adapter.connectors not in ("blocked", "none"):
+        ctx.ledger.append(SYSTEM, HUMAN, "system",
+                          f"{name}: the operator's account connectors are not blocked in {a.harness} "
+                          f"({adapter.connectors_note or 'no restriction declared'})")
     if adapter.desktop_tools not in ("blocked", "none"):
         ctx.ledger.append(SYSTEM, HUMAN, "system",
                           f"{name}: desktop and browser tools are not fully blocked in {a.harness} "
@@ -226,6 +242,8 @@ def request_spawn(
     existing = ctx.team.agent(name)
     if existing and existing.kind == HUMAN:
         raise XtError("can't spawn the human")
+    if existing is None and not re.fullmatch(r"[a-z][a-z0-9_-]{0,31}", name):
+        raise XtError(f"agent names are lowercase letters, digits, - and _ (starting with a letter): {name!r}")
     if existing and not (harness or role):
         harness, role, model = existing.harness, existing.role, model or existing.model
         reports_to = reports_to or existing.reports_to

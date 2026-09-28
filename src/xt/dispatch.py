@@ -46,17 +46,23 @@ def check_policy(team: Team, sender: str, to: str, mtype: str) -> None:
         raise XtError(f"tasks go downward only; {to} doesn't report to {sender}")
 
 
+HEREDOC_END = "XT_END"  # rarer than EOF, which can appear in the text itself
+
+
 def envelope(ctx: Ctx, msg: dict) -> str:
     ref = f" ref:#{msg['ref']}" if msg.get("ref") is not None else ""
     head = f"[xt #{msg['id']} {msg['type']} from:{msg['from']} to:{msg['to']}{ref}]"
     text = f"{head}\n{msg['body']}"
     if msg["from"] != SYSTEM and may_send(ctx.team, msg["to"], msg["from"]):
+        # the text goes on stdin in a quoted heredoc: the shell leaves backticks and $(…) alone (#106)
         text += (
-            f"\n\n(reply: {ctx.paths.xt_bin} send {msg['from']} --as {msg['to']} "
-            f"--type report --ref {msg['id']} \"...\""
+            f"\n\n(reply, text exactly as written between the {HEREDOC_END} lines:\n"
+            f"{ctx.paths.xt_bin} send {msg['from']} --as {msg['to']} --type report --ref {msg['id']} "
+            f"<<'{HEREDOC_END}'\n...\n{HEREDOC_END}"
         )
         if msg["type"] in ("goal", "task"):
-            text += f"; when finished: --type done --ref {msg['id']}"
+            text += (f"\nwhen finished: {ctx.paths.xt_bin} done {msg['id']} --as {msg['to']} "
+                     f"<<'{HEREDOC_END}' … {HEREDOC_END}")
         text += ")"
     return text
 

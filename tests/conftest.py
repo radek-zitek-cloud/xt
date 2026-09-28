@@ -185,3 +185,14 @@ def add_member(ctx: Ctx, name: str, role: str = "worker", reports_to: str = "lea
     ctx.team.upsert_agent(name, role, "claude", None, reports_to)
     ctx.team.save()
     ctx.reload_team()
+
+
+@pytest.fixture(autouse=True)
+def no_controlling_terminal(monkeypatch):
+    """Tests decide the human terminal through a fake stdin: never through the runner's own
+    terminal or an XT_AGENT inherited from an agent running the tests."""
+    from xt import cli
+
+    monkeypatch.setattr(cli, "controlling_terminal", lambda: False)
+    monkeypatch.setattr(cli, "under_harness", lambda: False)  # the tests may run inside an agent
+    monkeypatch.delenv("XT_AGENT", raising=False)

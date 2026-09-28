@@ -19,8 +19,10 @@ for installing, the [README](../README.md).
 ## Who's who
 
 - **You (the human)** talk to the **liaison**, decide what the team spends (hires, schedules), and
-  answer questions. Your commands need a real terminal: xt treats a command run from a terminal as
-  you, so agents (whose shells have no terminal) can't act as you.
+  answer questions. Your commands need your own terminal: xt treats a command run from a terminal
+  as you, unless it runs inside an agent's session. Every agent xt starts carries `XT_AGENT` in its
+  environment, and most agents' shells have no terminal at all, so agents can't act as you. This
+  is enforced by xt, not a sandbox: it closes the easy paths.
 - **The liaison** turns what you want into goals and relays questions and results. It never does
   the work and never hires.
 - **The lead** plans each goal, writes roles and skills, asks to hire members, hands out tasks and
@@ -58,7 +60,10 @@ set `[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notificati
 3. The supervisor starts the lead, with the goal in its first prompt. From here the Goals panel
    shows the goal and its tasks, and the Log panel every message.
 
-You can also message the liaison from the TUI (`s`) without switching workspaces.
+You can also message the liaison from the TUI without switching workspaces: `S` always opens a
+message to the liaison. `s` does too, except when a question is selected in the Inbox: then it
+answers that question. The key line at the bottom of the TUI starts with what `s` will do right
+now (`s answer #288 · S message liaison`, or `s/S message liaison`).
 
 ### 3. Hiring (approvals)
 
@@ -90,7 +95,11 @@ nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
 The **Supervisor** panel (6) shows what xt did (deliveries, wake-ups, nudges, notifications). The
 Status pane on top has three lines: the team with only what needs you (questions and approvals in
 yellow, alerts in red, or "nothing waiting for you"); today's usage and account allowance; and the
-result of your last action, in full.
+result of your last action, in full. The key line at the bottom starts with what `s` will do.
+
+An agent's detail (Team panel, 2) ends with the last lines of its screen, laid out like the
+terminal: each line starts on its own line, a line too long for the pane continues on indented
+lines marked `↳`, blank lines are dropped, and a line repeated in a row is shown once with `(×3)`.
 
 ### 5. Periodic work: schedules, quiet hours, standing rules
 
@@ -180,6 +189,25 @@ switched off and Claude Code agents with Claude in Chrome refused (their own set
 sessions stay as they are); `xt harnesses` shows what each harness blocks, and a start note says
 when a harness can't block everything. Agents are told to ask you for anything only a UI can do.
 
+**No account connectors.** Harnesses can reach your accounts through connectors: Claude Code's
+claude.ai connectors (Gmail, Drive, Calendar…) and MCP servers, Codex's apps. xt starts agents
+without them: Claude Code with `--strict-mcp-config` (no MCP server loads), Codex with its apps
+switched off. Your own sessions keep them. When an agent needs one, opt it in by name in
+`team.toml` and restart the agent:
+
+```toml
+[[agent]]
+name = "researcher"
+connectors = ["claude.ai Context7"]   # Claude Code: MCP server names as the harness lists them
+```
+
+A Claude Code agent then gets exactly those servers (xt lists the others at start and refuses
+their tools); a Codex agent gets its apps back as a whole, because Codex can't pick single apps.
+The start note, the agent's detail and `xt harnesses` show what's opted in and what each harness
+covers. Removing the line restores the default at the next start. **Not covered:** command-line
+tools that hold your credentials (a mail CLI, for example) are ordinary programs to the harness;
+keep such skills out of an agent's reach if it shouldn't use them.
+
 **How full is an agent's context?** The Team panel shows it per agent (`~211k/258k`: tokens in
 the conversation after its latest turn, out of the model's window), yellow from 70% and red from
 85%; the agent's detail, `xt status` and the lead's and liaison's briefs show it too. xt reads it
@@ -229,7 +257,7 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt spawn`](#xt-spawn) | both | `u` / `U` for agents in the roster |
 | [`xt stop`](#xt-stop) | human | `x` |
 | [`xt retire`](#xt-retire) | both | `R` |
-| [`xt send`](#xt-send) | both | `s` (to the liaison) |
+| [`xt send`](#xt-send) | both | `S` (to the liaison; `s` too when no question is selected) |
 | [`xt done`](#xt-done) | agents | none |
 | [`xt note`](#xt-note) | agents | none |
 | [`xt friction`](#xt-friction) | agents | shown in Inbox (`✱`) |
@@ -292,7 +320,8 @@ reported about xt or a harness, and recent messages to you, each with the comman
 
 `xt answer <id> "your answer"` — answers a question the liaison asked you; the liaison gets it as
 a report and the question closes. **Use it** from a terminal; in the TUI press `s` on the question.
-Answering in the liaison's pane works too (it closes the question itself).
+Answering in the liaison's pane works too (it closes the question itself). A longer answer can come
+from a heredoc (see `xt send`).
 
 ### `xt approve`, `xt deny`
 
@@ -342,7 +371,22 @@ is no longer needed; `R` in the TUI (not for the liaison or lead).
 `xt send <to> --type goal|task|ask|report|done|note|friction [--ref ID] "text"` — the one way agents
 talk. xt checks the hierarchy (an agent messages only the one it reports to and its own reports),
 logs the message and delivers it when the recipient is idle. **Use it** yourself rarely: to message
-an agent directly (`xt send lead --type ask "…"`); `s` in the TUI messages the liaison.
+an agent directly (`xt send lead --type ask "…"`); `S` in the TUI messages the liaison.
+
+For text with quotes, apostrophes, backticks or several lines, pass it on standard input in a
+heredoc whose end word is **quoted** (the quotes stop the shell from touching the text), from your
+own terminal or an agent's shell. xt's reply hints use `XT_END` as the end word, because `EOF` can
+turn up inside the text itself:
+
+```sh
+xt send liaison --type report <<'XT_END'
+Standing rule from the human: don't publish anything before 07:00.
+It's fine to prepare drafts overnight.
+XT_END
+```
+
+Agents are told to send every message this way (protocol section 2): text in a quoted argument
+goes through the shell first, so backticks and `$(…)` in it would run as commands.
 
 ### `xt done`
 
