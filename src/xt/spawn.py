@@ -76,6 +76,10 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     landed = send_first_prompt(ctx, name, pane, adapter, first_prompt(ctx, name))
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     ctx.ledger.append(SYSTEM, HUMAN, "system", f"started {name} ({a.role}, {a.harness}) in workspace {workspace}{note}")
+    if adapter.desktop_tools not in ("blocked", "none"):
+        ctx.ledger.append(SYSTEM, HUMAN, "system",
+                          f"{name}: desktop and browser tools are not fully blocked in {a.harness} "
+                          f"({adapter.desktop_tools_note or 'no restriction declared'}); agents must not use them")
     return workspace
 
 
@@ -185,6 +189,7 @@ class Approvals:
         if req.get("kind") == "schedule":
             what = (f"{req['requester']} asks to wake {req['name']} every {req['every']} when idle"
                     + (f" between {req['between']}" if req.get("between") and req["between"] != ALWAYS else "")
+                    + (f" at {req['at']}" if req.get("at") and req["at"] not in (ALWAYS, "off") else "")
                     + (f" ({req['message']})" if req.get("message") else "")
                     + ": each wake-up is a billed agent turn.")
         else:
@@ -272,7 +277,8 @@ def approval_what(r: dict) -> str:
     """One line for a pending approval: `wake scout every 60m between …` / `spawn carol (role, harness/model)`."""
     if r.get("kind") == "schedule":
         return (f"wake {r['name']} every {r['every']}"
-                + (f" between {r['between']}" if r.get("between") and r["between"] != ALWAYS else ""))
+                + (f" between {r['between']}" if r.get("between") and r["between"] != ALWAYS else "")
+                + (f" at {r['at']}" if r.get("at") and r["at"] not in (ALWAYS, "off") else ""))
     return f"spawn {r['name']} ({r['role']}, {harness_model(r['harness'], r.get('model'))})"
 
 
@@ -280,7 +286,7 @@ def decide(ctx: Ctx, req_id: int, approve: bool) -> str:
     req = Approvals(ctx).pop(req_id)
     if req.get("kind") == "schedule":
         if approve:
-            ctx.team.set_schedule(req["name"], req["every"], req.get("message"), req.get("between"))
+            ctx.team.set_schedule(req["name"], req["every"], req.get("message"), req.get("between"), req.get("at"))
             ctx.team.save()
             ctx.reload_team()
             result = f"{req['name']} is now woken {schedule_text(ctx.team.agent(req['name']))} when idle"

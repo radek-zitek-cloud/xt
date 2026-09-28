@@ -9,6 +9,46 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-09-28
+
+The first batch specified by the xt product team (eight cards, 11 points).
+
+### Added
+
+- **Agents without desktop control (#37).** Codex agents start with the computer-use plugin's
+  server and Codex's browser and computer-use features switched off for their session only; Claude
+  Code agents with Claude in Chrome refused. Adapters declare `desktop_tools` (blocked / none /
+  partial); a start note says when a harness can't block everything; `xt harnesses` shows it; the
+  protocol tells agents not to drive a GUI and to ask the human.
+- **Daily schedules at a set time (#41).** A daily or longer schedule with a window wakes at the
+  window's start every day, however late it was approved; `xt schedule … --at HH:MM` picks another
+  time inside the window. The next wake-up is shown by `xt schedule`, `xt status` and the agent's
+  detail. Wall-clock time holds across daylight-saving changes.
+- **A multi-line answer dialog (#38):** `s` opens a text box with the question above it; enter
+  starts a new line, ctrl+s sends.
+- **A readable Status pane (#44):** line 1 shows the team and only what needs you (questions and
+  approvals in yellow, alerts in red, or "nothing waiting for you"; queue and jobs only when stuck
+  for over a minute); line 2 today's usage and account allowance in words; line 3 the last action's
+  result in full.
+
+### Changed
+
+- **Goal read-backs are questions (#39):** the liaison asks "ready to dispatch?" through xt (Inbox,
+  notification) as well as in its pane, and dispatches once; a second dispatch of the same goal now
+  says it was already dispatched.
+- **Corrections become lessons (#40):** the liaison relays a correction as `Correction from the
+  human:`; the lead records it in `members/lead/lessons.md` and fixes the rule behind it.
+- **`xt restart --all` after `xt down` (#42)** restores the agents that were running before the
+  down (not ones stopped on purpose) and lists them.
+- **A stopped agent's context (#43)** isn't shown as current: `—` in Team rows and `xt status`,
+  "last session" in its detail and none in briefs.
+
+### Upgrading
+
+- `git pull upstream main`, then `xt restart --all` (or `xt down`, pull, `xt restart --all`). The
+  new roles and protocol reach agents on restart. Existing daily schedules with a window move to
+  the window's start from their next wake.
+
 ## [0.9.1] — 2026-09-28
 
 ### Fixed

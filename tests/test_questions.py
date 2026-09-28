@@ -11,7 +11,7 @@ import pytest
 from xt import brief, cli
 from xt.dispatch import send, waiting_on_human
 from xt.paths import XtError
-from xt.tui.app import LiveActions, Prompt, XtTui
+from xt.tui.app import Compose, LiveActions, XtTui
 from xt.tui.model import build
 from xt.watch import Supervisor
 
@@ -119,8 +119,9 @@ def test_answering_a_question_from_the_tui_inbox(ctx):
             assert row.kind == "question" and row.data["id"] == q["id"]
             assert "1 question" in app.summary
             await pilot.press("s")
-            assert isinstance(app.screen, Prompt) and f"#{q['id']}" in app.screen.title_text
-            await pilot.press(*"tennis", "enter")
+            assert isinstance(app.screen, Compose) and f"#{q['id']}" in app.screen.title_text
+            assert "Which story?" in app.screen.context  # the question stays in view
+            await pilot.press(*"tennis", "ctrl+s")
             await pilot.pause()
             assert f"answer to #{q['id']}" in app.status
             assert ctx.ledger.item(q["id"]) is None

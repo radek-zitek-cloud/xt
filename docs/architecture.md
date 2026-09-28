@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.9.0** (2026-09-28), after five real runs with a newsroom team and
+What the code does as of **v0.10.0** (2026-09-28), after five real runs with a newsroom team and
 the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the
 [user guide](user-guide.md).
 
@@ -73,7 +73,7 @@ upstream and aren't edited by the team, so upstream merges rarely conflict.
 [notify]    enabled, command (e.g. "notify-send --app-name=xt {title} {body}"), quiet (e.g. "21:00-07:00")
 [defaults]  liaison / lead harness (and optional model)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
-            wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"; set with `xt schedule`)
+            wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"), wake_at? (e.g. "09:30"; set with `xt schedule`)
 ```
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
@@ -222,7 +222,10 @@ memory. Agents may read their own brief and their reports' briefs. `xt log` give
    work. The clock starts when the supervisor first sees the schedule and is kept in
    `state/wakes.json`, so restarting the supervisor doesn't reset it. An optional `wake_between`
    window (local time, may wrap midnight) limits wake-ups to those hours; an agent that became due
-   outside it gets a single wake-up when the window opens. Schedules are set with `xt schedule` by
+   outside it gets a single wake-up when the window opens. Daily or longer
+   schedules with a window (or `wake_at`) are anchored to that local time: the next wake is the
+   first such time after the last one, whenever the schedule was approved, following the wall
+   clock across daylight-saving changes (`team.next_due`). Schedules are set with `xt schedule` by
    the human or the agent's lead. Each wake-up is a billed agent turn, so a lead's schedule is
    refused below `min_wake_minutes` (default 15) and, with `schedule_approval` (default on), waits
    in the human's Inbox like a hire; the human sets any schedule directly, and switching one off
@@ -283,7 +286,7 @@ harness goes to the human with `xt friction`.
   state and schedules; detail shows open work, recent messages and the last lines of the agent's
   screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox** (open
   questions first, then pending approvals, alerts, messages to the human), **Log** (newest first),
-  and **Supervisor** under the detail pane (the supervisor's events, newest first). The Status pane on top shows the team summary and the last action's result; the bottom line is
+  and **Supervisor** under the detail pane (the supervisor's events, newest first). The Status pane on top shows the team and only what needs the human (highlighted), today's usage and allowance, and the last action's result in full; the bottom line is
   key hints; `h` lists every key (the README has the table). Slow actions (starting agents) run in
   the background. `xt tui --demo` shows sample data.
 - `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; warns if

@@ -100,7 +100,8 @@ come with `git pull upstream main` (see [Updating a team](#updating-a-team)).
 drafts the liaison is still shaping), **Team** (with each agent's context, e.g. `~211k/258k`),
 **Tasks**, **Inbox** and **Log** panels on the left,
 the detail pane on the right with the **Supervisor** panel under it (what `xt watch` did:
-deliveries, wake-ups, nudges, notifications, alerts), the team summary on top and key hints at the
+deliveries, wake-ups, nudges, notifications, alerts), the Status pane on top (the team and only what
+needs you, highlighted; today's usage and allowance; the last action's result) and key hints at the
 bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
 
 | Key | What it does |
@@ -108,7 +109,7 @@ bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
 | `1`–`6`, `tab`, `j`/`k`, `enter` | Switch panels, move, read the detail |
 | `/` | Filter the focused panel by text (empty clears it) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
-| `s` | Answer the selected question (Inbox); anywhere else, message the liaison |
+| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. In the dialog, enter starts a new line and ctrl+s sends |
 | `c` | Clear the selected alert |
 | `f` | Switch Herdr to the selected agent's workspace |
 | `u` / `U` | Start the selected stopped agent / every stopped agent |

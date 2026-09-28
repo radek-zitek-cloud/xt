@@ -7,7 +7,7 @@ from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import ModalScreen
-from textual.widgets import Input, OptionList, Static
+from textual.widgets import Input, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from .. import __version__
@@ -91,6 +91,35 @@ class Prompt(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+class Compose(ModalScreen[str | None]):
+    """A few lines of text (an answer, a message): enter starts a new line, ctrl+s sends."""
+
+    BINDINGS = [Binding("escape", "cancel", show=False), Binding("ctrl+s", "send", show=False)]
+
+    def __init__(self, title: str, context: str | None = None):
+        super().__init__()
+        self.title_text = title
+        self.context = context
+
+    def compose(self) -> ComposeResult:
+        box = Vertical(classes="popup compose")
+        box.border_title = self.title_text
+        box.border_subtitle = "ctrl+s send · enter new line · esc cancel"
+        with box:
+            if self.context:
+                yield Static(Text(self.context), classes="compose-context")
+            yield TextArea(id="compose-text", soft_wrap=True, show_line_numbers=False)
+
+    def on_mount(self) -> None:
+        self.query_one("#compose-text", TextArea).focus()
+
+    def action_send(self) -> None:
+        self.dismiss(self.query_one("#compose-text", TextArea).text)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
 class Confirm(ModalScreen[bool]):
     BINDINGS = [Binding("y", "yes", show=False), Binding("n,escape", "no", show=False)]
 
@@ -136,7 +165,8 @@ class Help(ModalScreen[None]):
         ("R", "retire the selected agent: it leaves the roster (asks y/n; not the liaison or lead)"),
         ("f", "switch Herdr to the selected agent's workspace"),
         ("Anywhere", ""),
-        ("s", "answer the question selected in Inbox; anywhere else: send a message to the liaison"),
+        ("s", "answer the question selected in Inbox; anywhere else: send a message to the liaison "
+              "(enter: new line, ctrl+s: send)"),
         ("r", "refresh now (it also refreshes every 2 s)"),
         ("h / ?", "this help"),
         ("q", "quit"),
@@ -192,7 +222,8 @@ class XtTui(App):
         self.source = source
         self.actions = actions  # None in the demo
         self.last_panel = 1
-        self.summary = ""
+        self.summary = Text("")
+        self.usage = ""
         self.status = ""
 
     def compose(self) -> ComposeResult:
@@ -229,6 +260,7 @@ class XtTui(App):
         for i, title in enumerate(PANELS, start=1):
             self.query_one(f"#panel-{i}", Panel).set_rows(snap.panels.get(title, []))
         self.summary = snap.summary
+        self.usage = snap.usage
         self.render_hints()
         focused = self.focused if isinstance(self.focused, Panel) else self.panel(self.last_panel)
         self.show_detail(focused)
@@ -250,12 +282,14 @@ class XtTui(App):
         self.render_hints()
 
     def render_hints(self) -> None:
-        """Team summary and the latest action's result go on top; the bottom line is keys only."""
-        top = Text(no_wrap=True, overflow="ellipsis")
-        top.append(self.summary or "xt", style="bold")
+        """The Status pane: the team and what needs you; today's usage; the last action's result on
+        its own line, wrapped rather than cut off. The bottom line is keys only."""
+        top = Text()
+        top.append_text(self.summary if self.summary.plain else Text("xt", style="bold"))
+        if self.usage:
+            top.append("\n" + self.usage, style="bright_black")
         if self.status:
-            top.append("  │  ", style="bright_black")
-            top.append(self.status, style="yellow")
+            top.append("\n" + self.status, style="yellow")
         self.query_one("#topbar", Static).update(top)
         self.query_one("#hints", Static).update(Text(HINTS, no_wrap=True, overflow="ellipsis"))
 
@@ -376,10 +410,10 @@ class XtTui(App):
                 self.refresh_data()
 
         if question:
-            self.push_screen(Prompt(f"Answer question #{question['id']} from {question['opener']}",
-                                    "enter send · esc cancel"), done)
+            self.push_screen(Compose(f"Answer question #{question['id']} from {question['opener']}",
+                                     question.get("text")), done)
         else:
-            self.push_screen(Prompt("Send to the liaison", "enter send · esc cancel"), done)
+            self.push_screen(Compose("Send to the liaison"), done)
 
     def _run_bg(self, label: str, fn) -> None:
         """Run a slow action (starting agents takes seconds) without freezing the screen."""
@@ -622,7 +656,9 @@ def demo_snapshot() -> Snapshot:
                      "#47 report liaison→human\nforecast team: 4 of 7 tasks done", "message"),
             ],
         },
-        summary="demo · 3 running · 2 open · 1 approval · 1 alert · 0 queued · 0 jobs",
+        summary=Text.assemble(("demo", "bold"), " · 3 running · 2 open · ", ("1 approval", "bold yellow"),
+                              " · ", ("1 alert", "bold red")),
+        usage="today 8.4M tokens · est. $2.46 (+1.1M unpriced) · codex account 20% of the week, resets Sat 19:24",
     )
 
 

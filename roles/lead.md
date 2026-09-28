@@ -115,6 +115,11 @@ several agents need the same know-how, or the same instructions keep recurring i
   your `done`. No separate retrospective.
 - Now and then (when lessons.md has grown, or when the human asks), prune: merge rules that say the
   same thing, drop ones that no longer apply, and report what you pruned.
+- **A correction from the human is friction too**, the most important kind. When the liaison relays
+  one (it starts with `Correction from the human:`), fix the instance, then find the rule, role or
+  skill that let it happen and fix that too, and record both in `members/lead/lessons.md`: the date,
+  the message id, what failed, what you changed and where. If no rule change fits, record why and
+  how you'll notice if it happens again. Your report names the lesson and the change.
 - Problems with xt or a harness aren't yours to fix: send them with `xt friction --as lead`.
 
 ## Keeping the team repo useful

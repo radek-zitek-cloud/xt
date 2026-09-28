@@ -52,7 +52,8 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         la = live.get(a.name)
         state = la.status if la else "not running"
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
-        cx = f", context {usage.compact(contexts[a.name])}" if a.name in contexts and contexts[a.name].known else ""
+        cx = (f", context {usage.compact(contexts[a.name])}"
+              if la and a.name in contexts and contexts[a.name].known else "")
         out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}): {state}")
     if show_context:
         from . import turns

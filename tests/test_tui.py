@@ -2,7 +2,7 @@ import asyncio
 
 from xt.dispatch import send
 from xt.spawn import request_spawn
-from xt.tui.app import Confirm, Help, LiveActions, Panel, Prompt, XtTui, demo_snapshot
+from xt.tui.app import Compose, Confirm, Help, LiveActions, Panel, Prompt, XtTui, demo_snapshot
 from xt.tui.model import build
 
 from .conftest import add_member
@@ -81,11 +81,11 @@ def test_send_to_liaison_from_the_tui(ctx):
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(140, 45)) as pilot:
             await pilot.press("s")
-            assert isinstance(app.screen, Prompt)
-            await pilot.press(*"hello", "enter")
+            assert isinstance(app.screen, Compose)
+            await pilot.press(*"hello", "enter", *"second line", "ctrl+s")  # enter: new line; ctrl+s: send
             await pilot.pause()
             assert "delivered" in app.status
-            assert "hello" in ctx.herdr.last_prompt("liaison")
+            assert "hello\nsecond line" in ctx.herdr.last_prompt("liaison")
 
     asyncio.run(run())
 
@@ -189,7 +189,7 @@ def test_long_rows_stay_on_one_line():
 
     def src():
         rows = [Row(f"r{i}", Text(f"#{i} " + "word " * 100), lambda: Text("detail"), "message") for i in range(3)]
-        return Snapshot({p: list(rows) for p in PANELS}, "summary")
+        return Snapshot({p: list(rows) for p in PANELS}, Text("summary"))
 
     async def run():
         app = XtTui(src)

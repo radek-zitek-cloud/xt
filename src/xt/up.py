@@ -1,5 +1,7 @@
 """`xt up`: bring the team to its resting state — supervisor and liaison running, lead if goals are open."""
 
+import json
+
 from .context import Ctx
 from .spawn import do_spawn
 from .watch import expected, watch_pid
@@ -58,7 +60,10 @@ def down(ctx: Ctx, keep_supervisor: bool = False) -> list[str]:
     if not keep_supervisor:
         out += _stop_supervisor(ctx)
     live = ctx.herdr.agents()
-    agents = [stop(ctx, a.name) for a in ctx.team.agents() if a.kind != "human" and a.name in live]
+    running = [a.name for a in ctx.team.agents() if a.kind != "human" and a.name in live]
+    if running:  # so `xt restart --all` can bring back exactly this team
+        (ctx.paths.state / "predown.json").write_text(json.dumps({"running": running}))
+    agents = [stop(ctx, name) for name in running]
     out += agents or ["no agents were running"]
     return out
 
@@ -73,11 +78,23 @@ def restart(ctx: Ctx, names: list[str], everyone: bool = False) -> list[str]:
     if everyone:
         live = ctx.herdr.agents()
         was_running = [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.name in live]
+        note = ""
+        predown = ctx.paths.state / "predown.json"
+        if not was_running and predown.exists():
+            # the team was taken down with `xt down`: restore who was running then
+            was_running = json.loads(predown.read_text()).get("running", [])
+            note = " (running before xt down)"
         out = down(ctx) + up(ctx)
         live = ctx.herdr.agents()
         for name in was_running:
-            if name not in live:
+            a = ctx.team.agent(name)
+            if name not in live and a is not None and a.active:
                 out.append(f"member: started {name} again in workspace {do_spawn(ctx, name)}")
+        if was_running:
+            out.append(f"restored: {', '.join(was_running)}{note}")
+        else:
+            out.append("restored: nobody (no agent was running, and none was recorded at the last xt down)")
+        predown.unlink(missing_ok=True)
         return out
     out = []
     for name in names:

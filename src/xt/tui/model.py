@@ -39,7 +39,8 @@ class Row:
 @dataclass
 class Snapshot:
     panels: dict[str, list[Row]]
-    summary: str
+    summary: Text  # line 1 of the Status pane: the team and what needs the human
+    usage: str = ""  # line 2: today's usage and account allowance
 
 
 def _t(*parts) -> Text:
@@ -184,8 +185,16 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(state + "\n", style=STATUS_STYLE.get(state, "bright_black"))
             if la:
                 out.append(f"workspace {la.workspace_id} · pane {la.pane_id}  (f: jump there)\n", style="bright_black")
-            if ctxr is not None:
+            if ctxr is not None and la:
                 out.append(usage.describe(ctxr, now) + "\n", style="" if ctxr.known else "bright_black")
+            elif ctxr is not None and ctxr.known:  # stopped: history, not a current reading
+                out.append(f"last session: {usage.describe(ctxr, now)} (not running; a start begins a fresh "
+                           f"session)\n", style="bright_black")
+            from ..watch import next_wake
+
+            nxt = next_wake(ctx, a) if a.active and a.wake_every else None
+            if nxt:
+                out.append(f"next wake-up: {dt.datetime.fromtimestamp(nxt):%a %d %b %H:%M}\n")
             mine_today = spend.agents_today.get(a.name)
             out.append(f"usage today: {turns.fmt(mine_today) if mine_today else 'none recorded'}\n")
             out.append(_heading(f"open work ({len(owned)})"))
@@ -207,10 +216,14 @@ def build(ctx: Ctx) -> Snapshot:
                     out.append("(couldn't read the pane)\n", style="bright_black")
             return out
 
-        pct = ctxr.used / ctxr.window if ctxr and ctxr.known and ctxr.window else 0
+        if la is None:
+            ctxr_row = None  # a stopped agent has no current context
+        else:
+            ctxr_row = ctxr
+        pct = ctxr_row.used / ctxr_row.window if ctxr_row and ctxr_row.known and ctxr_row.window else 0
         team_rows.append(Row(f"agent:{a.name}", _t(dot, f" {a.name:<11} ",
                                                    (f"{harness_model(a.harness, a.model):<16} ", "bright_black"),
-                                                   (f"{usage.compact(ctxr) if ctxr else '':<11} ",
+                                                   (f"{usage.compact(ctxr_row) if ctxr_row else '—':<11} ",
                                                     "red" if pct >= 0.85 else "yellow" if pct >= 0.7 else "bright_black"),
                                                    (f"{state}", STATUS_STYLE.get(state, "bright_black"))),
                              detail, "agent", {"name": a.name, "workspace": la.workspace_id if la else None,
@@ -259,7 +272,9 @@ def build(ctx: Ctx) -> Snapshot:
         inbox_rows.append(Row(f"question:{q['id']}", _t(("? ", "bold yellow"), f"#{q['id']} {q['opener']}: ",
                                                         _first_line(q["title"], 44),
                                                         (f"  {_age(q['opened'], now)}", "yellow")),
-                              qdetail, "question", {"id": q["id"], "opener": q["opener"]}))
+                              qdetail, "question", {"id": q["id"], "opener": q["opener"],
+                                                    "text": next((m["body"] for m in msgs if m["id"] == q["id"]),
+                                                                 q["title"])}))
     for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
         if r.get("kind") == "schedule":
             def sdetail(rid=rid, r=r):
@@ -324,13 +339,9 @@ def build(ctx: Ctx) -> Snapshot:
                             lambda m=m: _msg_block(m), "message", {"id": m["id"]}))
 
     running = sum(1 for n in live if ctx.team.agent(n))
-    summary = (f"{ctx.team.name} · {running} running · {len(open_items) - len(questions)} open · "
-               f"{len(questions)} question{'s' if len(questions) != 1 else ''} · "
-               f"{len(approvals)} approval{'s' if len(approvals) != 1 else ''} · {len(alerts)} alert"
-               f"{'s' if len(alerts) != 1 else ''} · {len(queued)} queued · {len(jobs)} jobs · "
-               f"today {turns.fmt_short(spend.team_today)}")
-    for line in turns.allowance_lines(ctx):
-        summary += " · " + line.replace(" (account-wide)", "")
+    summary = status_line(ctx, running, len(open_items) - len(questions), len(questions), len(approvals),
+                          len(alerts), queued, jobs, msgs, now)
+    usage_line = usage_text(spend.team_today, turns.allowance_lines(ctx))
     # Supervisor: what xt watch did, newest first
     from ..watch import watch_log
 
@@ -345,4 +356,59 @@ def build(ctx: Ctx) -> Snapshot:
         {"Goals": goal_rows, "Team": team_rows, "Tasks": task_rows, "Inbox": inbox_rows, "Log": log_rows,
          "Supervisor": sup_rows},
         summary,
+        usage_line,
     )
+
+
+STUCK_AFTER = 60  # seconds: queued messages and jobs are normally handled within seconds
+
+
+def status_line(ctx, running: int, open_n: int, questions: int, approvals: int, alerts: int,
+                queued: list, jobs: list, msgs: list, now) -> Text:
+    """Line 1 of the Status pane: the team, and only the counters that matter right now. What
+    needs the human stands out; routine zeros aren't shown."""
+    out = Text(no_wrap=True, overflow="ellipsis")
+    out.append(ctx.team.name, style="bold")
+    out.append(f" · {running} running")
+    if open_n:
+        out.append(f" · {open_n} open")
+    plural = lambda n, w: f"{n} {w}{'s' if n != 1 else ''}"
+    waiting = [(questions, "question", "bold yellow"), (approvals, "approval", "bold yellow"),
+               (alerts, "alert", "bold red")]
+    if any(n for n, _, _ in waiting):
+        for n, word, style in waiting:
+            if n:
+                out.append(" · ")
+                out.append(plural(n, word), style=style)
+    else:
+        out.append(" · nothing waiting for you", style="green")
+    ts = {m["id"]: m["ts"] for m in msgs}
+    stuck_q = sum(1 for i in queued
+                  if i["id"] in ts and (now - dt.datetime.fromisoformat(ts[i["id"]])).total_seconds() > STUCK_AFTER)
+    stuck_j = sum(1 for j in jobs if j.get("added") and now.timestamp() - j["added"] > STUCK_AFTER)
+    if stuck_q:
+        out.append(f" · {stuck_q} queued over a minute", style="yellow")
+    if stuck_j:
+        out.append(f" · {plural(stuck_j, 'job')} waiting over a minute", style="yellow")
+    return out
+
+
+def usage_text(team_today, allowance: list[str]) -> str:
+    """Line 2: today's usage, the estimate (with any unpriced part) and account allowance, in words."""
+    from .. import turns, usage
+
+    parts = []
+    if team_today.turns:
+        money = ("est. unavailable" if team_today.unpriced_tokens == team_today.tokens
+                 else f"est. ${team_today.usd:,.2f}")
+        unpriced = (f" (+{usage.short(team_today.unpriced_tokens)} unpriced)"
+                    if team_today.unpriced_tokens and team_today.unpriced_tokens != team_today.tokens else "")
+        parts.append(f"today {usage.short(team_today.tokens)} tokens · {money}{unpriced}")
+    else:
+        parts.append("today: no usage recorded yet")
+    for line in allowance:  # "codex 20% of 7d, resets Sat 19:24 (account-wide)"
+        words = line.replace(" (account-wide)", "").replace("of 7d", "of the week").replace("of 1d", "of the day")
+        harness, _, rest = words.partition(" ")
+        parts.append(f"{harness} account {rest}")
+    return " · ".join(parts)
+

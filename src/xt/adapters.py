@@ -23,6 +23,10 @@ class Adapter:
     sessions: str | None = None
     session_format: str | None = None
     context_windows: dict[str, int] = field(default_factory=dict)
+    # Desktop/browser control for agents (card #89): "blocked" (switched off by the args), "none"
+    # (the harness has no such tools), "partial" or unset (not fully enforced: xt says so at start).
+    desktop_tools: str | None = None
+    desktop_tools_note: str = ""
 
     @property
     def installed(self) -> bool:
@@ -60,6 +64,8 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
             sessions=d.get("sessions"),
             session_format=d.get("session_format"),
             context_windows={k: int(v) for k, v in d.get("context_windows", {}).items()},
+            desktop_tools=d.get("desktop_tools"),
+            desktop_tools_note=d.get("desktop_tools_note", ""),
         )
     return out
 

@@ -1,4 +1,5 @@
 import argparse
+import datetime as dt
 import sys
 
 from . import __version__
@@ -84,12 +85,16 @@ def cmd_schedule(args) -> None:
         if ctx.team.policy("schedule_approval"):
             if args.between and args.between != ALWAYS:
                 parse_window(args.between)
+            if args.at and args.at not in (ALWAYS, "off"):
+                from .team import check_at
+
+                check_at(args.at, args.every, args.between or target.wake_between)
             rid = Approvals(ctx).add({"kind": "schedule", "requester": who, "name": args.name,
                                       "every": args.every, "message": args.message,
-                                      "between": args.between})
+                                      "between": args.between, "at": args.at})
             print(f"approval #{rid} requested from the human; you'll get a message when it's decided")
             return
-    ctx.team.set_schedule(args.name, None if off else args.every, args.message, args.between)
+    ctx.team.set_schedule(args.name, None if off else args.every, args.message, args.between, args.at)
     ctx.team.save()
     ctx.reload_team()
     if off:
@@ -98,6 +103,11 @@ def cmd_schedule(args) -> None:
         a = ctx.team.agent(args.name)
         print(f"{args.name}: woken {schedule_text(a)} when idle (by the supervisor)"
               + (f": {a.wake_message}" if a.wake_message else ""))
+        from .watch import next_wake
+
+        nxt = next_wake(ctx, a)
+        if nxt:
+            print(f"next wake-up: {dt.datetime.fromtimestamp(nxt):%a %d %b %H:%M}")
 
 
 def cmd_down(args) -> None:
@@ -203,8 +213,12 @@ def cmd_status(args) -> None:
             continue
         state = live[a.name].status if a.name in live else ("not running" if a.active else "retired")
         mine = sum(1 for i in items if i["owner"] == a.name)
-        ctx_txt = usage.compact(contexts[a.name]) if a.name in contexts else ""
+        ctx_txt = usage.compact(contexts[a.name]) if a.name in contexts and a.name in live else "—"
         today_txt = turns.fmt_short(spend.agents_today[a.name]) if a.name in spend.agents_today else "—"
+        from .watch import next_wake
+
+        nxt = next_wake(ctx, a) if a.active else None
+        today_txt += f"  next wake {dt.datetime.fromtimestamp(nxt):%a %H:%M}" if nxt else ""
         print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} "
               f"open:{mine:<3} context:{ctx_txt:<12} today:{today_txt}")
     from .jobs import Jobs
@@ -318,6 +332,8 @@ def cmd_harnesses(args) -> None:
         print(f"   {model}; start args: {' '.join(a.args) or '(none)'}")
         for lim in a.limits:
             print(f"   limit: {lim}")
+        print(f"   desktop/browser tools for agents: {a.desktop_tools or 'not restricted'}"
+              + (f" ({a.desktop_tools_note})" if a.desktop_tools_note else ""))
 
 
 def cmd_goal(args) -> None:
@@ -375,6 +391,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("name")
     sp.add_argument("every", metavar="interval|off", help="like 90s, 30m, 2h, 1d; or off")
     sp.add_argument("--message", help="what the agent should do on each wake-up (left out: keep the current one)")
+    sp.add_argument("--at", metavar="HH:MM",
+                    help="daily or longer schedules: wake at this local time (inside the window, if any; "
+                         "'off' removes it). Without it, a daily schedule with a window wakes at the window's start")
     sp.add_argument("--between", metavar="HH:MM-HH:MM",
                     help="only wake within this local-time window, e.g. 05:00-21:00 (may wrap midnight; "
                          "'always' removes it; left out: keep the current one)")

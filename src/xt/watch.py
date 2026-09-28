@@ -17,7 +17,7 @@ from .dispatch import Queue, drain, send, waiting_on_human
 from .herdr import DELIVERABLE
 from .jobs import Jobs, run_pending
 from .paths import XtError
-from .team import HUMAN, SYSTEM, in_window, parse_interval, schedule_text
+from .team import HUMAN, SYSTEM, in_window, next_due, schedule_text
 
 TICK = 3
 NUDGES_BEFORE_ALERT = 2
@@ -52,6 +52,17 @@ def watch_log(ctx: Ctx, limit: int = 200) -> list[str]:
         if f.exists():
             lines += f.read_text(errors="replace").splitlines()
     return lines[-limit:]
+
+
+def next_wake(ctx: Ctx, a) -> float | None:
+    """When the supervisor will next wake this agent (None: no schedule, or not seen yet)."""
+    if not a.wake_every:
+        return None
+    try:
+        last = json.loads((ctx.paths.state / "wakes.json").read_text()).get(a.name)
+    except (OSError, ValueError):
+        last = None
+    return next_due(a, last) if last is not None else None
 
 
 def watch_pid(ctx: Ctx) -> int | None:
@@ -182,9 +193,10 @@ class Supervisor:
     def wake_scheduled(self, live: dict, now: float) -> None:
         """Send a `wake` to agents whose schedule is due, only when they're idle and have nothing
         queued, so a wake-up never interrupts work. The clock starts when a schedule is first seen,
-        so restarting the supervisor doesn't wake everyone at once. Outside an agent's
-        `wake_between` window nobody is woken; when the window opens, an overdue agent gets one
-        wake-up, not one per missed interval."""
+        so restarting the supervisor doesn't wake everyone at once. Daily schedules with a window
+        or --at wake at that local time each day (see team.next_due). Outside an agent's
+        `wake_between` window nobody is woken; an overdue agent gets one wake-up, not one per
+        missed interval."""
         path = self.ctx.paths.state / "wakes.json"
         last = json.loads(path.read_text()) if path.exists() else {}
         queued = {i["to"] for i in Queue(self.ctx).pending()}
@@ -200,7 +212,7 @@ class Supervisor:
                 changed = True
                 continue
             agent = live.get(a.name)
-            if now - last[a.name] < parse_interval(a.wake_every) or agent is None \
+            if now < next_due(a, last[a.name]) or agent is None \
                     or agent.status not in DELIVERABLE or a.name in queued \
                     or not in_window(a.wake_between, dt.datetime.fromtimestamp(now)):
                 continue

@@ -7,6 +7,7 @@ reports back to the requester.
 """
 
 import json
+import time
 import os
 
 from .context import Ctx
@@ -35,7 +36,8 @@ class Jobs:
         with self.ctx.ledger.lock():
             items = self._load()
             job_id = max((j["id"] for j in items), default=0) + 1
-            items.append({"id": job_id, "kind": kind, "args": args, "requester": requester})
+            items.append({"id": job_id, "kind": kind, "args": args, "requester": requester,
+                          "added": time.time()})
             self._save(items)
         return job_id
 

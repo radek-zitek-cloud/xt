@@ -1,7 +1,11 @@
 # Adapter: how xt starts an agent in Claude Code.
 herdr_kind = "claude"
 binary = "claude"
-args = []
+# Agents get no browser control (card #89): Claude in Chrome's tools are refused for xt's sessions.
+# Other desktop skills weren't available to verify, so this is reported as partial.
+args = ["--disallowedTools", "mcp__claude-in-chrome"]
+desktop_tools = "partial"
+desktop_tools_note = "Claude in Chrome tools refused for this session; other desktop or computer-use skills not verified"
 model_flag = "--model"
 summary = "Claude Code: careful multi-step work and writing; reads repo skills via .claude/skills"
 limits = [

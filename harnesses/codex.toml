@@ -1,7 +1,16 @@
 # Adapter: how xt starts an agent in the OpenAI Codex CLI.
 herdr_kind = "codex"
 binary = "codex"
-args = []
+# Agents get no desktop or browser control (card #89): the computer-use plugin's MCP server
+# (cua_repl) is switched off for xt's sessions only, plus Codex's own browser and computer-use
+# features. No quotes or braces, because Herdr types the command into a shell.
+args = [
+  "-c", "mcp_servers.cua_repl.command=/bin/true", "-c", "mcp_servers.cua_repl.enabled=false",
+  "-c", "features.computer_use=false", "-c", "features.browser_use=false",
+  "-c", "features.browser_use_external=false", "-c", "features.in_app_browser=false",
+]
+desktop_tools = "blocked"
+desktop_tools_note = "computer-use server and browser features off for this session; checked 2026-09-28"
 model_flag = "--model"
 summary = "OpenAI Codex CLI: recommended for the liaison and lead; reads repo skills via .agents/skills"
 limits = [

@@ -88,7 +88,9 @@ While a question waits for you, the work that depends on it isn't nudged. If you
 nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
 
 The **Supervisor** panel (6) shows what xt did (deliveries, wake-ups, nudges, notifications). The
-Status pane on top summarises the team: running agents, open work, questions, approvals, alerts.
+Status pane on top has three lines: the team with only what needs you (questions and approvals in
+yellow, alerts in red, or "nothing waiting for you"); today's usage and account allowance; and the
+result of your last action, in full.
 
 ### 5. Periodic work: schedules, quiet hours, standing rules
 
@@ -120,8 +122,11 @@ git pull upstream main
 xt restart --all
 ```
 
-`xt restart --all` restarts the supervisor (new code) and every running agent (new protocol and
-roles in their first prompt), and brings the team back as it was. Read the release's **Upgrading**
+or, if you like to stop the team first (to commit its files, say): `xt down`, pull, `xt restart
+--all`. Either way `xt restart --all` restarts the supervisor (new code) and every agent that was
+running (new protocol and roles in their first prompt), and brings the team back as it was: after
+an `xt down` it restores the agents that were running just before it (agents you had stopped on
+purpose stay stopped) and lists who it restored. Read the release's **Upgrading**
 note in [CHANGELOG.md](../CHANGELOG.md) first; `xt --version` shows what you're on. (Teams on xt
 0.6.0 or older don't have `restart` yet: `xt down`, pull, `xt`, then `U` in the TUI.)
 
@@ -170,13 +175,19 @@ for that: the ledger, the goal briefs, the roles, skills and each agent's
 from them (every first prompt includes it). If an agent seems confused or its context is heavy,
 `xt restart <name>` gives it a clean session that starts from its brief.
 
+**No desktop or browser control.** xt starts Codex agents with its computer-use and browser tools
+switched off and Claude Code agents with Claude in Chrome refused (their own settings for your
+sessions stay as they are); `xt harnesses` shows what each harness blocks, and a start note says
+when a harness can't block everything. Agents are told to ask you for anything only a UI can do.
+
 **How full is an agent's context?** The Team panel shows it per agent (`~211k/258k`: tokens in
 the conversation after its latest turn, out of the model's window), yellow from 70% and red from
 85%; the agent's detail, `xt status` and the lead's and liaison's briefs show it too. xt reads it
 from the harness's own session log (only the counters, never the conversation) and links each
 agent to its log by its first prompt, so a restarted agent starts again from its new session. A
 `~` means approximate (Codex reports the latest turn's usage, not a live figure); `?` means the
-window isn't known for that model; `—` means nothing is recorded yet. Supported: Codex, Claude
+window isn't known for that model; `—` means nothing is recorded yet, or the agent isn't running
+(its detail then shows the last session's figure, labelled as such). Supported: Codex, Claude
 Code, pi.
 
 **What does the team cost?** The supervisor records every model call from the agents' session
@@ -259,7 +270,7 @@ by hand. `--keep-supervisor` stops only the agents (same as `X` in the TUI).
 
 `xt restart <name>…` | `xt restart --all` — stops and starts agents so they get fresh
 instructions; `--all` does the whole team and the supervisor, and brings back every agent that was
-running. **Use it** after updating xt (`git pull upstream main`), after changing a role, or to give
+running (right after an `xt down`: the agents that were running before it). **Use it** after updating xt (`git pull upstream main`), after changing a role, or to give
 a confused or heavy agent a clean session.
 
 ### `xt status`
@@ -297,10 +308,13 @@ shows the keys). **Use it** once you've dealt with the cause; in the TUI, `c`.
 
 ### `xt schedule`
 
-`xt schedule <name> <interval>|off [--message "…"] [--between HH:MM-HH:MM|always]` — wakes an agent
-every interval (`90s`, `30m`, `2h`, `1d`) when it's idle. `--message` says what to do each time;
-`--between` limits wake-ups to local hours (may wrap midnight; `always` removes it); both keep
-their current value when left out. `off` removes the schedule. The lead's requests wait for your
+`xt schedule <name> <interval>|off [--message "…"] [--between HH:MM-HH:MM|always] [--at HH:MM|off]`
+— wakes an agent every interval (`90s`, `30m`, `2h`, `1d`) when it's idle. `--message` says what to
+do each time; `--between` limits wake-ups to local hours (may wrap midnight; `always` removes it).
+A daily (or longer) schedule with a window wakes at the window's start, every day, whenever it was
+approved; `--at` picks another local time inside the window. The next wake-up is shown by `xt
+schedule`, `xt status` and the agent's detail. Options left out keep their current value; `off`
+removes the schedule. The lead's requests wait for your
 approval and can't go below `min_wake_minutes`; yours apply directly. **Use it** for periodic roles,
 to change a schedule's hours, or to switch one off.
 

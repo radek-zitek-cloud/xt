@@ -159,7 +159,7 @@ def test_usage_shows_in_status_brief_tui_and_not_in_member_briefs(ctx, fake_home
     assert "Team usage today: 101k tokens" in brief.build(ctx, "lead")
     assert "Team usage today" not in brief.build(ctx, "carol")
     snap = build(ctx)
-    assert "today 101k/est.$0.05" in snap.summary and "codex 13% of 7d" in snap.summary
+    assert "today 101k tokens · est. $0.05" in snap.usage and "codex account 13% of the week" in snap.usage
     lead = next(r for r in snap.panels["Team"] if r.data["name"] == "lead")
     assert "usage today: 101k tokens, est. $0.05" in lead.detail().plain
 

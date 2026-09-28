@@ -91,7 +91,8 @@ OptionList > .option-list--option-hover {
 
 /* Status pane on top: same thin frame as the panels, title in the border, never focused. */
 #topbar {
-    height: 3;
+    height: auto;
+    min-height: 4;
     background: ansi_default;
     border: solid ansi_bright_black;
     border-title-color: ansi_default;
@@ -137,3 +138,21 @@ ModalScreen {
 .popup Input:focus {
     border: none;
 }
+
+.popup.compose {
+    width: 80;
+}
+
+.compose-context {
+    color: ansi_bright_black;
+    max-height: 8;
+    margin: 0 0 1 0;
+}
+
+#compose-text {
+    height: 7;
+    background: ansi_default;
+    border: none;
+    padding: 0;
+}
+

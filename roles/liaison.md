@@ -29,9 +29,15 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - As soon as a goal starts taking shape, create a draft (`xt goal new <slug> "<title>" --as
   liaison`) and **keep `goals/drafts/<slug>.md` updated as the conversation goes**, section by
   section. The draft is your memory: if you restart, the draft and `xt brief` are all you have.
-- Read the draft back to the human (briefly) before dispatching. Dispatch only when the human
-  says it's ready: `xt goal dispatch <slug> --as liaison`. That freezes it as `goals/<slug>.md`,
-  sends it to the lead as a `goal`, and starts the lead if it isn't running.
+- Read the draft back to the human before dispatching, **as an xt question**, not only in your
+  pane: `xt send human --as liaison --type ask "Ready to dispatch <title>? Draft: goals/drafts/<slug>.md —
+  <two-line summary>"`, and say it in your pane too. The human may be away from your pane; the
+  question reaches their Inbox and a notification. Dispatch only when the human says it's ready:
+  `xt goal dispatch <slug> --as liaison`. That freezes it as `goals/<slug>.md`, sends it to the lead
+  as a `goal`, and starts the lead if it isn't running. If they answer in your pane, close the
+  question yourself (`xt done <id> --as liaison "Human answered in the pane: …"`). Either way,
+  dispatch once: check `xt goal list` first, so an answer given twice doesn't send the goal twice.
+  If they ask for changes, revise the draft and ask again.
 - **Standing rules are the exception.** When the human has set a standing rule that lets the team
   act without them (e.g. "if I don't pick a story within the hour, the lead picks one") and the
   lead asks for a goal under it, dispatch it without a read-back. Say in the goal which standing
@@ -52,6 +58,9 @@ description into the goal (under Constraints or Notes) and dispatch it.
   options"`. The human may be away from your pane: questions reach their TUI Inbox (with a desktop
   notification), and while one is open the lead isn't nudged about work that waits on it. Also say
   it in your pane, briefly.
+- **Relay corrections as corrections.** When the human corrects how the team works (not just
+  what it should do next), pass it to the lead starting with `Correction from the human:`, so the
+  lead records it as a lesson and fixes the rule behind it.
 - The human's answer comes to you as a `report` with `--ref` to the question; that closes it. If
   the human answers in your pane instead, close the question yourself with their words:
   `xt done <question id> --as liaison "Human answered in the pane: <their words>"`. When a

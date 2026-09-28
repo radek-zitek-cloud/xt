@@ -55,9 +55,11 @@ def dispatch(ctx: Ctx, sender: str, slug: str) -> str:
     if sender != HUMAN and (s is None or s.role != "liaison"):
         raise XtError("only the liaison (or the human) dispatches goals")
     draft = ctx.paths.drafts / f"{slug}.md"
+    final = ctx.paths.goals / f"{slug}.md"
+    if not draft.exists() and final.exists():
+        raise XtError(f"goals/{slug}.md was already dispatched; nothing to do")
     if not draft.exists():
         raise XtError(f"no draft goals/drafts/{slug}.md")
-    final = ctx.paths.goals / f"{slug}.md"
     if final.exists():
         raise XtError(f"goals/{slug}.md already exists — pick another slug")
     text = draft.read_text()

@@ -79,7 +79,8 @@ Messages from xt arrive in your conversation stamped like:
   (an instruction was unclear or wrong, a source or tool failed, you needed a workaround), add one
   line to your `done` or report: `Friction: <what happened>; cost: <what it cost>; fix: <a
   suggestion>`. No friction, no line: never write "no issues". If the problem is with xt or your
-  harness rather than the team's work, also send it with `xt friction`.
+  harness rather than the team's work, also send it with `xt friction`. A correction from the human
+  counts as friction: the lead records it as a lesson and fixes the rule behind it.
 
 ## 5. Memory and recovery
 
@@ -100,13 +101,20 @@ Messages from xt arrive in your conversation stamped like:
   human asks or your role makes it a duty. Never edit xt's own files (`bin/`, `src/`,
   `protocol.md`, `harnesses/`, `roles/lead.md`, `roles/liaison.md`); they come from upstream.
 
-## 7. Skills
+## 7. No desktop or browser control
+
+Don't drive the desktop or a web browser, even to look (computer-use, browser-control or
+screenshot tools). They act in the human's own logged-in sessions, outside xt's rules, and show
+their whole screen. Work through command-line tools and skills; if something can only be done or
+checked in a UI, say so and ask the human. xt switches these tools off where the harness allows it.
+
+## 8. Skills
 
 Team skills live in `skills/<name>/SKILL.md`. Your first prompt lists them. Read a skill's file
 when your work calls for it. You may also have skills or tools from the user's own setup: use them
 if they help, but never make the team depend on something that isn't in the team repo.
 
-## 8. Care with data
+## 9. Care with data
 
 Messages, notes and goals persist in the repo and its log. Don't copy secrets, credentials or
 more sensitive data (personal, financial) into them than the work needs. Refer to where data lives

@@ -27,6 +27,7 @@ class Agent:
     wake_every: str | None = None
     wake_message: str | None = None
     wake_between: str | None = None  # "05:00-21:00": local-time window for wake-ups; None = any time
+    wake_at: str | None = None  # "09:30": for daily (or longer) schedules, the local time to wake
 
     @property
     def active(self) -> bool:
@@ -84,6 +85,7 @@ class Team:
                     wake_every=a.get("wake_every") or None,
                     wake_message=a.get("wake_message") or None,
                     wake_between=a.get("wake_between") or None,
+                    wake_at=a.get("wake_at") or None,
                 )
             )
         return out
@@ -123,14 +125,14 @@ class Team:
         t["status"] = "active"
 
     def set_schedule(self, name: str, every: str | None, message: str | None = None,
-                     between: str | None = None) -> None:
+                     between: str | None = None, at: str | None = None) -> None:
         """Set or clear an agent's schedule. `every=None` clears it. A message or window left out
         (None) keeps the one the agent has; `between=ALWAYS` removes the window."""
         t = self._table(name)
         if t is None:
             raise XtError(f"no agent named {name!r} in team.toml")
         if not every:
-            for key in ("wake_every", "wake_message", "wake_between"):
+            for key in ("wake_every", "wake_message", "wake_between", "wake_at"):
                 if key in t:
                     del t[key]
             return
@@ -144,6 +146,11 @@ class Team:
         elif between:
             parse_window(between)
             t["wake_between"] = normalise_window(between)
+        if at == ALWAYS or at == "off":
+            if "wake_at" in t:
+                del t["wake_at"]
+        elif at:
+            t["wake_at"] = check_at(at, every, t.get("wake_between"))
 
     def set_status(self, name: str, status: str) -> None:
         t = self._table(name)
@@ -247,11 +254,55 @@ def harness_model(harness: str | None, model: str | None) -> str:
     return f"{harness or '?'}/{model or 'default'}"
 
 
+def check_at(at: str, every: str, window: str | None) -> str:
+    """Validate `--at HH:MM` (daily or longer schedules, inside the window if there is one)."""
+    import re
+
+    m = re.fullmatch(r"\s*(\d{1,2}):(\d{2})\s*", at or "")
+    if not m or int(m.group(1)) > 23 or int(m.group(2)) > 59:
+        raise XtError(f"--at {at!r} isn't a time like 09:30")
+    if parse_interval(every) < 86400:
+        raise XtError("--at is for daily or longer schedules (e.g. 1d); shorter ones run on their interval")
+    hhmm = f"{int(m.group(1)):02d}:{m.group(2)}"
+    if window and not in_window(window, dt.datetime(2000, 1, 1, int(m.group(1)), int(m.group(2)))):
+        raise XtError(f"--at {hhmm} is outside the schedule's window {window}")
+    return hhmm
+
+
+def next_due(a: "Agent", last: float) -> float:
+    """When the agent's next wake-up is due (epoch seconds, local time rules).
+
+    Daily or longer schedules with a window or an --at time are anchored to a local time: the
+    window's start, or --at. The next wake is the first such time after the last one (for N days,
+    after N-1 days have passed), so it doesn't depend on when the schedule was approved and stays
+    on the wall clock across daylight-saving changes. Shorter schedules run every interval (inside
+    their window, if any)."""
+    every = parse_interval(a.wake_every)
+    anchor = a.wake_at or (a.wake_between.split("-")[0] if a.wake_between else None)
+    if every >= 86400 and anchor:
+        h, m = (int(x) for x in anchor.split(":"))
+        base = dt.datetime.fromtimestamp(last) + dt.timedelta(days=round(every / 86400) - 1)
+        slot = dt.datetime.combine(base.date(), dt.time(h, m))
+        if slot.timestamp() <= base.timestamp():
+            slot = dt.datetime.combine(base.date() + dt.timedelta(days=1), dt.time(h, m))
+        return slot.timestamp()
+    due = last + every
+    if a.wake_between and not in_window(a.wake_between, dt.datetime.fromtimestamp(due)):
+        start_h, start_m = (int(x) for x in a.wake_between.split("-")[0].split(":"))
+        d = dt.datetime.fromtimestamp(due)
+        slot = dt.datetime.combine(d.date(), dt.time(start_h, start_m))
+        if slot <= d:
+            slot = dt.datetime.combine(d.date() + dt.timedelta(days=1), dt.time(start_h, start_m))
+        return slot.timestamp()
+    return due
+
+
 def schedule_text(a: "Agent") -> str:
     """'every 60m, 05:00-21:00' for displays; '' when the agent has no schedule."""
     if not a.wake_every:
         return ""
-    return f"every {a.wake_every}" + (f", {a.wake_between}" if a.wake_between else "")
+    return (f"every {a.wake_every}" + (f", {a.wake_between}" if a.wake_between else "")
+            + (f", at {a.wake_at}" if a.wake_at else ""))
 
 
 def parse_interval(text: str) -> int:
