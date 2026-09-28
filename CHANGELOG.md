@@ -9,6 +9,12 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-09-28
+
+The accepted release: the same code as 0.11.0-rc2 (only the version changed). All five cards
+(#98, #101, #102, #103, #106) passed the quality analyst's checks and were accepted; rc1 failed on
+#101 and #103, rc2 fixed both. The changes are listed under the two candidates below.
+
 ## [0.11.0-rc2] — 2026-09-28
 
 **Release candidate.** rc1 plus the two problems its acceptance found; it becomes 0.11.0, from the
