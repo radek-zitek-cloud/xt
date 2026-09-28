@@ -60,13 +60,13 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     if name in ctx.herdr.agents():
         raise XtError(f"{name} is already running")
     adapter = get_adapter(ctx.paths, a.harness)
+    args = adapter.start_args(a.model, a.connectors, str(ctx.paths.root))  # may refuse an opt-in
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
     # Before the harness starts, so it and every shell it opens inherit it (card #103).
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
     answered: list[str] = []
     try:
-        ctx.herdr.start_agent(name, adapter.herdr_kind, pane,
-                              adapter.start_args(a.model, a.connectors, str(ctx.paths.root)))
+        ctx.herdr.start_agent(name, adapter.herdr_kind, pane, args)
     except HerdrError as e:
         # Herdr refuses when the harness blocks at startup (e.g. claude's folder-trust question).
         # The agent is registered and blocked; answer the dialog and wait until it's ready.

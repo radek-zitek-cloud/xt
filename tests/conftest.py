@@ -189,10 +189,13 @@ def add_member(ctx: Ctx, name: str, role: str = "worker", reports_to: str = "lea
 
 @pytest.fixture(autouse=True)
 def no_controlling_terminal(monkeypatch):
-    """Tests decide the human terminal through a fake stdin: never through the runner's own
-    terminal or an XT_AGENT inherited from an agent running the tests."""
+    """Tests decide the human terminal through a fake stdin (a terminal on stdin stands for the
+    human's controlling terminal): never through the runner's own terminal or an XT_AGENT
+    inherited from an agent running the tests."""
+    import sys
+
     from xt import cli
 
-    monkeypatch.setattr(cli, "controlling_terminal", lambda: False)
+    monkeypatch.setattr(cli, "controlling_terminal", lambda: sys.stdin.isatty())
     monkeypatch.setattr(cli, "under_harness", lambda: False)  # the tests may run inside an agent
     monkeypatch.delenv("XT_AGENT", raising=False)

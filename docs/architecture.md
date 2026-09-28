@@ -140,8 +140,10 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
 - **Identity:** agents pass `--as <name>` (told in the first prompt). `--as human` works only from
   the human's own terminal: a process with a controlling terminal (stdin may be a heredoc or pipe),
   no `XT_AGENT` in its environment (xt exports it in every agent's pane before the harness
-  starts) and no harness (claude, codex, pi) among its ancestors. Most agents' shell tools have no
-  terminal at all; Codex can run commands in a pseudo-terminal, which the other two signals catch.
+  starts) and no harness (claude, codex, pi) among its ancestors. Claude Code's and pi's shell
+  tools have no terminal at all; Codex can put a pseudo-terminal on a command's stdin, but the
+  command still has no controlling terminal. (The ancestry signal can't see through Codex's PID
+  namespace; the controlling terminal and the marker don't depend on it.)
 - **Envelope:** delivered text is stamped `[xt #42 task from:lead to:carol ref:#3]`, with a reply
   hint that passes the text on stdin in a quoted heredoc (`<<'XT_END'`), so the agent's shell leaves
   backticks and `$(…)` alone. Unstamped text in a pane comes from the human typing there.

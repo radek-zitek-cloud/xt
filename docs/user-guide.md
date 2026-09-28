@@ -202,7 +202,8 @@ connectors = ["claude.ai Context7"]   # Claude Code: MCP server names as the har
 ```
 
 A Claude Code agent then gets exactly those servers (xt lists the others at start and refuses
-their tools); a Codex agent gets its apps back as a whole, because Codex can't pick single apps.
+their tools). A Codex agent takes no opt-in: Codex can switch its apps back on only all at once,
+so xt refuses to start a Codex agent that has `connectors` (use Claude Code for that agent).
 The start note, the agent's detail and `xt harnesses` show what's opted in and what each harness
 covers. Removing the line restores the default at the next start. **Not covered:** command-line
 tools that hold your credentials (a mail CLI, for example) are ordinary programs to the harness;

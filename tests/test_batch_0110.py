@@ -105,12 +105,17 @@ def test_human_heredoc_body_is_accepted_from_the_humans_terminal(monkeypatch, ct
     assert ctx.ledger.item(q["id"]) is None
 
 
-@pytest.mark.parametrize("case", ["claude or pi shell tool", "codex command in a pseudo-terminal", "piped"])
+@pytest.mark.parametrize("case", ["claude or pi shell tool", "codex pty, marked", "codex pty, unmarked",
+                                  "piped"])
 def test_agents_still_cannot_act_as_the_human(monkeypatch, ctx, case):
     if case == "claude or pi shell tool":  # no terminal at all
         stdin, tty, marker = _Stdin("x"), False, None
-    elif case == "codex command in a pseudo-terminal":  # a terminal, but inside an agent's session
-        stdin, tty, marker = _Stdin("x", tty=True), True, "lead"
+    elif case == "codex pty, marked":  # a terminal on stdin, inside an agent xt started
+        stdin, tty, marker = _Stdin("x", tty=True), False, "lead"
+    elif case == "codex pty, unmarked":
+        # rc1's hole, found in acceptance: an agent started by an older xt (no XT_AGENT), its
+        # ancestors hidden by Codex's PID namespace, a terminal on stdin but no controlling one
+        stdin, tty, marker = _Stdin("x", tty=True), False, None
     else:  # piped from inside an agent's pane
         stdin, tty, marker = _Stdin("x"), True, "lead"
     monkeypatch.setattr(cli, "controlling_terminal", lambda: tty)
@@ -270,8 +275,9 @@ def test_a_named_opt_in_exposes_only_those_connectors(ctx, monkeypatch):
     assert "--strict-mcp-config" not in args
     denied = args[args.index("--disallowedTools", args.index("--disallowedTools") + 1) + 1:]
     assert denied == ["mcp__claude_ai_Gmail", "mcp__plugin_operations_slack"]
-    assert "features.apps=true" in ad["codex"].start_args(None, ["Google Drive"])
-    assert "features.apps=false" not in ad["codex"].start_args(None, ["Google Drive"])
+    # Codex can only switch every app on at once, so it takes no named opt-in (rc1 did, and failed)
+    with pytest.raises(XtError, match="can't expose single account connectors"):
+        ad["codex"].start_args(None, ["Google Drive"])
 
 
 def test_start_note_and_detail_show_an_opt_in(ctx, monkeypatch):
@@ -303,3 +309,17 @@ def test_xt_harnesses_reports_connector_coverage(ctx, monkeypatch, capsys):
     args.func(args)
     out = capsys.readouterr().out
     assert out.count("account connectors for agents:") == 3 and "blocked" in out
+
+
+def test_a_codex_agent_with_an_opt_in_is_refused_before_any_workspace_opens(ctx):
+    from xt.spawn import do_spawn
+
+    ctx.team._table("liaison")["connectors"] = ["Google Drive"]  # the liaison runs on codex here?
+    ctx.team.save()
+    ctx.reload_team()
+    if ctx.team.agent("liaison").harness != "codex":
+        pytest.skip("fixture liaison isn't codex")
+    before = dict(ctx.herdr.labels)
+    with pytest.raises(XtError, match="can't expose single account connectors"):
+        do_spawn(ctx, "liaison")
+    assert ctx.herdr.labels == before and "liaison" not in ctx.herdr.live

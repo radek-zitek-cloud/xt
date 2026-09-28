@@ -9,6 +9,22 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.11.0-rc2] — 2026-09-28
+
+**Release candidate.** rc1 plus the two problems its acceptance found; it becomes 0.11.0, from the
+same code, once every card in it is accepted.
+
+### Fixed
+
+- **An agent could still pass as the human (card #103).** rc1 counted a terminal on stdin as the
+  human's terminal. A Codex command in pseudo-terminal mode has one, and inside Codex's own PID
+  namespace the harness isn't visible among its ancestors, so an agent started by an older xt
+  (without `XT_AGENT`) passed. xt now requires a controlling terminal, which the human's terminal
+  has and a Codex pseudo-terminal command doesn't. Found by the quality analyst from its own shell.
+- **A Codex connector opt-in exposed every app (card #101).** Codex can switch its apps on only as
+  a whole, so a named opt-in exposed more than named. A Codex agent now takes no opt-in: xt refuses
+  to start it with `connectors`, before opening its workspace.
+
 ## [0.11.0-rc1] — 2026-09-28
 
 **Release candidate.** It becomes 0.11.0, from the same code, once every card in it is accepted.

@@ -85,12 +85,16 @@ def human_terminal() -> bool:
     xt exports XT_AGENT in every agent's pane before its harness starts, so every shell the agent
     opens carries it, including a Codex command run in a pseudo-terminal; and in case the
     environment gets lost on the way (a shared daemon, a pooled shell), a harness among the
-    process's ancestors counts too. Claude Code's and pi's shell tools have no terminal at all.
-    The terminal check looks at the controlling terminal, not stdin, so the human can pipe a body
-    in (`xt send … <<'XT_END'`)."""
+    process's ancestors counts too (where the harness's process tree is visible: Codex runs
+    commands in its own PID namespace). The terminal check is the controlling terminal, which the
+    human's terminal has and agents' shells don't (Claude Code and pi: no terminal at all; Codex:
+    a pseudo-terminal on stdin but no controlling terminal), and it lets the human pipe a body in
+    (`xt send … <<'XT_END'`)."""
     if os.environ.get(AGENT_ENV) or under_harness():
         return False
-    return sys.stdin.isatty() or controlling_terminal()
+    # Not stdin: a Codex command in its pseudo-terminal mode has a terminal on stdin but no
+    # controlling terminal (rc1 accepted that; card #103, found in acceptance).
+    return controlling_terminal()
 
 
 def cmd_default(args) -> None:

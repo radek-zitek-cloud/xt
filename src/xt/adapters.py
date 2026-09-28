@@ -35,7 +35,7 @@ class Adapter:
     connectors: str | None = None
     connectors_note: str = ""
     connector_block_args: list[str] = field(default_factory=list)
-    connector_style: str | None = None  # "claude-mcp", "codex-apps" or None
+    connector_style: str | None = None  # "claude-mcp" (named opt-in possible) or None (no opt-in)
 
     @property
     def installed(self) -> bool:
@@ -51,8 +51,12 @@ class Adapter:
             others = [s for s in claude_mcp_servers(self.binary, cwd) if s not in connectors]
             if others:
                 args += ["--disallowedTools", *(f"mcp__{tool_prefix(s)}" for s in others)]
-        elif self.connector_style == "codex-apps":
-            args += ["-c", "features.apps=true"]
+        else:
+            # Only an adapter that can expose exactly the named connectors takes an opt-in: Codex
+            # can switch its apps on only as a whole (card #101, found in acceptance).
+            raise XtError(f"harness {self.name} can't expose single account connectors, so it takes no "
+                          f"`connectors` opt-in (asked for: {', '.join(connectors)}); use a harness "
+                          f"that can (claude) for that agent, or remove the line")
         if model:
             if not self.model_flag:
                 raise XtError(f"harness {self.name} has no model flag declared; leave the model empty")
