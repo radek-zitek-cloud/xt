@@ -9,8 +9,9 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.11.0] — 2026-09-28
+## [0.11.0-rc1] — 2026-09-28
 
+**Release candidate.** It becomes 0.11.0, from the same code, once every card in it is accepted.
 The second batch from the xt product team, and the first release planned before it was built (five
 cards, 8 points). Card numbers from here on are xt Board cards.
 

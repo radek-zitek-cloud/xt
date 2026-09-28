@@ -265,13 +265,21 @@ git merge v0.5.0
 
 ## Releasing
 
-1. Move the `[Unreleased]` entries in CHANGELOG.md under a new `## [X.Y.Z] — YYYY-MM-DD` heading,
-   with an **Upgrading** note.
-2. Set `version = "X.Y.Z"` in `pyproject.toml`, run `uv lock` and `uv run pytest`.
-3. Commit (`Release vX.Y.Z`), tag it `git tag -a vX.Y.Z -m "xt vX.Y.Z"`, and push both:
-   `git push origin main vX.Y.Z`.
-4. Create the GitHub release from the tag with that version's changelog section as its notes:
-   `gh release create vX.Y.Z --title "xt vX.Y.Z" --notes-file <section>`.
+A release starts as a **candidate** and becomes final only once it's accepted, so a team that
+upgrades to check a release never runs code presented as final that nobody accepted yet.
+
+1. Move the `[Unreleased]` entries in CHANGELOG.md under a new `## [X.Y.Z-rcN] — YYYY-MM-DD`
+   heading, with an **Upgrading** note.
+2. Set `version = "X.Y.ZrcN"` in `pyproject.toml` (Python's spelling of `-rcN`), run `uv lock` and
+   `uv run pytest`.
+3. Commit (`Release vX.Y.Z-rcN`), tag it `git tag -a vX.Y.Z-rcN -m "xt vX.Y.Z-rcN"`, push both
+   (`git push origin main vX.Y.Z-rcN`) and create a **pre-release** from the tag with that
+   section as its notes: `gh release create vX.Y.Z-rcN --prerelease --title "xt vX.Y.Z-rcN" --notes-file <section>`.
+4. If acceptance finds a problem, fix it and release `-rcN+1` the same way.
+5. When every card in it is accepted, release the accepted code as final: rename the heading to
+   `## [X.Y.Z]`, set `version = "X.Y.Z"`, `uv lock`, commit (`Release vX.Y.Z`), tag `vX.Y.Z`, push,
+   and `gh release create vX.Y.Z` (not a pre-release). Nothing else changes between the accepted
+   candidate and the final release.
 
 ## Development
 
