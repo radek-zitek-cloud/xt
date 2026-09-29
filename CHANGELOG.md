@@ -9,6 +9,37 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.13.0-rc1] — 2026-09-29
+
+**Release candidate.** Two cards, approved by Radek on 2026-09-29 (#1150): the model data a Claude
+Sonnet 5.5 agent needs, and per-agent permission settings so a Claude Code agent can run
+unattended. It becomes 0.13.0, from the same code, once both are accepted.
+
+### Added
+
+- **Per-agent permission settings for Claude Code agents (#117).** `permissions = "settings/<file>.json"`
+  on an `[[agent]]` in team.toml, or once under `[defaults]` for every Claude agent, passes that file
+  with `--settings`. xt checks it before every start and refuses to start the agent when the file is
+  missing, outside the team repo (absolute, `..`, a symlink out), not a JSON object, has an unknown
+  `permissions.defaultMode` or a malformed `allow`/`deny`/`ask` rule, because Claude Code silently
+  ignores all of those and starts anyway. Other keys pass through. The start note shows the file, a
+  short content hash and the mode, and warns for `bypassPermissions` and `acceptEdits`; `xt status`
+  and the agent detail show the path; `xt harnesses` shows which harnesses take a file. A
+  `[defaults]` file is skipped (with a note) for Codex and pi agents; a `permissions` line on their own
+  entry is refused. The protocol now says agents never edit settings files.
+- **Prices and context windows for current models (#116).** `prices.toml` lists the Codex models
+  (gpt-6-astra/sol/luna, gpt-5.6-sol/terra/luna, gpt-5.5) and the Claude models (Fable 5.1 and 5,
+  Opus 5.5, 5, 4.8, 4.7, 4.6, Sonnet 5.5, 5, 4.6, Haiku 4.5) at Standard API rates, each with source,
+  tier and checked date (2026-09-29), including the model-specific cache-read prices.
+  `harnesses/claude.toml` lists their context windows, so a Claude agent on any of them shows a
+  context percentage and an estimate. Codex keeps using the window its session log states.
+
+### Upgrading
+
+- `xt down`, `git pull upstream main` (or merge tag v0.13.0-rc1), `xt restart --all`: agents read
+  the new protocol rule at start. Nothing changes until you add a `permissions` line;
+  `harnesses/claude.toml` and `prices.toml` come from upstream (if you edited them locally, merge).
+
 ## [0.12.1] — 2026-09-29
 
 The first patch release, via the team's bug path: the same code as 0.12.1-rc1 (only the version

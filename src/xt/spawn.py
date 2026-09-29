@@ -6,7 +6,7 @@ import re
 import shlex
 import time
 
-from . import brief, skills
+from . import brief, permissions, skills
 from .adapters import get_adapter
 from .alerts import Alerts
 from .herdr import HerdrError
@@ -63,7 +63,10 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     if name in ctx.herdr.agents():
         raise XtError(f"{name} is already running")
     adapter = get_adapter(ctx.paths, a.harness)
-    args = adapter.start_args(a.model, a.connectors, str(ctx.paths.root))  # may refuse an opt-in
+    rel, skipped = permissions.effective(ctx.team, a, adapter)  # may refuse a `permissions` line
+    settings = permissions.preflight(ctx.paths.root, rel) if rel else None  # refuses a bad file
+    args = adapter.start_args(a.model, a.connectors, str(ctx.paths.root),
+                              str(settings.path) if settings else None)  # may refuse an opt-in
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
     # Before the harness starts, so it and every shell it opens inherit it (card #103).
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
@@ -99,6 +102,10 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         ctx.ledger.append(SYSTEM, HUMAN, "system",
                           f"{name}: the operator's account connectors are not blocked in {a.harness} "
                           f"({adapter.connectors_note or 'no restriction declared'})")
+    if settings:
+        ctx.ledger.append(SYSTEM, HUMAN, "system", permissions.start_note(name, settings))
+    elif skipped:
+        ctx.ledger.append(SYSTEM, HUMAN, "system", skipped)
     if adapter.desktop_tools not in ("blocked", "none"):
         ctx.ledger.append(SYSTEM, HUMAN, "system",
                           f"{name}: desktop and browser tools are not fully blocked in {a.harness} "

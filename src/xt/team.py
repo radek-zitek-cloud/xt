@@ -29,6 +29,7 @@ class Agent:
     wake_between: str | None = None  # "05:00-21:00": local-time window for wake-ups; None = any time
     wake_at: str | None = None  # "09:30": for daily (or longer) schedules, the local time to wake
     connectors: list[str] = field(default_factory=list)  # account connectors opted in (card #101)
+    permissions: str | None = None  # settings file for the harness, relative to the team repo (card #117)
 
     @property
     def active(self) -> bool:
@@ -68,6 +69,12 @@ class Team:
     def log_setting(self, key: str):
         return self.doc.get("log", {}).get(key, LOG_DEFAULTS[key])
 
+    @property
+    def default_permissions(self) -> str | None:
+        """`[defaults] permissions = "…"`: the settings file for every agent whose harness takes one."""
+        v = self.doc.get("defaults", {}).get("permissions")
+        return str(v) if isinstance(v, str) and v else None
+
     def default(self, role: str) -> dict:
         return dict(self.doc.get("defaults", {}).get(role, {}))
 
@@ -88,6 +95,7 @@ class Team:
                     wake_between=a.get("wake_between") or None,
                     wake_at=a.get("wake_at") or None,
                     connectors=[str(c) for c in a.get("connectors", [])],
+                    permissions=str(a["permissions"]) if a.get("permissions") else None,
                 )
             )
         return out

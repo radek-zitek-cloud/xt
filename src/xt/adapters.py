@@ -36,15 +36,23 @@ class Adapter:
     connectors_note: str = ""
     connector_block_args: list[str] = field(default_factory=list)
     connector_style: str | None = None  # "claude-mcp" (named opt-in possible) or None (no opt-in)
+    # The flag that passes a settings file (per-agent permissions, card #117); None = not supported.
+    settings_flag: str | None = None
 
     @property
     def installed(self) -> bool:
         return shutil.which(self.binary) is not None
 
-    def start_args(self, model: str | None, connectors: list[str] | None = None, cwd: str | None = None) -> list[str]:
+    def start_args(self, model: str | None, connectors: list[str] | None = None, cwd: str | None = None,
+                   settings: str | None = None) -> list[str]:
         """The harness's command-line arguments. Without `connectors`, the operator's account
-        connectors are blocked; with them, only those connectors are exposed."""
+        connectors are blocked; with them, only those connectors are exposed. `settings` is a
+        checked settings file (card #117)."""
         args = list(self.args)
+        if settings:
+            if not self.settings_flag:
+                raise XtError(f"harness {self.name} takes no settings file")
+            args += [self.settings_flag, settings]
         if not connectors:
             args += self.connector_block_args
         elif self.connector_style == "claude-mcp":
@@ -116,6 +124,7 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
             connectors_note=d.get("connectors_note", ""),
             connector_block_args=list(d.get("connector_block_args", [])),
             connector_style=d.get("connector_style"),
+            settings_flag=d.get("settings_flag"),
         )
     return out
 

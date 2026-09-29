@@ -4,14 +4,92 @@
 # own cost per message and doesn't need an entry.
 #
 # Fields: input, cached_input (Codex), cache_write_5m / cache_write_1h / cache_read (Claude),
-# output; plus where the price comes from and when it was checked.
+# output; plus where the price comes from, which price tier it is, and when it was checked.
+#
+# Tier: the provider's Standard API rates (not Batch, Flex, Fast or priority). OpenAI's page also
+# lists long-context rates; Codex sessions stay below 272k tokens, so the short-context rates apply.
+# Claude 4.6 and later bill their whole 1M window at the standard rate. Actual billing (a
+# subscription, a negotiated plan) isn't visible to xt: every figure is an estimate.
+
+# --- Codex (OpenAI) ---
+
+[models."gpt-6-astra"]
+input = 10.00
+cached_input = 1.00
+output = 50.00
+source = "https://developers.openai.com/api/docs/pricing"
+tier = "standard, short context"
+checked = 2026-09-29
 
 [models."gpt-6-sol"]
 input = 2.00
 cached_input = 0.20
 output = 10.00
-source = "https://developers.openai.com/api/docs/pricing (standard, short context)"
-checked = 2026-09-28
+source = "https://developers.openai.com/api/docs/pricing"
+tier = "standard, short context"
+checked = 2026-09-29
+
+[models."gpt-6-luna"]
+input = 0.10
+cached_input = 0.01
+output = 0.50
+source = "https://developers.openai.com/api/docs/pricing"
+tier = "standard, short context"
+checked = 2026-09-29
+
+[models."gpt-5.6-sol"]
+input = 4.00
+cached_input = 0.40
+output = 20.00
+source = "https://developers.openai.com/api/docs/pricing"
+tier = "standard, short context"
+checked = 2026-09-29
+
+[models."gpt-5.6-terra"]
+input = 2.00
+cached_input = 0.20
+output = 12.00
+source = "https://developers.openai.com/api/docs/pricing"
+tier = "standard, short context"
+checked = 2026-09-29
+
+[models."gpt-5.6-luna"]
+input = 0.20
+cached_input = 0.02
+output = 1.20
+source = "https://developers.openai.com/api/docs/pricing"
+tier = "standard, short context"
+checked = 2026-09-29
+
+[models."gpt-5.5"]
+input = 5.00
+cached_input = 0.50
+output = 30.00
+source = "https://developers.openai.com/api/docs/pricing"
+tier = "standard, short context"
+checked = 2026-09-29
+
+# --- Claude (Anthropic) ---
+
+[models."claude-fable-5-1"]
+input = 10.00
+cache_write_5m = 12.50
+cache_write_1h = 20.00
+cache_read = 0.25
+output = 50.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-fable-5"]
+input = 10.00
+cache_write_5m = 12.50
+cache_write_1h = 20.00
+cache_read = 1.00
+output = 50.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
 
 [models."claude-opus-5-5"]
 input = 4.00
@@ -20,4 +98,95 @@ cache_write_1h = 8.00
 cache_read = 0.20
 output = 20.00
 source = "https://platform.claude.com/docs/en/about-claude/pricing"
-checked = 2026-09-28
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-opus-5"]
+input = 5.00
+cache_write_5m = 6.25
+cache_write_1h = 10.00
+cache_read = 0.50
+output = 25.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-opus-4-8"]
+input = 5.00
+cache_write_5m = 6.25
+cache_write_1h = 10.00
+cache_read = 0.50
+output = 25.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-opus-4-7"]
+input = 5.00
+cache_write_5m = 6.25
+cache_write_1h = 10.00
+cache_read = 0.50
+output = 25.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-opus-4-6"]
+input = 5.00
+cache_write_5m = 6.25
+cache_write_1h = 10.00
+cache_read = 0.50
+output = 25.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-sonnet-5-5"]
+input = 2.00
+cache_write_5m = 2.50
+cache_write_1h = 4.00
+cache_read = 0.20
+output = 10.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-sonnet-5"]
+input = 2.00
+cache_write_5m = 2.50
+cache_write_1h = 4.00
+cache_read = 0.20
+output = 10.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-sonnet-4-6"]
+input = 3.00
+cache_write_5m = 3.75
+cache_write_1h = 6.00
+cache_read = 0.30
+output = 15.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-haiku-4-5"]
+input = 1.00
+cache_write_5m = 1.25
+cache_write_1h = 2.00
+cache_read = 0.10
+output = 5.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29
+
+[models."claude-haiku-4-5-20251001"]  # the dated ID Haiku 4.5 logs
+input = 1.00
+cache_write_5m = 1.25
+cache_write_1h = 2.00
+cache_read = 0.10
+output = 5.00
+source = "https://platform.claude.com/docs/en/about-claude/pricing"
+tier = "standard"
+checked = 2026-09-29

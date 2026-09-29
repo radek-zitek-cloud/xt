@@ -251,6 +251,51 @@ covers. Removing the line restores the default at the next start. **Not covered:
 tools that hold your credentials (a mail CLI, for example) are ordinary programs to the harness;
 keep such skills out of an agent's reach if it shouldn't use them.
 
+**Permission settings for Claude Code agents.** A Claude Code agent starts in Claude's default
+permission mode: its first command outside Claude's built-in safe set waits at a permission
+prompt, and an unattended agent then sits blocked (`blocked:<name>`) until you answer it. Give it
+a settings file instead, per agent or once for all Claude agents:
+
+```toml
+[defaults]
+permissions = "settings/claude-agents.json"   # every Claude agent without its own line
+
+[[agent]]
+name = "liaison"
+permissions = "settings/liaison.json"         # this agent's own file wins
+```
+
+xt passes the file with `--settings`. For an agent nobody watches, use `"defaultMode":
+"dontAsk"`: anything not on its `allow` list is refused at once instead of waiting:
+
+```json
+{"permissions": {"defaultMode": "dontAsk",
+  "allow": ["Bash(/path/to/team/bin/xt *)", "Bash(cat *)", "Bash(rg *)", "Edit(goals/drafts/**)"],
+  "deny": ["Bash(git push *)", "Bash(curl *)", "WebFetch"]}}
+```
+
+Rules:
+- The path is relative to the team repo and must stay inside it (no absolute path, no `..`, no
+  symlink out). Settings files are yours, like `team.toml`: an agent that could edit its own file
+  could widen its own permissions, so the protocol tells agents never to touch them.
+- xt checks the file before every start and refuses to start the agent (it never starts it without
+  the file) when it's missing, not a JSON object, has an unknown `permissions.defaultMode`, or has a
+  malformed `allow`, `deny` or `ask` rule. That check matters: Claude Code (2.1.284) silently ignores
+  a broken file, an unknown mode or a bad rule and starts anyway. Other settings keys pass through
+  unchecked; Claude Code owns its schema.
+- The `[defaults]` file applies only to agents whose harness takes one (Claude Code); Codex and pi
+  agents skip it, and the start note says so. A `permissions` line on a Codex or pi agent's own
+  entry is refused.
+- The start note shows the file, a short hash of its content (a changed file shows a new hash at
+  the next start) and the mode, with a warning for `bypassPermissions` or `acceptEdits`, which let
+  the agent act without asking. `xt status` and the agent's detail show the path; `xt harnesses`
+  shows which harnesses take a file.
+- Pass the file this way rather than as a project `.claude/settings.json`: in a folder Claude Code
+  hasn't trusted yet, a project settings file applies its `deny` rules but ignores its `allow` rules
+  (seen 2026-09-29).
+- Your own `~/.claude/settings.json` still applies to every Claude agent on top of the file: its
+  hooks, and its `allow` and `deny` rules. A user-level `allow` rule widens every agent.
+
 **How full is an agent's context?** The Team panel shows it per agent (`~211k/258k`: tokens in
 the conversation after its latest turn, out of the model's window), yellow from 70% and red from
 85%; the agent's detail, `xt status` and the lead's and liaison's briefs show it too. xt reads it
@@ -259,7 +304,11 @@ agent to its log by its first prompt, so a restarted agent starts again from its
 `~` means approximate (Codex reports the latest turn's usage, not a live figure); `?` means the
 window isn't known for that model; `—` means nothing is recorded yet, or the agent isn't running
 (its detail then shows the last session's figure, labelled as such). Supported: Codex, Claude
-Code, pi.
+Code, pi. The window comes from where it's reliable: Codex writes the usable window of the session
+into its log (258,400 tokens for the current models, well below an API model's published maximum,
+such as gpt-6-astra's 1.05M); Claude Code doesn't, so xt uses the table in
+`harnesses/claude.toml` (1M for the current models, 200k for Haiku 4.5). A Codex log without a
+window leaves it unknown rather than borrowing an API figure.
 
 **What does the team cost?** The supervisor records every model call from the agents' session
 logs (once a minute; counters only) and attributes it to the goal the agent was working on. You
@@ -270,8 +319,12 @@ and is always labelled "est.": on a subscription you don't pay per token, and no
 bill. Tokens of a model with no listed price are shown as unpriced, never as zero; calls made on
 an agent's behalf (Codex's automatic reviewer, Claude subagents) are counted and shown as
 auxiliary. Where a harness reports your account's allowance (Codex: percent of its window and
-when it resets), the Status pane and `xt status` show it once per harness. To price another
-model, add it to `prices.toml` with its source.
+when it resets), the Status pane and `xt status` show it once per harness. `prices.toml` lists
+the current Codex and Claude models at the providers' **Standard** API rates (OpenAI's short-context
+rates, which cover every Codex session), each row with its source page and the date it was checked
+(2026-09-29 for the table shipped with 0.13.0); xt can't see which tier or plan you're actually
+billed on, which is one more reason the figure is an estimate. To price another model, add it to
+`prices.toml` with its source, tier and checked date.
 
 ### 12. Ending a team
 

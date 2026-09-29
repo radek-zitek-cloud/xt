@@ -14,6 +14,8 @@ connectors = "blocked"
 connectors_note = "no MCP servers or claude.ai connectors unless opted in per agent; CLIs holding your credentials aren't covered"
 connector_block_args = ["--strict-mcp-config"]
 connector_style = "claude-mcp"
+# Per-agent settings file (card #117): `permissions = "settings/<agent>.json"` in team.toml.
+settings_flag = "--settings"
 model_flag = "--model"
 summary = "Claude Code: careful multi-step work and writing; reads repo skills via .claude/skills"
 limits = [
@@ -34,5 +36,20 @@ name = "folder trust"
 match = ["Do you trust the files in this folder?", "Is this a project you created or one you trust"]
 keys = ["down", "enter"]
 
+# Windows (checked 2026-09-29): the current models from https://platform.claude.com/docs/en/models/overview
+# (Fable 5.1, Opus 5.5, Sonnet 5.5: 1M; Haiku 4.5: 200k); the legacy models it links (Fable 5, Opus 5,
+# Opus 4.8/4.7/4.6, Sonnet 5, Sonnet 4.6) have 1M like every 4.6-and-later model. Haiku 4.5 logs its
+# dated ID, so both spellings are listed. A model missing here shows no context percentage.
 [context_windows]
+"claude-fable-5-1" = 1000000
+"claude-fable-5" = 1000000
 "claude-opus-5-5" = 1000000
+"claude-opus-5" = 1000000
+"claude-opus-4-8" = 1000000
+"claude-opus-4-7" = 1000000
+"claude-opus-4-6" = 1000000
+"claude-sonnet-5-5" = 1000000
+"claude-sonnet-5" = 1000000
+"claude-sonnet-4-6" = 1000000
+"claude-haiku-4-5" = 200000
+"claude-haiku-4-5-20251001" = 200000

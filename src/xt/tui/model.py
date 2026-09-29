@@ -12,6 +12,8 @@ from typing import Callable
 
 from rich.text import Text
 
+from .. import permissions
+from ..adapters import load_adapters
 from ..alerts import Alerts
 from ..context import Ctx
 from ..dispatch import Queue
@@ -259,6 +261,9 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(f"usage today: {turns.fmt(mine_today) if mine_today else 'none recorded'}\n")
             if a.connectors:
                 out.append(f"account connectors (opted in): {', '.join(a.connectors)}\n", style="yellow")
+            settings_path = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness))
+            if settings_path:
+                out.append(f"settings file: {settings_path}\n")
             if la:
                 from ..reset import suggestion
 

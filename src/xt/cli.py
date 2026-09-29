@@ -5,7 +5,7 @@ import sys
 
 from . import __version__
 from . import brief as brief_mod
-from . import goals
+from . import goals, permissions
 from .adapters import load_adapters
 from .alerts import Alerts
 from .context import Ctx
@@ -270,6 +270,7 @@ def cmd_status(args) -> None:
     print(versions.current(ctx, live_names=set(live)).line())
 
     contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
+    adapters = load_adapters(ctx.paths)
     spend = turns.today(ctx)
     for a in ctx.team.agents():
         if a.kind == HUMAN:
@@ -284,6 +285,9 @@ def cmd_status(args) -> None:
         today_txt += f"  next wake {dt.datetime.fromtimestamp(nxt):%a %H:%M}" if nxt else ""
         print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} "
               f"open:{mine:<3} context:{ctx_txt:<12} today:{today_txt}")
+        settings_path = permissions.shown(ctx.team, a, adapters.get(a.harness))
+        if settings_path:
+            print(f"  {'':<12} settings: {settings_path}")
     from .jobs import Jobs
     from .reset import suggestion
     from .watch import watch_pid
@@ -426,6 +430,8 @@ def cmd_harnesses(args) -> None:
               + (f" ({a.desktop_tools_note})" if a.desktop_tools_note else ""))
         print(f"   account connectors for agents: {a.connectors or 'not restricted'}"
               + (f" ({a.connectors_note})" if a.connectors_note else ""))
+        print(f"   per-agent settings file (`permissions` in team.toml): "
+              + (f"yes, passed with {a.settings_flag}" if a.settings_flag else "not supported"))
 
 
 def cmd_goal(args) -> None:

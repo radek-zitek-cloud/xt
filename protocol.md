@@ -112,6 +112,9 @@ Messages from xt arrive in your conversation stamped like:
   `skills/` and `team.toml` via `xt spawn`/`xt retire`. Don't commit to the team repo unless the
   human asks or your role makes it a duty. Never edit xt's own files (`bin/`, `src/`,
   `protocol.md`, `harnesses/`, `roles/lead.md`, `roles/liaison.md`); they come from upstream.
+- Never edit an agent's settings file (`settings/`, or any file `team.toml` names under
+  `permissions`): it sets what that agent may do without asking, so it belongs to the human, like
+  the rest of `team.toml`. Ask the human for a change.
 
 ## 7. No desktop or browser control, no account connectors
 
