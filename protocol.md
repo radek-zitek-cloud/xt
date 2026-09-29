@@ -99,6 +99,10 @@ Messages from xt arrive in your conversation stamped like:
   - `xt log --member <you>` or `xt log --id <id>` for the full history.
   - `members/<you>/notes.md`: your own durable notes. Write down decisions, findings and
     where things are, not just in your head or in your harness's own memory.
+- When xt asks you for a **checkpoint** (`[xt reset] …`), the human is about to give you a fresh
+  session: save what the next session needs into `members/<you>/notes.md`, then confirm with
+  `xt checkpoint --as <you>` and one line on stdin saying what to read first. Don't start new work
+  in between. Your next brief shows that line.
 
 ## 6. Where work happens
 

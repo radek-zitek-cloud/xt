@@ -264,8 +264,10 @@ def cmd_status(args) -> None:
     ctx = Ctx.load()
     live = ctx.herdr.agents()
     items = ctx.ledger.open_items()
-    print(f"team {ctx.team.name} · session {ctx.team.session} · xt {__version__}")
-    from . import turns, usage
+    print(f"team {ctx.team.name} · session {ctx.team.session}")
+    from . import turns, usage, versions
+
+    print(versions.current(ctx, live_names=set(live)).line())
 
     contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
     spend = turns.today(ctx)
@@ -283,8 +285,14 @@ def cmd_status(args) -> None:
         print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} "
               f"open:{mine:<3} context:{ctx_txt:<12} today:{today_txt}")
     from .jobs import Jobs
+    from .reset import suggestion
     from .watch import watch_pid
 
+    now = dt.datetime.now(dt.timezone.utc).astimezone()
+    for name, reading in contexts.items():
+        tip = suggestion(name, reading, now) if name in live else None
+        if tip:
+            print(tip)
     q = Queue(ctx).pending()
     jobs = Jobs(ctx).pending()
     questions = sum(1 for i in items if i["type"] == "ask")
@@ -307,6 +315,26 @@ def cmd_restart(args) -> None:
         raise XtError("name the agents to restart, or pass --all (the whole team and the supervisor)")
     for line in restart(Ctx.load(), args.names, args.all):
         print(line)
+
+
+def cmd_reset(args) -> None:
+    if _who(args) != HUMAN:
+        raise XtError("only the human resets an agent's context")
+    from .reset import reset
+
+    ctx = Ctx.load()
+    print(f"asking {args.name} to save a checkpoint (up to {int(args.timeout)} s)…", flush=True)
+    for line in reset(ctx, args.name, timeout=args.timeout):
+        print(line)
+
+
+def cmd_checkpoint(args) -> None:
+    who = _who(args)
+    if who == HUMAN:
+        raise XtError("agents confirm their own checkpoint: pass --as <your name>")
+    from .reset import record_checkpoint
+
+    print(record_checkpoint(Ctx.load(), who, _body(args)))
 
 
 def cmd_inbox(args) -> None:
@@ -527,6 +555,16 @@ def build_parser() -> argparse.ArgumentParser:
              "whole team and the supervisor (human only)")
     sp.add_argument("names", nargs="*", metavar="name")
     sp.add_argument("--all", action="store_true")
+
+    sp = add("reset", cmd_reset,
+             "give one agent a fresh context safely: refused while it owns open work; it saves a "
+             "checkpoint to its notes first (human only; `restart` is the route without a checkpoint)")
+    sp.add_argument("name")
+    sp.add_argument("--timeout", type=float, default=300, help="seconds to wait for the checkpoint (default 300)")
+    sp = add("checkpoint", cmd_checkpoint,
+             "confirm that your notes hold what a fresh session needs (asked for by `xt reset`); "
+             "text on stdin: what the next session should know first")
+    sp.add_argument("body", nargs="*")
 
     sp = add("stop", cmd_stop, "close an agent's workspace, keep it in the roster (human only)")
     sp.add_argument("name")

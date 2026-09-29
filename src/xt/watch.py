@@ -146,12 +146,22 @@ class Supervisor:
         if now - self.last_usage >= USAGE_EVERY:
             self.last_usage = now
             self.record_usage()
+        self.check_published()
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
             for line in self.ctx.ledger.rotate(
                 int(self.ctx.team.log_setting("raw_days")), int(self.ctx.team.log_setting("delete_after_days"))
             ):
                 self.say(line)
+
+    def check_published(self) -> None:
+        """The newest published xt release, at most every few hours (card #58): agents' shells often
+        have no network, so status and briefs only ever read this cache."""
+        from . import versions
+
+        now = dt.datetime.now(dt.timezone.utc).astimezone()
+        if versions.published_due(self.ctx, now):
+            self.say(versions.refresh_published(self.ctx, now))
 
     def check_agents(self, live: dict) -> None:
         team = self.ctx.team
@@ -335,7 +345,11 @@ def run(ctx: Ctx) -> None:
     pidfile = ctx.paths.state / "watch.pid"
     pidfile.write_text(str(os.getpid()))
     sup = Supervisor(ctx)
-    sup.say(f"xt watch started for team {ctx.team.name} (session {ctx.team.session}); ctrl+c to stop")
+    from . import __version__, versions
+
+    versions.record_supervisor(ctx, dt.datetime.now(dt.timezone.utc).astimezone())
+    sup.say(f"xt watch {versions.display(__version__)} started for team {ctx.team.name} "
+            f"(session {ctx.team.session}); ctrl+c to stop")
     try:
         while True:
             try:

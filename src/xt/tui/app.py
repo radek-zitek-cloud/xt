@@ -91,6 +91,36 @@ class Prompt(ModalScreen[str | None]):
         self.dismiss(None)
 
 
+class Editor(TextArea):
+    """The composer's text box: copy and paste go through the system clipboard (card #110)."""
+
+    def action_copy(self) -> None:
+        from . import clipboard
+
+        text = self.selected_text
+        if not text:
+            return
+        self.app.copy_to_clipboard(text)  # the terminal's clipboard too, where it supports it
+        if not clipboard.copy(text):
+            self.notify("couldn't reach the system clipboard (wl-copy, xclip, xsel or pbcopy)", severity="warning")
+
+    def action_cut(self) -> None:
+        text = self.selected_text
+        if text:
+            self.action_copy()
+            self.replace("", *self.selection)
+
+    def action_paste(self) -> None:
+        from . import clipboard
+
+        text = clipboard.paste()
+        if text is None:
+            self.notify("couldn't read the system clipboard (wl-paste, xclip, xsel or pbpaste); "
+                        "your terminal's paste (e.g. ctrl+shift+v) still works", severity="warning")
+            return
+        self.replace(text, *self.selection)
+
+
 class Compose(ModalScreen[str | None]):
     """A few lines of text (an answer, a message): enter starts a new line, ctrl+s sends."""
 
@@ -104,11 +134,12 @@ class Compose(ModalScreen[str | None]):
     def compose(self) -> ComposeResult:
         box = Vertical(classes="popup compose")
         box.border_title = self.title_text
-        box.border_subtitle = "ctrl+s send · enter new line · esc cancel"
+        box.border_subtitle = "ctrl+s send · enter new line · ctrl+c/ctrl+v copy/paste · esc cancel"
         with box:
             if self.context:
-                yield Static(Text(self.context), classes="compose-context")
-            yield TextArea(id="compose-text", soft_wrap=True, show_line_numbers=False)
+                with VerticalScroll(classes="compose-context"):
+                    yield Static(Text(self.context))
+            yield Editor(id="compose-text", soft_wrap=True, show_line_numbers=False)
 
     def on_mount(self) -> None:
         self.query_one("#compose-text", TextArea).focus()
@@ -263,6 +294,8 @@ class XtTui(App):
             self.query_one(f"#panel-{i}", Panel).set_rows(snap.panels.get(title, []))
         self.summary = snap.summary
         self.usage = snap.usage
+        if snap.versions:
+            self.query_one("#topbar", Static).border_title = f"Status─xt {snap.versions}"
         self.render_hints()
         focused = self.focused if isinstance(self.focused, Panel) else self.panel(self.last_panel)
         self.show_detail(focused)

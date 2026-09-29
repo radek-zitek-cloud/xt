@@ -100,6 +100,7 @@ class Snapshot:
     panels: dict[str, list[Row]]
     summary: Text  # line 1 of the Status pane: the team and what needs the human
     usage: str = ""  # line 2: today's usage and account allowance
+    versions: str = ""  # the Status title: installed, running and published xt (card #58)
 
 
 def _t(*parts) -> Text:
@@ -258,6 +259,12 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(f"usage today: {turns.fmt(mine_today) if mine_today else 'none recorded'}\n")
             if a.connectors:
                 out.append(f"account connectors (opted in): {', '.join(a.connectors)}\n", style="yellow")
+            if la:
+                from ..reset import suggestion
+
+                tip = suggestion(a.name, ctxr, dt.datetime.now(dt.timezone.utc).astimezone())
+                if tip:
+                    out.append(tip + "\n", style="yellow")
             out.append(_heading(f"open work ({len(owned)})"))
             for i in owned:
                 out.append(f"#{i['id']} {i['type']} {_age(i['opened'], now)}  {i['title']}\n")
@@ -413,11 +420,18 @@ def build(ctx: Ctx) -> Snapshot:
         sup_rows.append(Row(f"sup:{n}:{stamp}", _t((stamp[11:16] + " ", "bright_black"), (text, style)),
                             lambda line=line: Text(line + "\n"), "event", {}))
 
+    from .. import versions
+
+    try:
+        vtitle = versions.current(ctx, live_names=set(live)).title()
+    except Exception:  # never let a version read break the TUI
+        vtitle = ""
     return Snapshot(
         {"Goals": goal_rows, "Team": team_rows, "Tasks": task_rows, "Inbox": inbox_rows, "Log": log_rows,
          "Supervisor": sup_rows},
         summary,
         usage_line,
+        vtitle,
     )
 
 

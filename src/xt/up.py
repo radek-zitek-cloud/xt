@@ -78,23 +78,37 @@ def restart(ctx: Ctx, names: list[str], everyone: bool = False) -> list[str]:
     if everyone:
         live = ctx.herdr.agents()
         was_running = [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.name in live]
-        note = ""
+        source = "running now"
         predown = ctx.paths.state / "predown.json"
         if not was_running and predown.exists():
             # the team was taken down with `xt down`: restore who was running then
             was_running = json.loads(predown.read_text()).get("running", [])
-            note = " (running before xt down)"
-        out = down(ctx) + up(ctx)
+            source = "running before xt down"
+        # down + up, keeping only what they did: their advice ("pm not running; xt spawn pm…",
+        # "no agents were running") would contradict the restore that follows (card #104)
+        out = [line for line in down(ctx) if line != "no agents were running"]
+        if not was_running and not any(line.startswith("stopped ") for line in out):
+            out.append("nothing was running, and nothing was recorded at the last xt down")
+        for line in up(ctx):
+            if line.startswith(("member: ", "lead: ")) and ("not running" in line or "not started" in line):
+                continue  # restored below, or summarised as left stopped
+            out.append(line)
         live = ctx.herdr.agents()
         for name in was_running:
             a = ctx.team.agent(name)
             if name not in live and a is not None and a.active:
-                out.append(f"member: started {name} again in workspace {do_spawn(ctx, name)}")
-        if was_running:
-            out.append(f"restored: {', '.join(was_running)}{note}")
+                out.append(f"started {name} again in workspace {do_spawn(ctx, name)}")
+        predown.unlink(missing_ok=True)
+        live = ctx.herdr.agents()
+        restored = [n for n in was_running if n in live]
+        left = [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active and a.name not in live]
+        if restored:
+            out.append(f"restored: {', '.join(restored)} ({source})")
         else:
             out.append("restored: nobody (no agent was running, and none was recorded at the last xt down)")
-        predown.unlink(missing_ok=True)
+        if left:
+            out.append(f"left stopped: {', '.join(left)} (not running before; `xt spawn <name>` starts one)")
+        out.append("supervisor: running" if watch_pid(ctx) else "supervisor: NOT running (see above)")
         return out
     out = []
     for name in names:

@@ -60,6 +60,13 @@ set `[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notificati
 3. The supervisor starts the lead, with the goal in its first prompt. From here the Goals panel
    shows the goal and its tasks, and the Log panel every message.
 
+The answer and message dialog takes about two-thirds of the screen (up to 160 columns wide), with
+the question above the text box. It's an ordinary editor: arrows, home/end, ctrl+←/→ by word,
+shift+arrows to select, ctrl+z / ctrl+y to undo and redo, ctrl+c / ctrl+x / ctrl+v to copy, cut and
+paste through the system clipboard (wl-copy/wl-paste on Wayland, xclip or xsel on X11, pbcopy on
+macOS; if none is available the dialog says so, and your terminal's own paste still works). Enter
+starts a new line, ctrl+s sends, esc cancels.
+
 You can also message the liaison from the TUI without switching workspaces: `S` always opens a
 message to the liaison. `s` does too, except when a question is selected in the Inbox: then it
 answers that question. The key line at the bottom of the TUI starts with what `s` will do right
@@ -135,8 +142,31 @@ or, if you like to stop the team first (to commit its files, say): `xt down`, pu
 --all`. Either way `xt restart --all` restarts the supervisor (new code) and every agent that was
 running (new protocol and roles in their first prompt), and brings the team back as it was: after
 an `xt down` it restores the agents that were running just before it (agents you had stopped on
-purpose stay stopped) and lists who it restored. Read the release's **Upgrading**
-note in [CHANGELOG.md](../CHANGELOG.md) first; `xt --version` shows what you're on. (Teams on xt
+purpose stay stopped) and ends with one summary:
+
+```text
+restored: liaison, lead, carol (running before xt down)
+left stopped: dora (not running before; `xt spawn <name>` starts one)
+supervisor: running
+```
+
+If nothing was running and nothing was recorded, it says `restored: nobody` and why. Read the release's **Upgrading**
+note in [CHANGELOG.md](../CHANGELOG.md) first.
+
+**Which version is the team on?** Three different things, shown in the TUI's Status title, `xt
+status` and every agent's brief:
+
+| Label | What it is | Where it comes from |
+|---|---|---|
+| **published** | the newest final release (candidates don't count) | the supervisor checks the upstream's tags every 6 hours; if the check fails you see the last known one and why |
+| **installed** | the xt in the team's repo: what the next command or start runs | the repo's `pyproject.toml`, read every time |
+| **running** | the supervisor's version and, per agent, the xt that started it (its first prompt, protocol and reply hints) | recorded when each starts; `mixed` when they differ |
+
+After `git pull` the team is *installed* on the new version but still *running* the old one until
+`xt restart --all`; the status line says which processes haven't picked it up yet. A newer
+*published* release only produces a notice: nothing upgrades on its own. Processes started by xt
+older than 0.12.0 show as `unknown` until their next restart. To verify an upgrade finished: all
+three read the same version and no note follows the line. (Teams on xt
 0.6.0 or older don't have `restart` yet: `xt down`, pull, `xt`, then `U` in the TUI.)
 
 ### 8. Pausing and resuming the team
@@ -148,10 +178,22 @@ note in [CHANGELOG.md](../CHANGELOG.md) first; `xt --version` shows what you're 
 | Stop the agents but keep the supervisor | `X` in the TUI, or `xt down --keep-supervisor` |
 | Restart everything with fresh instructions | `xt restart --all` |
 | Stop / start one agent | `x` / `u` on it in the TUI (`xt stop <name>` / `xt spawn <name>`) |
-| Give one agent a fresh session | `xt restart <name>` |
+| Give one agent a fresh context, safely | `xt reset <name>` (see below) |
+| Give one agent a fresh session right now | `xt restart <name>` |
 
 Stopping keeps an agent in the roster, its notes and its open work; nothing alerts about an agent
 you stopped. A schedule's rhythm survives restarts.
+
+**Resetting a heavy agent.** An agent's context grows with every turn, and a big context costs
+more per turn and carries stale detail. `xt reset <name>` gives it a fresh one without losing its
+work: it is refused while the agent owns an open goal or task (it names them) or is busy; otherwise
+xt asks the agent to save what it needs into `members/<name>/notes.md` and confirm with `xt
+checkpoint`, waits up to 5 minutes (`--timeout`), and only then starts a fresh session, whose brief
+points to the notes and the checkpoint line. No checkpoint, or new work arriving meanwhile, means
+nothing is reset. `xt restart <name>` is the emergency route, without a checkpoint. xt never resets
+anyone on its own: when an agent's context reaches 70% of its window, `xt status`, the agent's
+detail in the TUI and the lead's and liaison's briefs show `reset suggested for …`, and only when the
+reading is known, has a window and is recent.
 
 ### 9. When something goes wrong
 
@@ -295,6 +337,12 @@ liaison, and the lead if goals are open; lists members that aren't running. **Us
 alerts afterwards). **Use it** at the end of a day, before a reboot, or before editing `team.toml`
 by hand. `--keep-supervisor` stops only the agents (same as `X` in the TUI).
 
+### `xt reset`
+
+`xt reset <name> [--timeout S]` — a fresh context for one agent, after it saved a checkpoint to its
+notes; refused while it owns open work or is busy (see 8). Human only. Agents answer the request with
+`xt checkpoint --as <name>` (text on stdin: what the next session should read first).
+
 ### `xt restart`
 
 `xt restart <name>…` | `xt restart --all` — stops and starts agents so they get fresh
@@ -304,7 +352,7 @@ a confused or heavy agent a clean session.
 
 ### `xt status`
 
-`xt status` — one screen: every agent with its role, `harness/model`, live state, open work and
+`xt status` — one screen: the published, installed and running xt versions (see 7); every agent with its role, `harness/model`, live state, open work and
 context (e.g. `~211k/258k`) and today's usage; today's team total and, where reported, the
 account allowance;
 counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts; a

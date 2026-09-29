@@ -140,19 +140,41 @@ ModalScreen {
 }
 
 .popup.compose {
-    width: 80;
+    width: 90%;
+    max-width: 160;
+    height: 70%;
+    min-height: 12;
 }
 
 .compose-context {
     color: ansi_bright_black;
-    max-height: 8;
+    height: auto;
+    max-height: 35%;
+    overflow-y: auto;
     margin: 0 0 1 0;
 }
 
 #compose-text {
-    height: 7;
+    height: 1fr;
+    min-height: 3;
     background: ansi_default;
     border: none;
     padding: 0;
+}
+
+/* a cursor in the text's own colour and a selection you can see, also in the ANSI colour mode */
+#compose-text > .text-area--cursor {
+    color: ansi_default;
+    background: ansi_default;
+    text-style: reverse;
+}
+
+#compose-text > .text-area--selection {
+    background: ansi_blue;
+    color: ansi_bright_white;
+}
+
+#compose-text > .text-area--cursor-line {
+    background: ansi_default;
 }
 

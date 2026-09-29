@@ -37,6 +37,12 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     if name:
         out[0] += f" — for {name}"
 
+    from . import versions
+
+    try:
+        out.append(versions.current(ctx, live_names=set(live)).line())
+    except Exception as e:  # a brief must always build
+        out.append(f"xt versions: unknown ({type(e).__name__})")
     out.append("\n## Team")
     viewer = ctx.team.agent(name) if name else None
     # context usage is for whoever decides about resets: the human, the lead and the liaison
@@ -57,8 +63,20 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}): {state}")
     if show_context:
         from . import turns
+        from .reset import suggestion
 
         out.append(f"Team usage today: {turns.fmt(turns.today(ctx).team_today)}")
+        for n, r in contexts.items():
+            tip = suggestion(n, r, now) if n in live else None
+            if tip:
+                out.append(tip)
+    if viewer is not None and viewer.kind != HUMAN:
+        from .reset import checkpoints
+
+        out.append(f"Your notes: members/{name}/notes.md (read them after any restart or reset).")
+        cp = checkpoints(ctx).get(name)
+        if cp:
+            out.append(f"Your last checkpoint ({cp['at'][:16].replace('T', ' ')}): {cp['summary']}")
 
     items = [i for i in ctx.ledger.open_items() if i["type"] != "ask"]  # questions: see below
     if name and name not in (HUMAN,) and ctx.team.agent(name) and ctx.team.agent(name).role not in ("lead", "liaison"):

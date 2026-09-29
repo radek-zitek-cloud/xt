@@ -83,7 +83,11 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         ctx.ledger.append(SYSTEM, HUMAN, "system", f"answered {a.harness}'s '{dialog}' dialog for {name}")
     landed = send_first_prompt(ctx, name, pane, adapter, first_prompt(ctx, name))
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
-    ctx.ledger.append(SYSTEM, HUMAN, "system", f"started {name} ({a.role}, {a.harness}) in workspace {workspace}{note}")
+    from . import __version__, versions
+
+    versions.record_agent_start(ctx, name, ctx.ledger.clock())
+    ctx.ledger.append(SYSTEM, HUMAN, "system",
+                      f"started {name} ({a.role}, {a.harness}) in workspace {workspace} with xt {versions.display(__version__)}{note}")
     if a.connectors:
         ctx.ledger.append(SYSTEM, HUMAN, "system",
                           f"{name}: account connectors opted in: {', '.join(a.connectors)}"

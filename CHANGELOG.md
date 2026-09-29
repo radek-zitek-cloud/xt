@@ -9,6 +9,45 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.12.0-rc1] — 2026-09-29
+
+**Release candidate.** It becomes 0.12.0, from the same code, once every card in it is accepted.
+Four product cards, 14 points, in the approved order.
+
+### Added
+
+- **Which xt a team is on (card #58).** The TUI's Status title, `xt status` and every agent's brief
+  show three versions: **published** (the newest final release on the team's upstream, checked by
+  the supervisor every 6 hours and cached; a failed check shows the last known one and why),
+  **installed** (the team repo's own version, read every time) and **running** (the supervisor's
+  version and, per agent, the xt that started it; `mixed` when they differ). A note names the
+  processes not yet running the installed version, and a newer published release only produces a
+  notice. Each agent's start line in the log now ends `with xt X`.
+- **`xt reset <name>`: a fresh context, safely (card #56).** Refused while the agent owns open work
+  (named) or is busy; otherwise the agent is asked to save what it needs into its notes and confirm
+  with the new **`xt checkpoint`**, and only then gets a fresh session, whose brief points to its
+  notes and the checkpoint line. No checkpoint within 5 minutes, or new work meanwhile, means
+  nothing is reset. When an agent's context reaches 70% of its window (a known, recent reading),
+  `xt status`, its TUI detail and the lead's and liaison's briefs suggest a reset; nothing resets
+  on its own. `xt restart <name>` stays the route without a checkpoint.
+
+### Changed
+
+- **A roomy answer/send dialog (card #110):** about two-thirds of the screen (up to 160 columns;
+  27 editable lines on a 60-row terminal), the question above it scrolls, a cursor in the text's own
+  colour and a visible selection, and ctrl+c / ctrl+x / ctrl+v through the system clipboard
+  (wl-copy/wl-paste, xclip, xsel or pbcopy); when none is available the dialog says so.
+- **`xt restart --all` says what happened, once (card #104):** the stop/start advice lines are gone,
+  and it ends with `restored: …`, `left stopped: …` and the supervisor's state; an empty record is
+  told apart from a team that was merely stopped.
+- Every agent's brief now points to its own notes (`members/<name>/notes.md`).
+
+### Upgrading
+
+- `xt down`, `git pull upstream main`, `xt restart --all`. Restart every agent: the protocol gained
+  the checkpoint step, and only processes started by 0.12.0 record their version (older ones show
+  as `unknown` until then).
+
 ## [0.11.0] — 2026-09-28
 
 The accepted release: the same code as 0.11.0-rc2 (only the version changed). All five cards

@@ -142,7 +142,7 @@ bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
 | `1`–`6`, `tab`, `j`/`k`, `enter` | Switch panels, move, read the detail |
 | `/` | Filter the focused panel by text (empty clears it) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
-| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says which (`s answer #288` or `s/S message liaison`). In the dialog, enter starts a new line and ctrl+s sends |
+| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says which (`s answer #288` or `s/S message liaison`). In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
 | `S` | Always message the liaison, even with a question selected |
 | `c` | Clear the selected alert |
 | `f` | Switch Herdr to the selected agent's workspace |
