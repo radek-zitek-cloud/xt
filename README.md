@@ -25,8 +25,8 @@ the scout goal's brief in the detail pane.*
 
 ## What xt can do
 
-Each of these has been shown in real runs, not only in tests (v0.10.0). The story behind each one
-is in [the story so far](docs/story.md).
+Each of these has been shown in real runs, not only in tests (as of v0.10.0). The story behind
+each one is in [the story so far](docs/story.md).
 
 - **Run persistent, named agents with roles.** A liaison, a lead and members, each in its own
   workspace, keep working while you're away. Codex has carried every real team so far; adapters for
@@ -53,6 +53,30 @@ is in [the story so far](docs/story.md).
   agents recover from files and a brief, not from memory.
 - **Keep agents in bounds.** No desktop or browser control and none of your account connectors
   (mail, files, calendar) unless you opt one in; public output stays free of private details.
+
+Added since (0.12.0 to 0.15.0), each checked against its spec by the product team's quality
+analyst before its final release, some on staging teams rather than in daily use yet:
+
+- **Know which xt is running.** The published, installed and running versions are shown apart,
+  so a half-finished upgrade is visible ([Updating xt](docs/user-guide.md#7-updating-xt)).
+- **Choose a version and roll back.** `xt version use <tag>` merges a release into your team repo
+  after checking the state format and taking a verified snapshot; `xt version rollback` undoes it
+  ([`xt version`](docs/user-guide.md#xt-version)).
+- **Give one agent a fresh context safely.** `xt reset <name>` waits until the agent has saved its
+  notes and has no open work ([`xt reset`](docs/user-guide.md#xt-reset)).
+- **Decide with options.** A decision question shows numbered options, each with its consequence,
+  and a recommendation; you answer with a number or your own words
+  ([`xt answer`](docs/user-guide.md#xt-answer)).
+- **Per-agent permissions for Claude Code agents.** A settings file per agent (or one for all),
+  checked before every start; `xt spawn --permissions` sets it for a new agent, and the approval
+  warns when a Claude agent would start without one
+  ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery), [`xt spawn`](docs/user-guide.md#xt-spawn)).
+- **See the Claude plan's usage.** The five-hour and weekly windows in `xt status` and the TUI,
+  through a shipped status-line script ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
+- **Hear when a goal is done.** One notification per goal you dispatched, and a "Done since you
+  last looked" list in the Inbox ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **Short logs by default.** `xt log` prints the newest 20 messages; `--full` prints all
+  ([`xt log`](docs/user-guide.md#xt-log)).
 
 What it can't do yet is in [Known limits](#known-limits).
 
@@ -105,6 +129,11 @@ and tell it what you want. The lead starts when the first goal is dispatched.
 
 Your clone becomes your team's own repo: `xt init` renames `origin` to `upstream`, so xt updates
 come with `git pull upstream main` (see [Updating a team](#updating-a-team)).
+
+**Already running a team on an older xt?** Your first upgrade to this version: `xt down`, commit
+your team's changes, `git pull upstream main`, then `xt restart --all`, and read each newer
+release's **Upgrading** note in [CHANGELOG.md](CHANGELOG.md). From 0.14.0 on, `xt version use
+<tag>` picks a release and `xt version rollback` undoes it (see [Updating a team](#updating-a-team)).
 
 ## How a team works
 
@@ -167,13 +196,15 @@ equivalent and when you'd use it.
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, context and today's usage per agent, team usage and allowance (Codex, and Claude's five-hour and weekly windows through `bin/xt-statusline`), open work, questions, queue, approvals, alerts |
-| `xt inbox` | What needs you: questions, alerts, approvals, recent messages |
-| `xt answer <id> "..."` | Answer a question the liaison asked you |
+| `xt inbox` | What needs you: questions, alerts, approvals, goals done since you last looked, friction, recent messages |
+| `xt answer <id> "..."` | Answer a question the liaison asked you (a number picks one of its options) |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |
 | `xt clear <alert>` | Dismiss an alert |
-| `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00]` | Wake an agent periodically when idle, optionally only within local hours |
+| `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00] [--at 09:30]` | Wake an agent periodically when idle, optionally only within local hours or at a set time |
 | `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent (`xt spawn … --permissions FILE`: a Claude agent's settings file) |
 | `xt restart <name>…` / `xt restart --all` | Restart agents with fresh instructions; `--all` restarts the supervisor too and brings the team back as it was |
+| `xt reset <name>` / `xt checkpoint` | A fresh context for one agent, only after it saved its notes (the agent confirms with `xt checkpoint`) |
+| `xt version` / `xt version use <tag>` / `xt version rollback` | The team's versions; switch to a release (a candidate with `--candidate`) or undo the last switch |
 | `xt send <to> --type <t> "..."`, `xt done <id> "..."`, `xt note "..."` | Messages, closing work, notes (agents add `--as <name>`) |
 | `xt friction "..."` | An agent's feedback about xt or its harness; lands in your Inbox |
 | `xt goal new\|dispatch\|list` | Goal drafts and dispatch (normally the liaison does this) |
@@ -204,9 +235,11 @@ raw_days = 30               # then gzipped; delete_after_days = 0 keeps them for
 ```
 
 Each `[[agent]]` has `name`, `role`, `harness`, optional `model`, `reports_to`, `status`, an
-optional schedule (`wake_every`, `wake_message`, `wake_between`, `wake_at`) and optional
-`connectors` (account connectors opted in for that agent; none by default). Runtime facts such as
-pane ids never go in `team.toml`.
+optional schedule (`wake_every`, `wake_message`, `wake_between`, `wake_at`), optional
+`connectors` (account connectors opted in for that agent; none by default) and, for a Claude Code
+agent, optional `permissions` (its settings file, e.g. `"settings/carol.json"`; `[defaults]
+permissions` sets one for every Claude agent). Runtime facts such as pane ids never go in
+`team.toml`. A copyable settings file is in [docs/examples.md](docs/examples.md).
 
 ## Layout
 
@@ -232,6 +265,19 @@ agents that were running (from 0.10.0 on; an older `xt down` records nothing, so
 `xt` and then `U` in the TUI). Read the
 **Upgrading** note of each new release in [CHANGELOG.md](CHANGELOG.md) for anything else to do.
 
+To pick a release on purpose and be able to go back (from 0.14.0 on):
+
+```sh
+xt down
+git commit -am "team changes"  # xt refuses while tracked files have uncommitted changes
+xt version use v0.15.0         # a candidate needs --candidate
+xt restart --all
+# if it misbehaves: xt down && xt version rollback && xt restart --all
+```
+
+`xt version` shows the published, installed and running versions; see
+[Updating xt](docs/user-guide.md#7-updating-xt) for the checks and the snapshot it takes.
+
 ## Known limits
 
 - Tested on Linux only; most runs used Codex for every agent. The Claude Code and pi adapters
@@ -242,7 +288,8 @@ agents that were running (from 0.10.0 on; an older `xt down` records nothing, so
   Codex's reviewer (or you) approves.
 - Costs are estimates from public list prices (`prices.toml`), not bills; no budgets yet.
 - Account connectors are off for agents, but command-line tools that hold your credentials (a
-  mail CLI, say) are just programs to the harness: xt can't switch them off.
+  mail CLI, say) are just programs to the harness: xt can't switch them off. A Claude agent's
+  settings file can refuse them; a Codex agent is bounded only by its sandbox's escalation review.
 
 ## Versioning
 
@@ -258,11 +305,13 @@ While xt is `0.x`, a breaking change or a notable feature raises the minor versi
 fix raises the patch version (0.1.0 → 0.1.1). `1.0.0` comes once `team.toml` and the protocol are
 stable.
 
-**Following releases instead of `main`:** to stay on a release, merge its tag instead of pulling:
+**Following releases instead of `main`:** to stay on a release, switch to its tag instead of
+pulling: `xt version use v0.15.0` (from 0.14.0 on; it merges the tag after its checks, see
+[Updating a team](#updating-a-team)). On an older xt, merge the tag by hand:
 
 ```sh
 git fetch upstream --tags
-git merge v0.5.0
+git merge v0.14.1
 ```
 
 ## Releasing

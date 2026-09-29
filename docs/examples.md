@@ -1,6 +1,9 @@
 # Goals in practice
 
-Three real goals, word for word, as they were sent to xt teams in September 2026. Together they
+Part one: three real goals, word for word, as they were sent to xt teams in September 2026. Part
+two: [configurations and questions to copy](#part-two-copy-and-adapt), written for this page.
+
+Together the three goals
 show what the [story](story.md) means by "write outcomes, not steps": what a goal looks like, how
 a team reads it, and how a plain-language goal fixes a rule the team followed too faithfully.
 
@@ -15,6 +18,10 @@ and an internal board id.
   fixing a rule the team followed exactly
 - [3. Set up the xt product team](#3-set-up-the-xt-product-team-a-team-with-a-working-method):
   a new team, with a working method passed on as part of the goal
+- [4. A Claude Code agent with a permissions file](#4-a-claude-code-agent-with-a-permissions-file):
+  settings to copy (part two)
+- [5. A decision question with options](#5-a-decision-question-with-options): what the liaison
+  sends and what you see (part two)
 
 ## 1. Hire a scout: the newsroom finds its own stories
 
@@ -213,3 +220,108 @@ Two things went less smoothly, and both became cards on the board: the PM checke
 display in Radek's own browser with a computer-use tool (read-only, but outside xt's rules; the
 team now uses command-line tools only), and the lead asked the PM for the product direction
 twice, so the liaison had to withdraw its first question and ask again with the final wording.
+
+## Part two: copy and adapt
+
+These two are written for this page, not taken from a run. They follow the setup of xt's own
+product team (from 0.15.0); adjust names, paths and rules to your team.
+
+## 4. A Claude Code agent with a permissions file
+
+**Context.** A Claude Code agent nobody watches must never stop at a permission prompt, and must
+never do more than its role needs. Give it a settings file in the team repo. Settings files are
+yours, like `team.toml`: agents never edit them.
+
+`settings/researcher.json`:
+
+```json
+{
+  "permissions": {
+    "defaultMode": "dontAsk",
+    "allow": [
+      "Bash(/path/to/team/bin/xt *)",
+      "Bash(rg *)",
+      "Bash(cat *)",
+      "Bash(git status *)",
+      "Bash(git log *)",
+      "Edit(members/researcher/**)",
+      "Read"
+    ],
+    "deny": [
+      "Bash(git push *)",
+      "Bash(curl *)",
+      "Bash(rm *)",
+      "Edit(settings/**)",
+      "Edit(team.toml)",
+      "WebFetch"
+    ]
+  },
+  "statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}
+}
+```
+
+- `dontAsk` refuses anything not on the `allow` list at once, instead of waiting at a prompt
+  nobody sees. `deny` wins over `allow`.
+- The `xt` rule uses the team's absolute path, as in the agent's first prompt.
+- `statusLine` is optional: it shows the Claude plan's usage in `xt status` (one agent is enough).
+
+The lead asks for the hire with the file (the approval names it and its mode; without one, it
+warns that the agent would start with your own Claude defaults):
+
+```sh
+xt spawn researcher --harness claude --model claude-sonnet-5-5 --role researcher \
+  --permissions settings/researcher.json --as lead
+```
+
+After your approval, the agent's entry in `team.toml` has the line (you can also add it by hand):
+
+```toml
+[[agent]]
+name = "researcher"
+role = "researcher"
+harness = "claude"
+model = "claude-sonnet-5-5"
+permissions = "settings/researcher.json"
+reports_to = "lead"
+status = "active"
+```
+
+xt checks the file before every start (missing, not JSON, an unknown `defaultMode` or a malformed
+rule refuses the start) and the start note shows its path, a hash of its content and the mode. To
+give every Claude agent the same file, set it once under `[defaults]`: `permissions =
+"settings/claude-agents.json"`. See the [user guide](user-guide.md#11-memory-and-recovery).
+
+## 5. A decision question with options
+
+**Context.** When the team needs a decision only you can make, the liaison asks it through xt as
+one self-contained sentence with two or three options, each with what follows from it, and one
+recommendation.
+
+What the liaison sends:
+
+```sh
+xt send human --as liaison --type ask --ref 212 \
+  --option "Publish the digest today :: readers get it on time; the last section is unreviewed" \
+  --option "Publish tomorrow :: fully reviewed, one day late" \
+  --recommend 2 <<'XT_END'
+Should the weekly digest go out today or tomorrow?
+XT_END
+```
+
+What you see in the Inbox (TUI and `xt inbox`), with a desktop notification:
+
+```text
+Should the weekly digest go out today or tomorrow?
+
+Options:
+1. Publish the digest today — readers get it on time; the last section is unreviewed
+2. Publish tomorrow — fully reviewed, one day late
+Recommended: 2
+Or answer in your own words.
+```
+
+Answer with the number (`xt answer 230 2`, or in the TUI `s` on it, `2`, ctrl+s), and the log records
+"Option 2: Publish tomorrow — fully reviewed, one day late", so it says what you chose. Your own
+words work too. xt refuses a question with fewer than two or more than three options, an option
+without ` :: ` and its consequence, or no single recommendation. See
+[`xt answer`](user-guide.md#xt-answer).

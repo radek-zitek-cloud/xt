@@ -612,6 +612,54 @@ def test_the_tui_inbox_shows_done_goals_and_clears_them_after_a_look(ctx):
     assert goaldone.seen_upto(ctx) >= done
 
 
+def _blocks(text: str, lang: str) -> list[str]:
+    parts = text.split(f"```{lang}\n")[1:]
+    return [p.split("```", 1)[0] for p in parts]
+
+
+def test_the_examples_settings_file_passes_the_preflight_and_its_question_renders_as_shown(ctx):
+    """#124: docs/examples.md's copyable settings file and decision question match what xt does."""
+    from xt import choices
+
+    examples = (REPO / "docs/examples.md").read_text()
+    (settings,) = [b for b in _blocks(examples, "json") if '"defaultMode"' in b]
+    f = ctx.paths.root / "settings/researcher.json"
+    f.parent.mkdir()
+    f.write_text(settings)
+    assert permissions.preflight(ctx.paths.root, "settings/researcher.json").mode == "dontAsk"
+    (toml_block,) = [b for b in _blocks(examples, "toml") if 'name = "researcher"' in b]
+    assert tomllib.loads(toml_block)["agent"][0]["permissions"] == "settings/researcher.json"
+    (shown,) = [b for b in _blocks(examples, "text") if "Options:" in b]
+    rendered = choices.render("Should the weekly digest go out today or tomorrow?",
+                              ["Publish the digest today :: readers get it on time; the last section is unreviewed",
+                               "Publish tomorrow :: fully reviewed, one day late"], 2)
+    assert rendered == shown.rstrip("\n")
+    assert choices.resolve(rendered, "2")[0] == "Option 2: Publish tomorrow — fully reviewed, one day late"
+
+
+def test_architecture_names_every_module_and_repo_doc_links_resolve():
+    """#124: every source file is named in docs/architecture.md; relative links in the docs resolve."""
+    import re
+
+    arch = (REPO / "docs/architecture.md").read_text()
+    for p in sorted((REPO / "src/xt").rglob("*")):
+        if p.is_file() and p.suffix in (".py", ".tcss"):
+            assert f"`{p.relative_to(REPO)}`" in arch, p
+    for doc in ["README.md", "docs/architecture.md", "docs/examples.md", "docs/user-guide.md", "docs/story.md",
+                "CHANGELOG.md"]:
+        text = (REPO / doc).read_text()
+        for target in re.findall(r"\]\(([^)\s]+)\)", text):
+            if target.startswith(("http://", "https://", "mailto:")):
+                continue
+            path, _, anchor = target.partition("#")
+            dest = (REPO / doc).parent / path if path else REPO / doc
+            assert dest.exists(), f"{doc}: {target}"
+            if anchor and dest.suffix == ".md":
+                slugs = {re.sub(r"[^\w\- ]", "", h.strip().lower()).replace(" ", "-")
+                         for h in re.findall(r"^#+ (.+)$", dest.read_text(), re.M)}
+                assert anchor in slugs, f"{doc}: {target}"
+
+
 def test_the_liaison_role_sends_the_goal_done_summary_as_an_xt_report():
     liaison = " ".join((REPO / "roles/liaison.md").read_text().split())
     assert "as an xt report**, not only in your pane: `xt send human --as liaison --type report --ref <goal id>`" in liaison

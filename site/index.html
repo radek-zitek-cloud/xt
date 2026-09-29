@@ -31,7 +31,7 @@
 <header class="hero">
   <div class="grid-bg"></div>
   <div class="wrap">
-    <div class="eyebrow">open source · MIT · v0.11.0</div>
+    <div class="eyebrow">open source · MIT · v0.15.0</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You approve, decide and correct, and every step is on record.</p>
     <div class="cta">
@@ -109,7 +109,8 @@
         <p class="sub">The team runs without you watching. You are needed only for decisions.</p>
         <ul>
           <li><b>Approvals:</b> every hire and every schedule waits for your yes.</li>
-          <li><b>One Inbox</b> for questions, approvals and alerts, in the TUI or <code class="mono">xt inbox</code>, with a desktop notification.</li>
+          <li><b>One Inbox</b> for questions, approvals and alerts, in the TUI or <code class="mono">xt inbox</code>, with a desktop notification, and one notification when a goal you gave is done.</li>
+          <li><b>Decisions with options:</b> each question offers two or three options with their consequences and a recommendation; you answer with a number or your own words.</li>
           <li><b>Standing rules</b> instead of step-by-step instructions: "if I don't answer within the hour, pick the top story yourself, at most six a day".</li>
           <li><b>Corrections become rules:</b> a correction from you is recorded as a lesson, and the rule that allowed the mistake is fixed.</li>
         </ul>
@@ -156,8 +157,9 @@
         <h3>Measure &amp; bound</h3>
         <p class="sub">Know what each agent holds and costs. Keep it inside the lines.</p>
         <ul>
-          <li><b>Context per agent</b> (<code class="mono">~211k/258k</code>, yellow at 70%, red at 85%), tokens and estimated cost per turn and per goal, subscription allowance per week.</li>
-          <li><b>No desktop or browser control</b> for agents, and none of your account connectors (mail, files, calendar) unless you opt one in.</li>
+          <li><b>Context per agent</b> (<code class="mono">~211k/258k</code>, yellow at 70%, red at 85%), tokens and estimated cost per turn and per goal, and the subscription allowance: Codex's week, Claude's five-hour and weekly windows.</li>
+          <li><b>No desktop or browser control</b> for agents, and none of your account connectors (mail, files, calendar) unless you opt one in. Claude Code agents get a checked permissions file each.</li>
+          <li><b>Upgrades you can undo:</b> <code class="mono">xt version use</code> switches to a release after checks and a verified snapshot; <code class="mono">xt version rollback</code> goes back.</li>
           <li><b>Survives restarts:</b> <code class="mono">xt down</code> and <code class="mono">xt restart --all</code> bring back the team that was running; agents recover from files and a brief, not from memory.</li>
         </ul>
       </div>
@@ -188,6 +190,20 @@
       <div class="cell"><div class="k">11</div><h4>Restarts without loss</h4><p>The team that was running comes back, and each agent picks up from its brief.</p></div>
       <div class="cell"><div class="k">12</div><h4>Agents in bounds</h4><p>No desktop, browser or account connectors by default, and no posing as the human.</p></div>
     </div>
+    <div class="section-title">
+      <h2>Added since 0.12</h2>
+      <p>Each checked against its spec by the product team's quality analyst before its final release; some on staging teams rather than in daily use yet.</p>
+    </div>
+    <div class="grid four">
+      <div class="cell"><div class="k">13</div><h4>Which xt is running</h4><p>Published, installed and running versions shown apart, so a half-finished upgrade is visible.</p></div>
+      <div class="cell"><div class="k">14</div><h4>Choose a version, roll back</h4><p><code class="mono">xt version use</code> checks the state format and takes a verified snapshot; <code class="mono">rollback</code> undoes it.</p></div>
+      <div class="cell"><div class="k">15</div><h4>A fresh context, safely</h4><p><code class="mono">xt reset</code> waits until the agent has saved its notes and has no open work.</p></div>
+      <div class="cell"><div class="k">16</div><h4>Decisions with options</h4><p>Numbered options, each with its consequence, and a recommendation; answer with a number.</p></div>
+      <div class="cell"><div class="k">17</div><h4>Per-agent permissions</h4><p>A checked settings file for each Claude Code agent; a hire's approval warns when one is missing.</p></div>
+      <div class="cell"><div class="k">18</div><h4>Claude plan usage</h4><p>The five-hour and weekly windows in status, through a shipped status-line script.</p></div>
+      <div class="cell"><div class="k">19</div><h4>Told when it's done</h4><p>One notification per goal you gave, and a "done since you last looked" list in the Inbox.</p></div>
+      <div class="cell"><div class="k">20</div><h4>Short logs by default</h4><p><code class="mono">xt log</code> shows the newest 20 messages; <code class="mono">--full</code> shows everything.</p></div>
+    </div>
   </div>
 </section>
 
@@ -211,7 +227,7 @@
       <div class="team">
         <div class="tag">● product team</div>
         <h4>Runs the development of xt itself</h4>
-        <p>A product manager specifies and plans; a quality analyst accepts or rejects each delivery; the human owns the approval points; the code is built outside the team.</p>
+        <p>A product manager specifies and plans; a builder agent implements approved cards and prepares release candidates; a quality analyst accepts or rejects each delivery; the human owns the approval points and every publication.</p>
         <div class="stats">
           <div class="stat"><div class="n">13</div><div class="l">cards specified, built and accepted in a day</div></div>
           <div class="stat"><div class="n">2</div><div class="l">real bugs caught in a release candidate</div></div>
@@ -232,7 +248,7 @@
       <li>Tested on Linux only, with Herdr. Most runs used Codex for every agent; the Claude Code and pi adapters have seen little real use.</li>
       <li>The hierarchy is enforced by xt, not by a sandbox. A determined agent could still reach around it through its shell.</li>
       <li>Costs are estimates from public list prices, not bills. No budgets yet.</li>
-      <li>Command-line tools that hold your credentials are ordinary programs to a harness; xt can't switch them off.</li>
+      <li>Command-line tools that hold your credentials are ordinary programs to a harness; xt can't switch them off. A Claude agent's permissions file can refuse them; a Codex agent is bounded only by its sandbox's review.</li>
     </ul>
   </div>
 </section>

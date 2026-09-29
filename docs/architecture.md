@@ -1,8 +1,8 @@
 # xt architecture: how it works
 
-What the code does as of **v0.10.0** (2026-09-28), after five real runs with a newsroom team and
-the fixes they led to. Release-by-release changes are in [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the
-[user guide](user-guide.md).
+What the code does as of **v0.15.0** (2026-09-29), after real runs with a newsroom team and xt's
+own product team, and the fixes they led to. Release-by-release changes are in
+[CHANGELOG.md](../CHANGELOG.md); how to use xt is in the [user guide](user-guide.md).
 
 ## In one paragraph
 
@@ -45,6 +45,47 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | **Team repo** | A clone of xt that `xt init` turns into the user's own repo (`origin` renamed `upstream`, so `git pull upstream main` brings xt updates). |
 | **mise** | Puts `bin/` on PATH inside the repo and provides uv. |
 
+### The source, module by module
+
+| File | Its job |
+|---|---|
+| `bin/xt` | The launcher (above). |
+| `bin/xt-clone.sh` | Clones xt for a new team and runs `xt init` (see Starting a team). |
+| `bin/xt-statusline` | Claude Code status-line command: records the plan's usage windows (runs `planusage`). |
+| `src/xt/__init__.py` | The package; reads `__version__` from the installed `pyproject.toml` version. |
+| `src/xt/__main__.py` | `python -m xt`: calls `cli.main`. |
+| `src/xt/cli.py` | Every `xt` command: argument parsing, `--as` identity checks (the human's own terminal), and the small commands (`send`, `log`, `status`, `inbox`, `approve`, …). |
+| `src/xt/context.py` | `Ctx`: one command's paths, team, ledger and Herdr client, loaded once. |
+| `src/xt/paths.py` | Where everything lives in a team repo (`.xt/state`, `.xt/log`, …), finding the root (`XT_ROOT`, else the enclosing xt checkout), and `XtError`, the user-facing error. |
+| `src/xt/team.py` | `team.toml`: the roster, policy, notify, log and default settings, schedules and their windows (`next_due`), and the new-team template. |
+| `src/xt/ledger.py` | The message log (append-only daily JSONL) and the ledger of open goals, tasks and questions derived from it; rotation and archiving. |
+| `src/xt/dispatch.py` | `xt send`: the reporting-chain policy, the envelope and reply hint, delivery now or through the queue, and what's waiting on the human. |
+| `src/xt/goals.py` | Goal drafts and dispatch (`xt goal new`, `dispatch`, `list`). |
+| `src/xt/goaldone.py` | One notification per goal the human dispatched, and the Inbox's "Done since you last looked". |
+| `src/xt/choices.py` | Decision questions with options: validation, rendering, and turning a numeric answer into the option's text. |
+| `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
+| `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
+| `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, first prompt, landed check), spawn requests and their approvals, stop and retire. |
+| `src/xt/permissions.py` | Claude Code settings files: which file applies (`effective`), the preflight check, the start note. |
+| `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (settings file, connector block or opt-in, model flag), dialogs, limits. |
+| `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |
+| `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor. |
+| `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. |
+| `src/xt/alerts.py` | Alerts for the human, raised and cleared by key. |
+| `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
+| `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
+| `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. |
+| `src/xt/usage.py` | Live context per agent, from its harness's session log. |
+| `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines. |
+| `src/xt/planusage.py` | Claude plan usage from the status line (standard library only). |
+| `src/xt/versions.py` | Published, installed and running xt versions. |
+| `src/xt/switch.py` | `xt version use` and `rollback`: state format checks, snapshots, merge and revert. |
+| `src/xt/tui/app.py` | The TUI (Textual): panels, keys, dialogs, and the actions it takes as the human. |
+| `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into panel rows and the Status pane. |
+| `src/xt/tui/clipboard.py` | The system clipboard for the TUI's text boxes. |
+| `src/xt/tui/lazy.tcss` | The TUI's stylesheet. |
+| `src/xt/tui/__init__.py` | The TUI package. |
+
 ## Files in a team repo
 
 | Committed (the team's durable state) | Runtime, gitignored (`.xt/`) |
@@ -71,9 +112,10 @@ upstream and aren't edited by the team, so upstream merges rarely conflict.
 [policy]    spawn_approval, max_agents, heartbeat_minutes, schedule_approval, min_wake_minutes
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [notify]    enabled, command (e.g. "notify-send --app-name=xt {title} {body}"), quiet (e.g. "21:00-07:00")
-[defaults]  liaison / lead harness (and optional model)
+[defaults]  liaison / lead harness (and optional model); permissions? (settings file for every Claude agent)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
-            wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"), wake_at? (e.g. "09:30"; set with `xt schedule`)
+            wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"), wake_at? (e.g. "09:30"; set with `xt schedule`),
+            permissions? (e.g. "settings/carol.json"; Claude Code only), connectors? (account connectors opted in)
 ```
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
@@ -116,11 +158,18 @@ supervisor, never inside an agent's shell.
    a plain assistant.)
 5. The agent is added to the "expected" set, so the supervisor can tell a crash from a stop.
 
-Before step 1, a Claude Code agent's settings file (`permissions`, from `permissions.py`) is
-checked and passed with `--settings`; a bad file refuses the start. A spawn *request*
+**What goes into the start command.** Before step 1, `permissions.effective` picks the agent's
+settings file (its own `permissions` line, else `[defaults] permissions` when the harness takes one;
+a Codex or pi agent with its own line is refused), `permissions.preflight` checks it (inside the
+repo, JSON, known `defaultMode`, well-formed rules; a bad file refuses the start) and
+`Adapter.start_args` builds the arguments: the adapter's own `args`, then `--settings <file>` (the
+adapter's `settings_flag`), then the connector block (or, for an opt-in, a refusal of every other
+connector's tools), then the adapter's `model_flag` with the agent's `model`. The start note in the
+ledger records the file's path, a short hash of its content and its mode. A spawn *request*
 (`request_spawn`, e.g. the lead's `xt spawn … --permissions FILE`) runs the same check before it
 asks the human, and the approval names the file or warns that a Claude agent would start without
-one.
+one. The model tables don't reach the harness: the adapter's `context_windows` and `prices.toml`
+are only read back by `usage` and `turns` to show context and estimate cost.
 
 An agent keeps the instructions of its first prompt until it's restarted, so a team picks up
 changed roles or a new xt version only after a restart (`xt down`, then `xt`).
@@ -221,6 +270,26 @@ brief, and any agent runs it after a restart or context loss; nothing depends on
 memory. Agents may read their own brief and their reports' briefs. `xt log` gives the history: the newest
 20 matching messages by default, `--full` for all of it.
 
+## Versions, state format and snapshots
+
+`versions.py` keeps three numbers apart: the **published** release (checked upstream by the
+supervisor every few hours, cached in `state/versions.json`), the **installed** one (the team repo's
+`pyproject.toml`) and the **running** ones (the supervisor's, and the xt that started each agent).
+`xt status`, the brief and the TUI title show them.
+
+`xt version use <tag>` (`switch.py`) merges an upstream release tag into the team repo. It runs
+only for the human, with the team fully down and the team's tracked files committed. The mutable
+state in `.xt/state/` has a **format number** (`state/format.json`, stamped by `xt up`; format 1
+since 0.12.0): the target tag must declare that it reads the team's format (`STATE_FORMATS` in its
+own `switch.py`), and xt never migrates state. Before the merge xt takes a **verified snapshot**:
+a copy of `.xt/state/` in `.xt/snapshots/<time>-before-<tag>/` with a manifest of hashes, checked
+against the original. It also records a fingerprint of the append-only ledger (`.xt/log/`, never
+copied back). The merge is `--no-ff`; a conflict aborts it and leaves the previous version.
+`xt version rollback` reverts what the switch committed, after checking that the previous version
+reads the team's state format and that the ledger still continues from its fingerprint. The state
+stays as it is (same format, and it matches the ledger); the snapshot is kept for recovery by hand,
+never copied back automatically. Switches are recorded in `state/switches.json`.
+
 ## The supervisor, one tick every 3 seconds
 
 1. Reload `team.toml`.
@@ -292,7 +361,8 @@ when Herdr is unreachable. The human's own commands still act directly.
    to the liaison, which asks them as questions.
 5. The lead integrates, makes sure anything that keeps running after the goal is described in
    roles or skills (not in the goal brief), and sends `done` for the goal to the liaison, who
-   tells the human. Tasks still open under the goal are closed with it.
+   tells the human with an xt report (the goal's one notification; see Notifications). Tasks still
+   open under the goal are closed with it.
 
 **Standing rules.** When the human sets a rule that lets the team act without them (e.g. an
 auto-pick when they don't answer), the lead asks the liaison for a goal under that rule, and the
@@ -313,15 +383,20 @@ harness goes to the human with `xt friction`.
   open goals with task progress; detail shows the tasks and the goal brief, or the draft), **Team** (live
   state and schedules; detail shows open work, recent messages and the last lines of the agent's
   screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox** (open
-  questions first, then pending approvals, alerts, messages to the human), **Log** (newest first),
+  questions first, then pending approvals, alerts, goals done since the human last looked,
+  friction, messages to the human), **Log** (newest first),
   and **Supervisor** under the detail pane (the supervisor's events, newest first). The Status pane on top shows the team and only what needs the human (highlighted), today's usage and allowance, and the last action's result in full; the bottom line is
   key hints; `h` lists every key (the README has the table). Slow actions (starting agents) run in
   the background. `xt tui --demo` shows sample data.
 - `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; warns if
   the supervisor isn't running.
-- `xt inbox`: questions, alerts, pending approvals, messages to the human. `xt answer <id> "..."`,
-  `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
-- `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM]`.
+- `xt inbox`: questions, alerts, pending approvals, goals done since the human last looked,
+  friction, messages to the human. `xt answer <id> "..."` (a number picks a decision question's
+  option), `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
+- `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM] [--at HH:MM]`.
+- `xt reset <name>`: a fresh context for one agent after it saved its notes (`xt checkpoint`).
+- `xt version`, `xt version use <tag> [--candidate]`, `xt version rollback` (see Versions above).
+- `xt log [--limit N | --full]`: the newest 20 messages by default.
 - `xt restart <name>…` (stop and start with fresh instructions) and `xt restart --all` (the
   supervisor and every running agent: the upgrade path), `xt stop <name>` (close without
   retiring), `xt spawn <name>`, `xt retire <name>`,
@@ -361,11 +436,13 @@ what saves it.
   pseudo-terminal commands (0.11.0), not for every harness or mode; an agent that deliberately
   unsets `XT_AGENT` and escapes its harness's process tree would still pass.
 - **Credential-holding CLIs.** Account connectors are off for agents, but a command-line tool that
-  holds the operator's credentials (a mail CLI) is an ordinary program to the harness.
+  holds the operator's credentials (a mail CLI) is an ordinary program to the harness. A Claude
+  agent is bounded by its settings file, a Codex agent only by its sandbox and escalation review
+  (research on card #107; enforcement proposed as card #126).
 - **Instructions age.** Running agents keep their first prompt's instructions until restarted.
 - **Estimates, not bills.** Dollar figures come from public list prices; subscriptions, discounts
-  and long-context tiers aren't reflected. No budgets or alerts on usage yet (card #92). There's
-  no `xt reset` yet; `xt restart <name>` gives an agent a fresh session.
+  and long-context tiers aren't reflected. No budgets or alerts on usage yet (card #92). The Claude
+  plan windows come only from agents whose settings file opts into the status line.
 - **Not built yet:** bypass detection, ping-pong loop detection (only the daily-volume alert),
   `xt config`.
 - **Latency.** Agents' messages and jobs wait for the next supervisor tick (up to ~3 s), and
