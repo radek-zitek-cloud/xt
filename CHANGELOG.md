@@ -9,6 +9,22 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.12.0-rc2] — 2026-09-29
+
+**Release candidate.** rc1 plus fixes for the three problems its acceptance found in card #56; it
+becomes 0.12.0, from the same code, once every card in it is accepted. #58 and #104 were accepted
+on rc1 and are unchanged; #110's code is unchanged.
+
+### Fixed
+
+- **A reset was suggested for a context reading without a timestamp (card #56).** The suggestion
+  now needs a known reading with a window *and* a recent timestamp; without one, nothing is
+  suggested. Found by the quality analyst.
+- **`xt reset` announced "asking … to save a checkpoint" before checking the name** (and the rest of
+  what refuses a reset). All refusals now come first. Found in the staging dry run.
+- **The reset line cut the checkpoint summary mid-word at 80 characters;** it now cuts at a word
+  boundary and marks the cut with `…`.
+
 ## [0.12.0-rc1] — 2026-09-29
 
 **Release candidate.** It becomes 0.12.0, from the same code, once every card in it is accepted.

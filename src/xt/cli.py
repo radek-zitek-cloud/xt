@@ -320,9 +320,10 @@ def cmd_restart(args) -> None:
 def cmd_reset(args) -> None:
     if _who(args) != HUMAN:
         raise XtError("only the human resets an agent's context")
-    from .reset import reset
+    from .reset import preflight, reset
 
     ctx = Ctx.load()
+    preflight(ctx, args.name)  # refuse before announcing anything (rc1 QA)
     print(f"asking {args.name} to save a checkpoint (up to {int(args.timeout)} s)…", flush=True)
     for line in reset(ctx, args.name, timeout=args.timeout):
         print(line)

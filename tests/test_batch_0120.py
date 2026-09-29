@@ -345,3 +345,30 @@ def test_an_unavailable_clipboard_says_so_instead_of_pasting_something_else(monk
             assert ed.text == "" and notes and "couldn't read the system clipboard" in notes[0]
 
     asyncio.run(run())
+
+
+# --- rc2: the three #56 findings from rc1's acceptance --------------------------------------------
+
+
+def test_a_reading_without_a_timestamp_never_suggests_a_reset():
+    now = dt.datetime(2026, 9, 29, 9, 0, tzinfo=dt.timezone.utc)
+    no_time = Reading(used=220_000, window=258_000, observed=None, source="codex session log")
+    assert reset_mod.suggestion("lead", no_time, now) is None
+    assert reset_mod.suggestion("lead", Reading(used=220_000, window=258_000, observed="not a time"), now) is None
+
+
+def test_reset_refuses_an_unknown_name_before_announcing_anything(ctx, monkeypatch, capsys):
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    monkeypatch.setattr(cli, "controlling_terminal", lambda: True)
+    args = cli.build_parser().parse_args(["reset", "liason", "--as", "human"])
+    with pytest.raises(XtError, match="'liason' is not an active agent"):
+        args.func(args)
+    assert "asking" not in capsys.readouterr().out
+
+
+def test_the_reset_line_cuts_the_checkpoint_summary_at_a_word():
+    long = "No open work; read members/liaison/notes.md and the latest xt brief, then await the human's request."
+    cut = reset_mod.clip(long)
+    assert cut.endswith("…") and len(cut) <= 81 and long.startswith(cut[:-1])
+    assert cut[:-1] == long[:len(cut) - 1] and long[len(cut) - 1] == " "  # ends before a space, not mid-word
+    assert reset_mod.clip("short") == "short"

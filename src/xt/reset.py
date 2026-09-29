@@ -58,10 +58,8 @@ def _request(ctx: Ctx, name: str) -> str:
             f"Don't start new work.")
 
 
-def reset(ctx: Ctx, name: str, timeout: float = CHECKPOINT_TIMEOUT, poll: float = 2.0,
-          sleep=time.sleep, clock=time.time) -> list[str]:
-    from .spawn import do_spawn, stop
-
+def preflight(ctx: Ctx, name: str) -> None:
+    """Everything that refuses a reset before anything is asked of the agent."""
     a = ctx.team.agent(name)
     if a is None or a.kind == HUMAN or not a.active:
         raise XtError(f"{name!r} is not an active agent of this team")
@@ -76,6 +74,20 @@ def reset(ctx: Ctx, name: str, timeout: float = CHECKPOINT_TIMEOUT, poll: float 
     if live.status == "working":
         raise XtError(f"{name} is working right now: nothing was reset; try again when it's idle")
 
+
+def clip(text: str, limit: int = 80) -> str:
+    """Shorten at a word boundary, marking the cut."""
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rsplit(" ", 1)[0].rstrip(" ,;:.")
+    return (cut or text[:limit]) + "…"
+
+
+def reset(ctx: Ctx, name: str, timeout: float = CHECKPOINT_TIMEOUT, poll: float = 2.0,
+          sleep=time.sleep, clock=time.time) -> list[str]:
+    from .spawn import do_spawn, stop
+
+    preflight(ctx, name)
     before = checkpoints(ctx).get(name, {}).get("at")
     ctx.ledger.append(SYSTEM, HUMAN, "system", f"reset requested for {name}: asked it to save a checkpoint")
     ctx.herdr.prompt(name, _request(ctx, name))
@@ -95,7 +107,7 @@ def reset(ctx: Ctx, name: str, timeout: float = CHECKPOINT_TIMEOUT, poll: float 
 
     stop(ctx, name)
     ws = do_spawn(ctx, name)
-    msg = (f"reset {name}: checkpoint of {done['at'][11:16]} saved (\"{done['summary'][:80]}\"); fresh session "
+    msg = (f"reset {name}: checkpoint of {done['at'][11:16]} saved (\"{clip(done['summary'])}\"); fresh session "
            f"in workspace {ws}, recovering from its first prompt, brief and members/{name}/notes.md")
     ctx.ledger.append(SYSTEM, HUMAN, "system", msg)
     return [msg]
@@ -109,13 +121,15 @@ def suggestion(name: str, reading, now: dt.datetime | None = None) -> str | None
     share = reading.used / reading.window
     if share < SUGGEST_AT:
         return None
-    if reading.observed and now:
-        try:
-            seen = dt.datetime.fromisoformat(str(reading.observed).replace("Z", "+00:00"))
-            if (now - seen).total_seconds() > FRESH_FOR:
-                return None
-        except (ValueError, TypeError):
+    # without a timestamp there's no telling whether the reading is current: no suggestion (#56, rc1 QA)
+    if not reading.observed or now is None:
+        return None
+    try:
+        seen = dt.datetime.fromisoformat(str(reading.observed).replace("Z", "+00:00"))
+        if (now - seen).total_seconds() > FRESH_FOR:
             return None
+    except (ValueError, TypeError):
+        return None
     from .usage import short
 
     approx = "~" if reading.approximate else ""
