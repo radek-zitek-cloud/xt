@@ -19,6 +19,8 @@ unchanged from rc2. **0.15.0-rc4** (2026-09-29) is rc3 plus the fix for QA's rc2
 seven cards of the approved composition, and the code is unchanged from rc4. **0.15.0-rc6**
 (2026-09-29) is rc5 plus the fixes for QA's rc3 FAIL on #125 (a goal notifies only once, when
 it's done) and QA's rc4 FAIL on #120 (no tolerance for a reading timestamped later than now).
+**0.15.0-rc7** (2026-09-29) is rc6 plus the README fix for QA's rc5 FAIL on #124 (see
+Documentation); code unchanged from rc6.
 
 ### Added
 
@@ -89,8 +91,11 @@ it's done) and QA's rc4 FAIL on #120 (no tolerance for a reading timestamped lat
 
 ### Documentation
 
-- **README, architecture, examples and the site caught up (#124, rc5).** The README lists what
-  0.12.0 to 0.15.0 added, with links into the user guide, and a first-upgrade path and `xt version
+- **README, architecture, examples and the site caught up (#124, rc5; rc7).** The README lists
+  what 0.11.0 to 0.15.0 added, with links into the user guide, apart from its list of what was
+  shown in real runs as of v0.10.0 (rc7, QA's rc5 FAIL: that list had gained the v0.15.0 goal
+  notification and the v0.11.0 connector block, neither live-checked as of v0.10.0; both now sit in
+  the "Added since" list). It also has a first-upgrade path and `xt version
   use` in Quick start and Updating a team; its command table and configuration cover `xt reset`,
   `xt version`, `--at`, numbered answers and `permissions`. `docs/architecture.md` describes v0.15.0:
   every source file with its job, the `team.toml` keys, how a settings file, connectors and the
@@ -110,7 +115,7 @@ it's done) and QA's rc4 FAIL on #120 (no tolerance for a reading timestamped lat
 
 ### Upgrading
 
-- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc6 --candidate`), then `xt restart --all`
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc7 --candidate`), then `xt restart --all`
   so agents get the new protocol and roles, and the supervisor the goal notifications. Scripts or
   roles that rely on `xt log` printing everything need `--full`. For Claude plan usage, add the
   `statusLine` entry to one Claude agent's settings file (yours to edit) and restart that agent.
