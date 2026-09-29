@@ -15,7 +15,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 and #113. **0.15.0-rc2** (2026-09-29) adds #120 and #105; #122 and #113 are unchanged from rc1.
 **0.15.0-rc3** (2026-09-29) adds #125 and #107 (research only, no code); the earlier cards are
 unchanged from rc2. **0.15.0-rc4** (2026-09-29) is rc3 plus the fix for QA's rc2 FAIL on #120
-(see Fixed). The last card of the approved composition (#124) follows in rc5.
+(see Fixed). **0.15.0-rc5** (2026-09-29) adds the last card, #124 (docs and site); it has all
+seven cards of the approved composition, and the code is unchanged from rc4.
 
 ### Added
 
@@ -80,6 +81,21 @@ unchanged from rc2. **0.15.0-rc4** (2026-09-29) is rc3 plus the fix for QA's rc2
   from a payload); a reading dated in the future shows `unknown`; and the rest of status stays
   usable whatever the snapshot holds.
 
+### Documentation
+
+- **README, architecture, examples and the site caught up (#124, rc5).** The README lists what
+  0.12.0 to 0.15.0 added, with links into the user guide, and a first-upgrade path and `xt version
+  use` in Quick start and Updating a team; its command table and configuration cover `xt reset`,
+  `xt version`, `--at`, numbered answers and `permissions`. `docs/architecture.md` describes v0.15.0:
+  every source file with its job, the `team.toml` keys, how a settings file, connectors and the
+  model reach a harness's start command (and that the model tables only feed the context and cost
+  views), and versions, the state format and snapshots. `docs/examples.md` has a second part with a
+  Claude Code agent's permissions file (and `xt spawn --permissions`) and a decision question with
+  options. `site/index.html` shows v0.15.0 and the same new features as the README (deploying it is
+  a separate step). Tests check that every source file is named in the architecture, that the
+  relative links and anchors in the repo docs resolve, and that the examples' settings file passes
+  xt's check and its question renders as shown.
+
 ### Research
 
 - **Credential-holding CLI skills visible to agents (#107, rc3).** A research page with an
@@ -88,7 +104,7 @@ unchanged from rc2. **0.15.0-rc4** (2026-09-29) is rc3 plus the fix for QA's rc2
 
 ### Upgrading
 
-- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc4`), then `xt restart --all`
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc5 --candidate`), then `xt restart --all`
   so agents get the new protocol and roles, and the supervisor the goal notifications. Scripts or
   roles that rely on `xt log` printing everything need `--full`. For Claude plan usage, add the
   `statusLine` entry to one Claude agent's settings file (yours to edit) and restart that agent.
