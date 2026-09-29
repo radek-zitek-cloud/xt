@@ -27,6 +27,7 @@ class FakeHerdr:
         self.started: list[tuple[str, str, list[str]]] = []
         self.stall: dict[str, int] = {}  # name -> how many confirmed prompts to "lose"
         self.swallow: dict[str, int] = {}  # name -> prompts that vanish silently
+        self.after_prompt: dict[str, str] = {}  # name -> output the agent prints right after its prompt
         self.dialogs: dict[str, str] = {}  # pane -> startup dialog text currently shown
         self.dialog_on_start: str | None = None  # dialog every newly started agent shows
         self.block_on_start: str | None = None  # dialog that makes herdr refuse the start
@@ -58,6 +59,8 @@ class FakeHerdr:
             return
         self.prompts.append((name, text))
         self.screens.setdefault(pane, []).append(text)
+        if name in self.after_prompt:  # the agent's own output, printed below the prompt
+            self.screens[pane].append(self.after_prompt[name])
 
     def save_snapshot(self, agents, ts):
         self.snapshots.append((ts, sorted(agents)))
@@ -66,7 +69,7 @@ class FakeHerdr:
         parts = list(self.screens.get(pane, []))
         if self.dialogs.get(pane):
             parts.append(self.dialogs[pane])
-        return "\n".join(parts)
+        return "\n".join("\n".join(parts).split("\n")[-lines:])
 
     def send_keys(self, pane, *keys):
         self.keys.append((pane, keys))

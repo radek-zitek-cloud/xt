@@ -77,6 +77,17 @@ def test_prompt_that_vanishes_without_a_known_dialog_is_caught(ctx):
     assert sum(1 for n, _ in ctx.herdr.prompts if n == "liaison") == 1
 
 
+def test_long_first_prompt_whose_first_line_scrolled_away_is_not_resent(ctx):
+    # card #115: the lead's 25k-character prompt plus its first output pushed the prompt's first
+    # line out of the 400 lines xt reads, so xt resent the whole prompt although it had landed
+    role = ctx.paths.role_file("liaison")
+    role.write_text(role.read_text() + "\n".join(f"filler line {i}" for i in range(450)))
+    ctx.herdr.after_prompt["liaison"] = "\n".join(f"• working {i}" for i in range(30))
+    up(ctx)
+    assert sum(1 for n, _ in ctx.herdr.prompts if n == "liaison") == 1
+    assert not Alerts(ctx).active()
+
+
 def test_prompt_that_never_shows_up_raises_an_alert(ctx):
     ctx.herdr.swallow["liaison"] = 5
     up(ctx)

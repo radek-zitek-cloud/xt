@@ -9,6 +9,25 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.12.1-rc1] — 2026-09-29
+
+**Release candidate** of the first patch release, via the team's new bug path: one bug card, no
+new features. It becomes 0.12.1, from the same code, once #115 is accepted.
+
+### Fixed
+
+- **An agent no longer gets its first prompt twice (#115).** xt confirmed a first prompt had
+  landed by finding its first line in the last 400 lines of the agent's pane. A long prompt (the
+  lead's is about 25k characters) plus the agent's first output pushed that line off, so xt resent
+  the whole prompt although it had landed: a double start and several thousand tokens carried for
+  the whole session. xt now also accepts the prompt's last line ("Start now: …"), which stays on
+  screen.
+
+### Upgrading
+
+- Nothing to do beyond `git pull upstream main`. The fix applies to agents started afterwards;
+  restart when convenient (`xt down`, `xt restart --all`) so `xt status` shows 0.12.1-rc1.
+
 ## [0.12.0] — 2026-09-29
 
 The accepted release: the same code as 0.12.0-rc3 (only the version changed). All four cards

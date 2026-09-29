@@ -22,6 +22,9 @@ other instructions you may have (global or project instruction files, memories, 
 everything else (how you do your actual work), your usual instructions still apply."""
 
 
+START_NOW = "Start now:"  # the first prompt's last line: stays on screen when the first line has scrolled away
+
+
 def first_prompt(ctx: Ctx, name: str) -> str:
     a = ctx.team.agent(name)
     role_file = ctx.paths.role_file(a.role)
@@ -44,7 +47,7 @@ Run xt as `{xt}` (absolute path — don't rely on PATH). Always pass `--as {name
 ===== your brief (`{xt} brief --as {name}`) =====
 {brief.build(ctx, name)}
 
-Start now: follow your role's "on start" instructions. If you have nothing to do, say so briefly and stop."""
+{START_NOW} follow your role's "on start" instructions. If you have nothing to do, say so briefly and stop."""
 
 
 AGENT_ENV = "XT_AGENT"  # set in every agent's pane: marks its shells as an agent's, never the human's
@@ -107,7 +110,7 @@ RETRY_DELAY = 5.0
 POLL = 1.0
 DIALOG_QUIET_CHECKS = 4  # consecutive checks (POLL apart) without a known dialog = ready
 LANDED_WAIT = 20  # seconds to wait for the first prompt's text to show up in the transcript
-MARKER = "an agent in the xt team"
+MARKER = "an agent in the xt team"  # the first prompt's first line
 
 
 def _flat(text: str) -> str:
@@ -152,9 +155,13 @@ def _ready_after_dialogs(ctx: Ctx, name: str, adapter, pane: str, answered: list
 
 
 def _landed(ctx: Ctx, pane: str) -> bool:
+    """The prompt's first line (MARKER) or its last line (START_NOW) is on screen. A long prompt plus
+    the agent's first output pushes the first line out of the read window: xt then resent the
+    lead's whole first prompt although it had landed (card #115, 2026-09-29)."""
     deadline = time.monotonic() + LANDED_WAIT
     while True:
-        if MARKER in _flat(ctx.herdr.read_pane(pane, lines=400)):
+        screen = _flat(ctx.herdr.read_pane(pane, lines=400))
+        if MARKER in screen or START_NOW in screen:
             return True
         if time.monotonic() >= deadline:
             return False
@@ -168,7 +175,7 @@ def send_first_prompt(ctx: Ctx, name: str, pane: str, adapter, text: str) -> boo
     was typed but never submitted), and the prompt's text must appear on the agent's screen
     (catches a prompt swallowed by a startup dialog, where the harness's own startup looked like
     'working'). Retry once; if it still doesn't land, alert the human instead of carrying on."""
-    assert MARKER in text
+    assert MARKER in text and START_NOW in text
     for attempt in (1, 2):
         try:
             ctx.herdr.prompt(name, text, confirm=True)
