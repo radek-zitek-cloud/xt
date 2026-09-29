@@ -9,6 +9,21 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.13.0] — 2026-09-29
+
+The accepted release: the same code as 0.13.0-rc2 (only the version changed). Both cards passed
+the quality analyst's checks on rc2 and were accepted: #116 (prices and context windows for current
+Codex and Claude models; rc1 failed on an overclaiming sentence about Codex rates, fixed in rc2) and
+#117 (per-agent permission settings for Claude Code agents; checked live on a staging team with a
+Claude Sonnet 5.5 liaison: allowed and denied actions without a prompt, a broken file refused at
+start). The changes are listed under the two candidates below.
+
+### Upgrading
+
+- From 0.12.1: `xt down`, `git pull upstream main`, `xt restart --all` (see 0.13.0-rc1 below).
+  From 0.13.0-rc2: nothing but the version changes; restart when convenient so `xt status` shows
+  every agent running 0.13.0.
+
 ## [0.13.0-rc2] — 2026-09-29
 
 **Release candidate.** rc1 plus the fix for #116 from rc1's acceptance; #117's code is unchanged
