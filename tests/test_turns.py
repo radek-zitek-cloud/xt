@@ -164,7 +164,7 @@ def test_usage_shows_in_status_brief_tui_and_not_in_member_briefs(ctx, fake_home
     assert "usage today: 101k tokens, est. $0.05" in lead.detail().plain
 
 
-def test_usage_from_before_a_restart_is_still_recorded(ctx, fake_home):
+def test_usage_from_before_a_restart_is_still_recorded(ctx, fake_home, monkeypatch):
     """An upgrade restarts every agent: the sessions they used before must still be counted."""
     request_spawn(ctx, "human", "liaison", None, None, None, None)
     codex_log(fake_home, ctx, "liaison", [("2026-09-28T07:00:00Z", 1000, 0, 10)])  # before the restart
@@ -175,6 +175,9 @@ def test_usage_from_before_a_restart_is_still_recorded(ctx, fake_home):
     import time
 
     last_written = ctx.ledger.clock().timestamp() - 3600  # written an hour before the restart,
+    # "now" is the test's own clock, not the wall clock: pinned to real time, this test started
+    # failing two days after the fixed dates above (2026-09-29, found in a fresh clone)
+    monkeypatch.setattr(turns.time, "time", lambda: ctx.ledger.clock().timestamp())
     assert time.time() - last_written < 2 * 86400  # but within the last two days
     os.utime(old, (last_written, last_written))
     from xt.up import restart
