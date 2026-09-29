@@ -268,27 +268,37 @@ def cmd_brief(args) -> None:
     print(brief_mod.build(ctx, name))
 
 
+LOG_LIMIT = 20  # plain `xt log`: the newest messages only (card #113)
+WATCH_LIMIT = 50  # `xt log --watch`: the newest supervisor events
+
+
 def cmd_log(args) -> None:
+    if args.limit is not None and args.limit < 1:
+        raise XtError("--limit needs a number of 1 or more (`--full` prints everything)")
     ctx = Ctx.load()
     if args.watch:
         from .watch import watch_log
 
-        lines = watch_log(ctx, args.limit)
+        lines = watch_log(ctx, args.limit or WATCH_LIMIT)
         print("\n".join(lines) if lines else "(no supervisor events yet)")
         return
-    n = 0
-    for m in ctx.ledger.messages(since_days=args.since):
-        if args.member and args.member not in (m["from"], m["to"]):
-            continue
-        if args.id and args.id not in (m["id"], m.get("ref")):
-            continue
-        if args.type and m["type"] != args.type:
-            continue
+    shown = [m for m in ctx.ledger.messages(since_days=args.since)
+             if not (args.member and args.member not in (m["from"], m["to"]))
+             and not (args.id and args.id not in (m["id"], m.get("ref")))
+             and not (args.type and m["type"] != args.type)]
+    # Filters first, then the newest N (card #113). `--id` keeps its whole thread unless --limit
+    # is given: it was already short, and cutting a thread would hide the message asked for.
+    limit = None if args.full else args.limit or (None if args.id else LOG_LIMIT)
+    left_out = max(0, len(shown) - limit) if limit else 0
+    if left_out:
+        shown = shown[left_out:]
+        print(f"({left_out} older message{'s' if left_out != 1 else ''} not shown; "
+              f"`--limit N` for more, `--full` for all)")
+    for m in shown:
         ref = f" ref:#{m['ref']}" if m.get("ref") is not None else ""
         print(f"#{m['id']} {m['ts']} {m['type']} {m['from']}→{m['to']}{ref}")
         print("   " + m["body"].replace("\n", "\n   "))
-        n += 1
-    if not n:
+    if not shown:
         print("(no messages)")
 
 
@@ -436,7 +446,8 @@ def cmd_approve(args, approve: bool = True) -> None:
 
 def cmd_spawn(args) -> None:
     ctx = Ctx.load()
-    print(request_spawn(ctx, _who(args), args.name, args.harness, args.model, args.role, args.reports_to))
+    print(request_spawn(ctx, _who(args), args.name, args.harness, args.model, args.role, args.reports_to,
+                        args.permissions))
 
 
 def cmd_retire(args) -> None:
@@ -571,7 +582,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--type")
     sp.add_argument("--since", type=int, metavar="DAYS")
     sp.add_argument("--watch", action="store_true", help="the supervisor's events instead of messages")
-    sp.add_argument("--limit", type=int, default=50, help="with --watch: how many recent events")
+    sp.add_argument("--limit", type=int, metavar="N",
+                    help=f"the newest N messages (default {LOG_LIMIT}), or with --watch events (default {WATCH_LIMIT})")
+    sp.add_argument("--full", action="store_true", help="the whole message history")
 
     add("status", cmd_status, "one-shot team status")
 
@@ -594,6 +607,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--model")
     sp.add_argument("--role")
     sp.add_argument("--reports-to")
+    sp.add_argument("--permissions", metavar="FILE",
+                    help="Claude Code settings file for the agent, relative to the team repo")
 
     sp = add("retire", cmd_retire, "close an agent's workspace and mark it retired")
     sp.add_argument("name")

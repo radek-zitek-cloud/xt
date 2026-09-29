@@ -86,7 +86,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         out.append("(none)")
     shown = items[-MAX_ITEMS:]
     if len(items) > MAX_ITEMS:
-        out.append(f"({len(items) - MAX_ITEMS} older open items not shown — `xt log` for all)")
+        out.append(f"({len(items) - MAX_ITEMS} older open items not shown — `xt log --full` for all)")
     for i in shown:
         goal = f" [goal #{i['goal']}]" if i.get("goal") else ""
         out.append(f"- #{i['id']} {i['type']} → {i['owner']}{goal}, open {_age(i['opened'], now)}: {i['title']}")

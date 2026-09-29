@@ -116,6 +116,12 @@ supervisor, never inside an agent's shell.
    a plain assistant.)
 5. The agent is added to the "expected" set, so the supervisor can tell a crash from a stop.
 
+Before step 1, a Claude Code agent's settings file (`permissions`, from `permissions.py`) is
+checked and passed with `--settings`; a bad file refuses the start. A spawn *request*
+(`request_spawn`, e.g. the lead's `xt spawn … --permissions FILE`) runs the same check before it
+asks the human, and the approval names the file or warns that a Claude agent would start without
+one.
+
 An agent keeps the instructions of its first prompt until it's restarted, so a team picks up
 changed roles or a new xt version only after a restart (`xt down`, then `xt`).
 
@@ -203,7 +209,8 @@ show first in the Inbox with their age, in `xt inbox` and `xt status`, and in th
 messages in about 2k tokens; the liaison's and lead's briefs add **Waiting on the human** (open
 questions, pending approvals and alerts, with the exact commands). Every first prompt includes the
 brief, and any agent runs it after a restart or context loss; nothing depends on an agent's own
-memory. Agents may read their own brief and their reports' briefs. `xt log` gives the full history.
+memory. Agents may read their own brief and their reports' briefs. `xt log` gives the history: the newest
+20 matching messages by default, `--full` for all of it.
 
 ## The supervisor, one tick every 3 seconds
 

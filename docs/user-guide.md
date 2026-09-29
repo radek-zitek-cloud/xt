@@ -323,6 +323,9 @@ Rules:
   the next start) and the mode, with a warning for `bypassPermissions` or `acceptEdits`, which let
   the agent act without asking. `xt status` and the agent's detail show the path; `xt harnesses`
   shows which harnesses take a file.
+- A new agent can get its line at spawn: `xt spawn carol ... --permissions settings/carol.json`
+  (from 0.15.0; see [`xt spawn`](#xt-spawn)). The spawn approval names the file, or warns when a
+  Claude agent would start without one.
 - Pass the file this way rather than as a project `.claude/settings.json`: in a folder Claude Code
   hasn't trusted yet, a project settings file applies its `deny` rules but ignores its `allow` rules
   (seen 2026-09-29).
@@ -518,11 +521,22 @@ to change a schedule's hours, or to switch one off.
 
 ### `xt spawn`
 
-`xt spawn <name> [--harness H --role R [--model M] [--reports-to NAME]]` — starts an agent. For an
-agent already in the roster (stopped), it starts it again with its role and harness. For a new one,
-`--harness` and `--role` are needed and `roles/<role>.md` must exist. The lead's spawns become
-approval requests; yours start immediately. **Use it** to bring back a stopped agent (`u` in the
-TUI), or to add an agent yourself.
+`xt spawn <name> [--harness H --role R [--model M] [--reports-to NAME]] [--permissions FILE]` —
+starts an agent. For an agent already in the roster (stopped), it starts it again with its role and
+harness. For a new one, `--harness` and `--role` are needed and `roles/<role>.md` must exist. The
+lead's spawns become approval requests; yours start immediately. **Use it** to bring back a stopped
+agent (`u` in the TUI), or to add an agent yourself.
+
+**Permissions file** (from 0.15.0). `--permissions settings/carol.json` gives a Claude Code agent
+its settings file: the line is written to its `team.toml` entry, as if you had added `permissions`
+there by hand. xt checks the file as it does at every start (see **Permission settings for Claude
+Code agents** above) before anything else happens, so a bad file refuses the
+spawn request before any approval reaches you. Without the flag, an existing entry keeps its own
+line and a team-wide `[defaults]` file applies as usual. The approval names the file and its
+`permissions.defaultMode`; when no file applies to a Claude agent it says instead, in red in the
+TUI: "WARNING: carol would start without a permissions file, so the operator's own claude defaults
+apply". A harness that takes no settings file (codex, pi) refuses `--permissions`, and a team
+default is skipped for it with a note.
 
 ### `xt stop`
 
@@ -590,10 +604,14 @@ what it knows (`xt brief lead`).
 
 ### `xt log`
 
-`xt log [--member NAME] [--id ID] [--type TYPE] [--since DAYS]` — the message history, filtered.
-`xt log --watch [--limit N]` shows the supervisor's events instead. **Use it** to trace a goal
-(`--id 234` shows the goal and every message that refers to it directly) or an agent (`--member carol`); the TUI's
-Log (`5`) and Supervisor (`6`) panels show the recent part.
+`xt log [--member NAME] [--id ID] [--type TYPE] [--since DAYS] [--limit N | --full]` — the
+message history, filtered. By default it prints the newest 20 messages that match the filters, oldest
+of them first, and a first line saying how many older ones were left out; `--limit N` prints the
+newest N, `--full` all of them. `--id` alone still prints the whole thread (from 0.15.0; before, `xt
+log` always printed everything). `xt log --watch [--limit N]` shows the supervisor's newest events
+instead (50 by default). **Use it** to trace a goal (`--id 234` shows the goal and every message
+that refers to it directly) or an agent (`--member carol`); the TUI's Log (`5`) and Supervisor
+(`6`) panels show the recent part.
 
 ### `xt harnesses`
 

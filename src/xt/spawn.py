@@ -229,7 +229,8 @@ class Approvals:
         else:
             what = (f"{req['requester']} asks to spawn {req['name']} as {req['role']} on {req['harness']}"
                     + (f" ({req['model']})" if req.get("model") else "")
-                    + f", reporting to {req['reports_to']}.")
+                    + f", reporting to {req['reports_to']}."
+                    + (f" {req['settings_note']}" if req.get("settings_note") else ""))
         msg = self.ctx.ledger.append(
             SYSTEM,
             HUMAN,
@@ -253,9 +254,31 @@ class Approvals:
         return req
 
 
+def spawn_settings(ctx: Ctx, name: str, harness: str, own: str | None) -> str:
+    """What the spawned agent's settings will be, in one sentence for the approval (card #122).
+
+    `own` is the `permissions` line the entry will have (from `--permissions`, or kept from an
+    existing entry). Checked with the #117 preflight here, so a bad file refuses the request before
+    any approval is asked for; do_spawn checks it again at the start."""
+    adapter = get_adapter(ctx.paths, harness)
+    if own and not adapter.settings_flag:
+        raise XtError(f"{name}: harness {adapter.name} takes no settings file, so it takes no "
+                      f"permissions file (asked for: {own}); use claude for that agent or leave it out")
+    rel = own or (ctx.team.default_permissions if adapter.settings_flag else None)
+    if rel:
+        s = permissions.preflight(ctx.paths.root, rel)
+        return f"Settings: {s.rel} (permissions.defaultMode {s.mode or 'not set'})."
+    if adapter.settings_flag:
+        return (f"WARNING: {name} would start without a permissions file, so the operator's own "
+                f"{adapter.name} defaults apply (--permissions FILE gives it one).")
+    if ctx.team.default_permissions:
+        return f"Team default permissions file {ctx.team.default_permissions} not applied ({adapter.name} takes no settings file)."
+    return ""
+
+
 def request_spawn(
     ctx: Ctx, requester: str, name: str, harness: str | None, model: str | None,
-    role: str | None, reports_to: str | None,
+    role: str | None, reports_to: str | None, permissions_file: str | None = None,
 ) -> str:
     existing = ctx.team.agent(name)
     if existing and existing.kind == HUMAN:
@@ -288,8 +311,14 @@ def request_spawn(
     if not existing and len(active) >= int(ctx.team.policy("max_agents")) and requester != HUMAN:
         raise XtError(f"team is at max_agents ({len(active)}); ask the human to raise it first")
 
+    own = permissions_file or (existing.permissions if existing else None)
+    note = spawn_settings(ctx, name, harness, own)  # refuses a bad file before anything else
     req = {"requester": requester, "name": name, "harness": harness, "model": model,
            "role": role, "reports_to": reports_to}
+    if permissions_file:
+        req["permissions"] = permissions_file
+    if note:
+        req["settings_note"] = note
     if requester != HUMAN and ctx.team.policy("spawn_approval"):
         rid = Approvals(ctx).add(req)
         return f"approval #{rid} requested from the human; you'll get a message when it's decided"
@@ -302,7 +331,8 @@ def request_spawn(
 
 
 def execute_spawn(ctx: Ctx, req: dict) -> str:
-    ctx.team.upsert_agent(req["name"], req["role"], req["harness"], req.get("model"), req["reports_to"])
+    ctx.team.upsert_agent(req["name"], req["role"], req["harness"], req.get("model"), req["reports_to"],
+                          permissions=req.get("permissions"))
     ctx.team.save()
     ctx.reload_team()
     ws = do_spawn(ctx, req["name"])
@@ -315,7 +345,8 @@ def approval_what(r: dict) -> str:
         return (f"wake {r['name']} every {r['every']}"
                 + (f" between {r['between']}" if r.get("between") and r["between"] != ALWAYS else "")
                 + (f" at {r['at']}" if r.get("at") and r["at"] not in (ALWAYS, "off") else ""))
-    return f"spawn {r['name']} ({r['role']}, {harness_model(r['harness'], r.get('model'))})"
+    return (f"spawn {r['name']} ({r['role']}, {harness_model(r['harness'], r.get('model'))})"
+            + (f" — {r['settings_note']}" if r.get("settings_note") else ""))
 
 
 def decide(ctx: Ctx, req_id: int, approve: bool) -> str:

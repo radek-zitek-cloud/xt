@@ -122,6 +122,7 @@ come with `git pull upstream main` (see [Updating a team](#updating-a-team)).
   problems with xt or a harness reach you as `friction` in the Inbox.
 - **You stay in control of spending.** Hires and agent-set schedules wait for your approval;
   schedules have a minimum interval and can be limited to local hours (`--between 05:00-21:00`).
+  A hire's approval names the Claude agent's permissions file, or warns that it has none.
 - **Alerts, never repairs.** A crashed, blocked or silent agent raises an alert for you; xt
   doesn't guess at fixes.
 - **Any harness per agent.** Adapters in [harnesses/](harnesses/) describe how to start Claude
@@ -170,12 +171,12 @@ equivalent and when you'd use it.
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |
 | `xt clear <alert>` | Dismiss an alert |
 | `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00]` | Wake an agent periodically when idle, optionally only within local hours |
-| `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent |
+| `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent (`xt spawn … --permissions FILE`: a Claude agent's settings file) |
 | `xt restart <name>…` / `xt restart --all` | Restart agents with fresh instructions; `--all` restarts the supervisor too and brings the team back as it was |
 | `xt send <to> --type <t> "..."`, `xt done <id> "..."`, `xt note "..."` | Messages, closing work, notes (agents add `--as <name>`) |
 | `xt friction "..."` | An agent's feedback about xt or its harness; lands in your Inbox |
 | `xt goal new\|dispatch\|list` | Goal drafts and dispatch (normally the liaison does this) |
-| `xt brief [name]`, `xt log` | Recovery summary and full message history (`xt log --watch`: the supervisor's events) |
+| `xt brief [name]`, `xt log` | Recovery summary and the newest 20 messages (`--limit N`, `--full` for the whole history; `xt log --watch`: the supervisor's events) |
 | `xt harnesses` | Installed harnesses and their known limits |
 | `xt watch` | The supervisor loop (`xt up` runs it in its own pane) |
 | `xt --version` | The xt version |

@@ -110,7 +110,8 @@ Messages from xt arrive in your conversation stamped like:
   matters must be recoverable from the team repo:
   - `xt brief --as <you>`: the team, your open work, your recent messages. Run it after your notes
     on any restart, or whenever you're unsure what's going on.
-  - `xt log --member <you>` or `xt log --id <id>` for the full history.
+  - `xt log --member <you>` (your newest 20 messages; `--limit N` for more, `--full` for all) or
+    `xt log --id <id>` (a message and its direct replies) for the history.
   - `members/<you>/notes.md`: your own durable notes. Write down decisions, findings and
     where things are, not just in your head or in your harness's own memory.
 - When xt asks you for a **checkpoint** (`[xt reset] …`), the human is about to give you a fresh

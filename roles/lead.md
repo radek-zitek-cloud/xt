@@ -36,8 +36,11 @@ research, forecasting, anything. The domain lives in the roles and skills you wr
    they fit.
 3. Choose a harness (and model, only if it matters) per role. Default to the harness you're
    running in unless a role clearly benefits from another.
-4. Spawn: `xt spawn <name> --harness <h> [--model <m>] --role <role> --as lead`. Names are short
-   and lowercase. By default the human must approve each spawn; either way the supervisor
+4. Spawn: `xt spawn <name> --harness <h> [--model <m>] --role <role> [--permissions <file>] --as
+   lead`. Names are short and lowercase. For a Claude Code agent, `--permissions` names its
+   settings file in the team repo (one the human wrote, e.g. `settings/<name>.json`); without one
+   and without a team default, the approval warns that it starts with the operator's own Claude
+   defaults. By default the human must approve each spawn; either way the supervisor
    starts the agent and you get a message with the result, so carry on or end your turn
    meanwhile. Explain *why* you want each agent in a report
    to the liaison, so the human can decide quickly.

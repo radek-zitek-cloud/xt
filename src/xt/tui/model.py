@@ -375,6 +375,9 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(f"{r['name']}", style="bold yellow")
             out.append(f"\nrole {r['role']} · {harness_model(r['harness'], r.get('model'))}"
                        f" · reports to {r['reports_to']}\n")
+            if r.get("settings_note"):
+                out.append(r["settings_note"] + "\n",
+                           style="bold red" if r["settings_note"].startswith("WARNING") else "")
             out.append("a approve · d deny\n", style="bright_black")
             out.append(_heading(f"role brief: roles/{r['role']}.md"))
             out.append_text(_file_text(ctx, f"roles/{r['role']}.md"))

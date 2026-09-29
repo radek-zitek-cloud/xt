@@ -115,7 +115,9 @@ class Team:
                 return a
         return None
 
-    def upsert_agent(self, name: str, role: str, harness: str, model: str | None, reports_to: str) -> None:
+    def upsert_agent(self, name: str, role: str, harness: str, model: str | None, reports_to: str,
+                     permissions: str | None = None) -> None:
+        """Add or update an agent entry. A `permissions` line is set when given, else kept (card #122)."""
         t = self._table(name)
         if t is None:
             if "agent" not in self.doc:
@@ -132,6 +134,8 @@ class Team:
         elif "model" in t:
             del t["model"]
         t["reports_to"] = reports_to
+        if permissions:
+            t["permissions"] = permissions
         t["status"] = "active"
 
     def set_schedule(self, name: str, every: str | None, message: str | None = None,
