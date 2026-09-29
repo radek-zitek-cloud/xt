@@ -9,6 +9,43 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.15.0] — not released yet
+
+**Work entry**, filled in batch by batch. **0.15.0-rc1** (2026-09-29) has the first batch: #122
+and #113. The rest of the approved composition (#120, #105, #107, #125, #124) follows in later
+candidates.
+
+### Added
+
+- **`xt spawn --permissions FILE` (#122).** A spawn can give a new Claude Code agent its settings
+  file: the line is written to its `team.toml` entry, as if added by hand (0.13.0, #117). The file
+  gets the same check as at every start *before* anything else happens, so a bad file (missing, not
+  JSON, unknown `defaultMode`, malformed rule, outside the team repo) refuses the lead's request
+  before an approval reaches you. The approval (ledger message, TUI detail, `xt approve` and `xt
+  inbox` lists) names the file and its `permissions.defaultMode`; when no file applies to a Claude
+  agent it says "WARNING: carol would start without a permissions file, so the operator's own
+  claude defaults apply", in red in the TUI. Without the flag, a team `[defaults]` file applies as
+  before and an existing entry keeps its own line. A harness that takes no settings file (codex, pi)
+  refuses `--permissions`; a team default is skipped for it, and the approval says so. The shipped
+  lead role mentions the flag.
+
+### Changed
+
+- **`xt log` prints the newest messages by default (#113).** Plain `xt log` printed the whole
+  history (about 300 KB on a two-day-old team), and `--limit` only worked with `--watch`, so
+  agents' `xt log --limit 80` still filled their context. Now it prints the newest 20 messages that
+  match the filters (`--member`, `--type`, `--since`, `--id`), oldest of them first, under one line
+  saying how many older ones were left out. `--limit N` gives the newest N, `--full` everything.
+  `xt log --id N` still prints the whole thread (a message and its direct replies) unless you pass
+  `--limit`. `--watch` keeps its default of 50 events; `--limit` below 1 is refused. `protocol.md`
+  describes the default.
+
+### Upgrading
+
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc1`), then `xt restart --all`
+  so agents get the new protocol and lead role. Scripts or roles that rely on `xt log` printing
+  everything need `--full`.
+
 ## [0.14.1] — 2026-09-29
 
 A patch release: one wording clarification, no behavior change. The same code as 0.14.1-rc1 (only
