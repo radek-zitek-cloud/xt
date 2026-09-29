@@ -9,6 +9,17 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.12.0-rc3] — 2026-09-29
+
+**Release candidate.** rc2 plus one fix for card #56 found in rc2's acceptance; it becomes 0.12.0,
+from the same code, once #56 is accepted. #58, #104 and #110 were accepted on rc1 and are unchanged.
+
+### Fixed
+
+- **A reset was suggested for a context reading stamped in the future (card #56).** "Recent" now
+  means observed within the last 2 hours and not more than 5 minutes ahead of the clock; a
+  timestamp further in the future says nothing about now. Found by the quality analyst.
+
 ## [0.12.0-rc2] — 2026-09-29
 
 **Release candidate.** rc1 plus fixes for the three problems its acceptance found in card #56; it

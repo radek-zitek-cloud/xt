@@ -372,3 +372,15 @@ def test_the_reset_line_cuts_the_checkpoint_summary_at_a_word():
     assert cut.endswith("…") and len(cut) <= 81 and long.startswith(cut[:-1])
     assert cut[:-1] == long[:len(cut) - 1] and long[len(cut) - 1] == " "  # ends before a space, not mid-word
     assert reset_mod.clip("short") == "short"
+
+
+def test_a_reading_from_the_future_never_suggests_a_reset():
+    """rc2 QA: a timestamp a year ahead passed the "not older than 2 h" check."""
+    now = dt.datetime(2026, 9, 29, 9, 0, tzinfo=dt.timezone.utc)
+    def at(delta):
+        return Reading(used=200_000, window=258_000, observed=(now + delta).isoformat(), source="session log")
+    assert reset_mod.suggestion("agent", at(dt.timedelta(days=365)), now) is None
+    assert reset_mod.suggestion("agent", at(dt.timedelta(minutes=10)), now) is None
+    assert reset_mod.suggestion("agent", at(dt.timedelta(minutes=2)), now) is not None  # small clock skew is fine
+    assert reset_mod.suggestion("agent", at(-dt.timedelta(minutes=30)), now) is not None
+    assert reset_mod.suggestion("agent", at(-dt.timedelta(hours=3)), now) is None

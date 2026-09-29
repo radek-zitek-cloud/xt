@@ -193,7 +193,7 @@ points to the notes and the checkpoint line. No checkpoint, or new work arriving
 nothing is reset. `xt restart <name>` is the emergency route, without a checkpoint. xt never resets
 anyone on its own: when an agent's context reaches 70% of its window, `xt status`, the agent's
 detail in the TUI and the lead's and liaison's briefs show `reset suggested for …`, and only when the
-reading is known, has a window and is recent.
+reading is known, has a window and was observed within the last 2 hours (not in the future, beyond a few minutes of clock difference).
 
 ### 9. When something goes wrong
 

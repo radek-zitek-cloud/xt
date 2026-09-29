@@ -19,6 +19,7 @@ from .team import HUMAN, SYSTEM
 CHECKPOINT_TIMEOUT = 300  # seconds an agent gets to save its notes and confirm
 SUGGEST_AT = 0.70  # context share at which xt suggests a reset (the Team panel's yellow line)
 FRESH_FOR = 2 * 3600  # a context reading older than this is too stale to suggest anything
+CLOCK_SKEW = 300  # seconds a reading may appear to come from the future (clocks differ a little)
 
 
 def _path(ctx: Ctx):
@@ -126,9 +127,12 @@ def suggestion(name: str, reading, now: dt.datetime | None = None) -> str | None
         return None
     try:
         seen = dt.datetime.fromisoformat(str(reading.observed).replace("Z", "+00:00"))
-        if (now - seen).total_seconds() > FRESH_FOR:
-            return None
+        age = (now - seen).total_seconds()
     except (ValueError, TypeError):
+        return None
+    # recent means observed in the last FRESH_FOR seconds: not older, and not from the future beyond
+    # a little clock skew (a future timestamp says nothing about now; rc2 QA)
+    if age > FRESH_FOR or age < -CLOCK_SKEW:
         return None
     from .usage import short
 
