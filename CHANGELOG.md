@@ -12,10 +12,22 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.15.0] — not released yet
 
 **Work entry**, filled in batch by batch. **0.15.0-rc1** (2026-09-29) has the first batch: #122
-and #113. The rest of the approved composition (#120, #105, #107, #125, #124) follows in later
-candidates.
+and #113. **0.15.0-rc2** (2026-09-29) adds #120 and #105; #122 and #113 are unchanged from rc1.
+The rest of the approved composition (#107, #125, #124) follows in later candidates.
 
 ### Added
+
+- **Claude plan usage in `xt status` and the TUI (#120, rc2).** Claude Code logs no rate limits;
+  it passes them only to a status-line command. The new `bin/xt-statusline` is one: point a Claude
+  agent's settings file at it (`"statusLine": {"type": "command", "command":
+  "/path/to/team/bin/xt-statusline"}`) and it keeps the five-hour and seven-day windows (percent
+  used, reset time, when read; nothing else from the status) in `.xt/state/claude_plan.json`,
+  written atomically, under `XT_ROOT` or else its own checkout. `xt status` and the Status pane show
+  `claude 5% of 5h, resets …; 7% of 7d, resets …; read 2m ago (account-wide)` next to the Codex
+  allowance. A session's first call (no limits yet) keeps the last reading; a window whose reset
+  has passed shows "window reset, no reading since"; a reading over 3 hours old or a missing or
+  broken file shows `unknown`. Bad input never breaks the agent's status line. Tested against a
+  redacted real Claude Code 2.1.284 payload. The reading is account-wide: it includes your own use.
 
 - **`xt spawn --permissions FILE` (#122).** A spawn can give a new Claude Code agent its settings
   file: the line is written to its `team.toml` entry, as if added by hand (0.13.0, #117). The file
@@ -39,12 +51,18 @@ candidates.
   `xt log --id N` still prints the whole thread (a message and its direct replies) unless you pass
   `--limit`. `--watch` keeps its default of 50 events; `--limit` below 1 is refused. `protocol.md`
   describes the default.
+- **The protocol states the liaison's goal writes (#105, rc2).** Section 6 listed only notes and
+  the lead's files, while the liaison role requires writing goal drafts. It now says the liaison
+  creates drafts with `xt goal new`, edits `goals/drafts/<slug>.md` and dispatches them into
+  `goals/<slug>.md` with `xt goal dispatch`, and writes nothing else besides its notes; the liaison
+  role says the same. Wording only, no behavior change.
 
 ### Upgrading
 
-- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc1`), then `xt restart --all`
-  so agents get the new protocol and lead role. Scripts or roles that rely on `xt log` printing
-  everything need `--full`.
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc2`), then `xt restart --all`
+  so agents get the new protocol and roles. Scripts or roles that rely on `xt log` printing
+  everything need `--full`. For Claude plan usage, add the `statusLine` entry to one Claude agent's
+  settings file (yours to edit) and restart that agent. From 0.15.0-rc1: the same restart.
 
 ## [0.14.1] — 2026-09-29
 
