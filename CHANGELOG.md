@@ -9,6 +9,23 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-09-29
+
+The accepted release: the same code as 0.14.0-rc2 (only the version changed). All four cards were
+accepted: #100 (choose a team's xt version and roll back; QA PASS on rc2 after a real staging
+switch, rollback and a switch to a later tag through the new re-apply path), #111 (decision
+questions with options; QA PASS on rc1, unchanged since), #118 (notes first on every start; QA PASS
+on rc1, seen on Claude Code and Codex liaisons) and #119 (never `--as human`, whoever asks; QA
+failed rc1 and rc2 on the wording's strictest reading, and Radek accepted it on rc2, #1353: the
+liaison never acted as the human; card #121 clarifies the wording later). The changes are listed
+under the candidates below.
+
+### Upgrading
+
+- From 0.13.0: `xt down`, commit your team changes, `git pull upstream main`, `xt restart --all`
+  (see 0.14.0-rc1 below). From then on, `xt version use <tag>` and `xt version rollback` work.
+  From 0.14.0-rc2: nothing but the version changes.
+
 ## [0.14.0-rc2] — 2026-09-29
 
 **Release candidate.** rc1 plus the fix for #119 from rc1's acceptance and a #100 fix found before
