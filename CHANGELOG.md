@@ -14,7 +14,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 **Work entry**, filled in batch by batch. **0.15.0-rc1** (2026-09-29) has the first batch: #122
 and #113. **0.15.0-rc2** (2026-09-29) adds #120 and #105; #122 and #113 are unchanged from rc1.
 **0.15.0-rc3** (2026-09-29) adds #125 and #107 (research only, no code); the earlier cards are
-unchanged from rc2. The last card of the approved composition (#124) follows in a later candidate.
+unchanged from rc2. **0.15.0-rc4** (2026-09-29) is rc3 plus the fix for QA's rc2 FAIL on #120
+(see Fixed). The last card of the approved composition (#124) follows in rc5.
 
 ### Added
 
@@ -69,6 +70,16 @@ unchanged from rc2. The last card of the approved composition (#124) follows in 
   `goals/<slug>.md` with `xt goal dispatch`, and writes nothing else besides its notes; the liaison
   role says the same. Wording only, no behavior change.
 
+### Fixed
+
+- **#120, QA's rc2 FAIL (rc4).** A plan-usage snapshot with a huge `resets_at` (10**20) raised
+  `OverflowError` while formatting the reset time and broke `xt status` and the TUI's Status pane.
+  Every number read from Claude Code's status line or the snapshot is now checked: `used_percentage`
+  0–100, `resets_at` and the read time Unix seconds between 2000 and 2100, finite, and a real
+  number (not a boolean, text, list or null). Anything else shows `unknown` (and is never stored
+  from a payload); a reading dated in the future shows `unknown`; and the rest of status stays
+  usable whatever the snapshot holds.
+
 ### Research
 
 - **Credential-holding CLI skills visible to agents (#107, rc3).** A research page with an
@@ -77,12 +88,12 @@ unchanged from rc2. The last card of the approved composition (#124) follows in 
 
 ### Upgrading
 
-- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc3`), then `xt restart --all`
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc4`), then `xt restart --all`
   so agents get the new protocol and roles, and the supervisor the goal notifications. Scripts or
   roles that rely on `xt log` printing everything need `--full`. For Claude plan usage, add the
   `statusLine` entry to one Claude agent's settings file (yours to edit) and restart that agent.
-  From 0.15.0-rc1 or rc2: the same restart. "Done since you last looked" starts empty and counts
-  from the supervisor's first run on rc3.
+  From an earlier 0.15.0 candidate: the same restart. "Done since you last looked" starts empty
+  and counts from the supervisor's first run on rc3 or later.
 
 ## [0.14.1] — 2026-09-29
 
