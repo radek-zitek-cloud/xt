@@ -16,15 +16,19 @@ and #113. **0.15.0-rc2** (2026-09-29) adds #120 and #105; #122 and #113 are unch
 **0.15.0-rc3** (2026-09-29) adds #125 and #107 (research only, no code); the earlier cards are
 unchanged from rc2. **0.15.0-rc4** (2026-09-29) is rc3 plus the fix for QA's rc2 FAIL on #120
 (see Fixed). **0.15.0-rc5** (2026-09-29) adds the last card, #124 (docs and site); it has all
-seven cards of the approved composition, and the code is unchanged from rc4.
+seven cards of the approved composition, and the code is unchanged from rc4. **0.15.0-rc6**
+(2026-09-29) is rc5 plus the fixes for QA's rc3 FAIL on #125 (a goal notifies only once, when
+it's done) and QA's rc4 FAIL on #120 (no tolerance for a reading timestamped later than now).
 
 ### Added
 
 - **One notification when a goal you dispatched is done (#125, rc3).** A goal the liaison opened
-  now notifies you exactly once when it closes. The notification is the liaison's report to you
-  about it (with `--ref` to the goal or to the lead's `done`); if none arrives within 5 minutes of
-  the closure, the supervisor sends "goal #N done" with the first line of the closing summary.
-  Other liaison reports to you notify too, once per `--ref`. Tasks, sub-team goals and friction
+  now notifies you exactly once, when it's done. The notification is the liaison's report to you
+  about it after the closure (with `--ref` to the goal or to the lead's `done`); if none arrives
+  within 5 minutes of the closure, the supervisor sends "goal #N done" with the first line of the
+  closing summary. Progress reports about a goal that's still open don't notify (rc6, QA's rc3
+  FAIL: rc3 to rc5 notified them too). Other liaison reports to you, not about a goal, notify once
+  per `--ref`. Tasks, sub-team goals and friction
   never notify, and quiet hours apply as for questions. The Inbox (TUI and `xt inbox`) has "Done
   since you last looked": each closed goal, with the lead's closing summary and its message id,
   until you've looked (in the TUI, when you leave the Inbox panel or quit; with `xt inbox`, in your
@@ -78,7 +82,9 @@ seven cards of the approved composition, and the code is unchanged from rc4.
   Every number read from Claude Code's status line or the snapshot is now checked: `used_percentage`
   0–100, `resets_at` and the read time Unix seconds between 2000 and 2100, finite, and a real
   number (not a boolean, text, list or null). Anything else shows `unknown` (and is never stored
-  from a payload); a reading dated in the future shows `unknown`; and the rest of status stays
+  from a payload); a reading timestamped later than now shows `unknown`, with no tolerance, since
+  the script and xt run on the same machine (rc6, QA on rc4: rc4 and rc5 allowed 60 seconds); and
+  the rest of status stays
   usable whatever the snapshot holds.
 
 ### Documentation
@@ -104,7 +110,7 @@ seven cards of the approved composition, and the code is unchanged from rc4.
 
 ### Upgrading
 
-- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc5 --candidate`), then `xt restart --all`
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc6 --candidate`), then `xt restart --all`
   so agents get the new protocol and roles, and the supervisor the goal notifications. Scripts or
   roles that rely on `xt log` printing everything need `--full`. For Claude plan usage, add the
   `statusLine` entry to one Claude agent's settings file (yours to edit) and restart that agent.
