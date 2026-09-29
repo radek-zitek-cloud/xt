@@ -207,7 +207,7 @@ delete_after_days = 0             # 0 = never delete archived logs
 daily_alert_mb = 5                # supervisor alerts above this (probable message loop)
 message_max_kb = 4                # larger payloads go in files, referenced by path
 
-[notify]                          # the supervisor tells the human about questions, approvals and alerts
+[notify]                          # the supervisor tells the human about questions, approvals, alerts and done goals
 enabled = true
 command = "notify-send --app-name=xt {{title}} {{body}}"   # e.g. "curl -s -d {{body}} ntfy.sh/<topic>"
 quiet = ""                        # local-time window with no notifications, e.g. "21:00-07:00"

@@ -93,11 +93,24 @@ notification:
 | `? #212 liaison: Which story…` | A **question** the liaison needs you to decide | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
 | `? #12 spawn …` / `? #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
 | `⚠ …` | An **alert**: an agent crashed, is blocked or went silent | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
+| `✓ #210 done: Write the weekly digest  #260` | **Done since you last looked**: a goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) | Read it; `xt log --id 210` for the thread. It clears once you've looked |
 | `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt |
 | `✉ #47 liaison: …` | A message to you | Read it |
 
 While a question waits for you, the work that depends on it isn't nudged. If you don't answer,
 nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
+
+**When a goal is done** (from 0.15.0). A goal you dispatched (one the liaison opened) gets exactly
+one desktop notification when it closes, "goal #210 done". Normally it's the liaison's report to
+you about it (its first line is the text); the liaison sends it with `--ref` to the goal. If no such
+report arrives within 5 minutes of the closure, the supervisor sends "goal #210 done" with the
+first line of the lead's closing summary instead. Other reports the liaison sends you notify too,
+once per `--ref`. Tasks, goals the lead opens for sub-teams, and friction never notify, and quiet
+hours apply as for questions (what closes at night isn't sent later). "Done since you last looked"
+lists closed goals until you've looked: in the TUI, until you leave the Inbox panel (or quit) after
+it showed them; with `xt inbox`, once it has printed them in your own terminal (an agent running `xt
+inbox` doesn't clear them). It counts from the supervisor's first run on 0.15.0, so older goals
+don't appear.
 
 The **Supervisor** panel (6) shows what xt did (deliveries, wake-ups, nudges, notifications). The
 Status pane on top has three lines: the team with only what needs you (questions and approvals in
@@ -498,8 +511,9 @@ ssh), or in scripts.
 
 ### `xt inbox`
 
-`xt inbox [--days N] [--limit N]` — what needs you: questions, alerts, pending approvals, friction
-reported about xt or a harness, and recent messages to you, each with the command to act on it.
+`xt inbox [--days N] [--limit N]` — what needs you: questions, alerts, pending approvals, goals
+done since you last looked (cleared once shown; see 4), friction reported about xt or a harness,
+and recent messages to you, each with the command to act on it.
 **Use it** when you're not in the TUI; the Inbox panel shows the same.
 
 ### `xt answer`

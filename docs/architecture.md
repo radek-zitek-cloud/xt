@@ -58,7 +58,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | | `state/watch.log` (+ `watch.log.1`): the supervisor's events, rotated at 512 KB |
 | | `state/sessions.json`: which harness session log belongs to which agent (per start); `state/model_windows.json`: pi's model windows, cached a day |
 | | `usage/YYYY-MM-DD.jsonl`: per-turn usage records; `state/usage_offsets.json`, `state/allowance.json`, `state/claude_plan.json` (Claude plan windows from the status line) |
-| | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
+| | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `goal_notices.json`, `inbox_seen.json`, `watch.pid`, `lock` |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
 `roles/liaison.md`, `prices.toml`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
@@ -256,7 +256,13 @@ memory. Agents may read their own brief and their reports' briefs. `xt log` give
 9. **Notifications**: each new question, approval request or alert for the human runs the
    `[notify]` command (default `notify-send`; any command with `{title}`/`{body}`, e.g. an ntfy
    `curl`), except inside the `quiet` window. Counting starts when the supervisor first runs; what
-   arrives in quiet hours stays in the Inbox without a notification.
+   arrives in quiet hours stays in the Inbox without a notification. A goal the liaison opened
+   notifies once when it closes (`src/xt/goaldone.py`, `state/goal_notices.json`): the liaison's
+   report to the human about it (its `--ref` is the goal or the lead's `done`) is the notification;
+   a closure without one within 5 minutes notifies with the closing summary's first line. Other
+   liaison reports to the human notify once per `ref`. `state/inbox_seen.json` holds the message id
+   up to which the human has seen the Inbox's "Done since you last looked" (the TUI moves it when
+   the human leaves the Inbox panel, `xt inbox` in the human's terminal after printing).
 10. **Rotation**, hourly.
 
 Every event the supervisor prints in its pane is also appended to `state/watch.log`, which the

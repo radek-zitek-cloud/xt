@@ -384,6 +384,9 @@ def cmd_checkpoint(args) -> None:
     print(record_checkpoint(Ctx.load(), who, _body(args)))
 
 
+DONE_DAYS = 30  # how far back the Inbox looks for goals done since the human last looked
+
+
 def cmd_inbox(args) -> None:
     ctx = Ctx.load()
     alerts = Alerts(ctx).active()
@@ -404,6 +407,17 @@ def cmd_inbox(args) -> None:
         print(f"  #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
     if not approvals:
         print("  (none)")
+    from .goaldone import done_since, first_line, mark_seen
+
+    done, upto = done_since(ctx, list(ctx.ledger.messages(since_days=DONE_DAYS)))
+    print("Done since you last looked:")
+    for goal, m in done:
+        print(f"  #{goal['id']} {first_line(goal['body'], 80)} — done #{m['id']} {m['ts'][5:16]} by "
+              f"{m['from']}: {first_line(m['body'], 160)}  (xt log --id {goal['id']})")
+    if not done:
+        print("  (none)")
+    if human_terminal():  # only the human's own look clears them, never an agent's
+        mark_seen(ctx, upto)
     recent_all = [m for m in ctx.ledger.messages(since_days=args.days) if m["to"] == HUMAN]
     friction = [m for m in recent_all if m["type"] == "friction"]
     print("Friction reported about xt or a harness:")

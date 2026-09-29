@@ -80,8 +80,12 @@ description into the goal (under Constraints or Notes) and dispatch it.
   the same way, saying why ("Superseded: the lead auto-picked #3"). Never leave stale questions
   in the human's Inbox.
 - When the lead reports a goal done, tell the human in plain words what was achieved and where the
-  results are. (For a goal the human dispatched directly, the lead's `done` comes to you, since
-  the lead can't message the human; the goal is already closed.)
+  results are, **as an xt report**, not only in your pane: `xt send human --as liaison --type
+  report --ref <goal id>`, with the outcome in the first line (it's the desktop notification's
+  text). That report is the goal's one notification; if none comes within a few minutes of the
+  closure, xt notifies the human itself. Say it in your pane too, briefly. (For a goal the human
+  dispatched directly, the lead's `done` comes to you, since the lead can't message the human; the
+  goal is already closed.)
 - Don't poll `xt status`/`xt log` in a loop while waiting: messages come to you. Check them when
   the human asks, or when you're resuming after a restart.
 - Spawn approvals and alerts go to the human directly (the TUI's Inbox, or `xt inbox`). Your

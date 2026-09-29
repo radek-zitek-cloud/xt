@@ -103,6 +103,7 @@ class Snapshot:
     summary: Text  # line 1 of the Status pane: the team and what needs the human
     usage: str = ""  # line 2: today's usage and account allowance
     versions: str = ""  # the Status title: installed, running and published xt (card #58)
+    done_upto: int = 0  # the Inbox's done goals are seen up to here once the human has looked (#125)
 
 
 def _t(*parts) -> Text:
@@ -397,6 +398,25 @@ def build(ctx: Ctx) -> Snapshot:
 
         inbox_rows.append(Row(f"alert:{key}", _t(("⚠ ", "red"), _first_line(al["text"], 60)), detail, "alert",
                               {"key": key}))
+    from ..goaldone import done_since, first_line
+
+    done_goals, done_upto = done_since(ctx, msgs)
+    for goal, done in reversed(done_goals):  # "Done since you last looked" (card #125)
+        def ddetail(goal=goal, done=done):
+            out = Text()
+            out.append(f"Goal #{goal['id']} done · {done['ts'][:16].replace('T', ' ')} by {done['from']}\n",
+                       style="bold green")
+            out.append(first_line(goal["body"], 200) + "\n", style="bold")
+            out.append(_heading(f"closing summary: #{done['id']}"))
+            out.append(done["body"] + "\n")
+            out.append(f"\nthe whole thread: xt log --id {goal['id']} · clears from the Inbox once you "
+                       "leave it\n", style="bright_black")
+            return out
+
+        inbox_rows.append(Row(f"done:{goal['id']}", _t(("✓ ", "green"), f"#{goal['id']} done: ",
+                                                      _first_line(goal["body"], 50),
+                                                      (f"  #{done['id']}", "bright_black")),
+                              ddetail, "done", {"id": goal["id"], "done": done["id"]}))
     for m in [m for m in msgs if m["type"] == "friction"][-10:][::-1]:
         inbox_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "magenta"), f"#{m['id']} {m['from']}: ",
                                                         _first_line(m["body"], 50)),
@@ -440,6 +460,7 @@ def build(ctx: Ctx) -> Snapshot:
         summary,
         usage_line,
         vtitle,
+        done_upto,
     )
 
 

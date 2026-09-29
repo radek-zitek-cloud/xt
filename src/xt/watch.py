@@ -240,37 +240,53 @@ class Supervisor:
 
     def notify_human(self, now: float) -> None:
         """Tell the human, outside the notify quiet window, about each new question, approval
-        request and alert addressed to them. Counting starts when the supervisor first runs, so an
+        request and alert addressed to them, and once about each goal they dispatched when it's
+        done (card #125, see goaldone.py). Counting starts when the supervisor first runs, so an
         old backlog never floods the desktop; what arrives in quiet hours is not sent later (it's
         in the Inbox)."""
+        from .goaldone import Notices, seen_upto
+
+        seen_upto(self.ctx)  # the Inbox's "done since you last looked" counts from the first run
         path = self.ctx.paths.state / "notified.json"
         seq = self.ctx.ledger.last_id()
         if not path.exists():
             path.write_text(json.dumps({"last": seq}))
             return
         last = json.loads(path.read_text()).get("last", 0)
-        if seq <= last:
+        notices = Notices(self.ctx)
+        if seq <= last and not notices.pending:
             return
         team = self.ctx.team
         quiet = team.notify_setting("quiet")
         send_now = bool(team.notify_setting("enabled")) and not (
             quiet and in_window(quiet, dt.datetime.fromtimestamp(now)))
-        if send_now:
-            for m in self.ctx.ledger.messages(since_days=1):
-                if m["id"] <= last or m["to"] != HUMAN or m["type"] not in NOTIFY_TYPES:
-                    continue
-                title = f"xt {team.name}: " + NOTIFY_TYPES[m["type"]].format(from_=m["from"])
-                body = " ".join(m["body"].split())
-                body = body if len(body) <= 180 else body[:179] + "…"
-                argv = [part.replace("{title}", title).replace("{body}", body)
-                        for part in shlex.split(str(team.notify_setting("command")))]
-                err = run_notify(argv) if argv else "empty notify command"
-                if err and err != self.notify_error:
-                    self.say(f"notification failed: {err} ([notify] in team.toml)")
-                elif not err:
-                    self.say(f"notified the human about #{m['id']}")
-                self.notify_error = err
-        path.write_text(json.dumps({"last": seq}))
+        new = [m for m in self.ctx.ledger.messages(since_days=1) if m["id"] > last] if seq > last else []
+        for m in new:
+            if m["to"] == HUMAN and m["type"] in NOTIFY_TYPES:
+                note = NOTIFY_TYPES[m["type"]].format(from_=m["from"]), m["body"]
+            else:
+                note = notices.see(m, now, new)  # goal closures and the liaison's reports
+            if note and send_now:
+                self._notify(*note, f"#{m['id']}")
+        for title, body in notices.due(now):
+            if send_now:
+                self._notify(title, body, f"{title} (no liaison report)")
+        notices.save()
+        path.write_text(json.dumps({"last": max(seq, last)}))
+
+    def _notify(self, what: str, body: str, about: str) -> None:
+        team = self.ctx.team
+        title = f"xt {team.name}: {what}"
+        body = " ".join(body.split())
+        body = body if len(body) <= 180 else body[:179] + "…"
+        argv = [part.replace("{title}", title).replace("{body}", body)
+                for part in shlex.split(str(team.notify_setting("command")))]
+        err = run_notify(argv) if argv else "empty notify command"
+        if err and err != self.notify_error:
+            self.say(f"notification failed: {err} ([notify] in team.toml)")
+        elif not err:
+            self.say(f"notified the human about {about}")
+        self.notify_error = err
 
     def record_usage(self) -> None:
         """Per-turn usage from the agents' session logs (see turns.py); a harness changing its log

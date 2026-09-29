@@ -32,7 +32,8 @@ is in [the story so far](docs/story.md).
   workspace, keep working while you're away. Codex has carried every real team so far; adapters for
   Claude Code and pi exist.
 - **Keep you to decisions only.** Questions wait in one Inbox (TUI or `xt inbox`) with a desktop
-  notification; you never have to watch an agent's pane.
+  notification; you never have to watch an agent's pane. When a goal you dispatched is done, you
+  get one notification and it waits under "Done since you last looked".
 - **Deliver every message through a supervisor, with a ledger.** Nothing is lost, and every step
   can be audited later: the quality analyst accepts work partly on evidence from the ledger.
 - **Work in goals, read back before dispatch.** The liaison reads a goal back to you, lets you
@@ -193,7 +194,7 @@ heartbeat_minutes = 15      # how often the supervisor checks for silent agents
 schedule_approval = true    # agent-set schedules wait for you
 min_wake_minutes = 15       # shortest schedule an agent may request
 
-[notify]                    # questions, approvals and alerts for you
+[notify]                    # questions, approvals, alerts, done goals and the liaison's reports for you
 enabled = true
 command = "notify-send --app-name=xt {title} {body}"   # or e.g. "curl -s -d {body} ntfy.sh/<topic>"
 quiet = ""                  # e.g. "21:00-07:00": no notifications then

@@ -14,6 +14,7 @@ from .. import __version__
 from .model import PANELS, Row, Snapshot
 
 REFRESH_SECONDS = 2.0
+INBOX = PANELS.index("Inbox") + 1  # its panel number
 HINTS = "h help · q quit · 1-6 panels · j/k move · enter read · / filter · a/d approve/deny · c clear · f jump · u/U start · x/X stop · R retire"
 
 
@@ -268,6 +269,8 @@ class XtTui(App):
         self.summary = Text("")
         self.usage = ""
         self.status = ""
+        self.done_upto = 0  # newest message the Inbox's "done" rows were built from (card #125)
+        self.inbox_looked = 0  # what the human saw while the Inbox had focus
 
     def compose(self) -> ComposeResult:
         topbar = Static(id="topbar")
@@ -304,6 +307,9 @@ class XtTui(App):
             self.query_one(f"#panel-{i}", Panel).set_rows(snap.panels.get(title, []))
         self.summary = snap.summary
         self.usage = snap.usage
+        self.done_upto = snap.done_upto
+        if self.last_panel == INBOX:
+            self.inbox_looked = self.done_upto
         if snap.versions:
             self.query_one("#topbar", Static).border_title = f"Status─xt {snap.versions}"
         self.render_hints()
@@ -360,9 +366,27 @@ class XtTui(App):
 
     def on_descendant_focus(self, event) -> None:
         if isinstance(event.widget, Panel):
-            self.last_panel = int(event.widget.id.split("-")[1])
+            n = int(event.widget.id.split("-")[1])
+            if self.last_panel == INBOX and n != INBOX:
+                self.mark_inbox_seen()
+            elif n == INBOX:
+                self.inbox_looked = self.done_upto
+            self.last_panel = n
             self.show_detail(event.widget)
             self.render_hints()
+
+    def mark_inbox_seen(self) -> None:
+        """Leaving the Inbox (or quitting) clears the done goals the human has now seen (card #125)."""
+        if self.actions is not None and self.inbox_looked:
+            try:
+                self.actions.inbox_seen(self.inbox_looked)
+            except Exception as e:  # never let the marker break the TUI
+                self.set_status(f"couldn't mark the Inbox seen: {e}")
+
+    async def action_quit(self) -> None:
+        if self.last_panel == INBOX:
+            self.mark_inbox_seen()
+        self.exit()
 
     def action_panel(self, n: int) -> None:
         self.panel(n).focus()
@@ -642,6 +666,11 @@ class LiveActions:
 
     def jump(self, workspace_id: str) -> None:
         self.ctx.herdr.focus_workspace(workspace_id)
+
+    def inbox_seen(self, upto: int) -> None:
+        from ..goaldone import mark_seen
+
+        mark_seen(self.ctx, upto)
 
     def start(self, name: str) -> str:
         from ..spawn import request_spawn

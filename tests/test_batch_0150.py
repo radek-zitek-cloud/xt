@@ -1,6 +1,10 @@
 """v0.15.0: spawn with a permissions file (#122), recent messages by default in xt log (#113),
-Claude plan usage in status (#120), liaison goal writes in the protocol (#105)."""
+Claude plan usage in status (#120), liaison goal writes in the protocol (#105), telling the human
+when a goal is done (#125)."""
 
+import asyncio
+import datetime as dt
+import io
 import json
 import os
 import subprocess
@@ -11,10 +15,12 @@ from pathlib import Path
 
 import pytest
 
-from xt import cli, permissions, planusage, turns
+from xt import cli, goaldone, permissions, planusage, turns
 from xt.paths import XtError
 from xt.spawn import Approvals, approval_what, decide, request_spawn, stop
+from xt.tui.app import LiveActions, XtTui
 from xt.tui.model import build
+from xt.watch import Supervisor
 
 from .conftest import REPO, add_member
 
@@ -392,3 +398,176 @@ def test_protocol_section_6_permits_the_liaisons_goal_writes_and_nothing_else():
     assert "The liaison writes nothing else in the repo besides its notes." in flat
     liaison = " ".join((REPO / "roles/liaison.md").read_text().split())
     assert "xt goal dispatch` writes the final `goals/<slug>.md`) and your own notes" in liaison
+
+
+# --- #125 tell the human when a goal is done -----------------------------------------------------
+
+
+def _local(h, m=0):
+    return time.mktime(dt.datetime(2026, 9, 27, h, m).timetuple())
+
+
+def _sup(ctx):
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.notify_human(_local(12))  # first run: counting starts here
+    return sup
+
+
+def _goal(ctx, sender="liaison", to="lead", title="Write the weekly digest"):
+    return ctx.ledger.append(sender, to, "goal", f"{title}\n\nMore detail.")["id"]
+
+
+def _done(ctx, goal, owner="lead", to="liaison", body="Digest published at /digest\nwith notes"):
+    return ctx.ledger.append(owner, to, "done", body, ref=goal)["id"]
+
+
+def _titles(notifications):
+    return [argv[2] for argv in notifications]
+
+
+def test_the_liaisons_report_is_the_goals_one_notification(ctx, notifications):
+    sup = _sup(ctx)
+    goal = _goal(ctx)
+    _done(ctx, goal)
+    sup.notify_human(_local(12, 1))
+    assert notifications == []  # waiting for the liaison's report
+    ctx.ledger.append("liaison", "human", "report", "The digest is out: /digest", ref=goal)
+    sup.notify_human(_local(12, 2))
+    assert _titles(notifications) == [f"xt t: goal #{goal} done"]
+    assert notifications[0][3] == "The digest is out: /digest"
+    sup.notify_human(_local(12, 30))  # no fallback after the report
+    ctx.ledger.append("liaison", "human", "report", "Also: a typo fixed", ref=goal)  # same ref again
+    sup.notify_human(_local(12, 31))
+    assert len(notifications) == 1
+
+
+def test_a_report_referring_to_the_leads_done_counts_too(ctx, notifications):
+    sup = _sup(ctx)
+    goal = _goal(ctx)
+    done = _done(ctx, goal)
+    ctx.ledger.append("liaison", "human", "report", "Done: the digest", ref=done)
+    sup.notify_human(_local(12, 1))
+    sup.notify_human(_local(12, 20))
+    assert _titles(notifications) == [f"xt t: goal #{goal} done"]
+
+
+def test_without_a_report_the_supervisor_notifies_after_the_wait_once(ctx, notifications):
+    sup = _sup(ctx)
+    goal = _goal(ctx)
+    _done(ctx, goal)
+    sup.notify_human(_local(12, 1))
+    sup.notify_human(_local(12, 1) + goaldone.FALLBACK_SECONDS - 10)
+    assert notifications == []
+    sup.notify_human(_local(12, 1) + goaldone.FALLBACK_SECONDS)
+    assert _titles(notifications) == [f"xt t: goal #{goal} done"]
+    assert notifications[0][3] == "Digest published at /digest"  # the closing summary's first line
+    ctx.ledger.append("liaison", "human", "report", "late report", ref=goal)
+    sup.notify_human(_local(12, 20))
+    assert len(notifications) == 1
+
+
+def test_tasks_and_goals_the_liaison_didnt_open_never_notify(ctx, notifications):
+    sup = _sup(ctx)
+    task = ctx.ledger.append("lead", "carol", "task", "a task")["id"]
+    ctx.ledger.append("carol", "lead", "done", "task done", ref=task)
+    sub = _goal(ctx, sender="lead", to="sublead", title="a sub-goal")
+    _done(ctx, sub, owner="sublead", to="lead")
+    human_goal = _goal(ctx, sender="human", title="dispatched by the human directly")
+    _done(ctx, human_goal, to="human")
+    ctx.ledger.append("carol", "human", "friction", "a sandbox refused something")
+    sup.notify_human(_local(12, 1))
+    sup.notify_human(_local(13))
+    assert notifications == []
+
+
+def test_other_liaison_reports_notify_once_per_ref(ctx, notifications):
+    sup = _sup(ctx)
+    goal = _goal(ctx)
+    ctx.ledger.append("liaison", "human", "report", "Progress: half done", ref=goal)
+    ctx.ledger.append("liaison", "human", "report", "Progress again", ref=goal)
+    ctx.ledger.append("liaison", "human", "report", "A note without a ref")
+    ctx.ledger.append("lead", "liaison", "report", "not for the human")
+    sup.notify_human(_local(12, 1))
+    assert _titles(notifications) == ["xt t: report from liaison"] * 2
+    _done(ctx, goal)
+    ctx.ledger.append("liaison", "human", "report", "Finished: the digest", ref=goal)
+    sup.notify_human(_local(12, 2))
+    assert _titles(notifications)[-1] == f"xt t: goal #{goal} done"  # its done report still notifies
+    assert len(notifications) == 3
+
+
+def test_quiet_hours_drop_the_goal_notification(ctx, notifications):
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.notify_human(_local(20))
+    ctx.team.doc["notify"]["quiet"] = "21:00-07:00"
+    goal = _goal(ctx)
+    _done(ctx, goal)
+    sup.notify_human(_local(22))
+    sup.notify_human(_local(22, 30))  # the fallback falls due in quiet hours
+    sup.notify_human(_local(8))
+    assert notifications == []
+    assert f"goal:{goal}" in goaldone.Notices(ctx).notified and not goaldone.Notices(ctx).pending
+
+
+def _human_inbox(ctx, monkeypatch, capsys, human=True):
+    class Tty(io.StringIO):
+        def isatty(self):
+            return human
+
+    monkeypatch.setattr(sys, "stdin", Tty())
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    cli.cmd_inbox(cli.build_parser().parse_args(["inbox"]))
+    out = capsys.readouterr().out
+    return out[out.index("Done since you last looked:"):out.index("Friction")]
+
+
+def test_the_inbox_lists_goals_done_since_the_last_look_until_seen(ctx, monkeypatch, capsys):
+    old = _goal(ctx, title="an old goal")
+    _done(ctx, old)
+    assert "(none)" in _human_inbox(ctx, monkeypatch, capsys)  # the first look starts from now
+    goal = _goal(ctx)
+    done = _done(ctx, goal)
+    task = ctx.ledger.append("lead", "carol", "task", "a task")["id"]
+    ctx.ledger.append("carol", "lead", "done", "task done", ref=task)
+    section = _human_inbox(ctx, monkeypatch, capsys, human=False)  # an agent's look doesn't clear it
+    assert f"#{goal} Write the weekly digest — done #{done}" in section and "Digest published" in section
+    assert "task done" not in section and "an old goal" not in section
+    section = _human_inbox(ctx, monkeypatch, capsys)
+    assert f"#{goal} Write the weekly digest" in section
+    assert "(none)" in _human_inbox(ctx, monkeypatch, capsys)  # seen now
+
+
+def test_goals_done_before_the_first_inbox_look_are_listed_once_the_supervisor_ran(ctx, monkeypatch, capsys):
+    _sup(ctx)
+    goal = _goal(ctx)
+    _done(ctx, goal)
+    assert f"#{goal} Write the weekly digest" in _human_inbox(ctx, monkeypatch, capsys)
+
+
+def test_the_tui_inbox_shows_done_goals_and_clears_them_after_a_look(ctx):
+    ctx.paths.ensure_runtime()
+    goaldone.seen_upto(ctx)
+    goal = _goal(ctx)
+    done = _done(ctx, goal)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("4")
+            row = next(r for r in app.panel(4).rows if r.kind == "done")
+            assert row.data == {"id": goal, "done": done}
+            detail = row.detail().plain
+            assert "Write the weekly digest" in detail and f"closing summary: #{done}" in detail
+            assert "Digest published at /digest" in detail
+            await pilot.press("1")  # leaving the Inbox: seen
+            await pilot.pause()
+            app.refresh_data()
+            assert not any(r.kind == "done" for r in app.panel(4).rows)
+
+    asyncio.run(run())
+    assert goaldone.seen_upto(ctx) >= done
+
+
+def test_the_liaison_role_sends_the_goal_done_summary_as_an_xt_report():
+    liaison = " ".join((REPO / "roles/liaison.md").read_text().split())
+    assert "as an xt report**, not only in your pane: `xt send human --as liaison --type report --ref <goal id>`" in liaison
