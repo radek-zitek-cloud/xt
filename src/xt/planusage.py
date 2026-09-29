@@ -13,6 +13,7 @@ status line of the agent it runs for."""
 
 import datetime as dt
 import json
+import math
 import os
 import tempfile
 import time
@@ -32,8 +33,28 @@ def snapshot_path(team_root: Path) -> Path:
     return team_root / ".xt" / "state" / SNAPSHOT
 
 
-def _number(v) -> bool:
-    return isinstance(v, (int, float)) and not isinstance(v, bool)
+TIME_MIN, TIME_MAX = 946684800, 4102444800  # 2000-01-01 … 2100-01-01 UTC: anything else is malformed
+
+
+def _number(v, low: float, high: float) -> bool:
+    """A real number in [low, high]: never a bool, a string, NaN, infinity or an out-of-range value
+    (a huge `resets_at` overflowed the date formatting in rc2 and broke status, QA on #120)."""
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        return False
+    if isinstance(v, float) and not math.isfinite(v):  # isfinite would overflow on a huge int
+        return False
+    return low <= v <= high
+
+
+def window(w, observed: bool = False) -> dict | None:
+    """One window's reading, checked: `used_percentage` 0–100, `resets_at` (and, from the
+    snapshot, `observed_at`) Unix seconds in this century. None when anything is off."""
+    if not isinstance(w, dict):
+        return None
+    keys = ("resets_at", "observed_at") if observed else ("resets_at",)
+    if not _number(w.get("used_percentage"), 0, 100) or not all(_number(w.get(k), TIME_MIN, TIME_MAX) for k in keys):
+        return None
+    return {"used_percentage": float(w["used_percentage"]), **{k: int(w[k]) for k in keys}}
 
 
 def parse(payload) -> dict:
@@ -45,9 +66,9 @@ def parse(payload) -> dict:
     if not isinstance(limits, dict):
         return out
     for key, _ in WINDOWS:
-        w = limits.get(key)
-        if isinstance(w, dict) and _number(w.get("used_percentage")) and _number(w.get("resets_at")):
-            out[key] = {"used_percentage": float(w["used_percentage"]), "resets_at": int(w["resets_at"])}
+        w = window(limits.get(key))
+        if w:
+            out[key] = w
     return out
 
 
@@ -110,22 +131,28 @@ def _age(seconds: float) -> str:
 
 def window_text(label: str, w, now: float) -> tuple[str, float | None]:
     """One window for status — `5% of 5h, resets Tue 14:30` — and when that reading was taken;
-    or why there's no number (and None)."""
-    if not (isinstance(w, dict) and _number(w.get("used_percentage")) and _number(w.get("resets_at"))
-            and _number(w.get("observed_at"))):
+    or why there's no number (and None). Never raises: a snapshot is only data."""
+    w = window(w, observed=True)
+    if w is None or w["observed_at"] > now + 60:  # malformed, or read "in the future"
         return f"{label} unknown", None
     if w["resets_at"] <= now:
         return f"{label} window reset, no reading since", None
     if now - w["observed_at"] > STALE_SECONDS:
         return f"{label} unknown (last reading {_age(now - w['observed_at'])})", None
-    reset = dt.datetime.fromtimestamp(w["resets_at"]).strftime("%a %H:%M")
+    try:
+        reset = dt.datetime.fromtimestamp(w["resets_at"]).strftime("%a %H:%M")
+    except (OverflowError, OSError, ValueError):
+        return f"{label} unknown", None
     return f"{w['used_percentage']:.0f}% of {label}, resets {reset}", w["observed_at"]
 
 
 def line(team_root: Path, now: float | None = None) -> str:
     """`claude 5% of 5h, resets …; 7% of 7d, resets …; read 2m ago (account-wide)`."""
     now = time.time() if now is None else now
-    snap = _load(snapshot_path(team_root))
+    try:
+        snap = _load(snapshot_path(team_root))
+    except Exception:  # e.g. a file too deeply nested for json: still only `unknown`
+        snap = {}
     shown = [window_text(label, snap.get(key), now) for key, label in WINDOWS]
     parts = [text for text, _ in shown]
     fresh = [seen for _, seen in shown if seen is not None]

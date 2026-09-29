@@ -315,6 +315,50 @@ def test_stale_absent_and_malformed_snapshots_show_unknown(state):
     assert planusage.line(ctx.paths.root, SEEN) == "claude 5h unknown; 7d unknown (account-wide)"
 
 
+BAD_VALUES = [10**20, 10**400, -5, 0, float("nan"), float("inf"), float("-inf"), "1790728200", True, None,
+              [1790728200], {"v": 1}]
+
+
+@pytest.mark.parametrize("field", ["resets_at", "observed_at", "used_percentage"])
+@pytest.mark.parametrize("bad", BAD_VALUES, ids=repr)
+def test_malformed_snapshot_numbers_show_unknown_and_status_still_works(state, monkeypatch, capsys, field, bad):
+    """QA's rc2 FAIL on #120: resets_at = 10**20 raised OverflowError and broke status."""
+    ctx = state
+    add_member(ctx, "carol")
+    good = {"used_percentage": 42, "resets_at": 1790728200, "observed_at": SEEN}
+    if field == "used_percentage" and bad in (0,):
+        bad = 100.5  # 0% is a real reading; over 100% isn't
+    raw = {"five_hour": {**good, field: bad}, "seven_day": {**good, "resets_at": 1791280800}}
+    planusage.snapshot_path(ctx.paths.root).write_text(json.dumps(raw))  # NaN/Infinity as JSON allows
+    line = planusage.line(ctx.paths.root, SEEN + 60)
+    assert line.startswith("claude 5h unknown; 42% of 7d, resets ") and line.endswith("; read 1m ago (account-wide)")
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    cli.cmd_status(cli.build_parser().parse_args(["status"]))
+    out = capsys.readouterr().out
+    assert "allowance: claude 5h unknown" in out and "carol" in out  # the rest of status is there
+    assert "claude account 5h unknown" in build(ctx).usage
+
+
+@pytest.mark.parametrize("bad", BAD_VALUES + [101], ids=repr)
+def test_malformed_payload_numbers_are_never_stored(state, bad):
+    ctx = state
+    for field in ("used_percentage", "resets_at"):
+        if field == "used_percentage" and bad == 0:
+            continue  # 0% is a real reading
+        payload = {"rate_limits": {"five_hour": {"used_percentage": 5, "resets_at": 1790728200, field: bad}}}
+        assert planusage.parse(payload) == {}
+        assert _feed(ctx, json.dumps(payload), SEEN) == "xt"
+        assert not planusage.snapshot_path(ctx.paths.root).exists()
+
+
+def test_a_reading_from_the_future_or_a_broken_file_shows_unknown(state):
+    ctx = state
+    _feed(ctx, SAMPLE, SEEN)
+    assert "5h unknown" in planusage.line(ctx.paths.root, SEEN - 3600)  # the clock went back
+    planusage.snapshot_path(ctx.paths.root).write_text("[" * 100000 + "]" * 100000)  # too deep for json
+    assert planusage.line(ctx.paths.root, SEEN) == "claude 5h unknown; 7d unknown (account-wide)"
+
+
 @pytest.mark.parametrize("stdin", ["", "not json", "[]", '{"rate_limits": "x"}',
                                    '{"rate_limits": {"five_hour": {"used_percentage": true, "resets_at": 1}}}'])
 def test_bad_input_prints_a_line_and_leaves_the_snapshot_alone(state, stdin):

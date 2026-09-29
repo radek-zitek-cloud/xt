@@ -397,7 +397,10 @@ def allowance_lines(ctx: Ctx) -> list[str]:
     out = _codex_allowance(ctx)
     if (planusage.snapshot_path(ctx.paths.root).exists()
             or any(a.harness == "claude" and a.active for a in ctx.team.agents() if a.kind != HUMAN)):
-        out.append(planusage.line(ctx.paths.root))
+        try:
+            out.append(planusage.line(ctx.paths.root))
+        except Exception:  # a bad reading must never take the rest of status with it
+            out.append("claude unknown (account-wide)")
     return out
 
 
