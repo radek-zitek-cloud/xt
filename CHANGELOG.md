@@ -13,9 +13,21 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 **Work entry**, filled in batch by batch. **0.15.0-rc1** (2026-09-29) has the first batch: #122
 and #113. **0.15.0-rc2** (2026-09-29) adds #120 and #105; #122 and #113 are unchanged from rc1.
-The rest of the approved composition (#107, #125, #124) follows in later candidates.
+**0.15.0-rc3** (2026-09-29) adds #125 and #107 (research only, no code); the earlier cards are
+unchanged from rc2. The last card of the approved composition (#124) follows in a later candidate.
 
 ### Added
+
+- **One notification when a goal you dispatched is done (#125, rc3).** A goal the liaison opened
+  now notifies you exactly once when it closes. The notification is the liaison's report to you
+  about it (with `--ref` to the goal or to the lead's `done`); if none arrives within 5 minutes of
+  the closure, the supervisor sends "goal #N done" with the first line of the closing summary.
+  Other liaison reports to you notify too, once per `--ref`. Tasks, sub-team goals and friction
+  never notify, and quiet hours apply as for questions. The Inbox (TUI and `xt inbox`) has "Done
+  since you last looked": each closed goal, with the lead's closing summary and its message id,
+  until you've looked (in the TUI, when you leave the Inbox panel or quit; with `xt inbox`, in your
+  own terminal). The liaison role now says to send the goal-done summary as an xt report. New state:
+  `.xt/state/goal_notices.json`, `.xt/state/inbox_seen.json`.
 
 - **Claude plan usage in `xt status` and the TUI (#120, rc2).** Claude Code logs no rate limits;
   it passes them only to a status-line command. The new `bin/xt-statusline` is one: point a Claude
@@ -57,12 +69,20 @@ The rest of the approved composition (#107, #125, #124) follows in later candida
   `goals/<slug>.md` with `xt goal dispatch`, and writes nothing else besides its notes; the liaison
   role says the same. Wording only, no behavior change.
 
+### Research
+
+- **Credential-holding CLI skills visible to agents (#107, rc3).** A research page with an
+  inventory by class, a login-status-only check of visibility against authority, and a proposed
+  default boundary for Radek's review. No change to xt; any enforcement is card #126.
+
 ### Upgrading
 
-- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc2`), then `xt restart --all`
-  so agents get the new protocol and roles. Scripts or roles that rely on `xt log` printing
-  everything need `--full`. For Claude plan usage, add the `statusLine` entry to one Claude agent's
-  settings file (yours to edit) and restart that agent. From 0.15.0-rc1: the same restart.
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc3`), then `xt restart --all`
+  so agents get the new protocol and roles, and the supervisor the goal notifications. Scripts or
+  roles that rely on `xt log` printing everything need `--full`. For Claude plan usage, add the
+  `statusLine` entry to one Claude agent's settings file (yours to edit) and restart that agent.
+  From 0.15.0-rc1 or rc2: the same restart. "Done since you last looked" starts empty and counts
+  from the supervisor's first run on rc3.
 
 ## [0.14.1] — 2026-09-29
 
