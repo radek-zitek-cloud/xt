@@ -184,9 +184,36 @@ def cmd_down(args) -> None:
         print(line)
 
 
+def cmd_version(args) -> None:
+    from . import switch
+
+    ctx = Ctx.load()
+    if args.action == "show":
+        for line in switch.show(ctx):
+            print(line)
+        return
+    if _who(args) != HUMAN:
+        raise XtError("only the human switches the team's xt version")
+    if args.action == "use":
+        if not args.tag:
+            raise XtError("name the tag: xt version use vX.Y.Z (a candidate needs --candidate)")
+        lines = switch.use(ctx, args.tag, candidate=args.candidate)
+    else:
+        lines = switch.rollback(ctx)
+    for line in lines:
+        print(line)
+
+
 def cmd_send(args) -> None:
     ctx = Ctx.load()
-    msg, status = send(ctx, _who(args), args.to, args.type, _body(args), args.ref)
+    body = _body(args)
+    if args.option or args.recommend is not None:
+        if args.type != "ask":
+            raise XtError("--option and --recommend belong to a question: add --type ask. Nothing was sent.")
+        from .choices import render
+
+        body = render(body, args.option or [], args.recommend)  # refuses a malformed set before sending
+    msg, status = send(ctx, _who(args), args.to, args.type, body, args.ref)
     print(f"#{msg['id']} {msg['type']} → {msg['to']}: {status}")
 
 
@@ -209,8 +236,13 @@ def cmd_answer(args) -> None:
         raise XtError(f"#{args.id} is not an open question (see `xt inbox`)")
     if who != item["owner"]:
         raise XtError(f"#{args.id} is a question for {item['owner']}, not {who}")
-    msg, status = send(ctx, who, item["opener"], "report", _body(args), args.id)
-    print(f"#{msg['id']} answer to #{args.id} → {item['opener']}: {status}")
+    from .choices import resolve
+
+    question = ctx.ledger.message(args.id) or {}
+    text, chosen = resolve(question.get("body", ""), _body(args))  # "2" → the option's full text
+    msg, status = send(ctx, who, item["opener"], "report", text, args.id)
+    print(f"#{msg['id']} answer to #{args.id} → {item['opener']}: {status}"
+          + (f" (recorded as: {text})" if chosen else ""))
 
 
 def cmd_friction(args) -> None:
@@ -499,10 +531,18 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("down", cmd_down, "stop every running agent and the supervisor (human only)")
     sp.add_argument("--keep-supervisor", action="store_true", help="stop the agents only")
 
+    sp = add("version", cmd_version, "show, select (use) or roll back the team's xt version (use/rollback: human only)")
+    sp.add_argument("action", nargs="?", choices=("show", "use", "rollback"), default="show")
+    sp.add_argument("tag", nargs="?", help="for use: an upstream release tag, e.g. v0.14.0")
+    sp.add_argument("--candidate", action="store_true", help="allow a release candidate tag (vX.Y.Z-rcN)")
+
     sp = add("send", cmd_send, "send a message through xt (the only sanctioned way agents talk)")
     sp.add_argument("to")
     sp.add_argument("--type", choices=AGENT_TYPES, default="report")
     sp.add_argument("--ref", type=int, help="goal/task/message id this is about")
+    sp.add_argument("--option", action="append", metavar="'OPTION :: CONSEQUENCE'",
+                    help="with --type ask: one of two or three numbered options (repeat the flag)")
+    sp.add_argument("--recommend", type=int, metavar="N", help="with --option: the option you recommend")
     sp.add_argument("body", nargs="*", help="message text (or stdin)")
 
     sp = add("done", cmd_done, "close an open goal or task you own (reports to whoever opened it)")

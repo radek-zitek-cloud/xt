@@ -126,15 +126,17 @@ class Compose(ModalScreen[str | None]):
 
     BINDINGS = [Binding("escape", "cancel", show=False), Binding("ctrl+s", "send", show=False)]
 
-    def __init__(self, title: str, context: str | None = None):
+    def __init__(self, title: str, context: str | None = None, options: dict[int, str] | None = None):
         super().__init__()
         self.title_text = title
         self.context = context
+        self.options = options or {}  # a question's numbered options (card #111)
 
     def compose(self) -> ComposeResult:
         box = Vertical(classes="popup compose")
         box.border_title = self.title_text
-        box.border_subtitle = "ctrl+s send · enter new line · ctrl+c/ctrl+v copy/paste · esc cancel"
+        box.border_subtitle = (("1-3 fill an option · " if self.options else "")
+                               + "ctrl+s send · enter new line · ctrl+c/ctrl+v copy/paste · esc cancel")
         with box:
             if self.context:
                 with VerticalScroll(classes="compose-context"):
@@ -143,6 +145,14 @@ class Compose(ModalScreen[str | None]):
 
     def on_mount(self) -> None:
         self.query_one("#compose-text", TextArea).focus()
+
+    def on_text_area_changed(self, event: TextArea.Changed) -> None:
+        """In an empty answer, typing 1, 2 or 3 fills that option's full text, still editable; with
+        text already there, digits are just digits."""
+        area = event.text_area
+        if self.options and area.text in {str(n) for n in self.options}:
+            area.text = f"Option {area.text}: {self.options[int(area.text)]}"
+            area.move_cursor(area.document.end)
 
     def action_send(self) -> None:
         self.dismiss(self.query_one("#compose-text", TextArea).text)
@@ -464,8 +474,10 @@ class XtTui(App):
                 self.refresh_data()
 
         if question:
+            from ..choices import options_of
+
             self.push_screen(Compose(f"Answer question #{question['id']} from {question['opener']}",
-                                     question.get("text")), done)
+                                     question.get("text"), options_of(question.get("text") or "")), done)
         else:
             self.push_screen(Compose("Send to the liaison"), done)
 
@@ -617,12 +629,14 @@ class LiveActions:
         return f"#{msg['id']} to {liaison.name}: {status}"
 
     def answer(self, qid: int, text: str) -> str:
+        from ..choices import resolve
         from ..dispatch import send
         from ..team import HUMAN
 
         item = self.ctx.ledger.item(qid)
         if item is None or item["type"] != "ask":
             raise RuntimeError(f"#{qid} is no longer an open question")
+        text, _ = resolve((self.ctx.ledger.message(qid) or {}).get("body", ""), text)
         msg, status = send(self.ctx, HUMAN, item["opener"], "report", text, qid)
         return f"#{msg['id']} answer to #{qid} → {item['opener']}: {status}"
 

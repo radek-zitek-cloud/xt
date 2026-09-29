@@ -169,6 +169,39 @@ older than 0.12.0 show as `unknown` until their next restart. To verify an upgra
 three read the same version and no note follows the line. (Teams on xt
 0.6.0 or older don't have `restart` yet: `xt down`, pull, `xt`, then `U` in the TUI.)
 
+**Choosing a version, and going back.** `git pull upstream main` takes whatever is newest. To pick
+a release on purpose, and to be able to undo it (from 0.14.0 on):
+
+```sh
+xt down
+git commit -am "team changes"          # xt refuses while tracked files have uncommitted changes
+xt version use v0.14.0                 # a candidate: xt version use v0.15.0-rc1 --candidate
+xt restart --all
+# if it misbehaves:
+xt down && xt version rollback && xt restart --all
+```
+
+- The team must be fully down (no supervisor, no agent) and no other xt command writing; xt checks.
+- `use` fetches the upstream tags and merges the tag into your repo with a merge commit, so your own
+  commits and files stay. A conflict (say you edited `roles/lead.md` and the release changed it too)
+  stops the switch: xt aborts the merge, names the files and leaves the previous version in place.
+  To resolve by hand: `git merge --no-ff <tag>`, fix the files, `git commit`, then run `xt version use
+  <tag>` again to finish the checks.
+- The team's state (`.xt/state/`) has a **format** number (`.xt/state/format.json`, written by `xt
+  up`). xt switches only to a version that says it reads that format, and never converts state; a
+  release that needs a new format will say so in its Upgrading note. Every version from 0.12.0 reads
+  format 1.
+- Before merging, xt takes a verified snapshot of `.xt/state/` (under `.xt/snapshots/`) and records
+  a fingerprint of the ledger. The ledger (`.xt/log/`) is never copied back or rewritten: it only
+  grows.
+- `rollback` reverts the last switch's merge commit (your later commits stay), checks the version
+  and that the ledger still starts with the recorded messages, and keeps the current state when
+  the format is the same (it matches the ledger). It refuses, and changes nothing, when the snapshot
+  is missing, the ledger was altered, the old version can't read the state, or files changed since
+  the switch conflict (then: `git revert -m 1 <merge commit>` by hand).
+- Neither command starts the team: `xt restart --all` (or `xt up`) does. `xt version` alone shows the
+  three versions, the state format and the last switches.
+
 ### 8. Pausing and resuming the team
 
 | You want to | Do |
@@ -347,6 +380,7 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt up`](#xt-up) | human | none (bare `xt` runs it) |
 | [`xt down`](#xt-down) | human | `X` stops agents only |
 | [`xt restart`](#xt-restart) | human | `x` then `u` for one agent |
+| [`xt version`](#xt-version) | show: both; use/rollback: human | none |
 | [`xt status`](#xt-status) | both | Status pane + Team panel |
 | [`xt inbox`](#xt-inbox) | human | Inbox panel (`4`) |
 | [`xt answer`](#xt-answer) | human | `s` on a question |
@@ -406,6 +440,14 @@ instructions; `--all` does the whole team and the supervisor, and brings back ev
 running (right after an `xt down`: the agents that were running before it). **Use it** after updating xt (`git pull upstream main`), after changing a role, or to give
 a confused or heavy agent a clean session.
 
+### `xt version`
+
+`xt version` | `xt version use <tag> [--candidate]` | `xt version rollback` — shows the team's
+versions, state format and recent switches; `use` merges an upstream release tag into the team repo
+(team down, tracked files committed, state format supported, verified snapshot first); `rollback`
+reverts the last switch. **Use it** to upgrade to a chosen release, or to go back one. See
+[Updating xt](#7-updating-xt).
+
 ### `xt status`
 
 `xt status` — one screen: the published, installed and running xt versions (see 7); every agent with its role, `harness/model`, live state, open work and
@@ -427,6 +469,28 @@ reported about xt or a harness, and recent messages to you, each with the comman
 a report and the question closes. **Use it** from a terminal; in the TUI press `s` on the question.
 Answering in the liaison's pane works too (it closes the question itself). A longer answer can come
 from a heredoc (see `xt send`).
+
+**Questions with options** (from 0.14.0). A decision question shows numbered options, each with
+what it leads to, and the asker's recommendation:
+
+```text
+When do we ship 0.14.0?
+
+Options:
+1. Ship on Friday — the release waits two days
+2. Ship today — no staging check
+Recommended: 1
+Or answer in your own words.
+```
+
+Answer with the number (`xt answer 1261 2`), and xt records the option's full text ("Option 2: Ship
+today — no staging check"), so the log says what you chose, not just "2"; a number that isn't an
+option is refused. In the TUI answer dialog, pressing 1, 2 or 3 while the answer is empty fills in
+that option's text, which you can still edit before ctrl+s; once there's text, digits are just
+digits. Your own words always work. Agents ask this way with `xt send … --type ask --option
+"<option> :: <consequence>" --option … --recommend <n> "the question"`; xt refuses a question with
+fewer than two or more than three options, an option without a consequence or no single
+recommendation, and sends nothing.
 
 ### `xt approve`, `xt deny`
 

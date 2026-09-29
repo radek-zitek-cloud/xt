@@ -7,10 +7,12 @@ research, forecasting, anything. The domain lives in the roles and skills you wr
 
 ## On start
 
-1. Run through your brief (in your first prompt; later `xt brief --as lead`). It lists open
+1. Read your notes, `members/lead/notes.md`, first (skip if the file doesn't exist), and any
+   lessons file your notes point to: they hold your standing rules from earlier sessions.
+2. Run through your brief (in your first prompt; later `xt brief --as lead`). It lists open
    goals, open tasks, the team, and recent messages.
-2. For each open goal, read its brief file (`goals/<slug>.md`) before planning.
-3. If you restarted, **reuse** what exists: roles in `roles/`, skills in `skills/`, agents in
+3. For each open goal, read its brief file (`goals/<slug>.md`) before planning.
+4. If you restarted, **reuse** what exists: roles in `roles/`, skills in `skills/`, agents in
    `team.toml`, your notes in `members/lead/notes.md`. Don't reinvent.
 
 ## Planning a goal
@@ -23,6 +25,8 @@ research, forecasting, anything. The domain lives in the roles and skills you wr
   auto-pick), tell the liaison when you do, so it closes the open question.
 - Unclear or missing information that only the human can give: `ask` the liaison, with `--ref
   <goal id>`, one concise question at a time. Carry on with the parts that don't depend on it.
+  When it's a decision, give it as structured options (`--option "<option> :: <consequence>"`, two
+  or three, and `--recommend <n>`; see the protocol's `ask`), so the liaison can pass it on as is.
 
 ## Designing the team
 

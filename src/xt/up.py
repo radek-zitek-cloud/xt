@@ -9,6 +9,9 @@ from .watch import expected, watch_pid
 
 def up(ctx: Ctx) -> list[str]:
     ctx.herdr.check_session()
+    from .switch import stamp_format
+
+    stamp_format(ctx)  # labels the existing state layout for `xt version` (card #100); never migrates
     out = []
     if watch_pid(ctx):
         out.append("supervisor: running")
@@ -72,6 +75,9 @@ def restart(ctx: Ctx, names: list[str], everyone: bool = False) -> list[str]:
     """Stop and start agents so they pick up new instructions (a changed role, a new xt version).
     With everyone: the whole team the way `xt down` + `xt up` would, then every agent that was
     running before starts again, so the team comes back as it was."""
+    from .switch import stamp_format
+
+    stamp_format(ctx)  # the usual step after an upgrade; labels the state layout for `xt version` (#100)
     from .spawn import stop
     from .team import HUMAN
 
