@@ -390,7 +390,18 @@ def fmt_short(t: Totals) -> str:
 
 
 def allowance_lines(ctx: Ctx) -> list[str]:
-    """Account-wide allowance per harness, when a harness reports one (Codex does)."""
+    """Account-wide allowance per harness: Codex from its session logs, Claude Code from its status
+    line (card #120) when the team has a Claude agent or a reading."""
+    from . import planusage
+
+    out = _codex_allowance(ctx)
+    if (planusage.snapshot_path(ctx.paths.root).exists()
+            or any(a.harness == "claude" and a.active for a in ctx.team.agents() if a.kind != HUMAN)):
+        out.append(planusage.line(ctx.paths.root))
+    return out
+
+
+def _codex_allowance(ctx: Ctx) -> list[str]:
     try:
         d = json.loads((ctx.paths.state / "allowance.json").read_text())
     except (OSError, ValueError):

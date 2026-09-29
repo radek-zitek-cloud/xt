@@ -332,6 +332,41 @@ Rules:
 - Your own `~/.claude/settings.json` still applies to every Claude agent on top of the file: its
   hooks, and its `allow` and `deny` rules. A user-level `allow` rule widens every agent.
 
+**Claude plan usage in status** (from 0.15.0). Claude Code doesn't write its plan's rate limits to
+its session logs; it hands them only to a status-line command. xt ships one, `bin/xt-statusline`.
+To use it, add a `statusLine` entry to a Claude agent's settings file (one agent is enough; the
+reading is account-wide):
+
+```json
+{"statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"},
+ "permissions": {"defaultMode": "dontAsk", "allow": ["..."]}}
+```
+
+After each of that agent's replies, Claude Code passes its status to the script, which keeps the
+five-hour and seven-day windows (percent used and reset time, nothing else from the status: no
+session ids, paths or costs) in `.xt/state/claude_plan.json` and prints the model and both
+percentages as the agent's status line (`Sonnet 5.5 · 5h 5% · 7d 7%`). `xt status` then shows
+
+```text
+allowance: claude 5% of 5h, resets Tue 21:30; 7% of 7d, resets Mon 08:00; read 2m ago (account-wide)
+```
+
+and the TUI's Status pane shows the same next to the Codex allowance. The plan is shared with you
+and anyone else on the account, so the numbers include your own use; they are not one agent's
+share.
+
+- **Which team.** The script writes under `XT_ROOT` when that's set, otherwise under the xt checkout
+  it's in (`bin/..`), and only into an existing `.xt/state` directory. Point `command` at your team
+  repo's own `bin/xt-statusline`. It's one of xt's own files, which agents never edit.
+- **When there's no number.** A session's first status call (before any reply) carries no limits;
+  the last reading stays and status shows its age. A window whose reset time has passed shows
+  `5h window reset, no reading since` rather than the old percentage. A reading older than 3 hours,
+  a missing or unreadable file shows `unknown`; the rest of status is unaffected. Status shows the
+  Claude line when the team has a Claude agent or a reading exists.
+- **Never in the way.** The file is replaced in one step (never half-written), and bad input from
+  Claude Code only prints `xt` as the status line.
+- Seen on Claude Code 2.1.284; another version that changes the fields shows `unknown`.
+
 **How full is an agent's context?** The Team panel shows it per agent (`~211k/258k`: tokens in
 the conversation after its latest turn, out of the model's window), yellow from 70% and red from
 85%; the agent's detail, `xt status` and the lead's and liaison's briefs show it too. xt reads it
@@ -455,7 +490,8 @@ reverts the last switch. **Use it** to upgrade to a chosen release, or to go bac
 
 `xt status` — one screen: the published, installed and running xt versions (see 7); every agent with its role, `harness/model`, live state, open work and
 context (e.g. `~211k/258k`) and today's usage; today's team total and, where reported, the
-account allowance;
+account allowance (Codex from its logs; Claude's five-hour and weekly windows through the status
+line, see **Claude plan usage in status**);
 counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts; a
 warning if the supervisor isn't running. **Use it** for a quick look without the TUI (e.g. over
 ssh), or in scripts.

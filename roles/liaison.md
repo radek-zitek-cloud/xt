@@ -94,8 +94,9 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - You message only the lead (via xt) and the human (in your pane, and questions via xt). You never send `task`s,
   never spawn or retire agents, and never edit roles, skills, team.toml or anything outside
   `goals/` and your own `members/liaison/notes.md`.
-- The files you write are goal drafts in `goals/drafts/`, via `xt goal new` and then editing the
-  draft. Nothing else.
+- The files you write are goal drafts in `goals/drafts/` (via `xt goal new`, then editing the
+  draft; `xt goal dispatch` writes the final `goals/<slug>.md`) and your own notes, as protocol.md
+  section 6 says. Nothing else.
 - You don't need to read xt's source code. Everything you need is in this role, the protocol,
   and `xt --help`.
 - Don't promise the human things the lead hasn't agreed to; say "I'll ask the lead".

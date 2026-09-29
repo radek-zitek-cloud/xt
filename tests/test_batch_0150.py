@@ -1,16 +1,22 @@
-"""v0.15.0: spawn with a permissions file (#122), recent messages by default in xt log (#113)."""
+"""v0.15.0: spawn with a permissions file (#122), recent messages by default in xt log (#113),
+Claude plan usage in status (#120), liaison goal writes in the protocol (#105)."""
 
 import json
+import os
+import subprocess
+import sys
+import time
 import tomllib
+from pathlib import Path
 
 import pytest
 
-from xt import cli, permissions
+from xt import cli, permissions, planusage, turns
 from xt.paths import XtError
 from xt.spawn import Approvals, approval_what, decide, request_spawn, stop
 from xt.tui.model import build
 
-from .conftest import add_member
+from .conftest import REPO, add_member
 
 # --- #122 spawn with a permissions file ---------------------------------------------------------
 
@@ -141,8 +147,6 @@ def test_the_cli_passes_the_flag(ctx, monkeypatch):
 
 
 def test_the_shipped_lead_role_mentions_the_flag():
-    from .conftest import REPO
-
     assert "--permissions" in (REPO / "roles/lead.md").read_text()
 
 
@@ -221,3 +225,170 @@ def test_watch_keeps_its_own_default(ctx, monkeypatch, capsys):
     assert "event 10" in out and "event 9\n" not in out and len(out.splitlines()) == 50
     out = _log(ctx, monkeypatch, capsys, "--watch", "--limit", "5")
     assert len(out.splitlines()) == 5
+
+
+# --- #120 Claude plan usage in status -----------------------------------------------------------
+
+
+SAMPLE = json.loads((REPO / "tests/fixtures/claude-2.1.284-statusline.json").read_text())["payload"]
+SEEN = 1790714000  # shortly after the sample was taken; both windows still open
+FIRST_CALL = {k: v for k, v in SAMPLE.items() if k != "rate_limits"}  # a session's first call
+
+
+def _feed(ctx, payload, now, env=None):
+    return planusage.main(json.dumps(payload) if not isinstance(payload, str) else payload,
+                          env if env is not None else {"XT_ROOT": str(ctx.paths.root)}, Path("/nowhere"), now)
+
+
+def _snap(ctx):
+    return json.loads(planusage.snapshot_path(ctx.paths.root).read_text())
+
+
+@pytest.fixture
+def state(ctx):
+    ctx.paths.ensure_runtime()
+    return ctx
+
+
+def test_the_real_payload_is_parsed_and_only_the_windows_are_stored(state):
+    ctx = state
+    assert planusage.parse(SAMPLE) == {"five_hour": {"used_percentage": 5.0, "resets_at": 1790728200},
+                                       "seven_day": {"used_percentage": 7.0, "resets_at": 1791280800}}
+    printed = _feed(ctx, SAMPLE, SEEN)
+    assert printed == "Sonnet 5.5 · 5h 5% · 7d 7%"
+    raw = planusage.snapshot_path(ctx.paths.root).read_text()
+    assert _snap(ctx) == {"five_hour": {"used_percentage": 5.0, "resets_at": 1790728200, "observed_at": SEEN},
+                          "seven_day": {"used_percentage": 7.0, "resets_at": 1791280800, "observed_at": SEEN}}
+    for secret in ("session", "cost", "transcript", "cwd", "0.0547", "Sonnet"):
+        assert secret not in raw
+    line = planusage.line(ctx.paths.root, SEEN + 120)
+    assert line.startswith("claude 5% of 5h, resets ") and "; 7% of 7d, resets " in line
+    assert line.endswith("; read 2m ago (account-wide)")
+
+
+def test_a_first_call_without_rate_limits_keeps_the_last_reading(state):
+    ctx = state
+    _feed(ctx, SAMPLE, SEEN)
+    before = planusage.snapshot_path(ctx.paths.root).read_bytes()
+    assert _feed(ctx, FIRST_CALL, SEEN + 600) == "Sonnet 5.5"
+    assert planusage.snapshot_path(ctx.paths.root).read_bytes() == before
+    assert "5% of 5h" in planusage.line(ctx.paths.root, SEEN + 900) and "read 15m ago" in planusage.line(ctx.paths.root, SEEN + 900)
+
+
+def test_a_payload_with_one_window_keeps_the_other_windows_reading(state):
+    ctx = state
+    _feed(ctx, SAMPLE, SEEN)
+    _feed(ctx, {"rate_limits": {"five_hour": {"used_percentage": 9, "resets_at": 1790728200}}}, SEEN + 60)
+    snap = _snap(ctx)
+    assert snap["five_hour"]["used_percentage"] == 9 and snap["five_hour"]["observed_at"] == SEEN + 60
+    assert snap["seven_day"]["observed_at"] == SEEN
+
+
+def test_a_passed_reset_shows_window_reset_not_the_old_percentage(state):
+    ctx = state
+    _feed(ctx, SAMPLE, SEEN)
+    after = 1790728200 + 60  # the five-hour window has reset, the week hasn't
+    line = planusage.line(ctx.paths.root, after)
+    assert "5h window reset, no reading since" in line and "5% of 5h" not in line
+    assert "7% of 7d" not in line  # the reading is older than the stale limit by then
+    fresh_week = {"rate_limits": {"seven_day": {"used_percentage": 8, "resets_at": 1791280800}}}
+    _feed(ctx, fresh_week, after)
+    line = planusage.line(ctx.paths.root, after + 60)
+    assert "5h window reset, no reading since" in line and "8% of 7d" in line and "read 1m ago" in line
+
+
+def test_stale_absent_and_malformed_snapshots_show_unknown(state):
+    ctx = state
+    assert planusage.line(ctx.paths.root, SEEN) == "claude 5h unknown; 7d unknown (account-wide)"
+    _feed(ctx, SAMPLE, SEEN)
+    stale = planusage.line(ctx.paths.root, SEEN + planusage.STALE_SECONDS + 60)
+    assert "5h unknown (last reading 3h 01m ago)" in stale and "%" not in stale and "; read" not in stale
+    planusage.snapshot_path(ctx.paths.root).write_text("{not json")
+    assert planusage.line(ctx.paths.root, SEEN) == "claude 5h unknown; 7d unknown (account-wide)"
+    planusage.snapshot_path(ctx.paths.root).write_text(json.dumps({"five_hour": {"used_percentage": "5%"}}))
+    assert planusage.line(ctx.paths.root, SEEN) == "claude 5h unknown; 7d unknown (account-wide)"
+
+
+@pytest.mark.parametrize("stdin", ["", "not json", "[]", '{"rate_limits": "x"}',
+                                   '{"rate_limits": {"five_hour": {"used_percentage": true, "resets_at": 1}}}'])
+def test_bad_input_prints_a_line_and_leaves_the_snapshot_alone(state, stdin):
+    ctx = state
+    _feed(ctx, SAMPLE, SEEN)
+    before = planusage.snapshot_path(ctx.paths.root).read_bytes()
+    assert _feed(ctx, stdin, SEEN + 60) == "xt"
+    assert planusage.snapshot_path(ctx.paths.root).read_bytes() == before
+
+
+def test_snapshot_writes_are_atomic(state, monkeypatch):
+    ctx = state
+    _feed(ctx, SAMPLE, SEEN)
+    before = planusage.snapshot_path(ctx.paths.root).read_bytes()
+
+    def crash(src, dst):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(planusage.os, "replace", crash)
+    assert _feed(ctx, SAMPLE, SEEN + 60) == "xt"  # the status line survives the failure
+    assert planusage.snapshot_path(ctx.paths.root).read_bytes() == before
+    assert [p.name for p in ctx.paths.state.iterdir() if "claude_plan" in p.name] == ["claude_plan.json"]
+
+
+def test_the_team_root_is_xt_root_else_the_scripts_own_checkout(state, tmp_path):
+    ctx = state
+    assert planusage.root({"XT_ROOT": str(ctx.paths.root)}, tmp_path) == ctx.paths.root
+    assert planusage.root({}, ctx.paths.root) == ctx.paths.root
+    _feed(ctx, SAMPLE, SEEN, env={})  # no XT_ROOT: the script's checkout, here one without state
+    assert not planusage.snapshot_path(ctx.paths.root).exists()
+    assert not (Path("/nowhere") / ".xt").exists()
+    _feed(ctx, SAMPLE, SEEN, env={"XT_ROOT": str(tmp_path / "no-team")})  # never makes a state dir
+    assert not (tmp_path / "no-team").exists()
+
+
+def test_the_shipped_script_runs_with_plain_python_from_xt_owned_bin(state):
+    ctx = state
+    script = REPO / "bin/xt-statusline"
+    env = {**os.environ, "XT_ROOT": str(ctx.paths.root)}
+    ok = subprocess.run([sys.executable, str(script)], input=json.dumps(SAMPLE), env=env,
+                        capture_output=True, text=True, timeout=30)
+    assert ok.returncode == 0 and ok.stdout.strip() == "Sonnet 5.5 · 5h 5% · 7d 7%" and not ok.stderr
+    assert _snap(ctx)["five_hour"]["used_percentage"] == 5.0
+    bad = subprocess.run([sys.executable, str(script)], input="garbage", env=env,
+                         capture_output=True, text=True, timeout=30)
+    assert bad.returncode == 0 and bad.stdout.strip() == "xt"
+
+
+def test_status_and_tui_show_the_claude_windows(state, monkeypatch, capsys):
+    ctx = state
+    assert not any(line.startswith("claude") for line in turns.allowance_lines(ctx))  # codex-only team, no reading
+    add_member(ctx, "carol")  # a claude agent
+    assert "claude 5h unknown; 7d unknown (account-wide)" in turns.allowance_lines(ctx)
+    now = time.time()
+    _feed(ctx, {"rate_limits": {"five_hour": {"used_percentage": 42, "resets_at": int(now) + 3600},
+                                "seven_day": {"used_percentage": 11, "resets_at": int(now) + 86400}}}, now)
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    cli.cmd_status(cli.build_parser().parse_args(["status"]))
+    out = capsys.readouterr().out
+    assert "allowance: claude 42% of 5h, resets " in out and "11% of 7d" in out and "read just now" in out
+    assert "team " in out  # the rest of status is there
+    usage = build(ctx).usage
+    assert "claude account 42% of 5h" in usage and "11% of the week" in usage
+    planusage.snapshot_path(ctx.paths.root).write_text("garbage")
+    assert "claude account 5h unknown; 7d unknown" in build(ctx).usage
+
+
+def test_the_guide_documents_the_status_line_setting():
+    guide = (REPO / "docs/user-guide.md").read_text()
+    assert "xt-statusline" in guide and '"statusLine"' in guide and "account-wide" in guide
+
+
+# --- #105 liaison goal writes in the protocol ----------------------------------------------------
+
+
+def test_protocol_section_6_permits_the_liaisons_goal_writes_and_nothing_else():
+    protocol = (REPO / "protocol.md").read_text()
+    s6 = protocol[protocol.index("## 6."):protocol.index("## 7.")]
+    flat = " ".join(s6.split())
+    assert "(liaison only) goals" in flat and "xt goal new" in flat and "xt goal dispatch" in flat
+    assert "The liaison writes nothing else in the repo besides its notes." in flat
+    liaison = " ".join((REPO / "roles/liaison.md").read_text().split())
+    assert "xt goal dispatch` writes the final `goals/<slug>.md`) and your own notes" in liaison

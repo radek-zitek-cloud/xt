@@ -1,0 +1,67 @@
+{
+  "note": "Real Claude Code 2.1.284 status-line stdin (claude-sonnet-5-5), 2026-09-29, redacted: cwd, session_id, session_name, prompt_id, transcript_path, scratchpad_dir, workspace removed. The first status-line call of a session (before any model reply) has no rate_limits field; this is the call after the first reply.",
+  "payload": {
+    "effort": {
+      "level": "medium"
+    },
+    "model": {
+      "id": "claude-sonnet-5-5",
+      "display_name": "Sonnet 5.5"
+    },
+    "version": "2.1.284",
+    "output_style": {
+      "name": "default"
+    },
+    "cost": {
+      "total_cost_usd": 0.0547374,
+      "total_duration_ms": 2411,
+      "total_api_duration_ms": 1877,
+      "total_lines_added": 0,
+      "total_lines_removed": 0
+    },
+    "context_window": {
+      "total_input_tokens": 38543,
+      "total_output_tokens": 4,
+      "context_window_size": 1000000,
+      "current_usage": {
+        "input_tokens": 2,
+        "output_tokens": 4,
+        "cache_creation_input_tokens": 12114,
+        "cache_read_input_tokens": 26427
+      },
+      "used_percentage": 4,
+      "remaining_percentage": 96
+    },
+    "exceeds_200k_tokens": false,
+    "prompt_cache": {
+      "warm": true,
+      "caching_observed": true,
+      "ttl": "1h",
+      "expires_at": 1790714886,
+      "requests": 1,
+      "misses": 0,
+      "expected_rebuilds": 0,
+      "hit_ratio": 0.6856497937368653,
+      "cache_write_tokens": 12114,
+      "miss_recache_tokens": 0,
+      "last_miss_at": null,
+      "last_miss_cause": null,
+      "miss_causes": {},
+      "recache_tokens_if_cold": 38543
+    },
+    "fast_mode": false,
+    "thinking": {
+      "enabled": true
+    },
+    "rate_limits": {
+      "five_hour": {
+        "used_percentage": 5,
+        "resets_at": 1790728200
+      },
+      "seven_day": {
+        "used_percentage": 7,
+        "resets_at": 1791280800
+      }
+    }
+  }
+}

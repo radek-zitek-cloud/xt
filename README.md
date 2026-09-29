@@ -165,7 +165,7 @@ equivalent and when you'd use it.
 | `xt init` | Make this clone your team's repo (asks: team name, session, liaison/lead harness and model, hire approval) |
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
-| `xt status` | Team, live state, context and today's usage per agent, team usage and allowance, open work, questions, queue, approvals, alerts |
+| `xt status` | Team, live state, context and today's usage per agent, team usage and allowance (Codex, and Claude's five-hour and weekly windows through `bin/xt-statusline`), open work, questions, queue, approvals, alerts |
 | `xt inbox` | What needs you: questions, alerts, approvals, recent messages |
 | `xt answer <id> "..."` | Answer a question the liaison asked you |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |

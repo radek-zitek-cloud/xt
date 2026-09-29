@@ -57,7 +57,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | whatever the team produces (e.g. `output/`) | `state/live.json`: the supervisor's latest `agent list` |
 | | `state/watch.log` (+ `watch.log.1`): the supervisor's events, rotated at 512 KB |
 | | `state/sessions.json`: which harness session log belongs to which agent (per start); `state/model_windows.json`: pi's model windows, cached a day |
-| | `usage/YYYY-MM-DD.jsonl`: per-turn usage records; `state/usage_offsets.json`, `state/allowance.json` |
+| | `usage/YYYY-MM-DD.jsonl`: per-turn usage records; `state/usage_offsets.json`, `state/allowance.json`, `state/claude_plan.json` (Claude plan windows from the status line) |
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `watch.pid`, `lock` |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
@@ -191,6 +191,15 @@ tasks and `--ref`s up to the goal); scheduled work outside any goal has none. Es
 model without a price leaves its tokens unpriced. The latest account allowance a harness reports
 (Codex `rate_limits`) is kept in `state/allowance.json` and shown once per harness. Totals are
 added up on read: today per agent and team, and per goal over its lifetime.
+
+Claude Code logs no rate limits; it passes them only to a status-line command. `src/xt/planusage.py`
+(standard library only) is that command's logic, run by `bin/xt-statusline` with the system Python
+for a Claude agent whose settings file has a `statusLine` entry. It keeps each window's latest
+`used_percentage`, `resets_at` and the time it was read in `state/claude_plan.json`, replaced
+atomically (temporary file, then rename), under `XT_ROOT` or else the checkout the script is in. A
+call without `rate_limits` leaves the file alone. `xt status` and the TUI show it with the Codex
+allowance: a passed reset, a reading over 3 hours old, or a missing or broken file shows no
+percentage.
 
 ## The ledger and recovery
 
