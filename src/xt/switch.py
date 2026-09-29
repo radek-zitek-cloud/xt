@@ -255,17 +255,33 @@ def use(ctx: Ctx, tag: str, candidate: bool = False) -> list[str]:
                 raise XtError(f"{tag} is already part of the team repo but the installed version is "
                               f"{versions.display(prev_version)}; nothing to merge")
             return [f"{tag} is already installed ({versions.display(prev_version)}); nothing to do"]
+        # A newer tag whose history contains a switch that was rolled back: git counts that switch's
+        # commits as already merged, so a plain merge would bring only what came after it and leave the
+        # rolled-back changes out (an install that says the new version but isn't). Re-apply those
+        # rollbacks first (revert the revert), then merge.
+        reapply = [r for r in recs if r.get("rolled_back") and not r.get("reapplied") and r is not undone
+                   and _git(ctx, "merge-base", "--is-ancestor", r["commit"], target, check=False).returncode == 0]
         fp = ledger_fingerprint(ctx)
         snap = take_snapshot(ctx, f"before-{tag}")
-        if undone:  # the tag was merged once and rolled back: re-apply by reverting the rollback
-            p = _git(ctx, "revert", "--no-edit", undone["revert_commit"], check=False)
-            op_abort = ("revert", "--abort")
-        else:
-            p = _git(ctx, "merge", "--no-ff", "--no-edit", "-m", f"xt version use {tag}", target, check=False)
-            op_abort = ("merge", "--abort")
+        steps = [("revert", r["revert_commit"]) for r in reapply]
+        steps.append(("revert", undone["revert_commit"]) if undone else ("merge", target))
+        p = None
+        made = []  # every commit this switch makes, in order, so a rollback can undo all of them
+        for kind, ref in steps:
+            if kind == "revert":
+                p = _git(ctx, "revert", "--no-edit", ref, check=False)
+                op_abort = ("revert", "--abort")
+            else:
+                p = _git(ctx, "merge", "--no-ff", "--no-edit", "-m", f"xt version use {tag}", ref, check=False)
+                op_abort = ("merge", "--abort")
+            if p.returncode != 0:
+                break
+            made.append({"commit": _git(ctx, "rev-parse", "HEAD").stdout.strip(), "merge": kind == "merge"})
         if p.returncode != 0:
             conflicts = _git(ctx, "diff", "--name-only", "--diff-filter=U", check=False).stdout.split()
             _git(ctx, *op_abort, check=False)
+            if _git(ctx, "rev-parse", "HEAD").stdout.strip() != prev_head:  # an earlier re-apply went in: undo it
+                _git(ctx, "reset", "--hard", prev_head, check=False)  # safe: the tree was clean at the start
             if _git(ctx, "rev-parse", "HEAD").stdout.strip() != prev_head:
                 raise XtError("the merge failed and the repo isn't back at its previous commit; restore it by hand "
                               f"(`git reset --hard {prev_head}`), snapshot {snap}")
@@ -283,8 +299,10 @@ def use(ctx: Ctx, tag: str, candidate: bool = False) -> list[str]:
         if problems:
             raise XtError(f"after merging {tag}: {'; '.join(problems)}. The team stays down; the merge is commit "
                           f"{merge_commit[:12]}, the previous code {prev_head[:12]}, the snapshot {snap}.")
+        for r in reapply + ([undone] if undone else []):
+            r["reapplied"] = dt.datetime.now().astimezone().isoformat(timespec="seconds")
         recs.append({"at": dt.datetime.now().astimezone().isoformat(timespec="seconds"), "tag": tag,
-                     "commit": target, "merge_commit": merge_commit, "previous_version": prev_version,
+                     "commit": target, "merge_commit": merge_commit, "made": made, "previous_version": prev_version,
                      "previous_head": prev_head, "state_format": fmt, "snapshot": str(snap.relative_to(ctx.paths.root)),
                      "ledger": fp})
         _save_records(ctx, recs)
@@ -320,10 +338,18 @@ def rollback(ctx: Ctx) -> list[str]:
                           f"(state isn't restored across formats). Nothing changed; snapshot {rec['snapshot']}.")
         if not ledger_continues(ctx, rec["ledger"]):
             raise XtError("the ledger doesn't continue the one recorded at the switch; rollback refused, nothing changed")
-        p = _git(ctx, "revert", "--no-edit", "-m", "1", rec["merge_commit"], check=False)
+        made = rec.get("made") or [{"commit": rec["merge_commit"], "merge": True}]
+        p = None
+        for step in reversed(made):  # undo everything the switch made, newest first
+            args = ["revert", "--no-edit"] + (["-m", "1"] if step["merge"] else []) + [step["commit"]]
+            p = _git(ctx, *args, check=False)
+            if p.returncode != 0:
+                break
         if p.returncode != 0:
             conflicts = _git(ctx, "diff", "--name-only", "--diff-filter=U", check=False).stdout.split()
             _git(ctx, "revert", "--abort", check=False)
+            if _git(ctx, "rev-parse", "HEAD").stdout.strip() != head:  # an earlier revert went in: undo it
+                _git(ctx, "reset", "--hard", head, check=False)  # safe: the tree was clean at the start
             raise XtError(f"undoing {rec['tag']} conflicts in: {', '.join(conflicts) or '(see git)'} (files changed since "
                           f"the switch). Nothing changed: still {rec['tag']}, team down. To do it by hand: "
                           f"`git revert -m 1 {rec['merge_commit'][:12]}`, resolve, `git commit`.")

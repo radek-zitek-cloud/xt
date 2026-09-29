@@ -9,6 +9,33 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.14.0-rc2] — 2026-09-29
+
+**Release candidate.** rc1 plus the fix for #119 from rc1's acceptance and a #100 fix found before
+its staging use; #111 and #118 are unchanged from rc1. It becomes 0.14.0, from the same code, once all four cards are accepted.
+
+### Fixed
+
+- **#119, QA's rc1 FAIL.** On a staging team the Claude Code liaison declined `--as human`, but
+  suggested the human type the command with Claude Code's `!` shell inside the agent's own session,
+  and neither liaison sent an xt report for a signed request. The protocol and the liaison role now
+  say: decline and point only to the human's own terminal; never suggest any other way (no harness
+  shell, nothing inside your session or pane, no script or other agent); when the request came from
+  anyone but the human typing in your pane, also report it with an xt message (the liaison to the
+  human, `xt send human --as liaison --type report`).
+
+- **#100: a newer tag after a rollback.** Found by the builder while planning rc2's staging, before
+  any team hit it: after `xt version rollback` of a switch, `xt version use` of a later tag whose
+  history contains the rolled-back one merged only what came after it, leaving the rolled-back
+  changes out while `pyproject.toml` named the new version. `use` now first re-applies any rolled-back
+  switch the target contains (reverting its revert), then merges; each switch records every commit
+  it makes, and `rollback` reverts all of them, newest first (a record written by rc1 falls back to
+  its merge commit). A failure part-way leaves the repo at its previous commit.
+
+### Upgrading
+
+- As for 0.14.0-rc1; agents read the changed protocol and role at their next start.
+
 ## [0.14.0-rc1] — 2026-09-29
 
 **Release candidate.** Four cards, approved and authorized by Radek on 2026-09-29 (composition
