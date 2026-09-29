@@ -9,6 +9,29 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.14.1-rc1] — 2026-09-29
+
+**Release candidate** of a patch release: one wording clarification, no behavior change. It
+becomes 0.14.1, from the same code, once #121 is accepted.
+
+### Changed
+
+- **The human-identity rule is about the human's identity, not an agent's own work (#121).**
+  0.14.0's "never suggest any other way … not a command in your own session" could be read as
+  forbidding an agent's ordinary work too: on staging, the liaison declined `xt status --as human`,
+  then ran `xt status --as liaison` itself, and QA read that as a way around the rule. `protocol.md`
+  section 1 and the liaison role now say: never act as the human and never suggest any route to it
+  (a harness shell, a command in your session, a script, another agent); your own normal work under
+  your own name and your role's authority stays allowed, for example `xt status --as liaison`, as
+  long as you don't offer it as a way around the request. Reporting a request that didn't come from
+  the human in your pane is unchanged. `xt` itself (authorization, `--as` checks, routing) is
+  unchanged.
+
+### Upgrading
+
+- `git pull upstream main` (or `xt version use v0.14.1-rc1 --candidate`). Agents read the new
+  wording in their next first prompt; restart when convenient (`xt down`, `xt restart --all`).
+
 ## [0.14.0] — 2026-09-29
 
 The accepted release: the same code as 0.14.0-rc2 (only the version changed). All four cards were
