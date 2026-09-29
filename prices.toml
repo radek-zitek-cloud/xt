@@ -7,7 +7,10 @@
 # output; plus where the price comes from, which price tier it is, and when it was checked.
 #
 # Tier: the provider's Standard API rates (not Batch, Flex, Fast or priority). OpenAI's page also
-# lists long-context rates; Codex sessions stay below 272k tokens, so the short-context rates apply.
+# lists higher long-context rates; xt always uses the short-context rates. That holds while a
+# session's context stays below the provider's long-context threshold (OpenAI names 272K for
+# gpt-5.5; the Codex sessions checked on 2026-09-29 logged a usable window of 258,400). A session
+# past the threshold would be underestimated; xt doesn't switch rates.
 # Claude 4.6 and later bill their whole 1M window at the standard rate. Actual billing (a
 # subscription, a negotiated plan) isn't visible to xt: every figure is an estimate.
 

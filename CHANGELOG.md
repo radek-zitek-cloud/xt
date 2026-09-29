@@ -9,6 +9,26 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.13.0-rc2] — 2026-09-29
+
+**Release candidate.** rc1 plus the fix for #116 from rc1's acceptance; #117's code is unchanged
+from rc1. It becomes 0.13.0, from the same code, once both cards are accepted.
+
+### Fixed
+
+- **Codex rate wording (#116, QA's rc1 finding).** The guide and `prices.toml` said the
+  short-context rates cover every Codex session. They now state the assumption and its limit: xt
+  always uses the short-context rates, right while a session stays below the provider's
+  long-context threshold (272K for gpt-5.5; the sessions checked on 2026-09-29 logged 258,400), an
+  underestimate beyond it.
+- **The Sonnet 5.5 cost check can be verified independently.** Claude Code's own result for the
+  fixture call (usage and `total_cost_usd` 0.0489674, list prices) is kept beside the trimmed log
+  (`tests/fixtures/claude-sonnet-5-5-result.json`), and the test compares xt's estimate with it.
+
+### Upgrading
+
+- As for 0.13.0-rc1.
+
 ## [0.13.0-rc1] — 2026-09-29
 
 **Release candidate.** Two cards, approved by Radek on 2026-09-29 (#1150): the model data a Claude

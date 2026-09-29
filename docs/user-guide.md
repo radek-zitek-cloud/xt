@@ -320,10 +320,13 @@ bill. Tokens of a model with no listed price are shown as unpriced, never as zer
 an agent's behalf (Codex's automatic reviewer, Claude subagents) are counted and shown as
 auxiliary. Where a harness reports your account's allowance (Codex: percent of its window and
 when it resets), the Status pane and `xt status` show it once per harness. `prices.toml` lists
-the current Codex and Claude models at the providers' **Standard** API rates (OpenAI's short-context
-rates, which cover every Codex session), each row with its source page and the date it was checked
+the current Codex and Claude models at the providers' **Standard** API rates, each row with its
+source page and the date it was checked
 (2026-09-29 for the table shipped with 0.13.0); xt can't see which tier or plan you're actually
-billed on, which is one more reason the figure is an estimate. To price another model, add it to
+billed on, which is one more reason the figure is an estimate. For Codex models xt uses OpenAI's
+short-context rates: right while a session stays below OpenAI's long-context threshold (272K for
+gpt-5.5; the Codex sessions checked on 2026-09-29 logged a usable window of 258,400), an
+underestimate beyond it. To price another model, add it to
 `prices.toml` with its source, tier and checked date.
 
 ### 12. Ending a team

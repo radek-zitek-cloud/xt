@@ -68,7 +68,11 @@ def test_a_real_sonnet_5_5_session_reads_its_context_and_prices_like_claude_code
     assert "2%" in usage.describe(r)
     [turn] = turns._claude(lines, {}, False)
     assert turn["model"] == "claude-sonnet-5-5" and turn["cache_write_1h"] == 11818
-    assert turns.estimate(turn, PRICES) == 0.048967
+    # Claude Code's own result for the same call (list prices), kept beside the log
+    result = json.loads((REPO / "tests/fixtures/claude-sonnet-5-5-result.json").read_text())
+    assert result["usage"]["cache_read_input_tokens"] == turn["cached_input"]
+    assert result["modelUsage"]["claude-sonnet-5-5"]["contextWindow"] == r.window
+    assert turns.estimate(turn, PRICES) == round(result["total_cost_usd"], 6) == 0.048967
 
 
 def test_codex_uses_its_logged_window_never_an_api_maximum(paths):

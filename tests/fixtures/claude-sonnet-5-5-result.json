@@ -1,0 +1,7 @@
+{"source": "`claude -p \"Reply with the single word ok.\" --model claude-sonnet-5-5 --strict-mcp-config --output-format json`, Claude Code 2.1.284, 2026-09-29; the fields of its result that matter here, verbatim",
+ "session_id": "453e8a50-66aa-4c65-afbb-e3f73e45a4d0",
+ "usage": {"input_tokens": 2, "cache_creation_input_tokens": 11818, "cache_read_input_tokens": 8257, "output_tokens": 4,
+           "cache_creation": {"ephemeral_1h_input_tokens": 11818, "ephemeral_5m_input_tokens": 0}},
+ "total_cost_usd": 0.0489674,
+ "modelUsage": {"claude-sonnet-5-5": {"inputTokens": 2, "outputTokens": 4, "cacheReadInputTokens": 8257,
+                "cacheCreationInputTokens": 11818, "costUSD": 0.0489674, "contextWindow": 1000000, "costBasis": "list"}}}
