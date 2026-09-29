@@ -9,6 +9,20 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.12.0] — 2026-09-29
+
+The accepted release: the same code as 0.12.0-rc3 (only the version changed). All four cards
+(#58 team versions, #56 safe context reset, #104 clear restore output, #110 roomy composer) passed
+the quality analyst's checks and were accepted; rc1 failed on #56, rc2 fixed three findings and
+failed on one more, rc3 fixed it, and #56 passed after a live reset check on a staging team. The
+changes are listed under the three candidates below.
+
+### Upgrading
+
+- From 0.11.0: `xt down`, `git pull upstream main`, `xt restart --all` (see 0.12.0-rc1 below).
+  From 0.12.0-rc3: nothing but the version changes; restart when convenient so `xt status` shows
+  every agent running 0.12.0.
+
 ## [0.12.0-rc3] — 2026-09-29
 
 **Release candidate.** rc2 plus one fix for card #56 found in rc2's acceptance; it becomes 0.12.0,
