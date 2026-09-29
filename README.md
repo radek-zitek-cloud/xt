@@ -32,8 +32,7 @@ each one is in [the story so far](docs/story.md).
   workspace, keep working while you're away. Codex has carried every real team so far; adapters for
   Claude Code and pi exist.
 - **Keep you to decisions only.** Questions wait in one Inbox (TUI or `xt inbox`) with a desktop
-  notification; you never have to watch an agent's pane. When a goal you dispatched is done, you
-  get one notification and it waits under "Done since you last looked".
+  notification; you never have to watch an agent's pane.
 - **Deliver every message through a supervisor, with a ledger.** Nothing is lost, and every step
   can be audited later: the quality analyst accepts work partly on evidence from the ledger.
 - **Work in goals, read back before dispatch.** The liaison reads a goal back to you, lets you
@@ -51,11 +50,15 @@ each one is in [the story so far](docs/story.md).
   and how much of the subscription allowance the week has used.
 - **Survive restarts.** `xt down` then `xt restart --all` brings back the team that was running;
   agents recover from files and a brief, not from memory.
-- **Keep agents in bounds.** No desktop or browser control and none of your account connectors
-  (mail, files, calendar) unless you opt one in; public output stays free of private details.
+- **Keep agents in bounds.** No desktop or browser control for agents; public output stays free
+  of private details.
 
-Added since (0.12.0 to 0.15.0), each checked against its spec by the product team's quality
+Added since (0.11.0 to 0.15.0), each checked against its spec by the product team's quality
 analyst before its final release, some on staging teams rather than in daily use yet:
+
+- **No account connectors by default.** Agents start without your mail, files or calendar
+  connectors unless you opt one in, and can't act as you: `--as human` works only from your own
+  terminal ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
 
 - **Know which xt is running.** The published, installed and running versions are shown apart,
   so a half-finished upgrade is visible ([Updating xt](docs/user-guide.md#7-updating-xt)).
@@ -73,8 +76,8 @@ analyst before its final release, some on staging teams rather than in daily use
   ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery), [`xt spawn`](docs/user-guide.md#xt-spawn)).
 - **See the Claude plan's usage.** The five-hour and weekly windows in `xt status` and the TUI,
   through a shipped status-line script ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
-- **Hear when a goal is done.** One notification per goal you dispatched, and a "Done since you
-  last looked" list in the Inbox ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **Hear when a goal is done.** Exactly one notification per goal you dispatched, when it's done
+  (progress on an open goal doesn't notify), and a "Done since you last looked" list in the Inbox ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 - **Short logs by default.** `xt log` prints the newest 20 messages; `--full` prints all
   ([`xt log`](docs/user-guide.md#xt-log)).
 
