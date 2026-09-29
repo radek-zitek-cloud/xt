@@ -9,10 +9,10 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.14.1-rc1] — 2026-09-29
+## [0.14.1] — 2026-09-29
 
-**Release candidate** of a patch release: one wording clarification, no behavior change. It
-becomes 0.14.1, from the same code, once #121 is accepted.
+A patch release: one wording clarification, no behavior change. The same code as 0.14.1-rc1 (only
+the version changed); #121 was accepted on rc1.
 
 ### Changed
 
@@ -29,8 +29,9 @@ becomes 0.14.1, from the same code, once #121 is accepted.
 
 ### Upgrading
 
-- `git pull upstream main` (or `xt version use v0.14.1-rc1 --candidate`). Agents read the new
-  wording in their next first prompt; restart when convenient (`xt down`, `xt restart --all`).
+- From 0.14.0: `git pull upstream main` (or `xt version use v0.14.1`), then restart (`xt down`,
+  `xt restart --all`) so agents get the new wording in their first prompt. From 0.14.1-rc1:
+  nothing but the version changes.
 
 ## [0.14.0] — 2026-09-29
 
