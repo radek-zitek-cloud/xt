@@ -9,6 +9,18 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-09-29
+
+The first patch release, via the team's bug path: the same code as 0.12.1-rc1 (only the version
+changed). Card #115 (an agent no longer gets its first prompt twice) passed the quality analyst's
+live check: after `xt restart --all` each of the four agents' session logs held its first prompt
+exactly once. The change is listed under 0.12.1-rc1 below.
+
+### Upgrading
+
+- From 0.12.0: `git pull upstream main`; restart when convenient (`xt down`, `xt restart --all`).
+  From 0.12.1-rc1: nothing but the version changes.
+
 ## [0.12.1-rc1] — 2026-09-29
 
 **Release candidate** of the first patch release, via the team's new bug path: one bug card, no
