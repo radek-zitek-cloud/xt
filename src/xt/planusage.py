@@ -133,7 +133,9 @@ def window_text(label: str, w, now: float) -> tuple[str, float | None]:
     """One window for status — `5% of 5h, resets Tue 14:30` — and when that reading was taken;
     or why there's no number (and None). Never raises: a snapshot is only data."""
     w = window(w, observed=True)
-    if w is None or w["observed_at"] > now + 60:  # malformed, or read "in the future"
+    # Malformed, or read after now: the script and xt run on the same machine, so any reading
+    # timestamped later than now is wrong, with no tolerance (QA on rc4).
+    if w is None or w["observed_at"] > now:
         return f"{label} unknown", None
     if w["resets_at"] <= now:
         return f"{label} window reset, no reading since", None

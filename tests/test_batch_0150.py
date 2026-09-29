@@ -351,10 +351,19 @@ def test_malformed_payload_numbers_are_never_stored(state, bad):
         assert not planusage.snapshot_path(ctx.paths.root).exists()
 
 
-def test_a_reading_from_the_future_or_a_broken_file_shows_unknown(state):
+@pytest.mark.parametrize("ahead", [1, 30, 3600])
+def test_a_reading_timestamped_after_now_shows_unknown(state, ahead):
+    """QA on rc4: rc4 tolerated 60 s; no reading later than now is valid (same machine)."""
     ctx = state
     _feed(ctx, SAMPLE, SEEN)
-    assert "5h unknown" in planusage.line(ctx.paths.root, SEEN - 3600)  # the clock went back
+    line = planusage.line(ctx.paths.root, SEEN - ahead)
+    assert line == "claude 5h unknown; 7d unknown (account-wide)"
+    assert "5% of 5h" in planusage.line(ctx.paths.root, SEEN)  # at the same second it's valid
+
+
+def test_a_broken_file_shows_unknown(state):
+    ctx = state
+    _feed(ctx, SAMPLE, SEEN)
     planusage.snapshot_path(ctx.paths.root).write_text("[" * 100000 + "]" * 100000)  # too deep for json
     assert planusage.line(ctx.paths.root, SEEN) == "claude 5h unknown; 7d unknown (account-wide)"
 
@@ -524,20 +533,32 @@ def test_tasks_and_goals_the_liaison_didnt_open_never_notify(ctx, notifications)
     assert notifications == []
 
 
-def test_other_liaison_reports_notify_once_per_ref(ctx, notifications):
+def test_progress_on_an_open_goal_never_notifies_the_goal_notifies_once_when_done(ctx, notifications):
+    """QA's rc3 FAIL on #125: one notification per goal, when it's done."""
     sup = _sup(ctx)
     goal = _goal(ctx)
     ctx.ledger.append("liaison", "human", "report", "Progress: half done", ref=goal)
     ctx.ledger.append("liaison", "human", "report", "Progress again", ref=goal)
+    sup.notify_human(_local(12, 1))
+    assert notifications == []  # the goal is still open
+    done = _done(ctx, goal)
+    ctx.ledger.append("liaison", "human", "report", "Finished: the digest", ref=goal)
+    ctx.ledger.append("liaison", "human", "report", "And one more thing about it", ref=done)
+    sup.notify_human(_local(12, 2))
+    sup.notify_human(_local(12, 30))  # no fallback either
+    assert _titles(notifications) == [f"xt t: goal #{goal} done"]
+    assert notifications[0][3] == "Finished: the digest"
+
+
+def test_other_liaison_reports_notify_once_per_ref(ctx, notifications):
+    sup = _sup(ctx)
+    question = ctx.ledger.append("liaison", "human", "ask", "Which story?")["id"]
+    ctx.ledger.append("liaison", "human", "report", "About that question: context", ref=question)
+    ctx.ledger.append("liaison", "human", "report", "And more context", ref=question)
     ctx.ledger.append("liaison", "human", "report", "A note without a ref")
     ctx.ledger.append("lead", "liaison", "report", "not for the human")
     sup.notify_human(_local(12, 1))
-    assert _titles(notifications) == ["xt t: report from liaison"] * 2
-    _done(ctx, goal)
-    ctx.ledger.append("liaison", "human", "report", "Finished: the digest", ref=goal)
-    sup.notify_human(_local(12, 2))
-    assert _titles(notifications)[-1] == f"xt t: goal #{goal} done"  # its done report still notifies
-    assert len(notifications) == 3
+    assert _titles(notifications) == ["xt t: question from liaison"] + ["xt t: report from liaison"] * 2
 
 
 def test_quiet_hours_drop_the_goal_notification(ctx, notifications):

@@ -247,8 +247,8 @@ for a Claude agent whose settings file has a `statusLine` entry. It keeps each w
 `used_percentage`, `resets_at` and the time it was read in `state/claude_plan.json`, replaced
 atomically (temporary file, then rename), under `XT_ROOT` or else the checkout the script is in. A
 call without `rate_limits` leaves the file alone. `xt status` and the TUI show it with the Codex
-allowance: a passed reset, a reading over 3 hours old, or a missing or broken file shows no
-percentage.
+allowance: a passed reset, a reading over 3 hours old or timestamped later than now, an
+out-of-range value, or a missing or broken file shows no percentage.
 
 ## The ledger and recovery
 
@@ -327,9 +327,10 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    `curl`), except inside the `quiet` window. Counting starts when the supervisor first runs; what
    arrives in quiet hours stays in the Inbox without a notification. A goal the liaison opened
    notifies once when it closes (`src/xt/goaldone.py`, `state/goal_notices.json`): the liaison's
-   report to the human about it (its `--ref` is the goal or the lead's `done`) is the notification;
-   a closure without one within 5 minutes notifies with the closing summary's first line. Other
-   liaison reports to the human notify once per `ref`. `state/inbox_seen.json` holds the message id
+   report to the human about it after the closure (its `--ref` is the goal or the lead's `done`) is
+   the notification; a closure without one within 5 minutes notifies with the closing summary's
+   first line. Reports about a goal that's still open, or after its notification, don't notify.
+   Other liaison reports to the human (not about a goal) notify once per `ref`. `state/inbox_seen.json` holds the message id
    up to which the human has seen the Inbox's "Done since you last looked" (the TUI moves it when
    the human leaves the Inbox panel, `xt inbox` in the human's terminal after printing).
 10. **Rotation**, hourly.

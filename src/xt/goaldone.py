@@ -1,10 +1,11 @@
 """Telling the human when a goal is done (card #125).
 
-A goal the human dispatched is a goal the liaison opened. When one closes, the human gets exactly
-one notification: the liaison's report about it (a `report` to the human whose `--ref` is the goal
-or the lead's `done`), or, if no such report arrives within FALLBACK_SECONDS of the closure, the
-supervisor's own "goal done" with the first line of the closing summary. Other liaison reports to
-the human notify too, deduplicated by their `ref`. The Inbox lists goals closed since the human
+A goal the human dispatched is a goal the liaison opened. It gives the human exactly one
+notification, when it's done: the liaison's report about it after the closure (a `report` to the
+human whose `--ref` is the goal or the lead's `done`), or, if no such report arrives within
+FALLBACK_SECONDS of the closure, the supervisor's own "goal done" with the first line of the
+closing summary. Liaison reports about a goal that's still open don't notify. Other liaison
+reports to the human (not about a goal) notify, deduplicated by their `ref`. The Inbox lists goals closed since the human
 last looked (`state/inbox_seen.json`) until they've seen them."""
 
 import json
@@ -91,13 +92,16 @@ class Notices:
         if m["type"] != "report" or m["to"] != HUMAN or m["from"] not in liaisons(ctx):
             return None
         goal = goal_of_report(ctx, m, msgs)
-        if goal is not None and str(goal) in self.pending:  # the goal's own notification
+        if goal is not None:
+            # A goal notifies exactly once, when it's done (Radek's amendment, QA on rc3): the
+            # liaison's report after the closure, else the fallback. Progress on an open goal, and
+            # anything after the goal's one notification, stays in the Inbox only.
+            if str(goal) not in self.pending:
+                return None
             del self.pending[str(goal)]
             if self._once(f"goal:{goal}"):
                 return f"goal #{goal} done", first_line(m["body"])
             return None
-        if goal is not None and f"goal:{goal}" in self.notified:
-            return None  # the goal already notified (e.g. by the fallback)
         if m.get("ref") is not None and not self._once(f"ref:{m['ref']}"):
             return None
         return f"report from {m['from']}", first_line(m["body"])

@@ -104,8 +104,10 @@ nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
 one desktop notification when it closes, "goal #210 done". Normally it's the liaison's report to
 you about it (its first line is the text); the liaison sends it with `--ref` to the goal. If no such
 report arrives within 5 minutes of the closure, the supervisor sends "goal #210 done" with the
-first line of the lead's closing summary instead. Other reports the liaison sends you notify too,
-once per `--ref`. Tasks, goals the lead opens for sub-teams, and friction never notify, and quiet
+first line of the lead's closing summary instead. That is the goal's only notification: the
+liaison's progress reports about a goal that's still open, and anything it sends about the goal
+afterwards, wait in the Inbox without one. Other reports the liaison sends you (not about a goal)
+notify, once per `--ref`. Tasks, goals the lead opens for sub-teams, and friction never notify, and quiet
 hours apply as for questions (what closes at night isn't sent later). "Done since you last looked"
 lists closed goals until you've looked: in the TUI, until you leave the Inbox panel (or quit) after
 it showed them; with `xt inbox`, once it has printed them in your own terminal (an agent running `xt
@@ -374,7 +376,9 @@ share.
 - **When there's no number.** A session's first status call (before any reply) carries no limits;
   the last reading stays and status shows its age. A window whose reset time has passed shows
   `5h window reset, no reading since` rather than the old percentage. A reading older than 3 hours,
-  a missing or unreadable file shows `unknown`; the rest of status is unaffected. Status shows the
+  one timestamped later than now (the script and xt run on the same machine, so there's no
+  tolerance), a value out of range (a percentage outside 0–100, a time outside 2000–2100) or a
+  missing or unreadable file shows `unknown`; the rest of status is unaffected. Status shows the
   Claude line when the team has a Claude agent or a reading exists.
 - **Never in the way.** The file is replaced in one step (never half-written), and bad input from
   Claude Code only prints `xt` as the status line.
