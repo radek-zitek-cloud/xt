@@ -408,7 +408,8 @@ harness goes to the human with `xt friction`.
   (card #130: Flow about a third, the Inbox the tallest list). The TUI starts in the Inbox. Three
   numbered panes of fixed size (focus shows by frame colour and a reversed title; `/` filters the
   focused one; list rows are cut at the pane's width in cells and end with a dim age, `model.fit`):
-  **Inbox** (1: three groups: Needs you with open questions, pending approvals and alerts; New
+  **Inbox** (1: three groups: Needs you with open questions, pending approvals and alerts, and
+  the questions the human answered in the last 7 days folded under it, `inbox.answered`; New
   with goals done and reports to the human since they last looked, and those already seen from the
   last 7 days folded under it, `inbox.earlier`, card #157, read from the ledger and the existing
   marker; unread Friction, with seen friction folded; the counts in its title), **Work** (2, card #129: goals and their tasks as one

@@ -13,7 +13,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 A patch release for the TUI of 0.16.0: six fixes from its first live use, one card (#157), to the
 approved spec. No command, protocol, ledger or state-file change. **0.16.1-rc1** (2026-09-30) has
-all six.
+all six. **0.16.1-rc2** (2026-09-30) adds change 5b, the answered-questions fold, which Radek added
+to the card while rc1 was being built; the rest is unchanged from rc1.
 
 ### Fixed
 
@@ -37,6 +38,13 @@ all six.
   days, also after quitting and restarting the TUI. `enter` or `space` opens them; the detail pane
   shows each as before. Nothing is stored for it: it reads the ledger and the existing seen marker.
   `xt inbox` is unchanged.
+- **Your answers stay visible (#157, rc2).** A question you answered left the Inbox with no trace
+  there. Now the questions you answered in the last 7 days fold under Needs you as
+  `(N answered, last 7 days) ▸`, newest first, one row each with the question and your answer
+  (`✓ #2098 v0.16.1 spec → 1: Approve and build`). The detail pane shows the question with its
+  options, your answer and the thread; `enter` or `space` opens and folds it. It reads the
+  ledger only (your reply with `--ref` to the question, which `xt answer` and the TUI's `s`
+  record).
 - **The mouse (#157).** A click selects the row in any pane (a Team agent, a Flow row, an Inbox or
   Work row) and focuses that pane; the detail pane follows, but focus stays where you clicked
   (in v0.16.0 a click in the Inbox or Work threw focus into the detail pane, and Team and Flow

@@ -11,7 +11,7 @@ from textual import events
 
 from xt.tui import teampane
 from xt.tui.app import DETAIL, FLOW, HINTS, INBOX, TEAM, WORK, Help, LiveActions, XtTui
-from xt.tui.model import EARLIER_FOLD, FRICTION_FOLD, build
+from xt.tui.model import ANSWERED_FOLD, EARLIER_FOLD, FRICTION_FOLD, build
 from xt.tui.thread import ThreadDetail
 
 from .test_batch_0160 import _fixture, _shown, _team, _work_fixture, _xt_inbox
@@ -306,6 +306,88 @@ def test_4_space_and_enter_open_and_fold_both_seen_folds(ctx):
                 assert app.focused is p
 
     _run(run())
+
+
+# --- 5b answered questions under Needs you ----------------------------------------------------------------
+
+
+def test_5b_an_answer_given_in_the_tui_is_in_the_answered_fold_after_a_restart(ctx):
+    f = _fixture(ctx)
+
+    async def answer():
+        app = _app(ctx)
+        async with app.run_test(size=(160, 40)) as pilot:
+            p = app.panel(INBOX)
+            p.highlighted = next(i for i, r in enumerate(p.rows) if r.kind == "question")
+            await pilot.press("s")
+            await pilot.pause()
+            await pilot.press("1", "ctrl+s")  # option 1, recorded as its full text
+            await pilot.pause()
+            assert not [r for r in p.rows if r.kind == "question"]
+
+    _run(answer())
+    # no new state: the marker keeps v0.16.0's keys
+    assert set(json.loads((ctx.paths.state / "inbox_seen.json").read_text())) <= {"upto", "friction_upto",
+                                                                                   "friction_seen"}
+
+    async def restart():
+        app = _app(ctx)  # a fresh TUI
+        async with app.run_test(size=(160, 40)) as pilot:
+            p = app.panel(INBOX)
+            rows = p.all_rows
+            heads = [r.text.plain for r in rows if r.kind == "heading"]
+            assert heads[0] == "NEEDS YOU"
+            fold = next(i for i, r in enumerate(rows) if r.key == ANSWERED_FOLD)
+            assert rows[fold].text.plain == "(1 answered, last 7 days) ▸"
+            assert rows.index(next(r for r in rows if r.text.plain == "NEW")) > fold  # under Needs you
+            assert not [r for r in p.rows if r.kind == "answered"]  # folded at first
+            p.highlighted = next(i for i, r in enumerate(p.rows) if r.key == ANSWERED_FOLD)
+            await pilot.press("space")
+            await pilot.pause()
+            shown = [r for r in p.rows if r.kind == "answered"]
+            assert [r.data["id"] for r in shown] == [f["q"]]
+            assert shown[0].text.plain.startswith(f"✓ #{f['q']} How should goal #9 finish? → 1: Close it")
+            await pilot.press("down")
+            text = "\n".join(_shown(app))
+            assert "Options:" in text and "1. Close it — done now" in text  # the question with its options
+            assert "your answer" in text and "Option 1: Close it — done now" in text
+            assert isinstance(app.detail_view, ThreadDetail) and "◀ you are here" in text  # the thread
+            await pilot.press("space")  # folds it again from a row under it
+            await pilot.pause()
+            assert not [r for r in p.rows if r.kind == "answered"] and p.current.key == ANSWERED_FOLD
+            await pilot.press("enter")
+            await pilot.pause()
+            assert [r.kind for r in p.rows].count("answered") == 1
+
+    _run(restart())
+
+
+def test_5b_answers_newest_first_for_seven_days_and_open_questions_stay_in_needs_you(ctx, clock):
+    from xt.dispatch import send
+    from xt.tui.model import answer_text
+
+    add = lambda text: send(ctx, "liaison", "human", "ask", text)[0]["id"]
+    q1, q2, q3 = add("First question?"), add("Second question?"), add("Still open?")
+    actions = LiveActions(ctx)
+    actions.answer(q1, "yes, the first")
+    clock.advance(days=1)
+    actions.answer(q2, "no, the second")
+    rows = build(ctx).panels["Inbox"]
+    answered = [r for r in rows if r.kind == "answered"]
+    assert [r.data["id"] for r in answered] == [q2, q1]  # newest answer first
+    assert [r.data["id"] for r in rows if r.kind == "question"] == [q3]
+    assert answered[0].text.plain.startswith(f"✓ #{q2} Second question? → no, the second")
+    clock.advance(days=6, hours=1)  # q1's answer is over 7 days old
+    assert [r.data["id"] for r in build(ctx).panels["Inbox"] if r.kind == "answered"] == [q2]
+    assert answer_text("Option 2: Retry — one more day") == "2: Retry"
+    assert answer_text("free text\nmore") == "free text"
+
+
+def test_5b_xt_inbox_prints_what_it_did_before(ctx, monkeypatch, capsys):
+    f = _fixture(ctx)
+    LiveActions(ctx).answer(f["q"], "1")
+    out = _xt_inbox(ctx, monkeypatch, capsys, False)
+    assert "answered" not in out and "How should goal #9 finish?" not in out
 
 
 # --- 6 mouse --------------------------------------------------------------------------------------------

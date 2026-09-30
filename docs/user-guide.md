@@ -95,6 +95,7 @@ it isn't shown:
 | `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options` when it offers choices) | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
 | `⚑ #12 spawn …` / `⚑ #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
 | `⚠ …` | An **alert**: an agent crashed, is blocked or went silent; or (from 0.16.0) the supervisor failed to wake an agent, to send a notification or to record usage (`⚠ ×3 wake-up failed: …`) | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
+| `(2 answered, last 7 days) ▸` | (from 0.16.1) The questions you answered in the last 7 days, folded: `✓ #2098 v0.16.1 spec → 1: Approve and build`, newest first; the detail pane shows the question with its options, your answer and the thread | `enter` or `space` shows them; again folds them |
 | **NEW** | Since you last looked, newest first; clears once you've looked | |
 | `✓ #210 done: Write the weekly digest  #260` | A goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) and the goal's whole thread | Read it |
 | `✉ #47 liaison: …` | A report to you | Read it |

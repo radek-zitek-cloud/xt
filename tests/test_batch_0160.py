@@ -1096,7 +1096,7 @@ def test_space_and_o_outside_work_say_where_they_work(ctx):
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
             await pilot.press(str(INBOX), "space")  # no fold in this Inbox (space folds there since #157)
-            assert app.status.startswith("space in the Inbox works on its seen rows")
+            assert app.status.startswith("space in the Inbox works on its folds")
             await pilot.press(str(FLOW), "space")
             assert app.status == f"space works in the Inbox ({INBOX}) and Work ({WORK})"
             await pilot.press(str(INBOX), "o")

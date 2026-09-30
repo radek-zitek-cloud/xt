@@ -29,7 +29,16 @@ from .thread import ThreadDetail, thread_of
 # Tasks, the Supervisor is a pop-up on `v` (card #131) and Flow replaced the Log (card #130).
 PANELS = ("Inbox", "Work", "Flow")
 # the Inbox's folds (cards #127, #157): their rows carry the fold's key in `under`
-FRICTION_FOLD, EARLIER_FOLD = "fold:friction", "fold:earlier"
+FRICTION_FOLD, EARLIER_FOLD, ANSWERED_FOLD = "fold:friction", "fold:earlier", "fold:answered"
+OPTION_ANSWER = re.compile(r"^Option (\d+): (.+?)(?: — .*)?$", re.S)
+
+
+def answer_text(body: str) -> str:
+    """An answer as its row shows it: `1: Approve and build` for a picked option (recorded as
+    `Option 1: Approve and build — <consequence>`), else its first line."""
+    first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+    m = OPTION_ANSWER.match(first)
+    return f"{m.group(1)}: {m.group(2)}" if m else first
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
@@ -397,6 +406,28 @@ def build(ctx: Ctx) -> Snapshot:
         n = int(al.get("count", 1))
         needs.append(Row(f"alert:{key}", _t(("⚠ ", "red"), (f"×{n} ", "yellow") if n > 1 else "", _line(al["text"])),
                          detail, "alert", {"key": key}, row_age(al.get("last") or al.get("ts"), now)))
+    if box.answered:  # the human's decisions stay in view for a week (card #157)
+        n = len(box.answered)
+        needs.append(Row(ANSWERED_FOLD, _t((f"({n} answered, last {_inbox.EARLIER_DAYS} days) ▸", "bright_black")),
+                         lambda n=n: Text(f"{n} questions you answered in the last {_inbox.EARLIER_DAYS} days, "
+                                          "newest first: enter or space shows or hides them\n", style="bright_black"),
+                         "fold", {"n": n}))
+        for q, a in box.answered:
+            def adetail(q=q, a=a):
+                out = Text()
+                out.append(f"Question #{q['id']} from {q['from']} · answered {a['ts'][:16].replace('T', ' ')}\n",
+                           style="bold")
+                out.append(q["body"] + "\n")
+                out.append_text(_heading(f"your answer: #{a['id']}"))
+                out.append(a["body"] + "\n")
+                return thread(a, out, "answered already · S: message the liaison")
+
+            needs.append(Row(f"answered:{q['id']}", _t(("✓ ", "bright_black"),
+                                                       (f"#{q['id']} {_line(first_line(q['body'], 60))} → "
+                                                        f"{_line(answer_text(a['body']))}", "bright_black")),
+                             adetail, "answered", {"id": q["id"], "answer": a["id"], "folded": True,
+                                                   "under": ANSWERED_FOLD}, row_age(a["ts"], now)))
+
     def new_row(m: dict, goal: dict | None, seen: bool) -> Row:
         """A New row: a report to the human, or a goal of theirs that closed. Seen ones (card #157)
         are dim and folded under `(N earlier, seen)`."""

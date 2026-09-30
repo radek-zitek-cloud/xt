@@ -217,6 +217,7 @@ the pane's whole width and end with their age.
 | `c` | Clear the selected alert, or mark the selected friction seen (Inbox) |
 | `enter` or `space` on `(N older, seen) ▸` | Show or hide the friction you've already seen (Inbox) |
 | `enter` or `space` on `(N earlier, seen) ▸` | Show or hide what New showed you in the last 7 days (Inbox) |
+| `enter` or `space` on `(N answered, last 7 days) ▸` | Show or hide the questions you answered in the last 7 days, each with your answer (Inbox, under Needs you) |
 | `f` (Team) | Switch Herdr to the selected agent's workspace |
 | `u` / `U` | Start the selected stopped agent / every stopped agent |
 | `x` / `X` | Stop the selected agent / every agent (they stay in the roster) |

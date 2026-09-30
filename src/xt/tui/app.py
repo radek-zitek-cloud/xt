@@ -857,7 +857,8 @@ class Help(ModalScreen[None]):
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
         ("c", "clear the selected alert; on unread friction: mark it seen"),
         ("enter/space", "on (N older, seen): show or hide the friction you've seen; on (N earlier, seen): "
-                        "the New items you've seen in the last 7 days"),
+                        "the New items you've seen in the last 7 days; on (N answered, last 7 days): "
+                        "your answers"),
         (f"Work ({WORK})", ""),
         ("space", "fold or unfold the selected goal, done (N) or no goal row (on a task: fold its goal)"),
         ("o", "open work only: hide done (N) and done tasks; again: show them"),
@@ -1266,7 +1267,8 @@ class XtTui(App):
             if panel.toggle_fold():
                 self.show_detail(panel)
             else:
-                self.set_status("space in the Inbox works on its seen rows: (N older, seen), (N earlier, seen)")
+                self.set_status("space in the Inbox works on its folds: (N answered…), (N earlier, seen), "
+                                "(N older, seen)")
             return
         panel = self._work_focused("space", f"the Inbox ({INBOX}) and Work ({WORK})")
         if panel:

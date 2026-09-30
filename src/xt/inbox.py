@@ -38,6 +38,7 @@ class Inbox:
     unread: list[dict] = field(default_factory=list)  # unread friction, newest first
     seen: list[dict] = field(default_factory=list)  # seen friction, newest first
     earlier: list[tuple[dict, dict | None]] = field(default_factory=list)  # New items seen, last 7 days (#157)
+    answered: list[tuple[dict, dict]] = field(default_factory=list)  # (question, answer), last 7 days (#157)
     upto: int = 0  # the done marker to set once the human has looked
 
     @property
@@ -78,10 +79,8 @@ def mark_friction_seen(ctx: Ctx, ids) -> None:
     save_seen(ctx, d)
 
 
-def earlier(ctx: Ctx, msgs: list[dict], open_ids: set[int], upto: int) -> list[tuple[dict, dict | None]]:
-    """What New showed and the human has since seen (up to the done marker), from the last
-    EARLIER_DAYS: [(message, goal if a done goal)], newest first. The TUI folds them under New
-    (card #157); nothing is stored for it."""
+def _recent(ctx: Ctx):
+    """Whether a message is from the last EARLIER_DAYS."""
     since = ctx.ledger.clock() - dt.timedelta(days=EARLIER_DAYS)
 
     def recent(m: dict) -> bool:
@@ -90,6 +89,29 @@ def earlier(ctx: Ctx, msgs: list[dict], open_ids: set[int], upto: int) -> list[t
         except (KeyError, TypeError, ValueError):
             return False
 
+    return recent
+
+
+def answered(ctx: Ctx, msgs: list[dict], open_ids: set[int]) -> list[tuple[dict, dict]]:
+    """Questions to the human that the human answered in the last EARLIER_DAYS: [(question,
+    answer)], newest answer first. The answer is the human's first reply with `--ref` to the
+    question (what `xt answer` and the TUI's `s` record). The TUI folds them under Needs you
+    (card #157); read from the ledger only."""
+    recent = _recent(ctx)
+    questions = {m["id"]: m for m in msgs if m["type"] == "ask" and m["to"] == HUMAN}
+    out: dict[int, tuple[dict, dict]] = {}
+    for m in msgs:
+        q = questions.get(m.get("ref"))
+        if q and m["from"] == HUMAN and q["id"] not in open_ids and q["id"] not in out and recent(m):
+            out[q["id"]] = (q, m)
+    return sorted(out.values(), key=lambda p: -p[1]["id"])
+
+
+def earlier(ctx: Ctx, msgs: list[dict], open_ids: set[int], upto: int) -> list[tuple[dict, dict | None]]:
+    """What New showed and the human has since seen (up to the done marker), from the last
+    EARLIER_DAYS: [(message, goal if a done goal)], newest first. The TUI folds them under New
+    (card #157); nothing is stored for it."""
+    recent = _recent(ctx)
     out = []
     for m in msgs:
         if m["id"] > upto or not recent(m):
@@ -117,6 +139,7 @@ def build(ctx: Ctx, msgs: list[dict], open_items: list[dict] | None = None) -> I
             and m["id"] not in open_ids]
     box.new = sorted(new, key=lambda p: -p[0]["id"])
     box.earlier = earlier(ctx, msgs, open_ids, upto)
+    box.answered = answered(ctx, msgs, open_ids)
     f_upto, f_seen = friction_marker(ctx)
     friction = [m for m in msgs if m["type"] == "friction"][::-1]
     box.unread = [m for m in friction if m["id"] > f_upto and m["id"] not in f_seen]
