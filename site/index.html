@@ -20,6 +20,7 @@
   </a>
   <div class="nav-links">
     <a href="#how">How it works</a>
+    <a href="#tui">TUI</a>
     <a href="#can">Capabilities</a>
     <a href="#teams">Live teams</a>
     <a href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/story.md">Story</a>
@@ -31,7 +32,7 @@
 <header class="hero">
   <div class="grid-bg"></div>
   <div class="wrap">
-    <div class="eyebrow">open source · MIT · v0.15.0</div>
+    <div class="eyebrow">open source · MIT · v0.16.0</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You approve, decide and correct, and every step is on record.</p>
     <div class="cta">
@@ -166,6 +167,26 @@
       <div class="frame"><div class="frame-inner" style="padding:10px">
         <img class="shot" src="assets/screen.jpg" alt="The xt TUI next to a liaison's pane in Herdr: goals, team, tasks, inbox, log and supervisor panels" loading="lazy" width="1600" height="880">
       </div><div class="caption">The TUI (right) beside the liaison's pane in Herdr</div></div>
+    </div>
+  </div>
+</section>
+
+<section id="tui">
+  <div class="wrap">
+    <div class="section-title">
+      <h2>The whole team on one screen</h2>
+      <p>The TUI was redesigned in 0.16: what needs you comes first, the team is grouped by harness, and every message is drawn as it flows between agents.</p>
+    </div>
+    <div class="frame"><div class="frame-inner" style="padding:10px">
+      <img class="shot" src="assets/tui-v0160.svg" alt="The xt 0.16 TUI: the Team pane by harness on top, the Inbox and the Work outline on the left, the detail pane on the right, the Flow lane chart across the bottom" loading="lazy" width="1970" height="1026">
+    </div><div class="caption"><code class="mono">xt tui --demo</code> at 160×40: made-up data, not a live team</div></div>
+    <div class="grid">
+      <div class="cell"><div class="k">Inbox</div><h4>Three groups</h4><p><b>Needs you</b> (questions, approvals, alerts, until you act), <b>New</b> (done goals and reports since you last looked) and unread <b>Friction</b>.</p></div>
+      <div class="cell"><div class="k">Team</div><h4>By harness</h4><p>Each harness's account windows as bars with their reset time, then its agents: state, model and context used.</p></div>
+      <div class="cell"><div class="k">Work</div><h4>An outline</h4><p>Goals with their tasks under them, open, done or failed, and how many are done; fold them, or show open work only.</p></div>
+      <div class="cell"><div class="k">Flow</div><h4>A lane chart</h4><p>One lane per agent and one arrow per message, marked by its type; filter to an agent, a goal or some text.</p></div>
+      <div class="cell"><div class="k">Detail</div><h4>The whole thread</h4><p>The selected item with its goal, tasks and every reply in time order, and where you are in it.</p></div>
+      <div class="cell"><div class="k">Supervisor</div><h4>A pop-up on <code class="mono">v</code></h4><p>What the supervisor did, newest first. A failed wake-up or notification now raises an Inbox alert.</p></div>
     </div>
   </div>
 </section>

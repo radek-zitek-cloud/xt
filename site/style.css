@@ -160,6 +160,7 @@ h3 { margin: 0; font-size: clamp(28px, 3.2vw, 38px); font-weight: 400; letter-sp
 .grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .grid + .section-title { margin-top: 110px; }
+.frame + .grid { margin-top: 40px; }
 .cell { background: var(--bg); padding: 26px 24px; }
 .cell .k { font: 400 12px var(--mono); color: var(--accent); }
 .cell h4 { margin: 10px 0 8px; font-size: 17px; font-weight: 500; letter-spacing: -.01em; }
