@@ -672,8 +672,9 @@ def test_status_and_team_panes_are_gone_and_team_shows_header_blocks_and_agents(
             codex = next(i for i, ln in enumerate(lines) if ln.startswith("CODEX"))
             assert set(lines[spend + 1]) == set(lines[codex - 1]) == {"─"}
             claude = lines[spend + 2]
-            assert claude.startswith("CLAUDE  5h ▓") and "6% resets 15:00" in claude
-            assert "7d" not in claude  # Claude's stale 7d reading: no blank bar
+            # Claude's stale 7d reading: no blank bar, and the `?` cue after the name (card #151)
+            assert claude.startswith("CLAUDE ?  5h ▓") and "6% resets 15:00" in claude
+            assert "7d" not in claude
             assert lines[codex].startswith("CODEX  7d ▓▓▓▓▓▓░░░░  64% resets Tue")
             name = lambda ln: ln.split()[1]
             assert [name(ln) for ln in lines[spend + 3:codex - 1]] == ["pm", "builder", "qa"]  # one per line
@@ -823,8 +824,12 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
             assert app.focused.title == "Flow"
             await pilot.press("tab", "tab")  # past Flow Detail, the last pane (#162); then Team, at the top
             await pilot.pause()
-            assert app.focused is app.team and app.team.current.data["name"] == "pm"
+            # the header, then the Claude line, then its agents (card #151)
+            assert app.focused is app.team and app.team.current.kind == "team"
             await pilot.press("j")
+            await pilot.pause()
+            assert app.team.current.kind == "harness" and app.team.current.data["harness"] == "claude"
+            await pilot.press("j", "j")
             await pilot.pause()
             assert app.team.current.data["name"] == "builder"
             assert _title(app.query_one("#detail")) == "[4] - Detail - Team"

@@ -8,6 +8,7 @@ The pane never scrolls: what doesn't fit its height gives way to a last `+N more
 import datetime as dt
 import re
 from dataclasses import dataclass, field
+from typing import Callable
 
 from rich.style import Style
 from rich.text import Text
@@ -28,6 +29,8 @@ VERSIONED = re.compile(r"^([a-z]+)-(\d+)-(\d+)(?:-\d{8})?$", re.I)
 class Harness:
     name: str
     windows: list[tuple[str, float, int | None]] = field(default_factory=list)  # (label, used %, resets_at)
+    cue: bool = False  # a window with a stale or no reading: a dim `?` after the name (card #151)
+    detail: Callable[[], object] | None = None  # what Detail shows with the harness line selected
 
 
 def short_model(model: str | None) -> str:
@@ -152,7 +155,7 @@ def fit_bar(width: int, w: Widths) -> int:
 
 # --- the pane ---------------------------------------------------------------------------------
 
-HEADER = "header"  # the key of the header line; a harness line's is harness_key(name)
+HEADER = ":header"  # the key of the header line (no agent name has a colon); a harness line's is harness_key(name)
 MORE = "+{n} more (widen the terminal)"
 
 
@@ -166,7 +169,9 @@ def block_header(h: Harness, width: int, now: dt.datetime) -> list[Text]:
 
     name = h.name.upper()
     lines = [Text(name, style="bold")]
-    indent = len(name) + 2
+    if h.cue:
+        lines[0].append(" ?", style="bright_black")
+    indent = lines[0].cell_len + 2
     for label, pct, reset in h.windows:
         seg = window_segment(label, pct, reset, now)
         if lines[-1].cell_len + 2 + seg.cell_len <= width:
@@ -202,7 +207,8 @@ def render(header: Text, spend: str, harnesses: list[Harness], agents: list[dict
     """The pane's lines at `width`, top to bottom, each with the key of the row it belongs to: the
     header line (HEADER), a harness's lines (harness_key), an agent's line (its name), or None for
     today's spend and the separators. In order: the header, today's spend, a separator, then per
-    harness its usage line and its agents, a separator between harnesses (card #162)."""
+    harness its usage line and its agents, a separator between harnesses (card #162). The header and
+    the harness lines are rows that can be selected too (card #151); `selected` is a row's key."""
     from .model import fit
 
     out: list[tuple[Text, str | None]] = [(ln, HEADER) for ln in wrap_header(header, width)]
@@ -219,6 +225,12 @@ def render(header: Text, spend: str, harnesses: list[Harness], agents: list[dict
         out.append((separator(width), None))
         out += [(ln, harness_key(b.name)) for ln in block_header(b, width, now)]
         out += [(fit(cell(a, w, bar, a["name"] == selected), "", width), a["name"]) for a in by_harness[b.name]]
+    for line, key in out:  # the header and harness rows: selected like an agent, and a click selects them
+        if key in (HEADER, *(harness_key(b.name) for b in blocks)):
+            if key == selected:
+                line.append(" " * max(0, width - line.cell_len))
+                line.stylize(SELECTED)
+            line.stylize(Style.from_meta({"team_row": key}))
     return out
 
 

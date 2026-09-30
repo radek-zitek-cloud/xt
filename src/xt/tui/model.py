@@ -5,6 +5,7 @@ the row the human is looking at.
 """
 
 import datetime as dt
+import json
 import re
 import textwrap
 from dataclasses import dataclass, field
@@ -125,6 +126,7 @@ class Snapshot:
     inbox_title: str = ""  # the Inbox's counts, `⚑ 1 · ✉ 2 · ✱ 1` (card #127)
     work_title: str = ""  # the Work pane's counts, `1 open · 63 done` (card #129)
     flow: FlowData = field(default_factory=FlowData)  # what the Flow chart draws (card #130)
+    header_detail: Callable[[], object] | None = None  # Detail for the Team header row (card #151)
 
 
 def age_text(secs: float) -> str:
@@ -501,7 +503,7 @@ def build(ctx: Ctx) -> Snapshot:
     from .. import versions
 
     try:
-        vers = versions.current(ctx, live_names=set(live))
+        vers = versions.current(ctx, live_names=set(live), now=now)
     except Exception:  # never let a version read break the TUI
         vers = None
     running = sum(1 for n in live if ctx.team.agent(n))
@@ -512,7 +514,19 @@ def build(ctx: Ctx) -> Snapshot:
         windows = turns.allowance_windows(ctx)
     except Exception:  # a bad reading must never take the pane with it
         windows = {}
-    harnesses = [Harness(n, windows.get(n, [])) for n in sorted({r.data["harness"] for r in team_rows} | set(windows))]
+    harnesses = []
+    for n in sorted({r.data["harness"] for r in team_rows} | set(windows)):
+        try:
+            facts = window_facts(ctx, n, now)
+        except Exception:  # only data: a bad file never takes the pane with it
+            facts = []
+        members = [r.data for r in team_rows if r.data["harness"] == n]
+        harnesses.append(Harness(n, windows.get(n, []), cue=any(w is None for _, w, _ in facts),
+                                 detail=lambda n=n, facts=facts, members=members:
+                                 harness_detail(n, facts, members, spend, now)))
+
+    def header_detail(vers=vers):
+        return team_detail(vers, spend, now)
     # Supervisor: what xt watch did, newest first (the `v` pop-up, card #131)
     from ..watch import watch_log
 
@@ -532,7 +546,132 @@ def build(ctx: Ctx) -> Snapshot:
         box.title(),
         work_title,
         flow_data,
+        header_detail,
     )
+
+
+# --- the Team pane's header and harness rows (card #151) --------------------------------------------
+
+CLAUDE_SOURCE = "the statusLine snapshot (.xt/state/claude_plan.json), account-wide"
+CODEX_SOURCE = "its session logs (.xt/state/allowance.json), account-wide"
+
+
+def _span(secs: float) -> str:
+    """`3 h 10 m`, `12 m`, `under a minute`."""
+    m = max(0, int(secs // 60))
+    return "under a minute" if m < 1 else f"{m} m" if m < 60 else f"{m // 60} h {m % 60:02d} m"
+
+
+def _ago(secs: float) -> str:
+    return "just now" if secs < 60 else f"{_span(secs)} ago"
+
+
+def _reset(resets_at, now: dt.datetime) -> str:
+    return teampane.reset_text(resets_at, now) or "reset time unknown"
+
+
+def window_facts(ctx: Ctx, harness: str, now: dt.datetime) -> list[tuple[str, dict | None, str]]:
+    """A harness's account windows as (label, reading, text): the reading (used, resets_at, age,
+    source) when there is a current one, else None and why not with what to do. Only what xt already
+    reads: Claude Code's statusLine snapshot, a harness's rate limits from its session logs."""
+    from .. import planusage
+
+    t = now.timestamp()
+    if harness == "claude":
+        path = planusage.snapshot_path(ctx.paths.root)
+        snap = planusage._load(path) if path.exists() else None
+        out = []
+        for key, label in planusage.WINDOWS:
+            if snap is None or key not in snap:
+                out.append((label, None, "no reading yet: no Claude agent with the statusLine configured has "
+                                         "taken a turn (see the user guide, Memory and recovery)"))
+                continue
+            w, why = planusage.usable(snap.get(key), t)
+            if w is not None:
+                out.append((label, {"used": w["used_percentage"], "resets_at": w["resets_at"],
+                                    "age": f"read {_ago(t - w["observed_at"])}", "source": CLAUDE_SOURCE}, ""))
+            elif why == "window reset, no reading since":
+                out.append((label, None, "the window reset and no Claude agent has taken a turn since; the next "
+                                         "turn brings a reading"))
+            elif why.startswith("unknown (last reading"):
+                seen = planusage.window(snap.get(key), observed=True)
+                out.append((label, None, f"the last reading is {_span(t - seen['observed_at'])} old and stays "
+                                         "stale until a Claude agent takes a turn"))
+            else:
+                out.append((label, None, "the reading can't be used (malformed or from the future); the next "
+                                         "Claude turn replaces it"))
+        return out
+    try:
+        path = ctx.paths.state / "allowance.json"
+        rl = json.loads(path.read_text()).get(harness)
+        age = _ago(t - path.stat().st_mtime)
+    except (OSError, ValueError, AttributeError):
+        rl, age = None, ""
+    out = []
+    for key in ("primary", "secondary"):
+        p = rl.get(key) if isinstance(rl, dict) else None
+        if isinstance(p, dict) and isinstance(p.get("used_percent"), (int, float)):
+            win = p.get("window_minutes")
+            label = f"{round(win / 1440)}d" if win and win >= 1440 else f"{round(win / 60)}h" if win else "window"
+            out.append((label, {"used": float(p["used_percent"]), "resets_at": p.get("resets_at"),
+                                "age": f"recorded {age}", "source": CODEX_SOURCE.replace("its", f"{harness}'s")}, ""))
+    if not out and harness == "codex":
+        out.append(("window", None, "no reading yet: no Codex session log has reported its rate limits; the "
+                                    "next Codex turn brings one"))
+    return out
+
+
+def harness_detail(name: str, facts: list, members: list[dict], spend, now: dt.datetime) -> Text:
+    """Detail for a harness line (card #151): each window with its reading or why there is none,
+    then the harness's agents with model and today's tokens."""
+    from .. import turns
+
+    out = Text()
+    out.append(f"{name.upper()} · account windows\n", style="bold")
+    for label, w, why in facts:
+        if w is None:
+            out.append(f"{label:<4}", style="bold")
+            out.append(f"no current reading: {why}\n", style="yellow")
+            continue
+        out.append(f"{label:<4}", style="bold")
+        out.append(f"{w['used']:.0f}% used · {_reset(w['resets_at'], now)} · {w['age']}")
+        out.append(f" · from {w['source']}\n", style="bright_black")
+    if not facts:
+        out.append(f"xt reads no account windows for {name}\n", style="bright_black")
+    out.append_text(_heading(f"agents on {name} ({len(members)}), today's usage"))
+    width = max((len(a["name"]) for a in members), default=4)
+    model = max((len(a["model"]) for a in members), default=7)
+    for a in members:
+        mine = spend.agents_today.get(a["name"])
+        out.append(f"{a['name']:<{width}}  ", style="bold" if a.get("running") else "")
+        out.append(f"{a['model']:<{model}}  ", style="bright_black")
+        out.append(f"{turns.fmt(mine) if mine else 'no usage recorded'}\n")
+    if not members:
+        out.append("(none)\n", style="bright_black")
+    return out
+
+
+def team_detail(vers, spend, now: dt.datetime) -> Text:
+    """Detail for the Team header (card #151): "xt and the team": the versions and what `xt status`
+    notes about them, the published version's note, and today's usage split by agent."""
+    from .. import turns
+
+    out = Text()
+    out.append("xt and the team\n", style="bold")
+    if vers is None:
+        out.append("versions: couldn't be read\n", style="yellow")
+    else:
+        head, *notes = vers.line().split("\n")
+        out.append(head.removeprefix("xt versions: ") + "\n")
+        for n in notes:
+            out.append(n.strip() + "\n", style="yellow")
+        out.append_text(_heading("running"))
+        out.append(vers.detail() + "\n")
+    out.append_text(_heading("usage today"))
+    out.append(f"team: {turns.fmt(spend.team_today)}\n")
+    for name, t in sorted(spend.agents_today.items(), key=lambda kv: -kv[1].tokens):
+        out.append(f"  {name}: {turns.fmt(t)}\n")
+    return out
 
 
 def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread) -> tuple[list[Row], str]:

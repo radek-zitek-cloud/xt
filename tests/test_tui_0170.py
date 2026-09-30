@@ -1,4 +1,5 @@
-"""v0.17.0, card #162: TUI layout and consistency.
+"""v0.17.0, card #162: TUI layout and consistency; card #151: the Team header and harness lines
+open Detail (at the end).
 
 Three bands (Team and the Inbox side by side, Work or Flow in one pane, Detail at the bottom), pane
 titles `[n] - Title - info`, a one-column Team pane with a `+N more` line, NOTIFICATIONS, a key line
@@ -7,6 +8,7 @@ the Inbox-height rule), #128's Team cap and #130's "newest at the bottom".
 """
 
 import asyncio
+import datetime as dt
 import json
 
 import pytest
@@ -353,5 +355,180 @@ def test_newest_on_top_in_the_inbox_work_and_flow_and_the_top_row_follows(ctx, f
             await pilot.press("g")
             await pilot.pause()
             assert flow.message() is top and flow.follow
+
+    _run(run())
+
+
+# --- card #151: the header and harness lines open Detail ------------------------------------------------
+
+
+def _claude_plan(ctx, five: dict | None, seven: dict | None):
+    """The statusLine snapshot, each window given as (used %, reset in s, read s ago), None: absent."""
+    now = ctx.ledger.clock().timestamp()
+    snap = {}
+    for key, w in (("five_hour", five), ("seven_day", seven)):
+        if w is not None:
+            used, reset_in, ago = w
+            snap[key] = {"used_percentage": used, "resets_at": int(now + reset_in), "observed_at": int(now - ago)}
+    (ctx.paths.state / "claude_plan.json").write_text(json.dumps(snap))
+
+
+async def _select(pilot, app, key: str) -> str:
+    """Select a Team row with j from the top, as the human would; Detail's text."""
+    from xt.tui.app import DetailBody
+
+    await pilot.press("0", "home")
+    await pilot.pause()
+    for _ in range(len(app.team.keys)):
+        if app.team.selected == key:
+            break
+        await pilot.press("j")
+        await pilot.pause()
+    assert app.team.selected == key
+    return app.query_one(DetailBody).content.plain
+
+
+def _team_line(app, name: str) -> str:
+    return next(ln for ln in str(app.team.render()).split("\n") if ln.startswith(name.upper()))
+
+
+@pytest.mark.parametrize("case", ["fresh", "stale", "reset"])
+def test_a_harness_line_opens_its_windows_in_detail(ctx, fake_home, clock, case):
+    _acceptance(ctx, fake_home, clock)
+    hour = 3600
+    if case == "fresh":
+        _claude_plan(ctx, (6.0, 3 * hour, 120), (10.0, 4 * 86400, 30))
+    elif case == "stale":  # the 7d reading is 3 h 10 m old: older than 3 h
+        _claude_plan(ctx, (6.0, 3 * hour, 120), (10.0, 4 * 86400, 3 * hour + 600))
+    else:  # the 5h window reset an hour ago and no Claude agent has taken a turn since
+        _claude_plan(ctx, (80.0, -hour, 2 * hour), (10.0, 4 * 86400, 60))
+
+    async def run():
+        app = _app(ctx)
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            text = await _select(pilot, app, teampane.harness_key("claude"))
+            assert text.startswith("CLAUDE · account windows")
+            assert "statusLine snapshot" in text
+            line = _team_line(app, "claude")
+            if case == "fresh":
+                assert "5h  6% used · resets" in text and "read 2 m ago" in text
+                assert "7d  10% used · resets" in text and "read just now" in text
+                assert not line.startswith("CLAUDE ?")  # no cue
+            elif case == "stale":
+                assert "5h  6% used" in text
+                assert "7d  no current reading: the last reading is 3 h 10 m old and stays stale until a " \
+                       "Claude agent takes a turn" in text
+                assert line.startswith("CLAUDE ?")  # the cue
+            else:
+                assert "5h  no current reading: the window reset and no Claude agent has taken a turn since" in text
+                assert line.startswith("CLAUDE ?")
+            # the harness's agents with model and today's tokens
+            agents = text.split("agents on claude (3)")[1]
+            assert all(n in agents for n in ("pm", "builder", "qa")) and "sonnet 5.5" in agents
+            assert "no usage recorded" in agents
+
+    _run(run())
+
+
+def test_a_codex_line_shows_its_known_window_and_no_claude_reading_is_named(ctx, fake_home, clock):
+    _acceptance(ctx, fake_home, clock)
+    (ctx.paths.state / "claude_plan.json").unlink()  # no Claude agent has the statusLine configured
+
+    async def run():
+        app = _app(ctx)
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.pause()
+            text = await _select(pilot, app, teampane.harness_key("codex"))
+            assert text.startswith("CODEX · account windows")
+            assert "7d  64% used · resets Tue" in text and "recorded" in text and "codex's session logs" in text
+            assert "agents on codex (2)" in text and "gpt-5.2-codex" in text
+            assert not _team_line(app, "codex").startswith("CODEX ?")
+            text = await _select(pilot, app, teampane.harness_key("claude"))
+            assert "no current reading: no reading yet: no Claude agent with the statusLine configured" in text
+            assert _team_line(app, "claude").startswith("CLAUDE ?")
+            # nothing spills out of Detail
+            detail = app.query_one("#detail")
+            from xt.tui.app import DetailBody
+
+            lines = app.query_one(DetailBody).render_lines(detail.content_region.reset_offset)
+            assert all(sum(len(s.text) for s in ln) <= detail.content_size.width for ln in lines)
+
+    _run(run())
+
+
+@pytest.mark.parametrize("check", ["ok", "failed", "never"])
+def test_the_header_opens_xt_and_the_team_in_detail(ctx, fake_home, clock, check):
+    _acceptance(ctx, fake_home, clock)
+    now = ctx.ledger.clock()
+    data = {"agents": {"lead": {"version": "0.17.0"}, "pm": {"version": "0.16.1"}}}
+    if check == "ok":
+        data["published"] = {"checked": (now - dt.timedelta(hours=2)).isoformat(), "version": "0.16.1", "error": None}
+    elif check == "failed":
+        data["published"] = {"checked": now.isoformat(), "version": None, "error": "no upstream remote",
+                             "last_known": "0.16.1", "last_known_checked": now.isoformat()}
+    (ctx.paths.state / "versions.json").write_text(json.dumps(data))
+
+    async def run():
+        app = _app(ctx)
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            text = await _select(pilot, app, teampane.HEADER)
+            assert text.startswith("xt and the team")
+            assert "installed " in text and "running " in text
+            note = {"ok": "published 0.16.1 (checked 2 h ago)",
+                    "failed": "published 0.16.1 (last known, check failed: no upstream remote)",
+                    "never": "published unknown (not checked yet)"}[check]
+            assert note in text
+            running = text.split("── running ──")[1]
+            assert "supervisor: not running" in running and "lead: 0.17.0" in running and "pm: 0.16.1" in running
+            assert "── usage today ──" in text and "team: no usage recorded" in text
+
+    _run(run())
+
+
+def test_the_header_and_harness_rows_come_before_the_agents_and_agent_keys_still_work(ctx, fake_home, clock):
+    _acceptance(ctx, fake_home, clock)
+
+    async def run():
+        app = _app(ctx)
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            await pilot.press("shift+tab")  # tab goes round the panes: Team is the pane before the Inbox
+            await pilot.pause()
+            team = app.team
+            assert app.focused is team and team.selected == teampane.HEADER
+            assert team.keys == [teampane.HEADER, "harness:claude", "pm", "builder", "qa", "harness:codex",
+                                 "liaison", "lead"]
+            seen = [team.selected]
+            for key in ("j", "down", "j", "j", "down", "j", "j"):
+                await pilot.press(key)
+                await pilot.pause()
+                seen.append(team.selected)
+            assert seen == team.keys
+            await pilot.press("k", "up")
+            await pilot.pause()
+            assert team.selected == "harness:codex"
+            # the agent keys act on agents only
+            await pilot.press("home", "x")
+            await pilot.pause()
+            assert app.status.startswith("select an agent in Team first")
+            await pilot.press("j", "j", "x")  # pm
+            await pilot.pause()
+            from xt.tui.app import Confirm
+
+            assert isinstance(app.screen, Confirm) and app.screen.title_text == "Stop pm"
+            await pilot.press("n")
+            await pilot.pause()
+            # a click on a harness line selects it
+            region = team.content_region
+            y = next(i for i, ln in enumerate(str(team.render()).split("\n")) if ln.startswith("CODEX"))
+            await pilot.click(offset=(region.x + 2, region.y + y))
+            await pilot.pause()
+            assert team.selected == "harness:codex"
+            from xt.tui.app import DetailBody
+
+            assert app.query_one(DetailBody).content.plain.startswith("CODEX · account windows")
+            assert _title(app.query_one("#detail")) == "[4] - Detail - Team"
 
     _run(run())

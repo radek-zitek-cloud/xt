@@ -297,8 +297,9 @@ shown as the model its session log names.)
   messages or jobs stuck for over a minute. It wraps between its parts rather than cut them off.
   Under it, today's tokens and estimate, then a line.
 - One **block per harness**, a line between them: its account windows as bars with the share used
-  and the reset time (`CLAUDE 5h …`, `CODEX 7d …`); a window without a current reading isn't shown
-  (`xt status` says why). Then its agents, one per line, in columns that line up: a dot in the
+  and the reset time (`CLAUDE 5h …`, `CODEX 7d …`); a window without a current reading isn't shown,
+  and a dim `?` after the harness's name says so (select the line to read why). Then its agents,
+  one per line, in columns that line up: a dot in the
   state's colour (working yellow, idle and done green, blocked red, dim when not running: your
   terminal's own named colours, so your theme decides the shades), the name, the
   short model (`sonnet 5.5`; for an agent on `default`, the model its own session log names, else
@@ -307,6 +308,15 @@ shown as the model its session log names.)
 - The pane **never scrolls**. When the team doesn't fit its height, it shows what fits and a last
   line `+3 more (widen the terminal)`, counting the agents and harness lines out of view; `j`/`k`
   reach the agents in view. A team that large is better read with `xt status`.
+- The **header and harness lines can be selected** too (from 0.17.0), ahead of the agents.
+  The header's detail, *xt and the team*, shows the published version with when it was checked
+  (or why the check failed), the installed and running versions (the supervisor and each agent),
+  the notes `xt status` prints (restart needed, upgrade available) and today's usage split by
+  agent. A harness line's detail shows each account window: the share used, the reset time, how
+  old the reading is and where it comes from (Claude: the statusLine snapshot; Codex: its session
+  logs), or, for a window with no current reading, why and what brings one back (no Claude agent
+  has the statusLine configured, the window reset with no turn since, the last reading is 3 h 10 m
+  old); then the harness's agents with their model and today's tokens.
 
 **The layout** (from 0.17.0) has three bands and the key line:
 
@@ -339,8 +349,9 @@ shown as the model its session log names.)
 The panes' number keys (from 0.16.1) are `0` Team, `1` Inbox, `2` Work, `3` Flow and `4` the
 detail pane, and `v` opens the supervisor's log; the TUI starts in the Inbox, and `tab` goes round
 the panes. `esc` in the detail pane goes back to the pane you came from. In the Team pane `j`/`k`
-or the arrows select an agent (`Home`/`End` or `PgUp`/`PgDn`: the first and last in view), the
-detail pane shows it, and `u`, `x`, `R` and `f` act on it (`f` in Flow is its filter).
+or the arrows select the header, a harness line or an agent (`Home`/`End` or `PgUp`/`PgDn`: the
+first and last row in view), the detail pane shows it, and on an agent `u`, `x`, `R` and `f` act
+on it (`f` in Flow is its filter).
 
 **The key line** (from 0.17.0) shows the focused pane's own keys first, then `S`, `/` and `v`,
 which work everywhere; a narrow terminal keeps the keys and drops their words. Inbox: `a/d`,

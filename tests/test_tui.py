@@ -181,9 +181,11 @@ def test_moving_past_the_ends_of_a_list_does_nothing():
             await pilot.press("j", "j", "j", "j", "j", "j", "down")
             await pilot.pause()
             assert p.highlighted == 7 and p.border_subtitle == "5 of 5"  # no wrap to the top
-            app.team.focus()  # Team: 3 agents
+            app.team.focus()  # Team: the header, 3 harness lines and 5 agents (card #151)
             await pilot.pause()
-            await pilot.press("k", "k", "j", "j", "j", "j")
+            await pilot.press("k", "k")
+            assert app.team.selected == app.team.keys[0]  # the header, the first row
+            await pilot.press(*"j" * (len(app.team.keys) + 2))
             assert app.team.current.data["name"] == app.team.rows[-1].data["name"]
 
     asyncio.run(run())

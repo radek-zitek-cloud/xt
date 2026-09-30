@@ -14,6 +14,17 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 TUI layout and consistency: three cards, #162, #151 and #133, to their approved specs. No protocol,
 ledger or state-file change.
 
+### Added
+
+- **The Team header and harness lines open Detail (#151).** In the Team pane the header and each
+  harness line can be selected ahead of the agents (`j`/`k`, the arrows, a click). The header's
+  detail, *xt and the team*, shows the published version with when it was checked or why the
+  check failed, the installed and running versions per agent, the notes `xt status` prints and
+  today's usage split by agent. A harness line's detail shows each account window with the share
+  used, the reset time, the reading's age and its source, or why there is no current reading and
+  what brings one back, then the harness's agents with model and today's tokens. A harness with a
+  stale or missing window shows a dim `?` after its name.
+
 ### Changed
 
 - **Three bands (#162).** The TUI is laid out in three bands: the Team pane and the Inbox side by

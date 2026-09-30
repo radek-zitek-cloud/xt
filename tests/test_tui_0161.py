@@ -117,11 +117,13 @@ def test_2_up_and_down_move_in_team_like_j_and_k(ctx, fake_home):
         app = _app(ctx)
         async with app.run_test(size=(160, 40)) as pilot:
             await pilot.press("0")
-            order = [r.data["name"] for r in app.team.rows]
+            order = app.team.keys  # the header, harness lines and agents (card #151)
             assert app.team.selected == order[0]
-            await pilot.press("down")
+            await pilot.press("down", "down")
+            assert app.team.selected == order[2] == "pm"
+            assert app.query_one("#detail-body").content.plain.startswith(order[2])
+            await pilot.press("up")
             assert app.team.selected == order[1]
-            assert app.query_one("#detail-body").content.plain.startswith(order[1])
             await pilot.press("down", "up")
             assert app.team.selected == order[1]
             await pilot.press("up", "up")  # stops at the first
@@ -139,8 +141,8 @@ def test_2_home_end_and_the_page_keys_in_team(ctx, fake_home):
         app = _app(ctx)
         async with app.run_test(size=(160, 40)) as pilot:  # every agent fits: a page is the whole team
             await pilot.press("0")
-            order = [r.data["name"] for r in app.team.rows]
-            assert len(order) == 6 and app.team.hidden == 0
+            assert len(app.team.rows) == 6 and app.team.hidden == 0
+            order = app.team.keys  # the header, the harness lines and the agents (card #151)
             await pilot.press("end")
             assert app.team.selected == order[-1]
             await pilot.press("home")
@@ -163,8 +165,8 @@ def test_2_the_keys_reach_only_the_agents_in_view_when_the_team_does_not_fit(ctx
             await pilot.press("0")
             await pilot.pause()
             team = app.team
-            order = [r.data["name"] for r in team.rows]
-            assert team.limit is not None and team.hidden > 0 and 1 <= len(order) < len(everyone)
+            assert team.limit is not None and team.hidden > 0 and 1 <= len(team.rows) < len(everyone)
+            order = team.keys  # the header, the harness lines and the agents in view (card #151)
             assert team.page_size() == len(order)
             await pilot.press("pagedown")
             assert team.selected == order[-1]

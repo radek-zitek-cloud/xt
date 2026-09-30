@@ -187,7 +187,9 @@ release's **Upgrading** note in [CHANGELOG.md](CHANGELOG.md). From 0.14.0 on, `x
 the **Team** pane (0) on the left, one column: a header with the team, xt's version, what's running
 and what needs you; today's tokens and cost; then per harness its account windows as bars and its
 agents, one per line (short model such as `sonnet 5.5`, state, and context as tokens, a bar and a
-percentage); a team too big for the pane ends with `+N more (widen the terminal)`. Beside it, as
+percentage); a team too big for the pane ends with `+N more (widen the terminal)`. Selecting the
+header shows xt's versions and today's usage per agent; selecting a harness line shows its
+windows, how old each reading is, and why one is unknown (a dim `?` marks it). Beside it, as
 high, the **Inbox** (1: Needs you, Notifications and unread Friction, with their counts in its
 title; where the TUI starts). In the middle, full width, **Work** (2: goals with their tasks under
 them, open goals first, done goals folded under `done (N)`, and goal drafts the liaison is still

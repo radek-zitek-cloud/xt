@@ -285,8 +285,9 @@ class WorkPanel(Panel):
 class TeamPane(Static):
     """The Team pane, top left (cards #128, #162): the header, today's spend, then each harness's
     usage line and its agents, one column. It never scrolls: what doesn't fit gives way to a
-    `+N more` line. `0` (or tab) reaches it; j/k or the arrows, the page keys and a click select an
-    agent in view for the agent keys and Detail (card #157)."""
+    `+N more` line. `0` (or tab) reaches it; j/k or the arrows, the page keys and a click select a
+    row in view for Detail (card #157): the header and each harness line (card #151), then the
+    agents, whom the agent keys act on."""
 
     can_focus = True
     BINDINGS = [Binding("down", "step(1)", show=False), Binding("up", "step(-1)", show=False),
@@ -304,7 +305,9 @@ class TeamPane(Static):
         self.harnesses: list[teampane.Harness] = []
         self.all_rows: list[Row] = []
         self.rows: list[Row] = []  # the agents in view, in display order
-        self.selected: str | None = None  # the selected agent's name
+        self.keys: list[str] = []  # every row in view that can be selected, in display order
+        self.selected: str | None = None  # the selected row's key: teampane.HEADER, a harness's, an agent's name
+        self.header_detail = None
         self.now = None
         self.natural = 3  # the rows the whole pane needs, frame included
         self.limit: int | None = None  # the content rows it gets when that is fewer, else None
@@ -312,6 +315,7 @@ class TeamPane(Static):
 
     def set_data(self, snap: Snapshot, now) -> None:
         self.header, self.spend, self.harnesses = snap.header, snap.spend, snap.harnesses
+        self.header_detail = snap.header_detail
         self.all_rows = snap.panels.get("Team", [])
         self.now = now
         self.redraw()
@@ -336,9 +340,10 @@ class TeamPane(Static):
         by_name = {r.data["name"]: r for r in self.all_rows}
         lines = self.lines(width)
         shown, self.hidden = teampane.clip(lines, self.limit)
-        self.rows = [by_name[k] for k in dict.fromkeys(k for _, k in shown) if k in by_name]
-        if self.rows and self.selected not in {r.data["name"] for r in self.rows}:
-            self.selected = self.rows[0].data["name"]
+        self.keys = [k for k in dict.fromkeys(k for _, k in shown) if k is not None]
+        self.rows = [by_name[k] for k in self.keys if k in by_name]
+        if self.keys and self.selected not in self.keys:
+            self.selected = self.keys[0]
             if self.has_focus:
                 return self.redraw()
         natural, self.natural = self.natural, len(lines) + 2
@@ -357,38 +362,46 @@ class TeamPane(Static):
 
     @property
     def current(self) -> Row | None:
-        return next((r for r in self.rows if r.data["name"] == self.selected), None)
+        """The selected row: an agent's, or one made here for the header or a harness line."""
+        key = self.selected
+        if key == teampane.HEADER:
+            detail = self.header_detail or (lambda: Text("(nothing here)", style="bright_black"))
+            return Row(key, Text("xt and the team"), detail, "team", {})
+        harness = next((h for h in self.harnesses if teampane.harness_key(h.name) == key), None)
+        if harness is not None:
+            detail = harness.detail or (lambda h=harness: Text(f"{h.name.upper()}: no detail", style="bright_black"))
+            return Row(key, Text(harness.name), detail, "harness", {"harness": harness.name})
+        return next((r for r in self.rows if r.data["name"] == key), None)
 
-    def select(self, name: str) -> None:
-        self.selected = name
+    def select(self, key: str) -> None:
+        self.selected = key
         self.redraw()
 
     def move(self, step: int) -> None:
-        names = [r.data["name"] for r in self.rows]
-        if self.selected in names:
-            i = max(0, min(len(names) - 1, names.index(self.selected) + step))
-            self.select(names[i])
+        if self.selected in self.keys:
+            i = max(0, min(len(self.keys) - 1, self.keys.index(self.selected) + step))
+            self.select(self.keys[i])
 
     def page_size(self) -> int:
-        """Agents a page key moves by: all of them in view (the pane never scrolls)."""
-        return max(1, len(self.rows))
+        """Rows a page key moves by: all of them in view (the pane never scrolls)."""
+        return max(1, len(self.keys))
 
     def action_step(self, step: int) -> None:
         self.move(step)
         self.app.show_detail(self)
 
     def action_edge(self, step: int) -> None:
-        self.action_step(step * len(self.rows))
+        self.action_step(step * len(self.keys))
 
     def action_page(self, step: int) -> None:
         self.action_step(step * self.page_size())
 
     def on_click(self, event) -> None:
-        """A click on an agent selects it; Detail shows it and focus stays here (card #157)."""
-        name = event.style.meta.get("agent")
-        if name is not None and any(r.data["name"] == name for r in self.rows):
+        """A click on a row selects it; Detail shows it and focus stays here (card #157)."""
+        key = event.style.meta.get("agent") or event.style.meta.get("team_row")
+        if key is not None and key in self.keys:
             self.focus()
-            self.select(name)
+            self.select(key)
             self.app.show_detail(self)
 
 
@@ -921,9 +934,10 @@ class Help(ModalScreen[None]):
               "picker, or esc in Flow clears it"),
         ("/", "filter by the message's text"),
         (f"Team ({TEAM})", ""),
-        ("j / k", "select an agent (its details show in the detail pane); agents under the +N more "
-                  "line need a taller terminal"),
-        ("pgup/pgdn", "the first / the last agent in view (home / end too)"),
+        ("j / k", "select the header (xt and the team: versions, today's usage), a harness line (its "
+                  "windows and why one is unknown; ? marks one) or an agent; the detail pane shows it. "
+                  "Agents under the +N more line need a taller terminal"),
+        ("pgup/pgdn", "the first / the last row in view (home / end too)"),
         ("u", "start the selected stopped agent (existing role and harness)"),
         ("U", "start every stopped agent in the roster"),
         ("x", "stop the selected agent; it stays in the roster (asks y/n)"),
@@ -1714,8 +1728,15 @@ def demo_snapshot() -> Snapshot:
                              ("⚑ 2 needs you", "bold yellow"), " · ", ("✉ 1 new", "cyan")),
         spend="today 8.4M tokens · est. $2.46 (+1.1M unpriced)",
         harnesses=[teampane.Harness("claude", [("5h", 6.0, int(now.timestamp()) + 3 * 3600),
-                                               ("7d", 10.0, int(now.timestamp()) + 4 * 86400)]),
-                   teampane.Harness("codex", [("7d", 20.0, None)])],
+                                               ("7d", 10.0, int(now.timestamp()) + 4 * 86400)],
+                                    detail=lambda: Text("CLAUDE · account windows\n5h  6% used · read 2 m ago\n"
+                                                        "7d  10% used · read 2 m ago\n")),
+                   teampane.Harness("codex", [("7d", 20.0, None)],
+                                    detail=lambda: Text("CODEX · account windows\n7d  20% used\n")),
+                   teampane.Harness("pi", cue=False,
+                                    detail=lambda: Text("PI · account windows\nxt reads no account windows for pi\n"))],
+        header_detail=lambda: Text("xt and the team\npublished 0.17.0 (checked 1 h ago) · installed 0.17.0 · "
+                                   "running 0.17.0\n\n── usage today ──\nteam: 8.4M tokens, est. $2.46\n"),
         inbox_title="⚑ 2 · ✉ 1 · ✱ 1",
         work_title="1 open · 1 done",
         flow=_demo_flow(now),

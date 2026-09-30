@@ -225,6 +225,7 @@ def test_agent_detail_renders_the_preview_at_the_panes_width(ctx):
         async with app.run_test(size=(120, 45)) as pilot:
             app.team.focus()
             await pilot.pause()
+            app.team.select("liaison")  # the header is the first row since card #151
             row = app.team.current
             assert row.data["name"] == "liaison"
             detail = row.detail()

@@ -82,7 +82,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/versions.py` | Published, installed and running xt versions. |
 | `src/xt/switch.py` | `xt version use` and `rollback`: state format checks, snapshots, merge and revert. |
 | `src/xt/tui/app.py` | The TUI (Textual): the three bands and their heights, pane titles, the Team pane, Work and Flow sharing the middle pane, the Flow pane's filters and scrolling, keys and the per-pane key line, the toast, dialogs, and the actions it takes as the human. |
-| `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into pane rows, Flow's messages and roster, agents and the Team header. |
+| `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into pane rows, Flow's messages and roster, agents and the Team header, and the detail for the Team header and harness rows (versions, each window's reading or why it has none). |
 | `src/xt/tui/flow.py` | The Flow lane chart: lane order, which lanes fit and the `+N` lane, arrows with type glyphs, the margin, day separators and list mode, as pure functions of the messages and the width. |
 | `src/xt/tui/teampane.py` | The Team pane's layout, one column: the wrapped header, harness blocks, window bars, aligned agent lines, short model names, and the `+N more` cut to the pane's height. |
 | `src/xt/tui/work.py` | The Work outline: which goal each task belongs to (the root of its `ref` chain), task states, goal order, and a Work row laid out at the pane's width. |
