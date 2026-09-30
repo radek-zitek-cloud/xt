@@ -9,10 +9,12 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.17.0] — not released yet
+## [0.17.0] — 2026-09-30
 
+The release: the same code and docs as 0.17.0-rc1 (only the version and this changelog changed).
 TUI layout and consistency: three cards, #162, #151 and #133, to their approved specs. No protocol,
-ledger or state-file change.
+ledger or state-file change; one new command, `xt version check`. **0.17.0-rc1** (2026-09-30) has
+all three.
 
 ### Added
 
