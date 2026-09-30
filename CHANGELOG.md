@@ -9,10 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.16.0] — not released yet
+## [0.16.0] — 2026-09-30
 
-A TUI-focused release, built card by card to the approved specs of the TUI redesign.
-**0.16.0-rc1** (2026-09-30) has the first two cards: #127 (Inbox groups and friction read state)
+The release: the same code and docs as 0.16.0-rc6 (only the version and this changelog changed).
+A TUI-focused release, built card by card to the approved specs of the TUI redesign: six cards,
+#127, #132, #128, #129, #131 and #130. How the candidates got here: **0.16.0-rc1** (2026-09-30) has the first two cards: #127 (Inbox groups and friction read state)
 and #132 (rows cut at pane width, with ages). **0.16.0-rc2** (2026-09-30) adds #128 (the Team pane
 replaces the Status pane and the Team panel); #127 and #132 are unchanged from rc1 except that the
 Inbox is now panel 3. **0.16.0-rc3** (2026-09-30) adds #129 (the Work outline replaces the Goals
@@ -173,11 +174,13 @@ window fix in the detail pane. **0.16.0-rc6** (2026-09-30) is rc5 plus the fix f
 
 ### Upgrading
 
-- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc6`), then `xt restart --all`
+- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0`), then `xt restart --all`
   so the supervisor starts the friction marker and raises the new failure alerts. Friction from
   before that shows as seen. New keys in `.xt/state/inbox_seen.json` (`friction_upto`,
   `friction_seen`) and in `.xt/state/alerts.json` (`count`, `last`, on the failure alerts); no
   state format change. Scripts that parse `xt inbox` need the new section names.
+  From 0.16.0-rc6: nothing but the version changes. From an earlier 0.16.0 candidate: the same
+  restart.
 
 ## [0.15.0] — 2026-09-30
 
