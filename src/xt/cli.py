@@ -192,6 +192,12 @@ def cmd_version(args) -> None:
         for line in switch.show(ctx):
             print(line)
         return
+    if args.action == "check":  # card #133: ask the upstream now, then show what status shows
+        from . import versions
+
+        print(versions.refresh_published(ctx, dt.datetime.now().astimezone()))
+        print(versions.current(ctx).line())
+        return
     if _who(args) != HUMAN:
         raise XtError("only the human switches the team's xt version")
     if args.action == "use":
@@ -572,8 +578,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("down", cmd_down, "stop every running agent and the supervisor (human only)")
     sp.add_argument("--keep-supervisor", action="store_true", help="stop the agents only")
 
-    sp = add("version", cmd_version, "show, select (use) or roll back the team's xt version (use/rollback: human only)")
-    sp.add_argument("action", nargs="?", choices=("show", "use", "rollback"), default="show")
+    sp = add("version", cmd_version, "show, check (ask the upstream for the published version now), select (use) "
+                                     "or roll back the team's xt version (use/rollback: human only)")
+    sp.add_argument("action", nargs="?", choices=("show", "check", "use", "rollback"), default="show")
     sp.add_argument("tag", nargs="?", help="for use: an upstream release tag, e.g. v0.14.0")
     sp.add_argument("--candidate", action="store_true", help="allow a release candidate tag (vX.Y.Z-rcN)")
 

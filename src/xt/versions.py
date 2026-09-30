@@ -21,6 +21,8 @@ from . import __version__
 from .context import Ctx
 
 PUBLISHED_EVERY = 6 * 3600  # seconds between the supervisor's checks of the upstream tags
+STALE_RETRY = 15 * 60  # sooner while the cache is older than the installed final (card #133)
+PENDING = "published ≥ installed, check pending"
 FINAL_TAG = re.compile(r"refs/tags/v(\d+)\.(\d+)\.(\d+)$")
 
 
@@ -127,14 +129,26 @@ def refresh_published(ctx: Ctx, now: dt.datetime, timeout: int = 20) -> str:
     return f"published xt: {entry.get('version') or 'unknown'}" + (f" ({entry['error']})" if entry.get("error") else "")
 
 
+def stale(published: str | None, installed_version: str | None) -> bool:
+    """The cached published version is older than the installed final release (card #133): the
+    cache missed a release, so it is never shown as the latest."""
+    p, i = parse(published), parse(installed_version)
+    return bool(p and i and i[3] == 1 and p < i)
+
+
 def published_due(ctx: Ctx, now: dt.datetime) -> bool:
-    checked = load(ctx).get("published", {}).get("checked")
-    if not checked:
+    """Every PUBLISHED_EVERY; sooner, every STALE_RETRY, while the cache is older than the installed
+    final (card #133), so a failed or unhelpful check isn't repeated on every tick."""
+    pub = load(ctx).get("published", {})
+    if not pub.get("checked"):
         return True
     try:
-        return (now - dt.datetime.fromisoformat(checked)).total_seconds() >= PUBLISHED_EVERY
+        age = (now - dt.datetime.fromisoformat(pub["checked"])).total_seconds()
     except (ValueError, TypeError):
         return True
+    if stale(pub.get("version") or pub.get("last_known"), installed(ctx)):
+        return age >= STALE_RETRY
+    return age >= PUBLISHED_EVERY
 
 
 @dataclass
@@ -161,6 +175,11 @@ class Versions:
         return display(values[0]) if len(set(values)) == 1 else "mixed"
 
     @property
+    def pending(self) -> bool:
+        """The cache is older than the installed final: shown as PENDING, never as that number."""
+        return stale(self.published, self.installed)
+
+    @property
     def upgrade_available(self) -> bool:
         p, i = parse(self.published), parse(self.installed)
         return bool(p and i and p > i)
@@ -173,12 +192,18 @@ class Versions:
     def title(self) -> str:
         """Short, for the TUI's Status title."""
         out = f"installed {display(self.installed)} · running {self.running_label}"
+        if self.pending:
+            return out + " · published ≥ installed"
         out += f" · published {display(self.published)}" if self.published else " · published ?"
         return out
 
+    def published_text(self) -> str:
+        """`published 0.16.1 (checked 2 h ago)`, or PENDING when the cache is older than the installed final."""
+        return PENDING if self.pending else f"published {display(self.published)} ({self.published_note})"
+
     def line(self) -> str:
         """Labelled, for `xt status` and briefs."""
-        parts = [f"published {display(self.published)} ({self.published_note})",
+        parts = [self.published_text(),
                  f"installed {display(self.installed)}",
                  f"running {self.running_label}"]
         out = "xt versions: " + " · ".join(parts)

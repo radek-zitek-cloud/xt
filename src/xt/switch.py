@@ -311,7 +311,13 @@ def use(ctx: Ctx, tag: str, candidate: bool = False) -> list[str]:
                      f"state format {fmt}, snapshot {snap.relative_to(ctx.paths.root)}")
         lines.append("not running yet: `xt up` (or `xt restart --all`) starts the team on it")
     ctx.ledger.append(SYSTEM, HUMAN, "system", lines[0])
-    return lines
+    return lines + [_refresh(ctx)]
+
+
+def _refresh(ctx: Ctx) -> str:
+    """After a switch or a rollback, the published version is read again (card #133): the upstream
+    was just asked, and the cached one may predate the release switched to."""
+    return versions.refresh_published(ctx, dt.datetime.now().astimezone())
 
 
 # --- rollback -------------------------------------------------------------------------------------
@@ -369,7 +375,7 @@ def rollback(ctx: Ctx) -> list[str]:
                 f"state format {fmt} unchanged, so the current state stays (it matches the ledger); "
                 f"ledger intact ({rec['ledger']['count']} recorded messages); snapshot kept at {rec['snapshot']}")
     ctx.ledger.append(SYSTEM, HUMAN, "system", line)
-    return [line, "not running yet: `xt up` (or `xt restart --all`) starts the team on it"]
+    return [line, "not running yet: `xt up` (or `xt restart --all`) starts the team on it", _refresh(ctx)]
 
 
 def show(ctx: Ctx) -> list[str]:

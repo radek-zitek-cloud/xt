@@ -281,7 +281,9 @@ memory. Agents may read their own brief and their reports' briefs. `xt log` give
 ## Versions, state format and snapshots
 
 `versions.py` keeps three numbers apart: the **published** release (checked upstream by the
-supervisor every few hours, cached in `state/versions.json`), the **installed** one (the team repo's
+supervisor at start and every few hours, after `xt version use`/`rollback` and by `xt version
+check`, cached in `state/versions.json`; a cache older than the installed final is shown as
+"check pending" and retried sooner), the **installed** one (the team repo's
 `pyproject.toml`) and the **running** ones (the supervisor's, and the xt that started each agent).
 `xt status`, the brief and the TUI title show them.
 
@@ -454,7 +456,7 @@ harness goes to the human with `xt friction`.
   option), `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
 - `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM] [--at HH:MM]`.
 - `xt reset <name>`: a fresh context for one agent after it saved its notes (`xt checkpoint`).
-- `xt version`, `xt version use <tag> [--candidate]`, `xt version rollback` (see Versions above).
+- `xt version`, `xt version check`, `xt version use <tag> [--candidate]`, `xt version rollback` (see Versions above).
 - `xt log [--limit N | --full]`: the newest 20 messages by default.
 - `xt restart <name>…` (stop and start with fresh instructions) and `xt restart --all` (the
   supervisor and every running agent: the upgrade path), `xt stop <name>` (close without

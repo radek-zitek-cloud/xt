@@ -24,6 +24,17 @@ ledger or state-file change.
   used, the reset time, the reading's age and its source, or why there is no current reading and
   what brings one back, then the harness's agents with model and today's tokens. A harness with a
   stale or missing window shows a dim `?` after its name.
+- **`xt version check` (#133).** Asks the upstream for the newest release now and prints the result
+  and the versions line `xt status` shows. Any member may run it; it needs network access.
+
+### Fixed
+
+- **The published version no longer goes stale after a release (#133).** The supervisor checks it
+  once when it starts (in its loop, so an offline start isn't held up), and `xt version use` and
+  `xt version rollback` check it after a successful switch; the 6-hour interval applies otherwise,
+  and a failed check still keeps the last known version. A cached version older than the installed
+  final release is never shown: `xt status`, briefs and the TUI say `published ≥ installed, check
+  pending`, and the supervisor tries again every 15 minutes until a check succeeds.
 
 ### Changed
 

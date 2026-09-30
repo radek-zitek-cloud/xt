@@ -422,7 +422,7 @@ status` and every agent's brief:
 
 | Label | What it is | Where it comes from |
 |---|---|---|
-| **published** | the newest final release (candidates don't count) | the supervisor checks the upstream's tags every 6 hours; if the check fails you see the last known one and why |
+| **published** | the newest final release (candidates don't count) | the supervisor checks the upstream's tags when it starts and then every 6 hours, and `xt version use`, `xt version rollback` and `xt version check` check them too (from 0.17.0); if the check fails you see the last known one and why. It is never shown older than the installed final release: then you see `published ≥ installed, check pending` and the supervisor tries again every 15 minutes |
 | **installed** | the xt in the team's repo: what the next command or start runs | the repo's `pyproject.toml`, read every time |
 | **running** | the supervisor's version and, per agent, the xt that started it (its first prompt, protocol and reply hints) | recorded when each starts; `mixed` when they differ |
 
@@ -688,7 +688,7 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt up`](#xt-up) | human | none (bare `xt` runs it) |
 | [`xt down`](#xt-down) | human | `X` stops agents only |
 | [`xt restart`](#xt-restart) | human | `x` then `u` for one agent |
-| [`xt version`](#xt-version) | show: both; use/rollback: human | none |
+| [`xt version`](#xt-version) | show, check: both; use/rollback: human | none |
 | [`xt status`](#xt-status) | both | Team pane (on top) |
 | [`xt inbox`](#xt-inbox) | human | Inbox panel (`1`) |
 | [`xt answer`](#xt-answer) | human | `s` on a question |
@@ -750,8 +750,10 @@ a confused or heavy agent a clean session.
 
 ### `xt version`
 
-`xt version` | `xt version use <tag> [--candidate]` | `xt version rollback` — shows the team's
-versions, state format and recent switches; `use` merges an upstream release tag into the team repo
+`xt version` | `xt version check` | `xt version use <tag> [--candidate]` | `xt version rollback` —
+shows the team's versions, state format and recent switches; `check` asks the upstream for the
+newest release now and prints the result (from 0.17.0; it needs network access, and any member
+may run it); `use` merges an upstream release tag into the team repo
 (team down, tracked files committed, state format supported, verified snapshot first); `rollback`
 reverts the last switch. **Use it** to upgrade to a chosen release, or to go back one. See
 [Updating xt](#7-updating-xt).

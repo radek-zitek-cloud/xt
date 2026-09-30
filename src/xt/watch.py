@@ -109,6 +109,7 @@ class Supervisor:
         self.last_heartbeat = 0.0
         self.last_rotate = 0.0
         self.last_usage = 0.0
+        self.published_checked = False  # the first tick refreshes the published version (card #133)
         self.usage_error: str | None = None
         self.nudges_path = ctx.paths.state / "nudges.json"
         self.notify_error: str | None = None
@@ -165,11 +166,14 @@ class Supervisor:
 
     def check_published(self) -> None:
         """The newest published xt release, at most every few hours (card #58): agents' shells often
-        have no network, so status and briefs only ever read this cache."""
+        have no network, so status and briefs only ever read this cache. Once at start too, whatever
+        the cache's age (card #133): a restart after a release must not keep showing the old one. The
+        check runs in the loop, so a failing or slow one never holds up the start."""
         from . import versions
 
         now = dt.datetime.now(dt.timezone.utc).astimezone()
-        if versions.published_due(self.ctx, now):
+        if not self.published_checked or versions.published_due(self.ctx, now):
+            self.published_checked = True
             self.say(versions.refresh_published(self.ctx, now))
 
     def check_agents(self, live: dict) -> None:

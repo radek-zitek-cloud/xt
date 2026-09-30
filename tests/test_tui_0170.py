@@ -480,6 +480,7 @@ def test_the_header_opens_xt_and_the_team_in_detail(ctx, fake_home, clock, check
                     "failed": "published 0.16.1 (last known, check failed: no upstream remote)",
                     "never": "published unknown (not checked yet)"}[check]
             assert note in text
+            assert "check the published version now: xt version check" in text  # card #133
             running = text.split("── running ──")[1]
             assert "supervisor: not running" in running and "lead: 0.17.0" in running and "pm: 0.16.1" in running
             assert "── usage today ──" in text and "team: no usage recorded" in text

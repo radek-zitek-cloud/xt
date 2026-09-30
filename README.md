@@ -253,7 +253,7 @@ equivalent and when you'd use it.
 | `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent (`xt spawn … --permissions FILE`: a Claude agent's settings file) |
 | `xt restart <name>…` / `xt restart --all` | Restart agents with fresh instructions; `--all` restarts the supervisor too and brings the team back as it was |
 | `xt reset <name>` / `xt checkpoint` | A fresh context for one agent, only after it saved its notes (the agent confirms with `xt checkpoint`) |
-| `xt version` / `xt version use <tag>` / `xt version rollback` | The team's versions; switch to a release (a candidate with `--candidate`) or undo the last switch |
+| `xt version` / `xt version check` / `xt version use <tag>` / `xt version rollback` | The team's versions; ask the upstream for the published one now; switch to a release (a candidate with `--candidate`) or undo the last switch |
 | `xt send <to> --type <t> "..."`, `xt done <id> "..."`, `xt note "..."` | Messages, closing work, notes (agents add `--as <name>`) |
 | `xt friction "..."` | An agent's feedback about xt or its harness; lands in your Inbox |
 | `xt goal new\|dispatch\|list` | Goal drafts and dispatch (normally the liaison does this) |

@@ -665,6 +665,7 @@ def team_detail(vers, spend, now: dt.datetime) -> Text:
         out.append(head.removeprefix("xt versions: ") + "\n")
         for n in notes:
             out.append(n.strip() + "\n", style="yellow")
+        out.append("check the published version now: xt version check\n", style="bright_black")
         out.append_text(_heading("running"))
         out.append(vers.detail() + "\n")
     out.append_text(_heading("usage today"))
@@ -785,7 +786,9 @@ def version_text(vers) -> Text:
     if vers is None:
         return Text(f"xt {display(__version__)}")
     out = Text(f"xt {display(vers.installed)}")
-    if not vers.published:
+    if vers.pending:  # never an older published version than the installed final (card #133)
+        out.append(" (published ≥ installed, check pending)", style="bright_black")
+    elif not vers.published:
         out.append(" (published ?)", style="bright_black")
     elif vers.upgrade_available:
         out.append(f" ({display(vers.published)} published)", style="yellow")
