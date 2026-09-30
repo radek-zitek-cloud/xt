@@ -417,7 +417,7 @@ harness goes to the human with `xt friction`.
   work only, and the pane keeps both across refreshes; `N open · M done` in its title), and
   **Flow** (3, card #130, in place of the Log: the messages read as a swim-lane chart, laid out by
   `tui/flow.py`: one lane per agent, human first, then `xt` when it sent a shown message, the
-  chain and the roster, then dim lanes for retired or unknown agents; one row per message, an arrow
+  chain and the roster, then dim lanes for retired or unknown agents with a row in view; one row per message, an arrow
   from sender to receiver with the type's glyph and label, dotted into the human's lane, `#id` and
   the first line in the margin and a clock time on the left; lanes that don't fit collapse into a
   `+N` lane, and a narrow pane lists one line per message. `app.FlowPane` keeps the filters, `t`

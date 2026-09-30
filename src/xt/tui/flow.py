@@ -2,7 +2,7 @@
 
 One lane per agent, left to right: `human`, then `xt` when it sent a shown message, then the
 reporting chain (liaison, lead), then the other agents in roster order, then (dim) agents no longer
-on the team that appear in the rows. Time runs down a 6-cell column on the left, newest at the
+on the team that appear in the rows on screen. Time runs down a 6-cell column on the left, newest at the
 bottom, with a `── Sep 29 ──` row where the day changes. Each message is one row: an arrow from the
 sender's lane to the receiver's, its type glyph and label at the sender end, the arrowhead at the
 receiver end, dotted when the receiver is the human; then, in the right margin, `#id` and the body's
@@ -84,9 +84,11 @@ def glyph(m: dict) -> tuple[str, str, str]:
     return "•", kind, ""  # a type this version doesn't know: drawn as best it can
 
 
-def lanes(roster: list[tuple[str, str, bool]], shown: list[dict]) -> list[Lane]:
+def lanes(roster: list[tuple[str, str, bool]], shown: list[dict], visible: list[dict] | None = None) -> list[Lane]:
     """Every lane in order, before any collapse. `shown` are the messages that pass the system
-    toggle: the `xt` lane and the dim lanes depend on them, the agent and goal filters don't."""
+    toggle: the `xt` lane depends on them, the agent and goal filters don't. `visible` are the
+    message rows on screen (after every filter and the viewport; default `shown`): a retired or
+    unknown agent gets its dim lane only while one of its rows is among them."""
     out = [Lane(HUMAN)]
     if any(m.get("from") == SYSTEM for m in shown):
         out.append(Lane(SYSTEM))
@@ -95,7 +97,7 @@ def lanes(roster: list[tuple[str, str, bool]], shown: list[dict]) -> list[Lane]:
         out += [Lane(n) for n, r in active if r == role]
     out += [Lane(n) for n, r in active if r not in CHAIN]
     have = {lane.name for lane in out}
-    for m in shown:
+    for m in shown if visible is None else visible:
         for n in (m.get("from"), m.get("to")):
             if n and n not in have:
                 out.append(Lane(n, dim=True))

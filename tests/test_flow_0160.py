@@ -130,6 +130,103 @@ def test_1_lanes_in_roster_order_and_a_retired_lane_only_with_its_rows(ctx, cloc
     _run(run())
 
 
+def _scout_then(ctx, n):
+    """rc6 (QA's rc5 addendum): the retired scout's only message, then `n` newer reports."""
+    _members(ctx)
+    scout = ctx.ledger.append("scout", "lead", "report", "scouted three station feeds")["id"]
+    for i in range(n):
+        ctx.ledger.append("pm", "lead", "report", f"progress {i}")
+    return scout
+
+
+def _names(pane) -> list[str]:
+    return [lane.name for lane in pane.chart().lanes]
+
+
+def test_1_a_retired_lane_follows_the_rows_in_view_when_scrolling(ctx, clock):
+    """100x30, QA's failing case: the scout's only row is outside the rows in view, so no scout
+    lane; scrolled to the top it is in view and the dim lane appears; back to the end it goes."""
+    scout = _scout_then(ctx, 35)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.press(str(FLOW))
+            await pilot.pause()
+            pane = _pane(app)
+            assert scout not in [x["id"] for x in pane.in_view()] and len(pane.in_view()) < len(pane.items)
+            assert "scout" not in _names(pane) and "scout" not in _lines(pane)[0]
+            await pilot.press("g")
+            await pilot.pause()
+            assert scout in [x["id"] for x in pane.in_view()]
+            c = pane.chart()
+            assert _names(pane)[-1] == "scout" and c.lanes[-1].dim and "scout" in _lines(pane)[0]
+            await pilot.press("G")
+            await pilot.pause()
+            assert "scout" not in _names(pane)
+            await pilot.press("g", *"j" * pane.view_height())  # j past the view: the scout row scrolls out
+            await pilot.pause()
+            assert scout not in [x["id"] for x in pane.in_view()] and "scout" not in _names(pane)
+
+    _run(run())
+
+
+def test_1_a_retired_lane_follows_the_filters(ctx, clock):
+    """100x30: f on the scout, `/` on its text and t on its only (system) line each bring the lane
+    in exactly while one of its rows is visible."""
+    _scout_then(ctx, 35)
+    ctx.ledger.append("xt", "scout", "wake", "scheduled wake-up")  # newest, a system line
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.press(str(FLOW))
+            await pilot.pause()
+            pane = _pane(app)
+            assert "scout" not in _names(pane)
+            await pilot.press("t")  # the wake-up to the scout is the newest row: in view
+            await pilot.pause()
+            assert _names(pane)[-1] == "scout"
+            await pilot.press("t")
+            await pilot.pause()
+            assert "scout" not in _names(pane)
+            await _pick(pilot, app, ("agent", "scout"))  # `f` still offers the retired scout
+            assert _names(pane)[-1] == "scout" and len(pane.items) == 1
+            await pilot.press("escape")
+            await pilot.pause()
+            assert "scout" not in _names(pane)
+            await pilot.press("slash", *"station", "enter")
+            await pilot.pause()
+            assert _names(pane)[-1] == "scout" and len(pane.items) == 1
+            await pilot.press("slash", *"progress 3", "enter")  # a filter without the scout's rows
+            await pilot.pause()
+            assert pane.items and "scout" not in _names(pane)
+
+    _run(run())
+
+
+def test_1_a_retired_lane_follows_the_rows_in_view_when_resizing(ctx, clock):
+    """100x30 → 160x60: a taller Flow brings the scout's row, and its lane, into view; back to
+    100x30 it goes again."""
+    _scout_then(ctx, 9)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(100, 30)) as pilot:
+            await pilot.press(str(FLOW))
+            await pilot.pause()
+            pane = _pane(app)
+            assert len(pane.in_view()) < 10 and "scout" not in _names(pane)
+            await pilot.resize_terminal(160, 60)
+            await pilot.pause()
+            assert len(pane.in_view()) == 10 and _names(pane)[-1] == "scout"
+            await pilot.resize_terminal(100, 30)
+            await pilot.pause()
+            assert "scout" not in _names(pane)
+
+    _run(run())
+
+
 # --- 2 arrows, 15 the alert --------------------------------------------------------------------------
 
 
@@ -308,7 +405,9 @@ def test_6_f_filters_to_an_agent_or_a_goals_thread_and_esc_clears_it(ctx, clock)
             pm = [x["id"] for x in ctx.ledger.messages() if "pm" in (x["from"], x["to"]) and not fl.is_system(x)]
             assert [x["id"] for x in pane.items] == pm == [m["task"], m["friction"], m["done"]]
             assert "agent pm (f)" in pane.border_title and f"{len(pm)} of {len(pm)}" in pane.border_title
-            assert [lane.name for lane in pane.chart().lanes] == lanes  # the lanes stay
+            # the team's lanes stay; the retired scout's goes with its rows (criterion 1)
+            assert [lane.name for lane in pane.chart().lanes] == [n for n in lanes if n != "scout"]
+            assert "scout" in lanes
             await pilot.press("escape")  # esc in Flow clears it
             await pilot.pause()
             assert [x["id"] for x in pane.items] == everything and "(f)" not in pane.border_title

@@ -223,7 +223,8 @@ messages as a swim-lane chart, the newest at the bottom:
 
 - One **lane** per agent: you (`human`) first, then `xt` when it sent a message that's shown, then
   the liaison, the lead and the rest of the roster in order. An agent that has since retired (or
-  one the roster doesn't know) gets a dim lane at the end, while its messages are shown.
+  one the roster doesn't know) gets a dim lane at the end, only while one of its messages is in
+  view: scroll, filter or resize it out of the pane and its lane goes too.
 - One **row** per message: the time on the left (local `HH:MM`; a `── Sep 29 ──` row where the day
   changes), an arrow from the sender's lane to the receiver's with the type's glyph and label at
   the sender end, and `#id` with the first line on the right, cut at the pane's edge. The glyphs:
@@ -234,7 +235,7 @@ messages as a swim-lane chart, the newest at the bottom:
 - **System lines** (xt's starts, stops and settings lines, wake-ups and nudges) are hidden; `t`
   shows or hides them (the title says which). Approval requests and alerts are always shown.
 - `f` picks **one agent** (every message it sent or received) or **one goal** (the goal and every
-  message whose `--ref` chain leads to it); the lanes stay, only rows are filtered, and the title
+  message whose `--ref` chain leads to it); the team's lanes stay, only rows are filtered, and the title
   names the filter. The same pick again, `esc` in the picker, or `esc` in Flow clears it. `/`
   filters by the message text.
 - `j`/`k` select a row, the page keys scroll, `g`/`G` go to the oldest or newest. While the newest

@@ -23,7 +23,8 @@ the earlier cards are unchanged from rc3 except that the Supervisor panel and it
 gone. **0.16.0-rc5** (2026-09-30) adds the last card, #130 (the Flow lane chart replaces the Log),
 and the final layout; the earlier cards are unchanged from rc4 except the pane heights, the start
 pane (the Inbox), a cap on the Team pane for small terminals, the key line's order and a thread
-window fix in the detail pane.
+window fix in the detail pane. **0.16.0-rc6** (2026-09-30) is rc5 plus the fix for QA's rc5 FAIL on
+#130 criterion 1 (see Fixed).
 
 ### Added
 
@@ -96,7 +97,7 @@ window fix in the detail pane.
 - **The Flow lane chart (#130, rc5)** replaces the Log panel. Pane 3, across the bottom of the TUI,
   draws the messages as a swim-lane chart: one lane per agent (`human`; `xt` when it sent a shown
   message; the liaison, the lead and the rest of the roster in order; a dim lane at the end for a
-  retired or unknown agent while its messages are shown), time down the left (local `HH:MM`, a
+  retired or unknown agent while one of its messages is in view (rc6)), time down the left (local `HH:MM`, a
   `── Sep 29 ──` row where the day changes, the newest at the bottom), and one row per message: an
   arrow from the sender's lane to the receiver's with the type's glyph and label at the sender end
   (`◆` goal, `▸` task, `◇` done, `✉` report, `⚑` ask or approval, `✱` friction, `⚠` alert in amber,
@@ -104,7 +105,7 @@ window fix in the detail pane.
   the lanes are too close; `#id` and the first line on the right, cut at the pane's edge. Flow rows
   show a clock time, not an age. System lines (xt's `system` lines, `wake`, `nudge`) are hidden;
   `t` shows or hides them, and approval requests and alerts show either way. `f` filters to one
-  agent's messages or one goal and its `ref` chain (the lanes stay); the same pick again, `esc` in
+  agent's messages or one goal and its `ref` chain (the team's lanes stay); the same pick again, `esc` in
   the picker or `esc` in Flow clears it; `/` filters by the message text. `j`/`k`, the page keys and
   `g`/`G` move; with the newest row selected Flow follows new messages. `enter` shows the message
   and its thread in the detail pane. The title says `N of M` (rows in view of all that pass the
@@ -162,9 +163,17 @@ window fix in the detail pane.
 - The TUI's Inbox rows for questions and approvals start with `⚑` (was `?`); open task rows say
   `open` where they showed the age in yellow (rc1 and rc2; from rc3 a task row starts with `●`).
 
+### Fixed
+
+- **Flow's retired lanes (#130, rc6; QA's rc5 FAIL on criterion 1).** A retired or unknown agent's
+  dim lane appeared whenever any of its messages passed the system toggle, even with none of them
+  on screen. The lane is now there only while one of its rows is in view, after `f`, `/`, `t`,
+  scrolling and resizing. The team's own lanes, the chart width and the `+N` collapse are
+  unchanged; `f` still offers every agent, retired ones included.
+
 ### Upgrading
 
-- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc5`), then `xt restart --all`
+- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc6`), then `xt restart --all`
   so the supervisor starts the friction marker and raises the new failure alerts. Friction from
   before that shows as seen. New keys in `.xt/state/inbox_seen.json` (`friction_upto`,
   `friction_seen`) and in `.xt/state/alerts.json` (`count`, `last`, on the failure alerts); no

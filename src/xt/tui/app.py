@@ -319,7 +319,8 @@ class FlowPane(Widget):
         self.show_system = False
         self.pick: tuple[str, object] | None = None  # ("agent", name) or ("goal", id)
         self.filter = ""  # `/`: text in the body
-        self.lanes: list[flow.Lane] = []  # every lane, before any collapse
+        self.shown: list[dict] = []  # the messages that pass the system toggle
+        self.lanes: list[flow.Lane] = []  # every agent `f` offers: the lanes of all of `shown`
         self.items: list[dict] = []  # the messages that pass every filter
         self.rows: list[tuple[str, object]] = []  # what the pane lists: messages and day separators
         self.selected: int | None = None  # index in rows
@@ -337,7 +338,7 @@ class FlowPane(Widget):
         """Filter and lay out the rows again, keeping the selection on the same message (or the
         newest one before it), or on the newest while following."""
         keep = None if self.follow else self.message()
-        shown = [m for m in self.data.msgs if self.show_system or not flow.is_system(m)]
+        shown = self.shown = [m for m in self.data.msgs if self.show_system or not flow.is_system(m)]
         self.lanes = flow.lanes(self.data.roster, shown)
         if self.pick and self.pick[0] == "goal":
             by_id = {m["id"]: m for m in self.data.msgs if "id" in m}
@@ -405,11 +406,19 @@ class FlowPane(Widget):
         detail = (lambda: self.data.detail(m)) if self.data.detail else (lambda: Text(flow.first_line(m)))
         return Row(f"flow:{m.get('id')}", Text(flow.first_line(m)), detail, "message", {"id": m.get("id")})
 
+    def width(self) -> int:
+        return self.content_size.width or max(0, self.app.size.width - 2)
+
     def chart(self) -> flow.Chart | None:
-        return flow.chart(self.lanes, self.content_size.width or max(0, self.app.size.width - 2))
+        """The chart of the rows in view: a retired agent's dim lane only while its rows are on
+        screen (after the filters and the viewport, so scrolling and resizing change it too)."""
+        if self.width() < flow.NARROW:
+            return None
+        return flow.chart(flow.lanes(self.data.roster, self.shown, self.in_view()), self.width())
 
     def view_height(self) -> int:
-        return max(1, self.content_size.height - (1 if self.chart() else 0))
+        # the header row exactly when chart() draws one; no chart() here, it needs this height
+        return max(1, self.content_size.height - (1 if self.width() >= flow.NARROW else 0))
 
     def place(self) -> None:
         """Keep the selected row in view (the newest at the bottom while following), then retitle."""
