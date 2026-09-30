@@ -9,8 +9,9 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.16.1] — not released yet
+## [0.16.1] — 2026-09-30
 
+The release: the same code and docs as 0.16.1-rc2 (only the version and this changelog changed).
 A patch release for the TUI of 0.16.0: six fixes from its first live use, one card (#157), to the
 approved spec. No command, protocol, ledger or state-file change. **0.16.1-rc1** (2026-09-30) has
 all six. **0.16.1-rc2** (2026-09-30) adds change 5b, the answered-questions fold, which Radek added
