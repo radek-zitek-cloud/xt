@@ -13,8 +13,9 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 A TUI-focused release, built card by card to the approved specs of the TUI redesign.
 **0.16.0-rc1** (2026-09-30) has the first two cards: #127 (Inbox groups and friction read state)
-and #132 (rows cut at pane width, with ages). The other cards (#128, #129, #131, #130) follow in
-later candidates.
+and #132 (rows cut at pane width, with ages). **0.16.0-rc2** (2026-09-30) adds #128 (the Team pane
+replaces the Status pane and the Team panel); #127 and #132 are unchanged from rc1 except that the
+Inbox is now panel 3. The other cards (#129, #131, #130) follow in later candidates.
 
 ### Added
 
@@ -22,7 +23,8 @@ later candidates.
   questions with `N options` when they have choices, approvals, alerts with `⚠`; they stay until
   answered, decided or cleared), **New** (goals you dispatched that closed and reports to you, since
   you last looked, newest first) and **Friction** (unread only). An empty group isn't shown. The
-  Inbox's title carries the counts, e.g. `[4]─Inbox─⚑ 1 · ✉ 2 · ✱ 1`, leaving out a zero.
+  Inbox's title carries the counts, e.g. `[3]─Inbox─⚑ 1 · ✉ 2 · ✱ 1` (`[4]` in rc1), leaving out a
+  zero.
 - **Friction read state (#127, rc1).** Friction is unread until you've seen it: in the TUI, once
   you leave the Inbox (or quit) after it was on screen there; `c` on a friction row marks it seen
   at once; `xt inbox` in your own terminal marks the friction it printed as seen. An agent's `xt
@@ -35,8 +37,31 @@ later candidates.
   `14m`, `3h`, `2d` up to 59 days, and whole weeks from 60 days (`8w`). A goal's age is its newest
   activity (the goal, its tasks and their replies). Team rows have none; Supervisor rows keep their
   clock time.
+- **The Team pane (#128, rc2)** at the top of the TUI replaces the Status pane and the Team panel.
+  Its header line has the team, xt's version with `(latest)`, a newer published release or
+  `running …: restart to update`, the agents running, open goals, `⚑ N needs you` and `✉ N new`
+  (the Inbox's counts) or "nothing waiting for you", messages or jobs stuck over a minute, and
+  today's tokens and estimate on the right. Then one block per harness, in a fixed order: its
+  account windows as bars with the share used and the reset time (`CLAUDE 5h …`, `CODEX 7d …`; a
+  window with no current reading isn't drawn), and its agents in columns that line up: a state
+  dot, the name, a short model (`sonnet 5.5`, `opus 5.5`; for `default`, the model the agent's own
+  session log names, else `default`), the state, and the context as tokens, a bar and a
+  percentage of the window. Agents fill up to three columns as the width allows (five agents take
+  two lines at 160 columns); blocks sit side by side or one under the other, whichever is shorter.
+  The pane is as high as its content. It has no number key: `tab` reaches it, `j`/`k` select an
+  agent for its detail and for `u`, `x`, `R` and `f`.
+- **Action results in a toast (#128, rc2).** The result of your last action (`alert cleared`,
+  `starting carol…`) is a one-line toast at the bottom that dims and goes after about ten seconds
+  without a key press. It's never part of the Team pane.
 
 ### Changed
+
+- **Panel keys (#128, rc2).** With Team out of the numbered panels, the keys are `1` Goals, `2`
+  Tasks, `3` Inbox, `4` Log, `5` Supervisor (were 1–6 with Team at 2); the key line and `h` say so.
+- **Agent states (#128, rc2).** An agent that isn't running shows `stopped` in the Team pane (its
+  detail still says `not running`).
+- **Long action results (#128, rc2)** are cut to one line in the toast instead of wrapping in the
+  Status pane.
 
 - **Rows use the whole panel (#132, rc1).** List rows are cut at the panel's current width in
   terminal cells, not at fixed widths (60, 50, 40 characters), with `…` only when text was cut, and
@@ -51,7 +76,7 @@ later candidates.
 
 ### Upgrading
 
-- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc1`), then `xt restart --all`
+- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc2`), then `xt restart --all`
   so the supervisor starts the friction marker. Friction from before that shows as seen. New keys
   in `.xt/state/inbox_seen.json` (`friction_upto`, `friction_seen`); no state format change.
   Scripts that parse `xt inbox` need the new section names.
