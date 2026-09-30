@@ -11,6 +11,7 @@ import math
 import re
 from dataclasses import dataclass, field
 
+from rich.style import Style
 from rich.text import Text
 
 from ..usage import short
@@ -120,10 +121,17 @@ def widths(agents: list[dict]) -> Widths:
                   max((len(tokens_text(a)) for a in agents), default=1))
 
 
+def dot_style(d: dict) -> str:
+    """The state dot's style: the state word's colour while the agent runs, dim when it doesn't
+    (card #157). Only the terminal's named colours, so the human's theme decides the shades."""
+    return STATE_STYLE.get(d["state"], "bright_black") if d.get("running") else "bright_black"
+
+
 def cell(d: dict, w: Widths, bar: int, selected: bool = False) -> Text:
-    """One agent: dot, name, short model, state, context tokens, a bar and the share of the window."""
+    """One agent: dot, name, short model, state, context tokens, a bar and the share of the window.
+    The whole cell carries the agent's name as meta, so a click on it selects the agent (card #157)."""
     out = Text(no_wrap=True)
-    out.append(d.get("dot", "○"), style=d.get("dot_style", "bright_black"))
+    out.append(d.get("dot", "○"), style=dot_style(d))
     out.append(f" {d['name']:<{w.name}} ", style="bold" if d.get("running") else "")
     out.append(f"{d['model']:<{w.model}} ", style="bright_black")
     out.append(f"{d['state']:<{w.state}} ", style=STATE_STYLE.get(d["state"], "bright_black"))
@@ -136,6 +144,7 @@ def cell(d: dict, w: Widths, bar: int, selected: bool = False) -> Text:
     out.append(f" {f'{pct:.0f}%' if pct is not None else '':>{PCT_WIDTH}}", style=style)
     if selected:
         out.stylize(SELECTED)
+    out.stylize(Style.from_meta({"agent": d["name"]}))
     return out
 
 

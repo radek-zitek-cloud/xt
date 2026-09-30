@@ -98,9 +98,10 @@ it isn't shown:
 | **NEW** | Since you last looked, newest first; clears once you've looked | |
 | `✓ #210 done: Write the weekly digest  #260` | A goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) and the goal's whole thread | Read it |
 | `✉ #47 liaison: …` | A report to you | Read it |
+| `(3 earlier, seen) ▸` | (from 0.16.1) What New showed that you've since seen, from the last 7 days, folded | `enter` or `space` shows it (newest first, dim); again folds it |
 | **FRICTION** | Unread friction only, newest first | |
 | `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt. `c` marks it seen at once |
-| `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` shows it (newest first); `enter` again folds it |
+| `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` or `space` (from 0.16.1) shows it (newest first); again folds it |
 
 The Inbox's title counts what's in the groups: `[1]─Inbox─⚑ 2 · ✉ 1 · ✱ 3` is two items that need
 you, one new and three unread friction; a zero count is left out. The Team pane's header repeats
@@ -172,7 +173,9 @@ hours apply as for questions (what closes at night isn't sent later). The Inbox'
 closed goals, and from 0.16.0 the reports sent to you, until you've looked: in the TUI, until you
 leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it has printed them in
 your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
-first run on 0.15.0, so older goals don't appear.
+first run on 0.15.0, so older goals don't appear. From 0.16.1 what you've seen isn't gone from the
+TUI: it folds under New as `(N earlier, seen)` for 7 days, also after you quit and start it again
+(`xt inbox` still lists only what's new).
 
 The **detail pane** (from 0.16.0) shows the selected item with its **thread**: for anything under
 a goal (a goal, a task, a question or report about it), the whole goal in time order: the goal, its
@@ -238,7 +241,8 @@ messages as a swim-lane chart, the newest at the bottom:
   message whose `--ref` chain leads to it); the team's lanes stay, only rows are filtered, and the title
   names the filter. The same pick again, `esc` in the picker, or `esc` in Flow clears it. `/`
   filters by the message text.
-- `j`/`k` select a row, the page keys scroll, `g`/`G` go to the oldest or newest. While the newest
+- `j`/`k` or the arrows select a row, the page keys scroll, `g`/`G` (or `Home`/`End`) go to the
+  oldest or newest; a click selects a row and the wheel scrolls (from 0.16.1). While the newest
   row is selected, Flow follows new messages; move up and it stays where you are. The title says
   `N of M`: rows in view of all that pass the filters. `enter` shows the message with its thread in
   the detail pane. Flow is read-only.
@@ -276,7 +280,9 @@ shown as the model its session log names.)
   messages or jobs stuck for over a minute; and today's tokens and estimate on the right.
 - One **block per harness**: its account windows as bars with the share used and the reset time
   (`CLAUDE 5h …`, `CODEX 7d …`); a window without a current reading isn't shown (`xt status`
-  says why). Then its agents, in columns that line up: a dot in the state's colour, the name, the
+  says why). Then its agents, in columns that line up: a dot in the state's colour (working
+  yellow, idle and done green, blocked red, dim when not running: your terminal's own named
+  colours, so your theme decides the shades), the name, the
   short model (`sonnet 5.5`; for an agent on `default`, the model its own session log names, else
   `default`), the state (`stopped` when not running), and the context: tokens, a bar and the share
   of the model's window, yellow from 70 % and red from 85 %. Agents fill up to three columns as the
@@ -288,12 +294,21 @@ tallest list pane (at least 8 rows at 160x40, 5 at 100x30). On a small terminal 
 pane is capped so the Inbox keeps its rows: it shows the header and the lines around the selected
 agent, and its bottom edge says how many lines are out of view.
 
-The panes' number keys (from 0.16.0) are `1` Inbox, `2` Work and `3` Flow, and `v` opens the
-supervisor's log; the TUI starts in the Inbox. The Team pane has no number key: `tab` reaches it (it's before pane 1), `j`/`k` select an agent,
-the detail pane shows it, and `u`, `x`, `R` and `f` act on it (`f` in Flow is its filter). The
-key line lists what `s` does first, then `h`, `q`, `1-3`, `j/k`, `space`, `enter`, `a/d`, `/`, `t`,
+The panes' number keys (from 0.16.1) are `0` Team, `1` Inbox, `2` Work, `3` Flow and `4` the
+detail pane, and `v` opens the supervisor's log; the TUI starts in the Inbox, and `tab` goes round
+the panes. `esc` in the detail pane goes back to the pane you came from. In the Team pane `j`/`k`
+or the arrows select an agent (`Home`/`End`: the first and last; `PgUp`/`PgDn`: a page, the agent
+lines in view), the detail pane shows it, and `u`, `x`, `R` and `f` act on it (`f` in Flow is its
+filter). The
+key line lists what `s` does first, then `h`, `q`, `0-4`, `j/k`, `space`, `enter`, `a/d`, `/`, `t`,
 `f` and `v` (a narrow terminal keeps the keys and drops their words), and `g/G` while Flow has
-focus. The result of your last action
+focus.
+
+**The mouse** (from 0.16.1): a click selects a row in any pane (an agent in Team, a row in the
+Inbox, Work or Flow) and focuses that pane; the detail pane shows it but doesn't take focus, so the
+arrows keep moving in the pane you clicked. `enter` or `4` goes to the detail pane. The wheel
+scrolls Flow (the selection stays in view) and the detail pane (a long thread's hidden rows first),
+wherever focus is. The result of your last action
 (`alert cleared`, `starting carol…`) shows for about ten seconds in a one-line toast at the bottom,
 then goes away on its own.
 

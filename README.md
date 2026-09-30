@@ -202,7 +202,9 @@ the pane's whole width and end with their age.
 
 | Key | What it does |
 |---|---|
-| `1`–`3`, `tab`, `j`/`k`, `enter` | Switch panes: 1 Inbox, 2 Work, 3 Flow (Team and the detail pane have no number: `tab` reaches them), move, read the detail (`j`/`k` there bring a long thread's hidden rows in) |
+| `0`–`4`, `tab`, `j`/`k`, `enter`, `esc` | Switch panes: 0 Team, 1 Inbox, 2 Work, 3 Flow, 4 the detail pane (`tab` goes round them); move (the arrows too); read the detail (`j`/`k` there bring a long thread's hidden rows in); `esc` from the detail pane back to the pane you came from |
+| Mouse | A click selects a row in any pane and focuses that pane (the detail pane follows without taking focus); the wheel scrolls Flow and the detail pane |
+| `Home` / `End`, page keys (Team) | The first / last agent, a page of agents up or down |
 | `v` | The supervisor's log, newest first, in a pop-up (`esc` closes it) |
 | `/` | Filter the focused pane by text (empty clears it) |
 | `t` | Show or hide system lines (starts, stops, settings, wake-ups, nudges) in Flow |
@@ -213,7 +215,8 @@ the pane's whole width and end with their age.
 | `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says which (`s answer #288` or `s/S message liaison`). In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
 | `S` | Always message the liaison, even with a question selected |
 | `c` | Clear the selected alert, or mark the selected friction seen (Inbox) |
-| `enter` on `(N older, seen) ▸` | Show or hide the friction you've already seen (Inbox) |
+| `enter` or `space` on `(N older, seen) ▸` | Show or hide the friction you've already seen (Inbox) |
+| `enter` or `space` on `(N earlier, seen) ▸` | Show or hide what New showed you in the last 7 days (Inbox) |
 | `f` (Team) | Switch Herdr to the selected agent's workspace |
 | `u` / `U` | Start the selected stopped agent / every stopped agent |
 | `x` / `X` | Stop the selected agent / every agent (they stay in the roster) |

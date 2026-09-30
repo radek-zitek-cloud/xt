@@ -3,6 +3,7 @@
 import math
 from typing import Callable
 
+from rich.style import Style
 from rich.text import Text
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -20,16 +21,17 @@ REFRESH_SECONDS = 2.0
 INBOX = PANELS.index("Inbox") + 1  # its pane number
 WORK = PANELS.index("Work") + 1
 FLOW = PANELS.index("Flow") + 1
-TEAM = 0  # the Team pane has no number key (card #128); last_panel is 0 while it has focus
-PICK_AGENT = "select an agent in Team first (tab to it, then j/k)"
+TEAM = 0  # the Team pane's key (card #157); last_panel is 0 while it has focus
+DETAIL = len(PANELS) + 1  # Detail's key, 4 (card #157)
+PICK_AGENT = "select an agent in Team first (0, then j/k)"
 # The key line (card #130): what s does first (card #102), then the keys every pane shares, then the
 # rest while there is room. A pair loses its word, from the end, before a key is left out, so every
 # one of these fits at 100 columns.
 SEND_KEYS = [("s/S", "message liaison")]
-CORE_KEYS = [("h", "help"), ("q", "quit"), (f"1-{len(PANELS)}", "panes"), ("j/k", "move"), ("space", "fold"),
+CORE_KEYS = [("h", "help"), ("q", "quit"), (f"{TEAM}-{DETAIL}", "panes"), ("j/k", "move"), ("space", "fold"),
              ("enter", "read"), ("a/d", "approve/deny"), ("/", "filter"), ("t", "system"), ("f", "jump"),
              ("v", "supervisor")]
-MORE_KEYS = [("tab", "Team"), ("c", "clear"), ("u/U", "start"), ("x/X", "stop"), ("R", "retire")]
+MORE_KEYS = [("tab", "next pane"), ("c", "clear"), ("u/U", "start"), ("x/X", "stop"), ("R", "retire")]
 HINTS = " · ".join(f"{k} {w}" for k, w in SEND_KEYS + CORE_KEYS + MORE_KEYS)
 # pane heights (criterion 14 of #130): Flow gets about a third, the Team pane what it needs up to what
 # leaves the Inbox and Work their minimum, and the Inbox the larger part of the rest
@@ -73,7 +75,9 @@ class Panel(OptionList):
         self.rows: list[Row] = []
         self.all_rows: list[Row] = []
         self.filter = ""
-        self.unfolded = False  # the Inbox's seen friction, shown under its `(N older, seen)` row
+        # the Inbox's open folds, by fold key: seen friction under `(N older, seen)` (card #127), seen
+        # New items under `(N earlier, seen)` (card #157)
+        self.open_folds: set[str] = set()
         self.border_title = f"[{number}]─{title}"
 
     def set_counts(self, counts: str) -> None:
@@ -106,7 +110,7 @@ class Panel(OptionList):
         self.update_subtitle()
 
     def visible(self, rows: list[Row]) -> list[Row]:
-        rows = [r for r in rows if self.unfolded or not r.data.get("folded")]
+        rows = [r for r in rows if not r.data.get("folded") or r.data.get("under") in self.open_folds]
         if self.filter:
             needle = self.filter.lower()
             rows = [r for r in rows if r.kind != "heading" and needle in r.text.plain.lower()]
@@ -114,16 +118,38 @@ class Panel(OptionList):
 
     def line(self, row: Row, width: int) -> Text:
         text = row.text
-        if row.kind == "fold" and self.unfolded:
+        if row.kind == "fold" and row.key in self.open_folds:
             text = Text(text.plain.replace("▸", "▾"), style="bright_black")
         return fit(text, row.age, width)
 
     def on_resize(self) -> None:
         self.set_rows(self.all_rows)  # re-cut every row at the new width
 
-    def toggle_fold(self) -> None:
-        self.unfolded = not self.unfolded
+    def fold_of(self, row: Row | None) -> str | None:
+        """The fold a row opens or sits under, if any."""
+        if row is None:
+            return None
+        return row.key if row.kind == "fold" else row.data.get("under")
+
+    def toggle_fold(self, key: str | None = None) -> bool:
+        """Open or close the selected row's fold (`key`'s when given), keeping the selection on the
+        fold row when its rows go; False when there is no fold here."""
+        key = key or self.fold_of(self.current)
+        if key is None:
+            return False
+        self.open_folds ^= {key}
         self.set_rows(self.all_rows)
+        if key not in self.open_folds:
+            self.highlighted = next((i for i, r in enumerate(self.rows) if r.key == key), self.highlighted)
+        return True
+
+    async def _on_click(self, event) -> None:
+        """A click selects the row and leaves focus here; only enter (or 4) opens Detail (card #157).
+        Textual's own handler would select the option, which reads it."""
+        event.prevent_default()
+        clicked = event.style.meta.get("option")
+        if clicked is not None and not self.get_option_at_index(clicked).disabled:
+            self.highlighted = clicked
 
     def in_view(self) -> list[Row]:
         """The rows on screen right now (one line each), and the highlighted one."""
@@ -219,10 +245,14 @@ class WorkPanel(Panel):
 
 
 class TeamPane(Static):
-    """The Team pane at the top (card #128): the header, the harness blocks and the agents. It has
-    no number key; tab reaches it, j/k select an agent for the agent keys and Detail."""
+    """The Team pane at the top (card #128): the header, the harness blocks and the agents. `0` (or
+    tab) reaches it; j/k or the arrows, the page keys and a click select an agent for the agent keys
+    and Detail (card #157)."""
 
     can_focus = True
+    BINDINGS = [Binding("down", "step(1)", show=False), Binding("up", "step(-1)", show=False),
+                Binding("home", "edge(-1)", show=False), Binding("end", "edge(1)", show=False),
+                Binding("pageup", "page(-1)", show=False), Binding("pagedown", "page(1)", show=False)]
 
     def __init__(self):
         super().__init__(id="team", classes="panel")
@@ -274,7 +304,7 @@ class TeamPane(Static):
         at = next((i for i, ln in enumerate(rest) if any(str(s.style) == teampane.SELECTED for s in ln.spans)), 0)
         start = max(0, min(at - room // 2, len(rest) - room))
         hidden = len(rest) - room
-        self.border_subtitle = f"{hidden} more line{'s' if hidden != 1 else ''}: tab, then j/k"
+        self.border_subtitle = f"{hidden} more line{'s' if hidden != 1 else ''}: 0, then j/k"
         return lines[:1] + rest[start:start + room]
 
     def on_resize(self) -> None:
@@ -300,6 +330,28 @@ class TeamPane(Static):
             i = max(0, min(len(names) - 1, names.index(self.selected) + step))
             self.select(names[i])
 
+    def page_size(self) -> int:
+        """Agents a page key moves by: the agent lines in view when capped, else all of them."""
+        return max(1, self.limit - 1) if self.limit is not None else max(1, len(self.rows))
+
+    def action_step(self, step: int) -> None:
+        self.move(step)
+        self.app.show_detail(self)
+
+    def action_edge(self, step: int) -> None:
+        self.action_step(step * len(self.rows))
+
+    def action_page(self, step: int) -> None:
+        self.action_step(step * self.page_size())
+
+    def on_click(self, event) -> None:
+        """A click on an agent selects it; Detail shows it and focus stays here (card #157)."""
+        name = event.style.meta.get("agent")
+        if name is not None and any(r.data["name"] == name for r in self.rows):
+            self.focus()
+            self.select(name)
+            self.app.show_detail(self)
+
 
 class FlowPane(Widget):
     """The Flow chart (card #130), full width at the bottom. It keeps which rows pass its filters
@@ -309,7 +361,9 @@ class FlowPane(Widget):
 
     can_focus = True
     BINDINGS = [Binding("g,home", "edge(-1)", show=False), Binding("G,end", "edge(1)", show=False),
-                Binding("pageup", "page(-1)", show=False), Binding("pagedown", "page(1)", show=False)]
+                Binding("pageup", "page(-1)", show=False), Binding("pagedown", "page(1)", show=False),
+                Binding("down", "step(1)", show=False), Binding("up", "step(-1)", show=False)]
+    WHEEL_ROWS = 3  # rows one notch of the mouse wheel scrolls
 
     def __init__(self, title: str, number: int):
         super().__init__(id=f"panel-{number}", classes="panel")
@@ -444,9 +498,46 @@ class FlowPane(Widget):
         self.follow = self.selected == msgs[-1]
         self.place()
 
+    def action_step(self, step: int) -> None:
+        self.move(step)
+        self.app.show_detail(self)
+
     def action_page(self, step: int) -> None:
         self.move(step * max(1, self.view_height() - 1))
         self.app.show_detail(self)
+
+    def scroll_view(self, step: int) -> None:
+        """The wheel (card #157): the view moves `step` rows, the selection only as far as it must to
+        stay in view. Scrolled up from the newest row, Flow stops following."""
+        msgs = self.message_rows()
+        h, n = self.view_height(), len(self.rows)
+        self.top = max(0, min(self.top + step, n - h))
+        if msgs and self.selected is not None:
+            in_view = [i for i in msgs if self.top <= i < self.top + h]
+            if in_view and self.selected not in in_view:
+                self.selected = in_view[0] if self.selected < in_view[0] else in_view[-1]
+            self.follow = self.selected == msgs[-1] and self.top >= n - h
+        self.place()
+        if self.has_focus:
+            self.app.show_detail(self)
+
+    def on_mouse_scroll_down(self, event) -> None:
+        event.stop()
+        self.scroll_view(self.WHEEL_ROWS)
+
+    def on_mouse_scroll_up(self, event) -> None:
+        event.stop()
+        self.scroll_view(-self.WHEEL_ROWS)
+
+    def on_click(self, event) -> None:
+        """A click on a message row selects it; Detail shows it and focus stays here (card #157)."""
+        i = event.style.meta.get("flow_row")
+        if i is not None and 0 <= i < len(self.rows) and self.rows[i][0] == "msg":
+            self.focus()
+            self.selected = i
+            self.follow = i == self.message_rows()[-1]
+            self.place()
+            self.app.show_detail(self)
 
     def action_edge(self, step: int) -> None:
         msgs = self.message_rows()
@@ -490,9 +581,10 @@ class FlowPane(Widget):
                 lines.append(flow.separator(x, width))
                 continue
             line = flow.chart_row(x, c, width) if c else flow.list_row(x, width)
+            line.append(" " * max(0, width - line.cell_len))  # the whole row takes a click (card #157)
             if i == self.selected:
-                line.append(" " * max(0, width - line.cell_len))
                 line.stylize(flow.SELECTED if self.has_focus else "bold")
+            line.stylize(Style.from_meta({"flow_row": i}))
             lines.append(line)
         if not self.items:
             filtered = self.pick or self.filter
@@ -539,7 +631,22 @@ class FlowPick(ModalScreen[object]):
         self.dismiss("esc")
 
 
-PANES = (Panel, TeamPane, FlowPane)  # what focus moves between (Detail is reached with enter or tab)
+PANES = (Panel, TeamPane, FlowPane)  # what focus moves between (Detail is reached with enter, 4 or tab)
+
+
+class DetailPane(VerticalScroll):
+    """The detail pane's frame. The wheel moves a thread like j/k: its hidden rows first, then the
+    scroll (card #157)."""
+
+    def on_mouse_scroll_down(self, event) -> None:
+        event.prevent_default()
+        event.stop()
+        self.app.scroll_detail("down")
+
+    def on_mouse_scroll_up(self, event) -> None:
+        event.prevent_default()
+        event.stop()
+        self.app.scroll_detail("up")
 
 
 class DetailBody(Static):
@@ -737,18 +844,20 @@ class Help(ModalScreen[None]):
 
     KEYS = [
         ("Move", ""),
-        (f"1-{len(PANELS)}", "jump to a pane: " + ", ".join(PANELS)),
-        ("tab / l", "next pane (Team, at the top, and Detail have no number: tab reaches them)"),
+        (f"{TEAM}-{DETAIL}", "jump to a pane: " + ", ".join(["Team", *PANELS, "Detail"])),
+        ("tab / l", "next pane"),
         ("shift+tab", "previous pane"),
-        ("j / k", "down / up (in the detail pane: the thread's hidden rows first, then scroll)"),
+        ("j / k", "down / up; the arrows too (in the detail pane: the thread's hidden rows first, then scroll)"),
         ("enter", "read the detail pane: the selected item and its thread"),
         ("/", "filter the focused pane (empty clears it)"),
-        ("esc", "back from the detail pane to the panes"),
+        ("esc", "back from the detail pane to the pane you came from"),
+        ("mouse", "a click selects a row and keeps focus in its pane; the wheel scrolls Flow and the detail pane"),
         ("v", "the supervisor's log, newest first, in a pop-up (esc closes it)"),
         (f"Inbox ({INBOX})", ""),
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
         ("c", "clear the selected alert; on unread friction: mark it seen"),
-        ("enter", "on the (N older, seen) row: show or hide the friction you've seen"),
+        ("enter/space", "on (N older, seen): show or hide the friction you've seen; on (N earlier, seen): "
+                        "the New items you've seen in the last 7 days"),
         (f"Work ({WORK})", ""),
         ("space", "fold or unfold the selected goal, done (N) or no goal row (on a task: fold its goal)"),
         ("o", "open work only: hide done (N) and done tasks; again: show them"),
@@ -756,14 +865,15 @@ class Help(ModalScreen[None]):
         (f"Flow ({FLOW})", ""),
         ("j / k", "select a message; with the newest selected, Flow follows new ones"),
         ("pgup/pgdn", "a page up / down"),
-        ("g / G", "the oldest / the newest message"),
+        ("g / G", "the oldest / the newest message (home / end too)"),
         ("enter", "show the selected message and its thread in the detail pane"),
         ("t", "show or hide system lines (starts, stops, settings, wake-ups, nudges)"),
         ("f", "filter to one agent's messages or one goal's thread; the same pick again, esc in the "
               "picker, or esc in Flow clears it"),
         ("/", "filter by the message's text"),
-        ("Team (tab)", ""),
+        (f"Team ({TEAM})", ""),
         ("j / k", "select an agent (its details show in the detail pane)"),
+        ("pgup/pgdn", "a page of agents up / down; home / end: the first / the last agent"),
         ("u", "start the selected stopped agent (existing role and harness)"),
         ("U", "start every stopped agent in the roster"),
         ("x", "stop the selected agent; it stays in the roster (asks y/n)"),
@@ -829,7 +939,8 @@ class XtTui(App):
         Binding("o", "open_only", show=False),
         Binding("v", "supervisor", show=False),
         Binding("t", "system", show=False),
-        *[Binding(str(i), f"panel({i})", show=False) for i in range(1, len(PANELS) + 1)],
+        *[Binding(str(i), f"panel({i})", show=False) for i in range(TEAM, len(PANELS) + 1)],
+        Binding(str(DETAIL), "detail", show=False),
     ]
 
     def __init__(self, source: Callable[[], Snapshot], actions=None):
@@ -854,7 +965,7 @@ class XtTui(App):
                 yield Panel("Inbox", INBOX)
                 yield WorkPanel("Work", WORK)
             with Vertical(id="right"):
-                detail = VerticalScroll(id="detail", classes="panel")
+                detail = DetailPane(id="detail", classes="panel")
                 detail.border_title = "Detail"
                 with detail:
                     yield DetailBody(id="detail-body")
@@ -1053,14 +1164,28 @@ class XtTui(App):
         elif isinstance(w, (TeamPane, FlowPane)):
             w.move(1 if direction == "down" else -1)
             self.show_detail(w)
+        elif isinstance(w, DetailPane):
+            self.scroll_detail(direction)
         elif isinstance(w, VerticalScroll):
-            view = self.detail_view if w.id == "detail" else None
-            if isinstance(view, ThreadDetail):  # the thread's hidden rows first (card #131)
-                if direction == "down" and view.scroll(1):
-                    return self.query_one("#detail-body", Static).update(view)
-                if direction == "up" and w.scroll_y <= 0 and view.scroll(-1):
-                    return self.query_one("#detail-body", Static).update(view)
             (w.scroll_down if direction == "down" else w.scroll_up)()
+
+    def scroll_detail(self, direction: str) -> None:
+        """j/k in Detail, or the wheel over it: a thread's hidden rows first (card #131), then the
+        scroll."""
+        w = self.query_one("#detail", DetailPane)
+        view = self.detail_view
+        if isinstance(view, ThreadDetail):
+            if direction == "down" and view.scroll(1):
+                return self.query_one("#detail-body", Static).update(view)
+            if direction == "up" and w.scroll_y <= 0 and view.scroll(-1):
+                return self.query_one("#detail-body", Static).update(view)
+        (w.scroll_down if direction == "down" else w.scroll_up)()
+
+    def action_detail(self) -> None:
+        """4: Detail, showing what the pane the human was in has selected (card #157)."""
+        if isinstance(self.focused, PANES):
+            self.show_detail(self.focused)
+        self.query_one("#detail", DetailPane).focus()
 
     def action_read(self) -> None:
         if isinstance(self.focused, PANES):
@@ -1127,14 +1252,23 @@ class XtTui(App):
     def action_refresh(self) -> None:
         self.refresh_data()
 
-    def _work_focused(self, key: str) -> WorkPanel | None:
+    def _work_focused(self, key: str, where: str = f"Work ({WORK})") -> WorkPanel | None:
         if isinstance(self.focused, WorkPanel):
             return self.focused
-        self.set_status(f"{key} works in Work ({WORK})")
+        self.set_status(f"{key} works in {where}")
         return None
 
     def action_fold(self) -> None:
-        panel = self._work_focused("space")
+        """space: fold in Work; in the Inbox, open or close the seen rows the selected row belongs to
+        (card #157)."""
+        panel = self.focused
+        if isinstance(panel, Panel) and panel.number == INBOX:
+            if panel.toggle_fold():
+                self.show_detail(panel)
+            else:
+                self.set_status("space in the Inbox works on its seen rows: (N older, seen), (N earlier, seen)")
+            return
+        panel = self._work_focused("space", f"the Inbox ({INBOX}) and Work ({WORK})")
         if panel:
             panel.toggle()
             self.show_detail(panel)
@@ -1552,7 +1686,7 @@ def _demo_flow(now) -> flow.Data:
 
 def _agent(name: str, harness: str, model: str, state: str, used: int, window: int | None, detail: str) -> Row:
     data = {"name": name, "harness": harness, "model": model, "state": state, "running": True,
-            "dot": "●", "dot_style": teampane.STATE_STYLE.get(state, ""), "used": used, "window": window,
+            "dot": "●", "used": used, "window": window,
             "workspace": f"w-{name}", "active": True}
     return Row(name, teampane.cell(data, teampane.widths([data]), teampane.BAR_MAX), lambda: Text(detail),
                "agent", data)

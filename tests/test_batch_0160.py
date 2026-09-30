@@ -197,8 +197,10 @@ def test_viewing_the_inbox_marks_the_friction_seen_for_the_next_start(ctx):
     _run(look())
     rows = build(ctx).panels["Inbox"]  # the next start
     assert not [r for r in rows if r.kind == "friction" and not r.data["seen"]]
-    assert next(r for r in rows if r.kind == "fold").text.plain == "(15 older, seen) ▸"
+    assert next(r for r in rows if r.key == "fold:friction").text.plain == "(15 older, seen) ▸"
     assert set(f["unread"]) <= inbox.friction_marker(ctx)[1]
+    # since v0.16.1 (#157) the New items seen on that look fold under New instead of going
+    assert next(r for r in rows if r.key == "fold:earlier").text.plain == "(2 earlier, seen) ▸"
 
 
 def test_quitting_from_the_inbox_marks_the_friction_seen_too(ctx):
@@ -796,9 +798,10 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
     from xt.tui.app import HINTS, Help
 
     _team(ctx, fake_home)
-    assert "1-3 panes" in HINTS and "1-4" not in HINTS and "tab Team" in HINTS  # #131: no Supervisor pane
+    # #131: no Supervisor pane; #157: 0 is Team and 4 Detail
+    assert "0-4 panes" in HINTS and "1-3" not in HINTS and "tab next pane" in HINTS
     keys = dict(Help.KEYS)
-    assert keys["1-3"] == "jump to a pane: Inbox, Work, Flow"  # card #130: Flow in place of the Log
+    assert keys["0-4"] == "jump to a pane: Team, Inbox, Work, Flow, Detail"  # card #130: Flow in place of the Log
 
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
@@ -807,7 +810,9 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
                 await pilot.press(str(n))
                 await pilot.pause()
                 assert app.focused.title == title
-            await pilot.press("4")  # no fourth pane since card #131: nothing happens
+            await pilot.press("4")  # Detail since card #157
+            assert app.focused.id == "detail"
+            await pilot.press("escape")  # back to Flow, where it came from
             assert app.focused.title == "Flow"
             await pilot.press("tab")  # past Flow, the last pane: Team, at the top
             await pilot.pause()
@@ -1090,9 +1095,11 @@ def test_space_and_o_outside_work_say_where_they_work(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
-            await pilot.press(str(INBOX), "space")
-            assert app.status == f"space works in Work ({WORK})"
-            await pilot.press("o")
+            await pilot.press(str(INBOX), "space")  # no fold in this Inbox (space folds there since #157)
+            assert app.status.startswith("space in the Inbox works on its seen rows")
+            await pilot.press(str(FLOW), "space")
+            assert app.status == f"space works in the Inbox ({INBOX}) and Work ({WORK})"
+            await pilot.press(str(INBOX), "o")
             assert app.status == f"o works in Work ({WORK})"
             await pilot.press(str(WORK))
             await pilot.pause()

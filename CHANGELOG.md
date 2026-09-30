@@ -9,6 +9,46 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.16.1] — not released yet
+
+A patch release for the TUI of 0.16.0: six fixes from its first live use, one card (#157), to the
+approved spec. No command, protocol, ledger or state-file change. **0.16.1-rc1** (2026-09-30) has
+all six.
+
+### Fixed
+
+- **Every pane has a key (#157).** `0` focuses the Team pane and `4` the detail pane, next to `1`
+  Inbox, `2` Work and `3` Flow; `esc` in the detail pane goes back to the pane you came from (Team
+  too). The key line says `0-4 panes` and the help lists them. `tab` still goes round the panes
+  (its word in the key line is now `next pane`).
+- **Arrows work in every pane (#157).** Up and down move in the Team pane and in Flow as `j`/`k`
+  do. In the Team pane `Home` and `End` select the first and last agent, and `PgUp`/`PgDn` move by
+  the agent lines in view (the whole team when it all fits).
+- **The state dot (#157).** The dot before each agent in the Team pane is drawn from the state word's
+  colour in one place: working yellow, idle and done green, blocked red, not running dim, in the
+  terminal's own named colours (your theme decides the shades; a theme whose yellow is a green shows
+  working as green). v0.16.0 already coloured it this way through a second table in the model; the
+  dot and the word can no longer differ. No other colour changes.
+- **`space` folds in the Inbox too (#157).** On `(N older, seen)` or on a row under it, and on the
+  new `(N earlier, seen)`, `space` opens or folds it (the selection goes back to the fold row),
+  like `enter`. Anywhere else in the Inbox it says where it works.
+- **New items you have seen stay reachable (#157).** Reports to you and your closed goals that New
+  showed and you have since seen fold under New as `(N earlier, seen) ▸`, newest first, dim, for 7
+  days, also after quitting and restarting the TUI. `enter` or `space` opens them; the detail pane
+  shows each as before. Nothing is stored for it: it reads the ledger and the existing seen marker.
+  `xt inbox` is unchanged.
+- **The mouse (#157).** A click selects the row in any pane (a Team agent, a Flow row, an Inbox or
+  Work row) and focuses that pane; the detail pane follows, but focus stays where you clicked
+  (in v0.16.0 a click in the Inbox or Work threw focus into the detail pane, and Team and Flow
+  ignored clicks). `enter` or `4` moves focus to the detail pane. The wheel scrolls Flow (three rows a
+  notch; the selection stays in view, and scrolling up stops Flow following new messages) and the
+  detail pane (a long thread's hidden rows first, as `j`/`k`), without moving focus.
+
+### Upgrading
+
+- From 0.16.0: `git pull upstream main` (or `xt version use v0.16.1`), then quit and start `xt tui`
+  again. Agents need no restart: nothing they see changes.
+
 ## [0.16.0] — 2026-09-30
 
 The release: the same code and docs as 0.16.0-rc6 (only the version and this changelog changed).

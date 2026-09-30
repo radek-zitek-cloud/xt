@@ -25,9 +25,11 @@ from .flow import Data as FlowData
 from .teampane import Harness, shown_model
 from .thread import ThreadDetail, thread_of
 
-# the numbered panes, 1-3; Team and Detail have no number. Work (card #129) replaced Goals and
+# the numbered panes, 1-3; Team is 0 and Detail 4 (card #157). Work (card #129) replaced Goals and
 # Tasks, the Supervisor is a pop-up on `v` (card #131) and Flow replaced the Log (card #130).
 PANELS = ("Inbox", "Work", "Flow")
+# the Inbox's folds (cards #127, #157): their rows carry the fold's key in `under`
+FRICTION_FOLD, EARLIER_FOLD = "fold:friction", "fold:earlier"
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
@@ -242,7 +244,6 @@ def build(ctx: Ctx) -> Snapshot:
             continue
         la = live.get(a.name)
         state = la.status if la else ("retired" if not a.active else "not running")
-        dot = ("●", STATUS_STYLE.get(state, "bright_black")) if la else ("○", "bright_black")
         owned = [i for i in open_items.values() if i["owner"] == a.name]
 
         ctxr = contexts.get(a.name)
@@ -302,7 +303,7 @@ def build(ctx: Ctx) -> Snapshot:
                 "active": a.active, "role": a.role, "harness": a.harness or "?",
                 "model": shown_model(a.model, ctxr.model if ctxr else None),
                 "state": la.status if la else ("retired" if not a.active else "stopped"),
-                "dot": dot[0], "dot_style": dot[1],
+                "dot": "●" if la else "○",  # its colour follows the state (teampane.dot_style)
                 "used": now_ctx.used if now_ctx else None, "window": now_ctx.window if now_ctx else None,
                 "approximate": now_ctx.approximate if now_ctx else False}
         team_rows.append(Row(f"agent:{a.name}", teampane.cell(data, teampane.widths([data]), teampane.BAR_MAX),
@@ -396,12 +397,17 @@ def build(ctx: Ctx) -> Snapshot:
         n = int(al.get("count", 1))
         needs.append(Row(f"alert:{key}", _t(("⚠ ", "red"), (f"×{n} ", "yellow") if n > 1 else "", _line(al["text"])),
                          detail, "alert", {"key": key}, row_age(al.get("last") or al.get("ts"), now)))
-    for m, goal in box.new:  # since the human last looked (cards #125, #127)
+    def new_row(m: dict, goal: dict | None, seen: bool) -> Row:
+        """A New row: a report to the human, or a goal of theirs that closed. Seen ones (card #157)
+        are dim and folded under `(N earlier, seen)`."""
+        keys = "seen already" if seen else SEEN_KEYS
+        data = {"folded": True, "under": EARLIER_FOLD} if seen else {}
+        dim = "bright_black" if seen else None
         if goal is None:
-            new_rows.append(Row(f"msg:{m['id']}", _t(("✉ ", "cyan"), f"#{m['id']} {m['from']}: ", _line(m["body"])),
-                                lambda m=m: thread(m, _msg_block(m), SEEN_KEYS), "message", {"id": m["id"]},
-                                row_age(m["ts"], now)))
-            continue
+            return Row(f"msg:{m['id']}", _t(("✉ ", dim or "cyan"), (f"#{m['id']} {m['from']}: ", dim or ""),
+                                            (_line(m["body"]), dim or "")),
+                       lambda m=m: thread(m, _msg_block(m), keys), "message", {"id": m["id"], **data},
+                       row_age(m["ts"], now))
 
         def ddetail(goal=goal, done=m):
             out = Text()
@@ -410,11 +416,21 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(first_line(goal["body"], 200) + "\n", style="bold")
             out.append(_heading(f"closing summary: #{done['id']}"))
             out.append(done["body"] + "\n")
-            return thread(done, out, SEEN_KEYS)
+            return thread(done, out, keys)
 
-        new_rows.append(Row(f"done:{goal['id']}", _t(("✓ ", "green"), f"#{goal['id']} done: ", _line(goal["body"]),
-                                                     (f"  #{m['id']}", "bright_black")),
-                            ddetail, "done", {"id": goal["id"], "done": m["id"]}, row_age(m["ts"], now)))
+        return Row(f"done:{goal['id']}", _t(("✓ ", dim or "green"), (f"#{goal['id']} done: ", dim or ""),
+                                            (_line(goal["body"]), dim or ""), (f"  #{m['id']}", "bright_black")),
+                   ddetail, "done", {"id": goal["id"], "done": m["id"], **data}, row_age(m["ts"], now))
+
+    new_rows = [new_row(m, goal, False) for m, goal in box.new]  # since the human last looked (#125, #127)
+    if box.earlier:
+        n = len(box.earlier)
+        new_rows.append(Row(EARLIER_FOLD, _t((f"({n} earlier, seen) ▸", "bright_black")),
+                            lambda n=n: Text(f"{n} items from New you have seen in the last {_inbox.EARLIER_DAYS} days, "
+                                             "newest first: enter or space shows or hides them\n",
+                                             style="bright_black"),
+                            "fold", {"n": n}))
+        new_rows += [new_row(m, goal, True) for m, goal in box.earlier]
     for m in box.unread:
         friction_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "magenta"), f"#{m['id']} {m['from']}: ",
                                                           _line(m["body"])),
@@ -423,9 +439,9 @@ def build(ctx: Ctx) -> Snapshot:
                                  "friction", {"id": m["id"], "seen": False},
                                  row_age(m["ts"], now)))
     if box.seen:
-        friction_rows.append(Row("fold:friction", _t((f"({len(box.seen)} older, seen) ▸", "bright_black")),
+        friction_rows.append(Row(FRICTION_FOLD, _t((f"({len(box.seen)} older, seen) ▸", "bright_black")),
                                  lambda n=len(box.seen): Text(f"{n} older friction reports you have seen, newest "
-                                                              "first: enter shows or hides them\n",
+                                                              "first: enter or space shows or hides them\n",
                                                               style="bright_black"),
                                  "fold", {"n": len(box.seen)}))
         for m in box.seen:
@@ -433,7 +449,8 @@ def build(ctx: Ctx) -> Snapshot:
                                                               (f"#{m['id']} {m['from']}: {_line(m['body'])}",
                                                                "bright_black")),
                                      lambda m=m: thread(m, _msg_block(m), "seen already"), "friction",
-                                     {"id": m["id"], "seen": True, "folded": True}, row_age(m["ts"], now)))
+                                     {"id": m["id"], "seen": True, "folded": True, "under": FRICTION_FOLD},
+                                     row_age(m["ts"], now)))
     inbox_rows = []
     for heading, rows in (("NEEDS YOU", needs), ("NEW", new_rows), ("FRICTION", friction_rows)):
         if rows:

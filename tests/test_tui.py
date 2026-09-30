@@ -99,7 +99,7 @@ def test_h_opens_help_listing_every_key(ctx):
             await pilot.press("h")
             assert isinstance(app.screen, Help)
             keys = " ".join(k for k, _ in Help.KEYS)
-            for k in ("a / d", "c", "u", "U", "x", "f", "s", "r", "h / ?", "q", "1-3", "/", "R", "enter", "esc",
+            for k in ("a / d", "c", "u", "U", "x", "f", "s", "r", "h / ?", "q", "0-4", "/", "R", "enter", "esc",
                       "space", "o", "v"):
                 assert k in keys
             await pilot.press("h")  # h closes it again

@@ -394,7 +394,7 @@ harness goes to the human with `xt friction`.
 - Talk to the liaison in its Herdr pane (or type into any agent's pane: that's unstamped and
   legitimate).
 - `xt tui` (also what bare `xt` opens after `xt up`), refreshed every 2 s. The **Team** pane on top
-  (card #128; no number key, `tab` reaches it) is as high as its content: a header (team, xt's
+  (card #128; key `0` since card #157) is as high as its content: a header (team, xt's
   version and published or restart notices, running agents, open goals, the Inbox's needs-you and
   new counts, stuck messages or jobs, today's tokens and estimate), then one block per harness with
   its account windows as bars (`turns.allowance_windows`) and its agents in aligned columns
@@ -409,8 +409,9 @@ harness goes to the human with `xt friction`.
   numbered panes of fixed size (focus shows by frame colour and a reversed title; `/` filters the
   focused one; list rows are cut at the pane's width in cells and end with a dim age, `model.fit`):
   **Inbox** (1: three groups: Needs you with open questions, pending approvals and alerts; New
-  with goals done and reports to the human since they last looked; unread Friction, with seen
-  friction folded; the counts in its title), **Work** (2, card #129: goals and their tasks as one
+  with goals done and reports to the human since they last looked, and those already seen from the
+  last 7 days folded under it, `inbox.earlier`, card #157, read from the ledger and the existing
+  marker; unread Friction, with seen friction folded; the counts in its title), **Work** (2, card #129: goals and their tasks as one
   two-level outline, built by `tui/work.py`: a task goes under the goal at the root of its `ref`
   chain, or under a final `no goal` row; open goals first, expanded, newest activity first; the
   liaison's drafts; done goals under a collapsed `done (N)` fold; `space` folds, `o` shows open
@@ -429,8 +430,11 @@ harness goes to the human with `xt friction`.
   the selected one marked, then the goal's usage and the keys that apply, then reference text such
   as a goal's brief. The thread is laid out for the pane's height at each draw: a long one shows a
   window around the selected message with counts of the hidden rows, and `j`/`k` in the focused
-  detail pane move the window. `v` opens the supervisor's events, newest first, in a pop-up. The
-  last action's result is a
+  detail pane move the window. `v` opens the supervisor's events, newest first, in a pop-up. Every
+  pane has a key since card #157 (`0` Team to `4` Detail; `esc` in Detail returns to the pane it
+  came from); a click selects a row and focuses its pane without opening Detail (Team's cells and
+  Flow's rows carry the agent or row in their style's meta), and the wheel scrolls Flow and Detail.
+  The last action's result is a
   one-line toast that goes after about ten seconds; the bottom line is key hints; `h` lists every
   key (the README has the table). Slow actions (starting agents) run in the background.
   `xt tui --demo` shows sample data.

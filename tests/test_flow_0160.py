@@ -668,8 +668,8 @@ def test_12_the_log_pane_and_its_key_are_gone_and_xt_log_still_prints_the_ledger
             await pilot.pause()
             assert app.focused is _pane(app) and app.focused.title == "Flow"
             assert not [w for w in app.query("*") if getattr(w, "title", None) == "Log"]
-            await pilot.press("4")  # nothing
-            assert app.focused is _pane(app)
+            await pilot.press("4")  # no Log: since #157 the detail pane
+            assert app.focused.id == "detail"
 
     _run(run())
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
@@ -722,7 +722,7 @@ def test_14_the_final_layout_with_the_demo_fixture(size, inbox_min, tmp_path):
             inbox, work = app.panel(INBOX).content_size.height, app.panel(WORK).content_size.height
             assert inbox >= inbox_min and work <= inbox  # the Inbox: the tallest list pane
             keys = [item.split(" ")[0] for item in str(app.query_one("#hints").render()).split(" · ")]
-            for k in ("1-3", "j/k", "space", "enter", "s/S", "a/d", "/", "t", "f", "v", "h", "q"):
+            for k in ("0-4", "j/k", "space", "enter", "s/S", "a/d", "/", "t", "f", "v", "h", "q"):
                 assert k in keys, k
             if size == (160, 40):  # a Claude block with both its windows
                 team = str(app.team.render())
