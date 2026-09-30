@@ -86,6 +86,9 @@ analyst before its final release, some on staging teams rather than in daily use
 - **Rows that use the whole panel, with ages.** List rows are cut only at the panel's edge and show
   how old they are (`now`, `45s`, `14m`, `3h`, `2d`, `8w`); the focused panel's title is reversed
   ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **Goals and their tasks in one outline.** The TUI's Work panel lists open goals first with their
+  tasks under them, so a stuck goal shows its age; done goals fold away under `done (N)`, and `o`
+  shows open work only ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 
 What it can't do yet is in [Known limits](#known-limits).
 
@@ -173,9 +176,10 @@ release's **Upgrading** note in [CHANGELOG.md](CHANGELOG.md). From 0.14.0 on, `x
 (one header line with the team, xt's version, what's running and what needs you, and today's
 tokens and cost; then one block per harness with its account windows as bars and its agents in
 aligned columns: short model such as `sonnet 5.5`, state, and context as tokens, a bar and a
-percentage), **Goals** (with goal drafts the liaison is still shaping), **Tasks**, **Inbox** (Needs
-you, New and unread Friction, with their counts in its title) and **Log** panels on the left, the
-detail pane on the right with the **Supervisor** panel under it (what `xt watch` did: deliveries,
+percentage), **Inbox** (1: Needs you, New and unread Friction, with their counts in its title),
+**Work** (2: goals with their tasks under them, open goals first, done goals folded under
+`done (N)`, and goal drafts the liaison is still shaping) and **Log** (3) panels on the left, the
+detail pane on the right with the **Supervisor** panel (4) under it (what `xt watch` did: deliveries,
 wake-ups, nudges, notifications, alerts), and key hints at the bottom. The result of your last
 action shows for about ten seconds in a one-line toast. The Team pane is as high as its content;
 the panels keep a fixed size, and the focused one is shown by its frame colour and a reversed
@@ -183,8 +187,9 @@ title. Rows use the panel's whole width and end with their age.
 
 | Key | What it does |
 |---|---|
-| `1`–`5`, `tab`, `j`/`k`, `enter` | Switch panels (Team has no number: `tab` reaches it), move, read the detail |
+| `1`–`4`, `tab`, `j`/`k`, `enter` | Switch panels (Team has no number: `tab` reaches it), move, read the detail |
 | `/` | Filter the focused panel by text (empty clears it) |
+| `space` / `o` | Fold or unfold the selected goal, `done (N)` or `no goal` row / show open work only (Work) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
 | `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says which (`s answer #288` or `s/S message liaison`). In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
 | `S` | Always message the liaison, even with a question selected |

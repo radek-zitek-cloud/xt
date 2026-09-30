@@ -1,4 +1,5 @@
-"""v0.16.0: #127 Inbox groups and friction read state; #132 rows cut at pane width, with ages."""
+"""v0.16.0: #127 Inbox groups and friction read state; #132 rows cut at pane width, with ages;
+#128 Team pane; #129 Work outline."""
 
 import asyncio
 import io
@@ -19,6 +20,7 @@ from xt.tui.model import PANELS, Row, Snapshot, age_text, build, fit
 from .conftest import add_member
 
 INBOX = PANELS.index("Inbox") + 1
+WORK = PANELS.index("Work") + 1
 
 
 def _run(coro):
@@ -187,7 +189,7 @@ def test_viewing_the_inbox_marks_the_friction_seen_for_the_next_start(ctx):
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
             await _scroll_through_inbox(pilot, app)
-            await pilot.press("1")  # leaving the Inbox
+            await pilot.press(str(WORK))  # leaving the Inbox
             await pilot.pause()
 
     _run(look())
@@ -211,17 +213,20 @@ def test_quitting_from_the_inbox_marks_the_friction_seen_too(ctx):
 
 
 def test_friction_below_the_panes_edge_stays_unread_after_a_look(ctx):
-    f = _fixture(ctx)  # 11 Inbox rows; the pane shows 3 at 160x40
+    f = _fixture(ctx)
+    more = _friction(ctx, 20, "more friction")  # 31 Inbox rows; the pane shows about 11 at 160x40
 
     async def look():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
             await pilot.press(str(INBOX))
             await pilot.pause()
-            await pilot.press("1")
+            await pilot.press(str(WORK))
 
     _run(look())
-    assert inbox.friction_marker(ctx)[1] == set()
+    seen = inbox.friction_marker(ctx)[1]
+    assert more[-1] in seen  # the newest, at the top of the group
+    assert not seen & set(f["unread"]) and more[0] not in seen  # below the pane's bottom edge
 
 
 def test_friction_never_in_view_stays_unread(ctx):
@@ -233,7 +238,7 @@ def test_friction_never_in_view_stays_unread(ctx):
         async with app.run_test(size=(100, 30)) as pilot:
             await pilot.press(str(INBOX))
             await pilot.pause()
-            await pilot.press("1")
+            await pilot.press(str(WORK))
             await pilot.pause()
 
     _run(look())
@@ -480,8 +485,8 @@ def test_goal_rows_show_the_age_of_their_newest_activity(ctx, clock):
     ctx.ledger.append("carol", "lead", "report", "halfway", ref=t)
     clock.advance(minutes=5)
     snap = build(ctx)
-    goal = next(r for r in snap.panels["Goals"] if r.kind == "goal")
-    task = next(r for r in snap.panels["Tasks"] if r.kind == "task")
+    goal = next(r for r in snap.panels["Work"] if r.kind == "goal")
+    task = next(r for r in snap.panels["Work"] if r.kind == "task")
     assert goal.age == "5m" and task.age == "25m"
 
 
@@ -500,10 +505,10 @@ def test_the_focused_panels_title_is_reversed_and_follows_focus(ctx):
         async with app.run_test(size=(160, 40)) as pilot:
             await pilot.pause()
             style = lambda n: app.panel(n).styles.border_title_style
-            assert style(1).reverse and not style(INBOX).reverse
+            assert style(WORK).reverse and not style(INBOX).reverse
             await pilot.press(str(INBOX))
             await pilot.pause()
-            assert style(INBOX).reverse and not style(1).reverse
+            assert style(INBOX).reverse and not style(WORK).reverse
 
     _run(run())
 
@@ -782,9 +787,9 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
     from xt.tui.app import HINTS, Help
 
     _team(ctx, fake_home)
-    assert "1-5 panels" in HINTS and "1-6" not in HINTS and "tab Team" in HINTS
+    assert "1-4 panels" in HINTS and "1-5" not in HINTS and "tab Team" in HINTS
     keys = dict(Help.KEYS)
-    assert keys["1-5"] == "jump to a panel: Goals, Tasks, Inbox, Log, Supervisor"
+    assert keys["1-4"] == "jump to a panel: Inbox, Work, Log, Supervisor"
 
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
@@ -793,7 +798,7 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
                 await pilot.press(str(n))
                 await pilot.pause()
                 assert app.focused.title == title
-            await pilot.press("6")  # no sixth pane: nothing happens
+            await pilot.press("5")  # no fifth pane since card #129: nothing happens
             assert app.focused.title == "Supervisor"
             await pilot.press("tab")  # past the last panel: Team, at the top
             await pilot.pause()
@@ -803,5 +808,282 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
             assert app.team.current.data["name"] == "builder"
             assert app.query_one("#detail").border_title == "Detail─Team"
             assert app.team.current.detail().plain.startswith("builder · worker · claude/claude-opus-5-5")
+
+    _run(run())
+
+
+# --- #129 Work outline of goals and tasks ----------------------------------------------------------
+
+
+def _work_fixture(ctx, clock):
+    """The spec's fixture: 63 done goals; an open goal stuck for two days; an open goal with three
+    tasks in mixed states (open, done, failed); one orphan task; a goal the lead gave a sub-lead."""
+    add_member(ctx, "carol")
+    add_member(ctx, "sub", role="sublead")
+    add_member(ctx, "dan", reports_to="sub")
+    done_goals = []
+    for i in range(63):
+        g = ctx.ledger.append("liaison", "lead", "goal", f"Done goal {i}")["id"]
+        t = ctx.ledger.append("lead", "carol", "task", f"part of done goal {i}", ref=g)["id"]
+        ctx.ledger.append("carol", "lead", "done", "finished", ref=t)
+        ctx.ledger.append("lead", "liaison", "done", "all done", ref=g)
+        done_goals.append(g)
+        clock.advance(minutes=10)
+    stuck = ctx.ledger.append("liaison", "lead", "goal", "Stuck goal: waits on a vendor")["id"]
+    stuck_task = ctx.ledger.append("lead", "carol", "task", "chase the vendor", ref=stuck)["id"]
+    clock.advance(days=2)
+    busy = ctx.ledger.append("liaison", "lead", "goal", "Busy goal with three tasks")["id"]
+    t_open = ctx.ledger.append("lead", "carol", "task", "still going", ref=busy)["id"]
+    t_done = ctx.ledger.append("lead", "carol", "task", "finished part", ref=busy)["id"]
+    t_failed = ctx.ledger.append("lead", "carol", "task", "the failing part", ref=busy)["id"]
+    ctx.ledger.append("carol", "lead", "done", "shipped it", ref=t_done)
+    ctx.ledger.append("carol", "lead", "done", "FAIL: the build breaks", ref=t_failed)
+    orphan = ctx.ledger.append("lead", "carol", "task", "a task with no goal")["id"]
+    sub_goal = ctx.ledger.append("lead", "sub", "goal", "Sub-lead goal: the data pipeline")["id"]
+    sub_task = ctx.ledger.append("sub", "dan", "task", "load the data", ref=sub_goal)["id"]
+    clock.advance(minutes=5)
+    ctx.ledger.append("carol", "lead", "report", "halfway", ref=t_open)
+    clock.advance(minutes=3)
+    return dict(done_goals=done_goals, stuck=stuck, stuck_task=stuck_task, busy=busy, t_open=t_open,
+                t_done=t_done, t_failed=t_failed, orphan=orphan, sub_goal=sub_goal, sub_task=sub_task)
+
+
+def _work(app):
+    return app.panel(WORK)
+
+
+def _keys(p):
+    return [r.key for r in p.rows]
+
+
+def test_open_goals_first_expanded_done_under_a_collapsed_fold_orphan_under_no_goal(ctx, clock):
+    f = _work_fixture(ctx, clock)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            p = _work(app)
+            assert app.focused is p
+            keys = _keys(p)
+            # open goals first, newest activity first, each expanded with its tasks
+            assert keys[:10] == [f"goal:{f['busy']}", f"task:{f['t_open']}", f"task:{f['t_done']}",
+                                 f"task:{f['t_failed']}", f"goal:{f['sub_goal']}", f"task:{f['sub_task']}",
+                                 f"goal:{f['stuck']}", f"task:{f['stuck_task']}", "fold:done", "nogoal"]
+            assert keys[10:] == [f"task:{f['orphan']}"]  # the orphan, under `no goal`, the last row
+            # the done goals only under `done (63)`, collapsed
+            assert not any(f"goal:{g}" in keys for g in f["done_goals"])
+            fold = next(r for r in p.rows if r.key == "fold:done")
+            assert fold.text.plain == "done (63)" and not p.expanded(fold)
+            under = [r for r in p.all_rows if r.data.get("parent") == "fold:done"]
+            assert [r.data["id"] for r in under] == f["done_goals"][::-1]  # newest first
+            # the stuck goal reads old, the busy one recent
+            ages = {r.key: r.age for r in p.rows}
+            assert ages[f"goal:{f['stuck']}"] == "2d" and ages[f"goal:{f['busy']}"] == "3m"
+            # rows as shown: fold mark, id, first line, owner, done/total; task glyphs
+            text = {r.key: str(p.get_option_at_index(i).prompt) for i, r in enumerate(p.rows)}
+            busy = text[f"goal:{f['busy']}"]
+            assert busy.startswith(f"▾ #{f['busy']} Busy goal with three tasks ") and busy.endswith(" 3m")
+            assert " lead " in busy and " 2/3 " in busy
+            assert text[f"task:{f['t_open']}"].startswith(f"    ● #{f['t_open']} carol  still going")
+            assert text[f"task:{f['t_done']}"].startswith(f"    ✓ #{f['t_done']} carol")
+            assert text[f"task:{f['t_failed']}"].startswith(f"    ✗ #{f['t_failed']} carol")
+            assert text["fold:done"].startswith("▸ done (63)")
+            assert text["nogoal"].startswith("▾ no goal") and " 0/1 " in text["nogoal"]
+            assert text[f"goal:{f['sub_goal']}"].startswith(f"▾ #{f['sub_goal']} Sub-lead goal")
+            assert " sub " in text[f"goal:{f['sub_goal']}"]
+
+    _run(run())
+
+
+def test_the_counts_and_the_title_equal_the_ledgers(ctx, clock):
+    f = _work_fixture(ctx, clock)
+    snap = build(ctx)
+    open_goals = [i for i in ctx.ledger.open_items() if i["type"] == "goal"]
+    all_goals = [m for m in ctx.ledger.messages() if m["type"] == "goal"]
+    assert snap.work_title == f"{len(open_goals)} open · {len(all_goals) - len(open_goals)} done" == "3 open · 63 done"
+    open_ids = {i["id"] for i in ctx.ledger.open_items()}
+    tasks = [m for m in ctx.ledger.messages() if m["type"] == "task"]
+    for row in (r for r in snap.panels["Work"] if r.kind == "goal"):
+        mine = [t for t in tasks if t.get("ref") == row.data["id"]]
+        shown = row.data["tail"].plain.split()[1]
+        assert shown == f"{sum(1 for t in mine if t['id'] not in open_ids)}/{len(mine)}", row.key
+        if row.data["parent"] == "fold:done":
+            assert row.data["tail"].plain.endswith("1/1 ✓")
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)):
+            assert _work(app).border_title == f"[{WORK}]─Work─3 open · 63 done"
+
+    _run(run())
+
+
+def test_space_folds_o_hides_done_work_and_a_refresh_keeps_both(ctx, clock):
+    f = _work_fixture(ctx, clock)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            p = _work(app)
+            busy = f"goal:{f['busy']}"
+            assert p.current.key == busy
+            await pilot.press("space")  # fold the busy goal
+            await pilot.pause()
+            assert f"task:{f['t_open']}" not in _keys(p) and p.current.key == busy
+            assert str(p.get_option_at_index(0).prompt).startswith("▸ ")
+            await pilot.press("space")  # and unfold it
+            await pilot.pause()
+            assert f"task:{f['t_open']}" in _keys(p)
+            # on a task, space folds its goal and selects it
+            await pilot.press("j")
+            await pilot.press("space")
+            await pilot.pause()
+            assert p.current.key == busy and f"task:{f['t_open']}" not in _keys(p)
+            await pilot.press("space")
+            # unfold `done (63)`, then one done goal in it
+            p.highlighted = _keys(p).index("fold:done")
+            await pilot.press("space")
+            await pilot.pause()
+            newest_done = f"goal:{f['done_goals'][-1]}"
+            keys = _keys(p)
+            assert keys[keys.index("fold:done") + 1] == newest_done and len(keys) == 11 + 63
+            assert str(p.get_option_at_index(keys.index(newest_done)).prompt).startswith(
+                f"▸ #{f['done_goals'][-1]} Done goal 62")
+            p.highlighted = keys.index(newest_done)
+            await pilot.press("space")
+            await pilot.pause()
+            assert _keys(p)[_keys(p).index(newest_done) + 1].startswith("task:")
+            # a refresh keeps the folds and the selection
+            ctx.ledger.append("carol", "lead", "report", "news", ref=f["t_open"])
+            before = _keys(p)
+            await pilot.press("r")
+            await pilot.pause()
+            assert _keys(p) == before and p.current.key == newest_done
+            # o: open work only, then everything again
+            p.highlighted = 0
+            await pilot.press("o")
+            await pilot.pause()
+            keys = _keys(p)
+            assert "fold:done" not in keys and not any(k.startswith("goal:") and int(k[5:]) in f["done_goals"]
+                                                       for k in keys)
+            assert f"task:{f['t_done']}" not in keys and f"task:{f['t_failed']}" not in keys
+            assert f"task:{f['t_open']}" in keys and "open work only" in app.status
+            assert p.border_subtitle == "open only · 1 of 8"
+            assert keys == [f"goal:{f['busy']}", f"task:{f['t_open']}", f"goal:{f['sub_goal']}",
+                            f"task:{f['sub_task']}", f"goal:{f['stuck']}", f"task:{f['stuck_task']}", "nogoal",
+                            f"task:{f['orphan']}"]
+            await pilot.press("r")  # open-only survives a refresh too
+            await pilot.pause()
+            assert _keys(p) == keys
+            await pilot.press("o")
+            await pilot.pause()
+            assert _keys(p) == before
+
+    _run(run())
+
+
+def test_enter_shows_the_selected_row_in_detail(ctx, clock):
+    f = _work_fixture(ctx, clock)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            p = _work(app)
+            p.highlighted = _keys(p).index(f"task:{f['t_failed']}")
+            await pilot.pause()
+            await pilot.press("enter")
+            await pilot.pause()
+            assert app.focused.id == "detail"
+            body = str(app.query_one("#detail-body").render())
+            assert f"#{f['t_failed']} task · lead → carol" in body and "FAIL: the build breaks" in body
+            assert app.query_one("#detail").border_title == "Detail─Work"
+            await pilot.press("escape")  # back to Work, the row still selected
+            await pilot.pause()
+            assert app.focused is p and p.current.key == f"task:{f['t_failed']}"
+            p.highlighted = 0
+            await pilot.press("enter")
+            await pilot.pause()
+            body = str(app.query_one("#detail-body").render())
+            assert f"#{f['busy']} goal" in body and "tasks (2/3 done)" in body
+
+    _run(run())
+
+
+@pytest.mark.parametrize("size", [(160, 40), (100, 30)])
+def test_no_work_row_spills_out_of_the_pane(ctx, clock, size):
+    f = _work_fixture(ctx, clock)
+    ctx.ledger.append("lead", "carol", "task", "漢字のテスト " * 40, ref=f["busy"])
+    add_member(ctx, "a-very-long-agent-name")
+    ctx.ledger.append("lead", "a-very-long-agent-name", "task", "long owner " * 20, ref=f["busy"])
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause()
+            p = _work(app)
+            p.highlighted = _keys(p).index("fold:done")
+            await pilot.press("space")  # every done goal shown too
+            await pilot.pause()
+            width = p.content_size.width
+            for i in range(p.option_count):
+                prompt = p.get_option_at_index(i).prompt
+                assert prompt.cell_len <= width, (i, prompt.plain)
+            goal = next(i for i, r in enumerate(p.rows) if r.key == f"goal:{f['busy']}")
+            shown = p.get_option_at_index(goal).prompt.plain
+            assert shown.endswith(" now") and " 2/5 " in shown  # the count is never cut
+            assert (" lead " in shown) == (size == (160, 40))  # the owner gives way in a narrow pane
+            assert p.border_title.startswith(f"[{WORK}]─Work")
+
+    _run(run())
+
+
+def test_a_task_goes_under_the_goal_at_the_root_of_its_ref_chain():
+    from xt.tui import work
+
+    def m(i, typ, ref=None, to="carol"):
+        return {"id": i, "ts": f"2026-09-26T12:00:{i:02d}+00:00", "type": typ, "from": "lead", "to": to,
+                "ref": ref, "body": f"message {i}"}
+
+    msgs = [m(1, "goal", to="lead"), m(2, "task", 1), m(3, "task", 2), m(4, "report", 3), m(5, "task", 4),
+            m(6, "task", 99), m(7, "task"), m(8, "report"), m(9, "task", 8), m(10, "task", 11), m(11, "task", 10)]
+    out = work.outline(msgs, {}, set())
+    assert [t.msg["id"] for t in out.done[0].tasks] == [2, 3, 5]  # through a task and a report
+    assert [t.msg["id"] for t in out.orphans] == [6, 7, 9, 10, 11]  # unknown ref, none, no goal, a loop
+    assert work.root_goal(5, {x["id"]: x for x in msgs}) == 1
+
+
+def test_an_open_goal_older_than_the_messages_read_still_shows(ctx, clock):
+    old = ctx.ledger.append("liaison", "lead", "goal", "An old open goal")["id"]
+    clock.advance(days=40)
+    ctx.ledger.append("liaison", "human", "report", "much later")
+    rows = build(ctx).panels["Work"]
+    goal = next(r for r in rows if r.key == f"goal:{old}")
+    assert goal.data["open"] and goal.age == "40d"
+
+
+def test_an_open_task_whose_owner_is_blocked_shows_the_failed_glyph(ctx, clock):
+    add_member(ctx, "carol")
+    g = ctx.ledger.append("liaison", "lead", "goal", "Goal")["id"]
+    t = ctx.ledger.append("lead", "carol", "task", "stuck on a prompt", ref=g)["id"]
+    ctx.herdr.add("carol", "blocked")
+    row = next(r for r in build(ctx).panels["Work"] if r.key == f"task:{t}")
+    assert row.text.plain.startswith("✗ ") and row.data["open"]
+    assert "carol is blocked" in row.detail().plain
+
+
+def test_space_and_o_outside_work_say_where_they_work(ctx):
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(INBOX), "space")
+            assert app.status == f"space works in Work ({WORK})"
+            await pilot.press("o")
+            assert app.status == f"o works in Work ({WORK})"
+            await pilot.press(str(WORK))
+            await pilot.pause()
+            assert "space fold · o open only" in str(app.query_one("#hints").render())
 
     _run(run())

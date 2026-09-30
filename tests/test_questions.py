@@ -114,8 +114,8 @@ def test_answering_a_question_from_the_tui_inbox(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("3")  # the Inbox
-            row = app.panel(3).current
+            await pilot.press("1")  # the Inbox (card #129 renumbered the panes)
+            row = app.panel(1).current
             assert row.kind == "question" and row.data["id"] == q["id"]
             assert "⚑ 1 needs you" in str(app.team.render())
             await pilot.press("s")
@@ -125,6 +125,6 @@ def test_answering_a_question_from_the_tui_inbox(ctx):
             await pilot.pause()
             assert f"answer to #{q['id']}" in app.status
             assert ctx.ledger.item(q["id"]) is None
-            assert not any(r.kind == "question" for r in app.panel(3).rows)
+            assert not any(r.kind == "question" for r in app.panel(1).rows)
 
     asyncio.run(run())

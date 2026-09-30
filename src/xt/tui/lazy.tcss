@@ -19,16 +19,15 @@ Screen {
 
 /* Fixed sizes: moving focus never shifts the layout; the focused panel shows only by colour.
    Sizes follow how much each panel usually holds. */
-#panel-1 { height: 2fr; }  /* Goals */
-#panel-2 { height: 3fr; }  /* Tasks */
-#panel-3 { height: 2fr; }  /* Inbox */
-#panel-4 { height: 3fr; }  /* Log */
+#panel-1 { height: 4fr; }  /* Inbox */
+#panel-2 { height: 4fr; }  /* Work (card #129: Goals and Tasks in one outline) */
+#panel-3 { height: 2fr; }  /* Log */
 
 #right {
     width: 1fr;
 }
 
-#panel-5 {                 /* Supervisor, under the detail pane */
+#panel-4 {                 /* Supervisor, under the detail pane */
     height: 10;
 }
 

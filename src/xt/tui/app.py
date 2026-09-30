@@ -10,15 +10,17 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
-from . import teampane
+from . import teampane, work
 from .model import PANELS, Row, Snapshot, fit
 
 REFRESH_SECONDS = 2.0
 INBOX = PANELS.index("Inbox") + 1  # its panel number
+WORK = PANELS.index("Work") + 1
 TEAM = 0  # the Team pane has no number key (card #128); last_panel is 0 while it has focus
 PICK_AGENT = "select an agent in Team first (tab to it, then j/k)"
 HINTS = (f"h help · q quit · 1-{len(PANELS)} panels · tab Team · j/k move · enter read · / filter · "
          "a/d approve/deny · c clear · f jump · u/U start · x/X stop · R retire")
+WORK_HINTS = "space fold · o open only"  # on the key line while Work has focus (card #129)
 
 
 class Panel(OptionList):
@@ -41,23 +43,32 @@ class Panel(OptionList):
 
     def set_rows(self, rows: list[Row]) -> None:
         """Replace rows (only those matching the filter, if any), keeping the selection on the
-        same item when it still exists. Each row is laid out at the panel's width (card #132)."""
+        same item when it still exists, else on the nearest shown row above it in the outline. Each
+        row is laid out at the panel's width (card #132)."""
         keep = self.current.key if self.current else None
         self.all_rows = rows
-        rows = [r for r in rows if self.unfolded or not r.data.get("folded")]
-        if self.filter:
-            needle = self.filter.lower()
-            rows = [r for r in rows if r.kind != "heading" and needle in r.text.plain.lower()]
+        rows = self.visible(rows)
         self.rows = rows
         self.clear_options()
         width = self.content_size.width
         self.add_options([Option(self.line(r, width), disabled=r.kind == "heading") for r in rows])
         if rows:
-            idx = next((i for i, r in enumerate(rows) if r.key == keep), None)
+            parents = {r.key: r.data.get("parent") for r in self.all_rows}
+            idx = None
+            while keep is not None and idx is None:
+                idx = next((i for i, r in enumerate(rows) if r.key == keep), None)
+                keep = parents.get(keep)
             if idx is None:
                 idx = next((i for i, r in enumerate(rows) if r.kind != "heading"), None)
             self.highlighted = idx
         self.update_subtitle()
+
+    def visible(self, rows: list[Row]) -> list[Row]:
+        rows = [r for r in rows if self.unfolded or not r.data.get("folded")]
+        if self.filter:
+            needle = self.filter.lower()
+            rows = [r for r in rows if r.kind != "heading" and needle in r.text.plain.lower()]
+        return rows
 
     def line(self, row: Row, width: int) -> Text:
         text = row.text
@@ -103,6 +114,66 @@ class Panel(OptionList):
         if h is not None and not any(r.kind != "heading" for r in self.rows[:h]):
             return
         super().action_cursor_up()
+
+
+class WorkPanel(Panel):
+    """Goals and tasks as one outline (card #129). The model gives every row; this pane keeps which
+    rows are folded (by key, so it survives a refresh) and the open-only switch."""
+
+    def __init__(self, title: str, number: int):
+        super().__init__(title, number)
+        self.folds: dict[str, bool] = {}  # what the human folded or unfolded, by row key
+        self.open_only = False
+
+    def expanded(self, row: Row) -> bool:
+        return self.folds.get(row.key, bool(row.data.get("expanded")))
+
+    def visible(self, rows: list[Row]) -> list[Row]:
+        if self.open_only:
+            rows = [r for r in rows if r.data.get("open")]
+        if self.filter:  # a filter looks through the folds
+            needle = self.filter.lower()
+            return [r for r in rows if needle in r.text.plain.lower()]
+        by_key = {r.key: r for r in rows}
+
+        def shown(r: Row) -> bool:
+            parent = r.data.get("parent")
+            while parent is not None:
+                p = by_key.get(parent)
+                if p is None or not self.expanded(p):
+                    return False
+                parent = p.data.get("parent")
+            return True
+
+        return [r for r in rows if shown(r)]
+
+    def line(self, row: Row, width: int) -> Text:
+        return work.line(row.text, row.data, row.age, width, self.expanded(row))
+
+    def toggle(self) -> None:
+        """space: fold or unfold the selected row; on a task, fold its goal and select that."""
+        row = self.current
+        if row is None:
+            return
+        if not row.data.get("foldable"):
+            parent = next((r for r in self.all_rows if r.key == row.data.get("parent")), None)
+            if parent is None:
+                return
+            row = parent
+            self.folds[row.key] = False
+        else:
+            self.folds[row.key] = not self.expanded(row)
+        self.set_rows(self.all_rows)
+        self.highlighted = next((i for i, r in enumerate(self.rows) if r.key == row.key), self.highlighted)
+
+    def toggle_open_only(self) -> None:
+        self.open_only = not self.open_only
+        self.set_rows(self.all_rows)
+
+    def update_subtitle(self) -> None:
+        super().update_subtitle()
+        if self.open_only:  # still visible after the toast has gone
+            self.border_subtitle = f"open only · {self.border_subtitle}"
 
 
 class TeamPane(Static):
@@ -325,6 +396,10 @@ class Help(ModalScreen[None]):
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
         ("c", "clear the selected alert; on unread friction: mark it seen"),
         ("enter", "on the (N older, seen) row: show or hide the friction you've seen"),
+        (f"Work ({WORK})", ""),
+        ("space", "fold or unfold the selected goal, done (N) or no goal row (on a task: fold its goal)"),
+        ("o", "open work only: hide done (N) and done tasks; again: show them"),
+        ("enter", "show the selected goal or task in the detail pane"),
         ("Team (tab)", ""),
         ("j / k", "select an agent (its details show in the detail pane)"),
         ("u", "start the selected stopped agent (existing role and harness)"),
@@ -385,6 +460,8 @@ class XtTui(App):
         Binding("X", "stop_all", show=False),
         Binding("R", "retire_agent", show=False),
         Binding("slash", "filter", show=False),
+        Binding("space", "fold", show=False),
+        Binding("o", "open_only", show=False),
         *[Binding(str(i), f"panel({i})", show=False) for i in range(1, len(PANELS) + 1)],
     ]
 
@@ -392,7 +469,7 @@ class XtTui(App):
         super().__init__(ansi_color=True)
         self.source = source
         self.actions = actions  # None in the demo
-        self.last_panel = 1
+        self.last_panel = WORK
         self.status = ""  # the last action's result, shown in the toast
         self.done_upto = 0  # newest message the Inbox's "done" rows were built from (card #125)
         self.inbox_looked = 0  # what the human saw while the Inbox had focus
@@ -403,7 +480,7 @@ class XtTui(App):
         with Horizontal(id="main"):
             with Vertical(id="left"):
                 for i, title in enumerate(PANELS[:-1], start=1):
-                    yield Panel(title, i)
+                    yield (WorkPanel if i == WORK else Panel)(title, i)
             with Vertical(id="right"):
                 detail = VerticalScroll(id="detail", classes="panel")
                 detail.border_title = "Detail"
@@ -416,7 +493,8 @@ class XtTui(App):
 
     def on_mount(self) -> None:
         self.refresh_data()
-        self.query_one("#panel-1", Panel).focus()
+        # Work, as Goals before it: the Inbox counts what the human saw only once they go there
+        self.panel(WORK).focus()
         if self.actions is not None:
             self.set_interval(REFRESH_SECONDS, self.refresh_data)
 
@@ -436,6 +514,7 @@ class XtTui(App):
             self.set_status(f"couldn't draw Team: {e}")
         self.done_upto = snap.done_upto
         self.panel(INBOX).set_counts(snap.inbox_title)
+        self.panel(WORK).set_counts(snap.work_title)
         if self.last_panel == INBOX:
             self.inbox_looked = self.done_upto
             self.call_after_refresh(self.note_friction_in_view)
@@ -474,7 +553,8 @@ class XtTui(App):
 
     def render_hints(self) -> None:
         """The bottom line: keys only."""
-        self.query_one("#hints", Static).update(Text(f"{self.send_hint()} · {HINTS}", no_wrap=True,
+        work_keys = f"{WORK_HINTS} · " if self.last_panel == WORK else ""
+        self.query_one("#hints", Static).update(Text(f"{self.send_hint()} · {work_keys}{HINTS}", no_wrap=True,
                                                      overflow="ellipsis"))
 
     def send_hint(self) -> str:
@@ -499,13 +579,19 @@ class XtTui(App):
                     self.call_after_refresh(self.note_friction_in_view)
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        """enter on the Inbox's `(N older, seen)` row shows or hides the seen friction (card #127)."""
-        if isinstance(event.option_list, Panel):
+        """enter on the Inbox's `(N older, seen)` row shows or hides the seen friction (card #127);
+        enter in Work shows the selected row in the detail pane (card #129)."""
+        if isinstance(event.option_list, WorkPanel):
+            self.show_detail(event.option_list)
+            self.action_read()
+        elif isinstance(event.option_list, Panel):
             row = event.option_list.current
             if row and row.kind == "fold":
                 event.option_list.toggle_fold()
 
     def on_descendant_focus(self, event) -> None:
+        if not self.query("#detail-body"):
+            return  # the screen is being taken down: focus moves as panes go, the human did nothing
         if isinstance(event.widget, (Panel, TeamPane)):
             n = TEAM if isinstance(event.widget, TeamPane) else int(event.widget.id.split("-")[1])
             if self.last_panel == INBOX and n != INBOX:
@@ -586,6 +672,25 @@ class XtTui(App):
 
     def action_refresh(self) -> None:
         self.refresh_data()
+
+    def _work_focused(self, key: str) -> WorkPanel | None:
+        if isinstance(self.focused, WorkPanel):
+            return self.focused
+        self.set_status(f"{key} works in Work ({WORK})")
+        return None
+
+    def action_fold(self) -> None:
+        panel = self._work_focused("space")
+        if panel:
+            panel.toggle()
+            self.show_detail(panel)
+
+    def action_open_only(self) -> None:
+        panel = self._work_focused("o")
+        if panel:
+            panel.toggle_open_only()
+            self.show_detail(panel)
+            self.set_status("Work: open work only" if panel.open_only else "Work: done work shown again")
 
     # --- actions (live mode only) -------------------------------------------------------------
 
@@ -890,22 +995,28 @@ def _row(row_key: str, text: Text, detail: str, kind: str = "", **data) -> Row:
 def demo_snapshot() -> Snapshot:
     return Snapshot(
         panels={
-            "Goals": [
-                _row("dq", _t(("✎ ", "cyan"), "quarterly-report", ("  draft", "cyan")),
-                     "draft · goals/drafts/quarterly-report.md", "draft"),
-                _row("g3", _t(("#3 ", "bright_black"), "weather forecasting team", ("  4/7", "yellow")),
-                     "#3 weather forecasting team · open 2h\nbrief: goals/weather-team.md", "goal"),
-                _row("g5", _t(("#5 ", "bright_black"), "q3 close", ("  ✓", "green")), "#5 q3 close · done", "goal"),
+            "Work": [
+                _row("goal:3", _t(("#3 ", "bright_black"), "weather forecasting team"),
+                     "#3 weather forecasting team · open 2h\nbrief: goals/weather-team.md", "goal",
+                     id=3, level=1, foldable=True, expanded=True, open=True,
+                     tail=_t("  ", ("lead ", "bright_black"), "  ", ("1/2", "yellow"), "  ")),
+                _row("task:41", _t(("✓ ", "green"), ("#41 ", "bright_black"), "carol  find station data"),
+                     "#41 task lead→carol\nfind station data", "task", id=41, level=2, parent="goal:3"),
+                _row("task:42", _t(("● ", "yellow"), ("#42 ", "bright_black"), "carol  ingest stations"),
+                     "#42 task lead→carol\ningest station data", "task", id=42, level=2, parent="goal:3", open=True),
+                _row("draft:quarterly-report", _t(("✎ ", "cyan"), "quarterly-report", ("  draft", "cyan")),
+                     "draft · goals/drafts/quarterly-report.md", "draft", level=1, open=True),
+                _row(work.DONE_FOLD, _t(("done (1)", "bright_black")), "1 done goal", "donefold",
+                     level=1, foldable=True),
+                _row("goal:5", _t(("#5 ", "bright_black"), "q3 close"), "#5 q3 close · done", "goal",
+                     id=5, level=1, foldable=True, parent=work.DONE_FOLD,
+                     tail=_t("  ", ("lead ", "bright_black"), "  ", ("0/0", "green"), (" ✓", "green"))),
             ],
             "Team": [
                 _agent("liaison", "codex", "gpt-5.2", "idle", 58_000, 258_000, "liaison · codex · reports to human"),
                 _agent("lead", "codex", "gpt-5.2", "working", 181_000, 258_000, "lead · codex · reports to liaison"),
                 _agent("dave", "pi", "kimi", "blocked", 12_000, None,
                        "dave · pi · modeler · BLOCKED on an approval prompt in its pane"),
-            ],
-            "Tasks": [
-                _row("t42", _t(("#42 ", "bright_black"), "carol      ingest stations", ("  12m", "yellow")),
-                     "#42 task lead→carol\ningest station data", "task"),
             ],
             "Inbox": [
                 _row("hn", _t(("NEEDS YOU", "bold")), "", "heading"),
@@ -938,6 +1049,7 @@ def demo_snapshot() -> Snapshot:
         spend="today 8.4M tokens · est. $2.46 (+1.1M unpriced)",
         harnesses=[teampane.Harness("codex", [("7d", 20.0, None)])],
         inbox_title="⚑ 2 · ✉ 1 · ✱ 1",
+        work_title="1 open · 1 done",
     )
 
 

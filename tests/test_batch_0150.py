@@ -625,16 +625,16 @@ def test_the_tui_inbox_shows_done_goals_and_clears_them_after_a_look(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("3")  # the Inbox (card #128 renumbered the panes)
-            row = next(r for r in app.panel(3).rows if r.kind == "done")
+            await pilot.press("1")  # the Inbox (card #129 renumbered the panes)
+            row = next(r for r in app.panel(1).rows if r.kind == "done")
             assert row.data == {"id": goal, "done": done}
             detail = row.detail().plain
             assert "Write the weekly digest" in detail and f"closing summary: #{done}" in detail
             assert "Digest published at /digest" in detail
-            await pilot.press("1")  # leaving the Inbox: seen
+            await pilot.press("2")  # leaving the Inbox: seen
             await pilot.pause()
             app.refresh_data()
-            assert not any(r.kind == "done" for r in app.panel(3).rows)
+            assert not any(r.kind == "done" for r in app.panel(1).rows)
 
     asyncio.run(run())
     assert goaldone.seen_upto(ctx) >= done

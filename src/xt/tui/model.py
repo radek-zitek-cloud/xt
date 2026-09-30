@@ -22,7 +22,9 @@ from ..team import HUMAN, harness_model, schedule_text
 from . import teampane
 from .teampane import Harness, shown_model
 
-PANELS = ("Goals", "Tasks", "Inbox", "Log", "Supervisor")  # the numbered list panels, 1-5; Team has no number
+# the numbered list panels, 1-4; Team has no number. Work (card #129) replaced Goals and Tasks; the
+# final map is 1 Inbox, 2 Work, 3 Flow, and Log (3) and Supervisor (4) stay until #130 and #131.
+PANELS = ("Inbox", "Work", "Log", "Supervisor")
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
@@ -106,6 +108,7 @@ class Snapshot:
     harnesses: list[Harness] = field(default_factory=list)  # the Team pane's blocks and their windows
     done_upto: int = 0  # the Inbox's done goals are seen up to here once the human has looked (#125)
     inbox_title: str = ""  # the Inbox's counts, `⚑ 1 · ✉ 2 · ✱ 1` (card #127)
+    work_title: str = ""  # the Work pane's counts, `1 open · 63 done` (card #129)
 
 
 def age_text(secs: float) -> str:
@@ -220,54 +223,7 @@ def build(ctx: Ctx) -> Snapshot:
     def thread(item_id: int) -> list[dict]:
         return [m for m in msgs if m["id"] == item_id or m.get("ref") == item_id]
 
-    # Goals: drafts the liaison is still shaping, then open goals, then recently closed
-    goal_rows = []
-    drafts = sorted(ctx.paths.drafts.glob("*.md")) if ctx.paths.drafts.exists() else []
-    for d in drafts:
-        rel = str(d.relative_to(ctx.paths.root))
-
-        def ddetail(rel=rel):
-            out = Text()
-            out.append(f"draft · {rel} · not dispatched yet (the liaison shapes it with you)\n", style="bright_black")
-            out.append_text(_file_text(ctx, rel))
-            return out
-
-        goal_rows.append(Row(f"draft:{d.stem}", _t(("✎ ", "cyan"), d.stem, ("  draft", "cyan")), ddetail, "draft",
-                             {"path": rel}))
-    goals = [m for m in msgs if m["type"] == "goal"]
-    goals.sort(key=lambda g: (g["id"] not in open_items, -g["id"]))
-    for g in goals:
-        tasks = [m for m in msgs if m["type"] == "task" and m.get("ref") == g["id"]]
-        done_tasks = sum(1 for t in tasks if t["id"] not in open_items)
-        is_open = g["id"] in open_items
-        mark = (f"  {done_tasks}/{len(tasks)}", "yellow") if is_open else ("  ✓", "green")
-
-        def detail(g=g, tasks=tasks, is_open=is_open):
-            out = Text()
-            out.append(f"#{g['id']} goal · {g['from']} → {g['to']} · opened {_age(g['ts'], now)} ago · ",
-                       style="bright_black")
-            out.append("open\n" if is_open else "done\n", style="yellow" if is_open else "green")
-            out.append(_first_line(g["body"], 200) + "\n", style="bold")
-            from .. import turns as _turns
-
-            out.append(f"usage: {_turns.fmt(_turns.goal_totals(ctx, g['id'], g['ts']))}\n")
-            brief = re.search(r"Brief:\s*(\S+\.md)", g["body"])
-            out.append(_heading("tasks"))
-            for t in tasks:
-                st = "open" if t["id"] in open_items else "done"
-                out.append(f"#{t['id']} {st:<4} {t['to']:<11} {_first_line(t['body'], 90)}\n",
-                           style="yellow" if st == "open" else "")
-            if not tasks:
-                out.append("(none yet)\n", style="bright_black")
-            if brief:
-                out.append(_heading(f"brief: {brief.group(1)}"))
-                out.append_text(_file_text(ctx, brief.group(1)))
-            return out
-
-        ids = {g["id"], *(t["id"] for t in tasks)}
-        newest = max((m["ts"] for m in msgs if m["id"] in ids or m.get("ref") in ids), default=g["ts"])
-        goal_rows.append(Row(f"goal:{g['id']}", _t((f"#{g['id']} ", "bright_black"), _line(g["body"]), mark),
-                             detail, "goal", {"id": g["id"]}, row_age(newest, now)))
+    work_rows, work_title = _work(ctx, msgs, open_items, live, now, thread)
 
     # Team: roster with live state and context
     from .. import turns, usage
@@ -345,28 +301,6 @@ def build(ctx: Ctx) -> Snapshot:
                 "approximate": now_ctx.approximate if now_ctx else False}
         team_rows.append(Row(f"agent:{a.name}", teampane.cell(data, teampane.widths([data]), teampane.BAR_MAX),
                              detail, "agent", data))
-
-    # Tasks: open first, then the last few closed
-    tasks = [m for m in msgs if m["type"] == "task"]
-    open_tasks = [t for t in tasks if t["id"] in open_items]
-    closed_tasks = [t for t in tasks if t["id"] not in open_items][-10:]
-    task_rows = []
-    for t in open_tasks + list(reversed(closed_tasks)):
-        is_open = t["id"] in open_items
-
-        def detail(t=t, is_open=is_open):
-            out = Text()
-            out.append(f"#{t['id']} task · {t['from']} → {t['to']} · ", style="bright_black")
-            out.append("open\n" if is_open else "done\n", style="yellow" if is_open else "green")
-            out.append(_heading("thread"))
-            for m in thread(t["id"]):
-                out.append_text(_msg_block(m))
-            return out
-
-        task_rows.append(Row(f"task:{t['id']}", _t((f"#{t['id']} ", "bright_black"), f"{t['to']:<10} ",
-                                                   _line(t["body"]),
-                                                   ("  open", "yellow") if is_open else ("  ✓", "green")),
-                             detail, "task", {"id": t["id"]}, row_age(t["ts"], now)))
 
     # Inbox: three groups, Needs you / New / Friction, empty groups hidden (card #127)
     from .. import inbox as _inbox
@@ -524,14 +458,122 @@ def build(ctx: Ctx) -> Snapshot:
                             lambda line=line: Text(line + "\n"), "event", {}))
 
     return Snapshot(
-        {"Goals": goal_rows, "Team": team_rows, "Tasks": task_rows, "Inbox": inbox_rows, "Log": log_rows,
-         "Supervisor": sup_rows},
+        {"Inbox": inbox_rows, "Work": work_rows, "Team": team_rows, "Log": log_rows, "Supervisor": sup_rows},
         header,
         spend_text(spend.team_today),
         harnesses,
         done_upto,
         box.title(),
+        work_title,
     )
+
+
+def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread) -> tuple[list[Row], str]:
+    """The Work outline's rows (card #129), every one of them: the pane folds and filters. Open goals
+    with their tasks, then the liaison's drafts, then the `done (N)` fold with the done goals, then
+    `no goal` with the tasks that reach no goal. Also the pane's title, `N open · M done`."""
+    from . import work
+
+    out = work.outline(msgs, open_items, {n for n, a in live.items() if a.status == "blocked"})
+    goals = out.open + out.done
+    ow = min(12, max((len(m["to"]) for m in [g.msg for g in goals] + [t.msg for g in goals for t in g.tasks]
+                      + [t.msg for t in out.orphans]), default=4))
+    count = lambda tasks: f"{sum(1 for t in tasks if t.state != work.OPEN)}/{len(tasks)}"
+    cw = max((len(count(g.tasks)) for g in goals), default=3)
+    if out.orphans:
+        cw = max(cw, len(count(out.orphans)))
+
+    def tail(owner: str, tasks, is_open: bool) -> dict:
+        """The goal row's right-hand columns: owner and `done/total`, and the count alone for a
+        narrow pane."""
+        n = _t("  ", (count(tasks).rjust(cw), "yellow" if is_open else "green"), "  " if is_open else (" ✓", "green"))
+        return {"tail": _t("  ", (owner[:ow].ljust(ow), "bright_black"), n), "count": n}
+
+    def task_rows(tasks, parent: str) -> list[Row]:
+        rows = []
+        for t in tasks:
+            m, is_open = t.msg, t.msg["id"] in open_items
+
+            def detail(m=m, t=t, is_open=is_open):
+                o = Text()
+                o.append(f"#{m['id']} task · {m['from']} → {m['to']} · ", style="bright_black")
+                o.append("open\n" if is_open else "done\n", style="yellow" if is_open else "green")
+                if t.state == work.FAILED:
+                    o.append(f"{m['to']} is blocked\n" if is_open else "closed as failed or blocked\n", style="red")
+                o.append(_heading("thread"))
+                for x in thread(m["id"]):
+                    o.append_text(_msg_block(x))
+                return o
+
+            rows.append(Row(f"task:{m['id']}", _t((t.state + " ", work.GLYPH_STYLE[t.state]),
+                                                  (f"#{m['id']} ", "bright_black"), m["to"][:ow].ljust(ow) + "  ",
+                                                  _line(m["body"])),
+                            detail, "task", {"id": m["id"], "level": 2, "parent": parent, "open": is_open},
+                            row_age(m["ts"], now)))
+        return rows
+
+    def goal_rows(g, parent: str | None) -> list[Row]:
+        m = g.msg
+
+        def detail(g=g, m=m):
+            o = Text()
+            o.append(f"#{m['id']} goal · {m['from']} → {m['to']} · opened {_age(m['ts'], now)} ago · ",
+                     style="bright_black")
+            o.append("open\n" if g.open else "done\n", style="yellow" if g.open else "green")
+            o.append(_first_line(m["body"], 200) + "\n", style="bold")
+            from .. import turns as _turns
+
+            o.append(f"usage: {_turns.fmt(_turns.goal_totals(ctx, m['id'], m['ts']))}\n")
+            brief = re.search(r"Brief:\s*(\S+\.md)", m["body"])
+            o.append(_heading(f"tasks ({count(g.tasks)} done)"))
+            for t in g.tasks:
+                o.append(f"{t.state} #{t.msg['id']} {t.msg['to']:<11} {_first_line(t.msg['body'], 90)}\n",
+                         style="yellow" if t.state == work.OPEN else "")
+            if not g.tasks:
+                o.append("(none yet)\n", style="bright_black")
+            if brief:
+                o.append(_heading(f"brief: {brief.group(1)}"))
+                o.append_text(_file_text(ctx, brief.group(1)))
+            return o
+
+        key = f"goal:{m['id']}"
+        row = Row(key, _t((f"#{m['id']} ", "bright_black"), _line(m["body"])), detail, "goal",
+                  {"id": m["id"], "level": 1, "foldable": True, "expanded": g.open, "parent": parent,
+                   "open": g.open, **tail(m["to"], g.tasks, g.open)}, row_age(g.newest, now))
+        return [row] + task_rows(g.tasks, key)
+
+    rows = [r for g in out.open for r in goal_rows(g, None)]
+    drafts = sorted(ctx.paths.drafts.glob("*.md")) if ctx.paths.drafts.exists() else []
+    for d in drafts:  # the liaison is still shaping these with the human
+        rel = str(d.relative_to(ctx.paths.root))
+
+        def ddetail(rel=rel):
+            o = Text()
+            o.append(f"draft · {rel} · not dispatched yet (the liaison shapes it with you)\n", style="bright_black")
+            o.append_text(_file_text(ctx, rel))
+            return o
+
+        rows.append(Row(f"draft:{d.stem}", _t(("✎ ", "cyan"), d.stem, ("  draft", "cyan")), ddetail, "draft",
+                        {"path": rel, "level": 1, "open": True}))
+    if out.done:
+        n = len(out.done)
+        rows.append(Row(work.DONE_FOLD, _t((f"done ({n})", "bright_black")),
+                        lambda: Text(f"{n} done goals, newest first: space shows or hides them\n",
+                                     style="bright_black"),
+                        "donefold", {"level": 1, "foldable": True, "expanded": False, "open": False}))
+        rows += [r for g in out.done for r in goal_rows(g, work.DONE_FOLD)]
+    if out.orphans:
+        orphans = out.orphans
+        has_open = any(t.msg["id"] in open_items for t in orphans)
+        rows.append(Row(work.NO_GOAL, _t(("no goal", "bold")),
+                        lambda: Text("Tasks whose ref chain reaches no goal: no ref, a ref to a message that "
+                                     f"isn't under a goal, or one older than the {HISTORY_DAYS} days the TUI "
+                                     "reads.\n", style="bright_black"),
+                        "nogoal", {"level": 1, "foldable": True, "expanded": has_open, "open": has_open,
+                                   **tail("", orphans, has_open)},
+                        row_age(max(t.msg["ts"] for t in orphans), now)))
+        rows += task_rows(orphans, work.NO_GOAL)
+    return rows, f"{len(out.open)} open · {len(out.done)} done"
 
 
 STUCK_AFTER = 60  # seconds: queued messages and jobs are normally handled within seconds

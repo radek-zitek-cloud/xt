@@ -55,10 +55,10 @@ set `[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notificati
 
 1. Switch to the liaison's workspace (in the TUI: select it in Team, press `f`) and say what you
    want: the outcome, constraints, what "done" looks like.
-2. The liaison drafts the goal in `goals/drafts/<slug>.md` as you talk (the TUI's Goals panel
+2. The liaison drafts the goal in `goals/drafts/<slug>.md` as you talk (the TUI's Work panel
    shows it as `✎ … draft`), reads it back, and dispatches it when you say so.
-3. The supervisor starts the lead, with the goal in its first prompt. From here the Goals panel
-   shows the goal and its tasks, and the Log panel every message.
+3. The supervisor starts the lead, with the goal in its first prompt. From here the Work panel
+   shows the goal with its tasks under it, and the Log panel every message.
 
 The answer and message dialog takes about two-thirds of the screen (up to 160 columns wide), with
 the question above the text box. It's an ordinary editor: arrows, home/end, ctrl+←/→ by word,
@@ -85,7 +85,7 @@ the role the lead wrote, and you get a desktop notification.
 
 ### 4. Day to day: questions, approvals, alerts, friction
 
-Everything that needs you lands in the **Inbox** (TUI panel 3, or `xt inbox`), most with a desktop
+Everything that needs you lands in the **Inbox** (TUI panel 1, or `xt inbox`), most with a desktop
 notification. From 0.16.0 it has three groups, each under its heading, and a group with nothing in
 it isn't shown:
 
@@ -102,7 +102,7 @@ it isn't shown:
 | `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt. `c` marks it seen at once |
 | `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` shows it (newest first); `enter` again folds it |
 
-The Inbox's title counts what's in the groups: `[3]─Inbox─⚑ 2 · ✉ 1 · ✱ 3` is two items that need
+The Inbox's title counts what's in the groups: `[1]─Inbox─⚑ 2 · ✉ 1 · ✱ 3` is two items that need
 you, one new and three unread friction; a zero count is left out. The Team pane's header repeats
 the first two.
 
@@ -114,11 +114,47 @@ friction stays in the log (`xt log --type friction`) and under the folded row. I
 supervisor's first run on 0.16.0, so friction from before the upgrade shows as seen.
 
 **Rows** (from 0.16.0) use the whole width of their panel: a line is cut with `…` only when it
-doesn't fit, and again when you resize the terminal. Each row in the Goals, Tasks, Inbox and Log
+doesn't fit, and again when you resize the terminal. Each row in the Inbox, Work and Log
 panels ends with its age, dim at the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`,
 `2d`, and whole weeks from 60 days (`8w`). A goal's age is that of its newest message (the goal, its
-tasks and their replies), so a stuck goal looks old. Agents in the Team pane have no age, and
-Supervisor rows keep their clock time. The focused panel has a green frame and a reversed title.
+tasks and their replies), so a stuck goal looks old; a task's is that of the task itself. Agents in
+the Team pane have no age, and Supervisor rows keep their clock time. The focused panel has a
+green frame and a reversed title.
+
+**Work** (panel 2, from 0.16.0; it replaces the Goals and Tasks panels) shows goals with their
+tasks under them:
+
+```
+┌[2]─Work─2 open · 63 done──────────────────────────────┐
+│▾ #1729 Site check for #124         lead     1/2    16m│
+│    ✓ #1731 qa    Retry read-only curl for #124     15m│
+│    ● #1733 pm    Read-only site check (curl -LfsS) 14m│
+│▾ #1702 Weekly digest               lead     0/1     2d│
+│    ● #1705 carol Collect the week's links           2d│
+│✎ quarterly-report  draft                              │
+│▸ done (63)                                            │
+│▾ no goal                                    0/1     1h│
+│    ● #1740 carol A task with no goal                1h│
+└───────────────────────────────────────────────────────┘
+```
+
+- **Open goals** come first, unfolded, the one with the newest activity on top. A goal row shows
+  its id, first line, owner, how many of its tasks are done (`1/2`) and the age of its newest
+  activity, so a goal nobody has touched for two days reads `2d`.
+- A **task** shows `●` open, `✓` done or `✗` failed or blocked (closed with a `done` that starts
+  with FAIL or BLOCKED, or open while its owner is blocked), then its id, owner, first line and age.
+  A task belongs to the goal at the root of its `--ref` chain, so a task sent with `--ref` to
+  another task or to a report still sits under its goal; one that reaches no goal (no `--ref`, or
+  a chain that ends outside the last 30 days) sits under **no goal**, the last row.
+- The liaison's **drafts** follow the open goals.
+- **Done goals** are folded under `done (63)`; unfold it to see them newest first, each folded with
+  its `n/n ✓`, and unfold any of them to see its tasks.
+- `space` folds or unfolds the selected row (on a task: folds its goal). `o` shows open work only:
+  it hides `done (N)` and the done tasks, and the panel's bottom edge says `open only`; `o` again
+  shows them. Folds, `o` and the selected row stay
+  as they are when the TUI refreshes. `enter` shows the selected goal or task in the detail pane:
+  a goal with its tasks and brief, a task with its whole thread. `/` finds rows inside folds too.
+- The title counts the goals: `2 open · 63 done`.
 
 While a question waits for you, the work that depends on it isn't nudged. If you don't answer,
 nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
@@ -137,7 +173,7 @@ leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it h
 your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
 first run on 0.15.0, so older goals don't appear.
 
-The **Supervisor** panel (5) shows what xt did (deliveries, wake-ups, nudges, notifications). The
+The **Supervisor** panel (4) shows what xt did (deliveries, wake-ups, nudges, notifications). The
 key line at the bottom starts with what `s` will do.
 
 The **Team** pane on top (from 0.16.0; it replaces the Status pane and the Team panel) is as high
@@ -165,7 +201,8 @@ shown as the model its session log names.)
   of the model's window, yellow from 70 % and red from 85 %. Agents fill up to three columns as the
   width allows, so five take two lines.
 
-The Team pane has no number key: `tab` reaches it (it's before panel 1), `j`/`k` select an agent,
+The panels' number keys (from 0.16.0) are `1` Inbox, `2` Work, `3` Log and `4` Supervisor; the TUI
+starts in Work. The Team pane has no number key: `tab` reaches it (it's before panel 1), `j`/`k` select an agent,
 the detail pane shows it, and `u`, `x`, `R` and `f` act on it. The result of your last action
 (`alert cleared`, `starting carol…`) shows for about ten seconds in a one-line toast at the bottom,
 then goes away on its own.
@@ -492,7 +529,7 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt restart`](#xt-restart) | human | `x` then `u` for one agent |
 | [`xt version`](#xt-version) | show: both; use/rollback: human | none |
 | [`xt status`](#xt-status) | both | Team pane (on top) |
-| [`xt inbox`](#xt-inbox) | human | Inbox panel (`3`) |
+| [`xt inbox`](#xt-inbox) | human | Inbox panel (`1`) |
 | [`xt answer`](#xt-answer) | human | `s` on a question |
 | [`xt approve`, `xt deny`](#xt-approve-xt-deny) | human | `a` / `d` on an approval |
 | [`xt clear`](#xt-clear) | human | `c` on an alert |
@@ -504,9 +541,9 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt done`](#xt-done) | agents | none |
 | [`xt note`](#xt-note) | agents | none |
 | [`xt friction`](#xt-friction) | agents | shown in Inbox (`✱`) |
-| [`xt goal`](#xt-goal) | agents (liaison) | Goals panel shows drafts and goals |
+| [`xt goal`](#xt-goal) | agents (liaison) | Work panel (`2`) shows drafts and goals |
 | [`xt brief`](#xt-brief) | both | Team detail (partly) |
-| [`xt log`](#xt-log) | both | Log (`4`) and Supervisor (`5`) panels |
+| [`xt log`](#xt-log) | both | Log (`3`) and Supervisor (`4`) panels |
 | [`xt harnesses`](#xt-harnesses) | human | none |
 | [`xt watch`](#xt-watch) | (xt) | Supervisor panel shows its events |
 | [`xt tui`](#xt-tui) | human | is the TUI |
@@ -708,7 +745,7 @@ the agent's report instead, for the lead.
 `xt goal new <slug> [title]` creates a draft in `goals/drafts/`; `xt goal dispatch <slug>` freezes
 it as `goals/<slug>.md` and sends it to the lead (starting the lead if needed); `xt goal list`
 shows drafts and open goals. **The liaison** uses these while shaping goals with you; the TUI's
-Goals panel shows drafts and goals.
+Work panel shows drafts and goals.
 
 ### `xt brief`
 
@@ -724,8 +761,8 @@ of them first, and a first line saying how many older ones were left out; `--lim
 newest N, `--full` all of them. `--id` alone still prints the whole thread (from 0.15.0; before, `xt
 log` always printed everything). `xt log --watch [--limit N]` shows the supervisor's newest events
 instead (50 by default). **Use it** to trace a goal (`--id 234` shows the goal and every message
-that refers to it directly) or an agent (`--member carol`); the TUI's Log (`4`) and Supervisor
-(`5`) panels show the recent part.
+that refers to it directly) or an agent (`--member carol`); the TUI's Log (`3`) and Supervisor
+(`4`) panels show the recent part.
 
 ### `xt harnesses`
 

@@ -22,12 +22,12 @@ def test_key_line_says_what_s_does_and_S_always_messages_the_liaison(ctx):
         async with app.run_test(size=(160, 45)) as pilot:
             await pilot.pause()
             hints = lambda: str(app.query_one("#hints").render())  # noqa: E731
-            assert hints().startswith("s/S message liaison")  # Goals focused: nothing to answer
-            for panel in ("1", "2", "4", "5", "tab"):  # every pane but the Inbox (3), and Team
+            assert hints().startswith("s/S message liaison")  # Work focused: nothing to answer
+            for panel in ("2", "3", "4", "tab"):  # every pane but the Inbox (1), and Team
                 await pilot.press(panel, "S")
                 assert isinstance(app.screen, Compose) and app.screen.title_text == "Send to the liaison"
                 await pilot.press("escape")
-            await pilot.press("3")
+            await pilot.press("1")
             await pilot.pause()
             assert hints().startswith(f"s answer #{q['id']} · S message liaison")
             await pilot.press("S")  # a question is selected, but S doesn't answer it

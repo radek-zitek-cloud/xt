@@ -12,14 +12,14 @@ def test_tui_demo_navigation_and_popups():
     async def run():
         app = XtTui(demo_snapshot)
         async with app.run_test(size=(120, 40)) as pilot:
-            assert app.focused.id == "panel-1"
-            await pilot.press("3", "j", "j")
+            assert app.focused.id == "panel-2"  # Work
+            await pilot.press("1", "j", "j")
             await pilot.pause()
-            assert app.focused.id == "panel-3" and app.focused.border_subtitle == "3 of 5"
+            assert app.focused.id == "panel-1" and app.focused.border_subtitle == "3 of 5"
             await pilot.press("question_mark")
             assert isinstance(app.screen, Help)
             await pilot.press("escape", "tab")
-            assert isinstance(app.focused, Panel) and app.focused.id == "panel-4"
+            assert isinstance(app.focused, Panel) and app.focused.id == "panel-2"
             await pilot.press("s")  # actions are disabled in the demo
             assert "demo mode" in app.status
 
@@ -39,15 +39,15 @@ def _team_with_work(ctx):
     return g, t
 
 
-def test_model_shows_goals_team_tasks_inbox_and_log(ctx):
+def test_model_shows_work_team_inbox_and_log(ctx):
     g, t = _team_with_work(ctx)
     snap = build(ctx)
-    goal = snap.panels["Goals"][0]
-    assert goal.key == f"goal:{g['id']}" and "0/1" in goal.text.plain
+    goal = snap.panels["Work"][0]
+    assert goal.key == f"goal:{g['id']}" and "0/1" in goal.data["tail"].plain
     detail = goal.detail().plain
     assert "research the chip" in detail and "Outcome: an article." in detail  # tasks + brief file
     assert [r.data["name"] for r in snap.panels["Team"]] == ["liaison", "lead", "carol"]
-    assert snap.panels["Tasks"][0].key == f"task:{t['id']}"
+    assert snap.panels["Work"][1].key == f"task:{t['id']}"
     heading, approval = snap.panels["Inbox"][:2]
     assert heading.kind == "heading" and heading.text.plain == "NEEDS YOU"
     assert approval.kind == "approval" and "spawn dora" in approval.text.plain
@@ -98,7 +98,8 @@ def test_h_opens_help_listing_every_key(ctx):
             await pilot.press("h")
             assert isinstance(app.screen, Help)
             keys = " ".join(k for k, _ in Help.KEYS)
-            for k in ("a / d", "c", "u", "U", "x", "f", "s", "r", "h / ?", "q", "1-5", "/", "R", "enter", "esc"):
+            for k in ("a / d", "c", "u", "U", "x", "f", "s", "r", "h / ?", "q", "1-4", "/", "R", "enter", "esc",
+                      "space", "o"):
                 assert k in keys
             await pilot.press("h")  # h closes it again
             assert not isinstance(app.screen, Help)
@@ -240,7 +241,7 @@ def test_panels_keep_their_size_when_focus_moves():
         async with app.run_test(size=(140, 45)) as pilot:
             sizes = lambda: [app.panel(i).size for i in range(0, len(PANELS) + 1)]
             before = sizes()
-            for key in ("3", "5", "4", "2", "tab"):
+            for key in ("1", "4", "3", "2", "tab"):
                 await pilot.press(key)
                 await pilot.pause()
                 assert sizes() == before
@@ -280,7 +281,7 @@ def test_supervisor_panel_and_goal_drafts(ctx):
     snap = build(ctx)
     events = [r.text.plain for r in snap.panels["Supervisor"]]
     assert "notification failed" in events[0] and "woke scout" in events[1]  # newest first
-    drafts = [r for r in snap.panels["Goals"] if r.kind == "draft"]
+    drafts = [r for r in snap.panels["Work"] if r.kind == "draft"]
     assert drafts and drafts[0].text.plain.startswith("✎ weekly-digest")
     assert "A draft goal." in drafts[0].detail().plain
 

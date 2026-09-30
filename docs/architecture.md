@@ -84,6 +84,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/tui/app.py` | The TUI (Textual): the Team pane, panels, keys, the toast, dialogs, and the actions it takes as the human. |
 | `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into panel rows, agents and the Team header. |
 | `src/xt/tui/teampane.py` | The Team pane's layout: harness blocks, window bars, aligned agent columns and short model names. |
+| `src/xt/tui/work.py` | The Work outline: which goal each task belongs to (the root of its `ref` chain), task states, goal order, and a Work row laid out at the pane's width. |
 | `src/xt/tui/clipboard.py` | The system clipboard for the TUI's text boxes. |
 | `src/xt/tui/lazy.tcss` | The TUI's stylesheet. |
 | `src/xt/tui/__init__.py` | The TUI package. |
@@ -394,15 +395,19 @@ harness goes to the human with `xt friction`.
   (short model, or for `default` the model the agent's session log names, `usage.Reading.model`;
   state; context as tokens, bar and share). `tui/teampane.py` lays it out at the pane's width:
   up to three columns, blocks side by side or stacked, whichever is shorter. `j`/`k` select an agent;
-  its detail shows open work, schedules, recent messages and the last lines of its screen. Five
+  its detail shows open work, schedules, recent messages and the last lines of its screen. Four
   numbered panels of fixed size (focus shows by frame colour and a reversed title; `/` filters the
   focused one; rows are cut at the panel's width in cells and end with a dim age, `model.fit`):
-  **Goals** (1: drafts, then open goals with task progress; detail shows the tasks and the goal
-  brief, or the draft), **Tasks** (2: open, then recently closed; detail shows the thread),
-  **Inbox** (3: three groups: Needs you with open questions, pending approvals and alerts; New
+  **Inbox** (1: three groups: Needs you with open questions, pending approvals and alerts; New
   with goals done and reports to the human since they last looked; unread Friction, with seen
-  friction folded; the counts in its title), **Log** (4: newest first), and **Supervisor** (5,
-  under the detail pane: the supervisor's events, newest first). The last action's result is a
+  friction folded; the counts in its title), **Work** (2, card #129: goals and their tasks as one
+  two-level outline, built by `tui/work.py`: a task goes under the goal at the root of its `ref`
+  chain, or under a final `no goal` row; open goals first, expanded, newest activity first; the
+  liaison's drafts; done goals under a collapsed `done (N)` fold; `space` folds, `o` shows open
+  work only, and the pane keeps both across refreshes; `N open · M done` in its title; detail
+  shows a goal's tasks and brief, a task's thread, or the draft), **Log** (3: newest first), and
+  **Supervisor** (4, under the detail pane: the supervisor's events, newest first). The last
+  action's result is a
   one-line toast that goes after about ten seconds; the bottom line is key hints; `h` lists every
   key (the README has the table). Slow actions (starting agents) run in the background.
   `xt tui --demo` shows sample data.

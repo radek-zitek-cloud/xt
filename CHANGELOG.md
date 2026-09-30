@@ -15,7 +15,9 @@ A TUI-focused release, built card by card to the approved specs of the TUI redes
 **0.16.0-rc1** (2026-09-30) has the first two cards: #127 (Inbox groups and friction read state)
 and #132 (rows cut at pane width, with ages). **0.16.0-rc2** (2026-09-30) adds #128 (the Team pane
 replaces the Status pane and the Team panel); #127 and #132 are unchanged from rc1 except that the
-Inbox is now panel 3. The other cards (#129, #131, #130) follow in later candidates.
+Inbox is now panel 3. **0.16.0-rc3** (2026-09-30) adds #129 (the Work outline replaces the Goals
+and Tasks panels); the earlier cards are unchanged from rc2 except the panel numbers (Inbox is now
+1) and the panel heights. The other cards (#131, #130) follow in later candidates.
 
 ### Added
 
@@ -23,8 +25,8 @@ Inbox is now panel 3. The other cards (#129, #131, #130) follow in later candida
   questions with `N options` when they have choices, approvals, alerts with `⚠`; they stay until
   answered, decided or cleared), **New** (goals you dispatched that closed and reports to you, since
   you last looked, newest first) and **Friction** (unread only). An empty group isn't shown. The
-  Inbox's title carries the counts, e.g. `[3]─Inbox─⚑ 1 · ✉ 2 · ✱ 1` (`[4]` in rc1), leaving out a
-  zero.
+  Inbox's title carries the counts, e.g. `[1]─Inbox─⚑ 1 · ✉ 2 · ✱ 1` (`[4]` in rc1, `[3]` in rc2),
+  leaving out a zero.
 - **Friction read state (#127, rc1).** Friction is unread until you've seen it: in the TUI, once
   you leave the Inbox (or quit) after it was on screen there; `c` on a friction row marks it seen
   at once; `xt inbox` in your own terminal marks the friction it printed as seen. An agent's `xt
@@ -32,7 +34,7 @@ Inbox is now panel 3. The other cards (#129, #131, #130) follow in later candida
   folds into one row, `(12 older, seen) ▸`, that `enter` expands (newest first) and folds again;
   `xt inbox` prints `(12 older, seen; …)` and `--seen` lists them. On the first run after the
   upgrade all existing friction counts as seen. Friction stays in the log.
-- **Ages on rows (#132, rc1).** Each row in the Goals, Tasks, Inbox and Log panels ends with a dim
+- **Ages on rows (#132, rc1).** Each row in the Goals, Tasks (Work from rc3), Inbox and Log panels ends with a dim
   age at its right edge, by one rule in whole units rounded down: `now` under 10 s, then `45s`,
   `14m`, `3h`, `2d` up to 59 days, and whole weeks from 60 days (`8w`). A goal's age is its newest
   activity (the goal, its tasks and their replies). Team rows have none; Supervisor rows keep their
@@ -53,9 +55,27 @@ Inbox is now panel 3. The other cards (#129, #131, #130) follow in later candida
 - **Action results in a toast (#128, rc2).** The result of your last action (`alert cleared`,
   `starting carol…`) is a one-line toast at the bottom that dims and goes after about ten seconds
   without a key press. It's never part of the Team pane.
+- **The Work outline (#129, rc3)** replaces the Goals and Tasks panels: goals with their tasks
+  under them. A task belongs to the goal at the root of its `ref` chain (through other tasks or
+  messages); a task that reaches no goal sits under a final `no goal` row. Open goals come first,
+  unfolded, newest activity first; a goal row shows its fold mark, id, first line, owner,
+  `done/total` of its tasks and the age of its newest activity. A task row shows `●` open, `✓` done
+  or `✗` failed or blocked (closed with a `done` starting FAIL or BLOCKED, or open while its owner
+  is blocked), id, owner, first line and age. The liaison's drafts follow the open goals. Done goals
+  sit under one `done (N)` fold, folded, newest first, each folded with `n/n ✓`. `space` folds or
+  unfolds the selected row (on a task, its goal); `o` shows open work only (hides `done (N)` and
+  done tasks; the pane's bottom edge says `open only`); both, and the selected row, stay across
+  refreshes. `enter` shows the selected row in
+  the detail pane. The title counts the goals, `[2]─Work─1 open · 63 done`. An open goal older than
+  the 30 days the TUI reads still shows.
 
 ### Changed
 
+- **Panel keys (#129, rc3).** With Goals and Tasks merged into Work, the keys are `1` Inbox, `2`
+  Work, `3` Log, `4` Supervisor (were `1` Goals, `2` Tasks, `3` Inbox, `4` Log, `5` Supervisor in
+  rc2); the key line and `h` say so, and the key line adds `space fold · o open only` while Work
+  has focus. The TUI starts in Work, as it started in Goals. The left column is now Inbox, Work
+  and Log, with Inbox and Work the same height and Log half of that.
 - **Panel keys (#128, rc2).** With Team out of the numbered panels, the keys are `1` Goals, `2`
   Tasks, `3` Inbox, `4` Log, `5` Supervisor (were 1–6 with Team at 2); the key line and `h` say so.
 - **Agent states (#128, rc2).** An agent that isn't running shows `stopped` in the Team pane (its
@@ -72,11 +92,11 @@ Inbox is now panel 3. The other cards (#129, #131, #130) follow in later candida
   when all are). Reports to you appear once, under New, instead of in a "Recent messages to you"
   list that repeated them. `--days` defaults to 30 (was 7), as the TUI; `--limit` caps each group.
 - The TUI's Inbox rows for questions and approvals start with `⚑` (was `?`); open task rows say
-  `open` where they showed the age in yellow.
+  `open` where they showed the age in yellow (rc1 and rc2; from rc3 a task row starts with `●`).
 
 ### Upgrading
 
-- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc2`), then `xt restart --all`
+- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc3`), then `xt restart --all`
   so the supervisor starts the friction marker. Friction from before that shows as seen. New keys
   in `.xt/state/inbox_seen.json` (`friction_upto`, `friction_seen`); no state format change.
   Scripts that parse `xt inbox` need the new section names.
