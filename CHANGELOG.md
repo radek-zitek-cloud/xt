@@ -9,9 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.15.0] — not released yet
+## [0.15.0] — 2026-09-30
 
-**Work entry**, filled in batch by batch. **0.15.0-rc1** (2026-09-29) has the first batch: #122
+The release: the same code and docs as 0.15.0-rc7 (only the version and this changelog changed).
+Seven cards: #122, #113, #120, #105, #125, #107 (research only) and #124 (docs and site). How
+the candidates got here: **0.15.0-rc1** (2026-09-29) has the first batch: #122
 and #113. **0.15.0-rc2** (2026-09-29) adds #120 and #105; #122 and #113 are unchanged from rc1.
 **0.15.0-rc3** (2026-09-29) adds #125 and #107 (research only, no code); the earlier cards are
 unchanged from rc2. **0.15.0-rc4** (2026-09-29) is rc3 plus the fix for QA's rc2 FAIL on #120
@@ -115,11 +117,12 @@ Documentation); code unchanged from rc6.
 
 ### Upgrading
 
-- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0-rc7 --candidate`), then `xt restart --all`
+- From 0.14.1: `git pull upstream main` (or `xt version use v0.15.0`), then `xt restart --all`
   so agents get the new protocol and roles, and the supervisor the goal notifications. Scripts or
   roles that rely on `xt log` printing everything need `--full`. For Claude plan usage, add the
   `statusLine` entry to one Claude agent's settings file (yours to edit) and restart that agent.
-  From an earlier 0.15.0 candidate: the same restart. "Done since you last looked" starts empty
+  From 0.15.0-rc7: nothing but the version changes. From an earlier 0.15.0 candidate: the same
+  restart. "Done since you last looked" starts empty
   and counts from the supervisor's first run on rc3 or later.
 
 ## [0.14.1] — 2026-09-29
