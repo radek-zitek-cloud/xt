@@ -75,7 +75,7 @@ now (`s answer #288 · S message liaison`, or `s/S message liaison`).
 ### 3. Hiring (approvals)
 
 The lead writes a role (`roles/<role>.md`) and asks to hire someone for it. The request waits for
-you: the TUI's Inbox shows `? #12 spawn carol (researcher, codex/default)`, the detail pane shows
+you: the TUI's Inbox shows `⚑ #12 spawn carol (researcher, codex/default)`, the detail pane shows
 the role the lead wrote, and you get a desktop notification.
 
 - Approve with `a` (or `xt approve 12`), deny with `d` (`xt deny 12`). Several at once:
@@ -86,16 +86,38 @@ the role the lead wrote, and you get a desktop notification.
 ### 4. Day to day: questions, approvals, alerts, friction
 
 Everything that needs you lands in the **Inbox** (TUI panel 4, or `xt inbox`), most with a desktop
-notification:
+notification. From 0.16.0 it has three groups, each under its heading, and a group with nothing in
+it isn't shown:
 
 | In the Inbox | What it is | What you do |
 |---|---|---|
-| `? #212 liaison: Which story…` | A **question** the liaison needs you to decide | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
-| `? #12 spawn …` / `? #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
+| **NEEDS YOU** | Stays until you answer, decide or clear it | |
+| `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options` when it offers choices) | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
+| `⚑ #12 spawn …` / `⚑ #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
 | `⚠ …` | An **alert**: an agent crashed, is blocked or went silent | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
-| `✓ #210 done: Write the weekly digest  #260` | **Done since you last looked**: a goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) | Read it; `xt log --id 210` for the thread. It clears once you've looked |
-| `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt |
-| `✉ #47 liaison: …` | A message to you | Read it |
+| **NEW** | Since you last looked, newest first; clears once you've looked | |
+| `✓ #210 done: Write the weekly digest  #260` | A goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) | Read it; `xt log --id 210` for the thread |
+| `✉ #47 liaison: …` | A report to you | Read it |
+| **FRICTION** | Unread friction only, newest first | |
+| `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt. `c` marks it seen at once |
+| `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` shows it (newest first); `enter` again folds it |
+
+The Inbox's title counts what's in the groups: `[4]─Inbox─⚑ 2 · ✉ 1 · ✱ 3` is two items that need
+you, one new and three unread friction; a zero count is left out.
+
+**Friction is unread until you've seen it.** In the TUI, friction counts as seen once you leave the
+Inbox panel (or quit) after it was on screen there; friction further down, which you never
+scrolled to, stays unread. `c` on one friction row marks it seen at once. `xt inbox` in your own
+terminal marks the friction it printed as seen; an agent running `xt inbox` changes nothing. Seen
+friction stays in the log (`xt log --type friction`) and under the folded row. It counts from the
+supervisor's first run on 0.16.0, so friction from before the upgrade shows as seen.
+
+**Rows** (from 0.16.0) use the whole width of their panel: a line is cut with `…` only when it
+doesn't fit, and again when you resize the terminal. Each row in the Goals, Tasks, Inbox and Log
+panels ends with its age, dim at the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`,
+`2d`, and whole weeks from 60 days (`8w`). A goal's age is that of its newest message (the goal, its
+tasks and their replies), so a stuck goal looks old. Team rows have no age, and Supervisor rows
+keep their clock time. The focused panel has a green frame and a reversed title.
 
 While a question waits for you, the work that depends on it isn't nudged. If you don't answer,
 nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
@@ -108,11 +130,11 @@ first line of the lead's closing summary instead. That is the goal's only notifi
 liaison's progress reports about a goal that's still open, and anything it sends about the goal
 afterwards, wait in the Inbox without one. Other reports the liaison sends you (not about a goal)
 notify, once per `--ref`. Tasks, goals the lead opens for sub-teams, and friction never notify, and quiet
-hours apply as for questions (what closes at night isn't sent later). "Done since you last looked"
-lists closed goals until you've looked: in the TUI, until you leave the Inbox panel (or quit) after
-it showed them; with `xt inbox`, once it has printed them in your own terminal (an agent running `xt
-inbox` doesn't clear them). It counts from the supervisor's first run on 0.15.0, so older goals
-don't appear.
+hours apply as for questions (what closes at night isn't sent later). The Inbox's New group lists
+closed goals, and from 0.16.0 the reports sent to you, until you've looked: in the TUI, until you
+leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it has printed them in
+your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
+first run on 0.15.0, so older goals don't appear.
 
 The **Supervisor** panel (6) shows what xt did (deliveries, wake-ups, nudges, notifications). The
 Status pane on top has three lines: the team with only what needs you (questions and approvals in
@@ -515,9 +537,14 @@ ssh), or in scripts.
 
 ### `xt inbox`
 
-`xt inbox [--days N] [--limit N]` — what needs you: questions, alerts, pending approvals, goals
-done since you last looked (cleared once shown; see 4), friction reported about xt or a harness,
-and recent messages to you, each with the command to act on it.
+`xt inbox [--days N] [--limit N] [--seen]` — the Inbox's three groups, as in the TUI (see 4), each
+row with the command to act on it: **Needs you** (questions, approvals, alerts `⚠`), **New since you
+last looked** (goals done and reports to you) and **Friction** (unread only, then `(12 older, seen;
+…)`). A group with nothing in it is left out; with nothing at all it prints `Nothing for you.`
+In your own terminal it clears New and marks the friction it printed as seen; run by an agent it
+changes nothing. `--limit` caps each group (default 20; what it leaves out, such as older unread
+friction, stays unread), `--seen` also lists the friction you've seen, `--days` is how far back it
+looks (default 30, as the TUI).
 **Use it** when you're not in the TUI; the Inbox panel shows the same.
 
 ### `xt answer`

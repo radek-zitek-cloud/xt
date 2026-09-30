@@ -63,6 +63,9 @@ def test_restart_one_agent_and_the_whole_team(ctx, human, monkeypatch):
 def test_friction_reaches_the_humans_inbox_not_a_pane(ctx, human, capsys):
     add_member(ctx, "carol")
     ctx.herdr.add("liaison")
+    from xt.inbox import friction_marker
+
+    friction_marker(ctx)  # the supervisor's first run: friction from here on is unread (card #127)
     msg, status = send(ctx, "carol", "human", "friction", "xt refused task --ref to a report; used a goal instead")
     assert msg["to"] == "human" and "Inbox" in status
     assert ctx.herdr.prompts == []  # nobody's pane got it

@@ -384,53 +384,69 @@ def cmd_checkpoint(args) -> None:
     print(record_checkpoint(Ctx.load(), who, _body(args)))
 
 
-DONE_DAYS = 30  # how far back the Inbox looks for goals done since the human last looked
+DONE_DAYS = 30  # how far back the Inbox looks, as the TUI does (model.HISTORY_DAYS)
 
 
 def cmd_inbox(args) -> None:
-    ctx = Ctx.load()
-    alerts = Alerts(ctx).active()
-    approvals = Approvals(ctx).pending()
-    questions = [i for i in ctx.ledger.open_items() if i["type"] == "ask"]
-    print("Questions for you:")
-    for q in questions:
-        print(f"  #{q['id']} {q['opened'][5:16]} from {q['opener']}: {q['title']}  (xt answer {q['id']} \"...\")")
-    if not questions:
-        print("  (none)")
-    print("Alerts:")
-    for k, a in alerts.items():
-        print(f"  #{a['id']} {a['ts'][5:16]} {a['text']}  (clear: xt clear {k})")
-    if not alerts:
-        print("  (none)")
-    print("Pending approvals:")
-    for rid, r in approvals.items():
-        print(f"  #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
-    if not approvals:
-        print("  (none)")
-    from .goaldone import done_since, first_line, mark_seen
+    """The Inbox in the TUI's three groups, empty ones left out (card #127). In the human's own
+    terminal the listing counts as a look: New clears and the friction it printed is seen. An
+    agent's listing changes nothing."""
+    from . import inbox
+    from .choices import options_of
+    from .goaldone import first_line, mark_seen
 
-    done, upto = done_since(ctx, list(ctx.ledger.messages(since_days=DONE_DAYS)))
-    print("Done since you last looked:")
-    for goal, m in done:
-        print(f"  #{goal['id']} {first_line(goal['body'], 80)} — done #{m['id']} {m['ts'][5:16]} by "
-              f"{m['from']}: {first_line(m['body'], 160)}  (xt log --id {goal['id']})")
-    if not done:
-        print("  (none)")
-    if human_terminal():  # only the human's own look clears them, never an agent's
-        mark_seen(ctx, upto)
-    recent_all = [m for m in ctx.ledger.messages(since_days=args.days) if m["to"] == HUMAN]
-    friction = [m for m in recent_all if m["type"] == "friction"]
-    print("Friction reported about xt or a harness:")
-    for m in friction[-args.limit:]:
-        print(f"  #{m['id']} {m['ts'][5:16]} {m['from']}: {' '.join(m['body'].split())[:160]}")
-    if not friction:
-        print("  (none)")
-    print("Recent messages to you:")
-    recent = [m for m in recent_all if m["type"] not in ("system", "friction")]
-    for m in recent[-args.limit:]:
-        print(f"  #{m['id']} {m['ts'][5:16]} {m['type']} from {m['from']}: {' '.join(m['body'].split())[:160]}")
-    if not recent:
-        print("  (none)")
+    ctx = Ctx.load()
+    msgs = list(ctx.ledger.messages(since_days=args.days))
+    box = inbox.build(ctx, msgs)
+    one = lambda text, n=160: " ".join(text.split())[:n]
+    printed = False
+    if box.questions or box.approvals or box.alerts:
+        print("Needs you:")
+        bodies = {m["id"]: m["body"] for m in msgs}
+        for q in box.questions:
+            n = len(options_of(bodies.get(q["id"], "")))
+            opts = f"  {n} options" if n else ""
+            print(f"  ⚑ #{q['id']} {q['opened'][5:16]} from {q['opener']}: {q['title']}{opts}  "
+                  f"(xt answer {q['id']} \"...\")")
+        for rid, r in box.approvals:
+            print(f"  ⚑ #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
+        for k, a in box.alerts:
+            print(f"  ⚠ #{a['id']} {a['ts'][5:16]} {a['text']}  (clear: xt clear {k})")
+        printed = True
+
+    def more(n: int) -> None:
+        if n > 0:
+            print(f"  … {n} more (xt inbox --limit {args.limit + n})")
+
+    if box.new:
+        print("New since you last looked:")
+        for m, goal in box.new[:args.limit]:
+            if goal:
+                print(f"  ✓ #{goal['id']} {first_line(goal['body'], 80)} — done #{m['id']} {m['ts'][5:16]} by "
+                      f"{m['from']}: {first_line(m['body'], 160)}  (xt log --id {goal['id']})")
+            else:
+                print(f"  ✉ #{m['id']} {m['ts'][5:16]} {m['type']} from {m['from']}: {one(m['body'])}")
+        more(len(box.new) - args.limit)
+        printed = True
+    shown = box.unread[:args.limit]
+    if box.unread or box.seen:
+        print("Friction reported about xt or a harness:")
+        for m in shown:
+            print(f"  ✱ #{m['id']} {m['ts'][5:16]} {m['from']}: {one(m['body'])}")
+        more(len(box.unread) - args.limit)
+        if box.seen and args.seen:
+            print(f"  ({len(box.seen)} older, seen)")
+            for m in box.seen[:args.limit]:
+                print(f"    #{m['id']} {m['ts'][5:16]} {m['from']}: {one(m['body'])}")
+            more(len(box.seen) - args.limit)
+        elif box.seen:
+            print(f"  ({len(box.seen)} older, seen; xt inbox --seen lists them)")
+        printed = True
+    if not printed:
+        print("Nothing for you.")
+    if human_terminal():  # only the human's own look counts, never an agent's (cards #125, #127)
+        mark_seen(ctx, box.upto)
+        inbox.mark_friction_seen(ctx, [m["id"] for m in shown])
 
 
 def cmd_clear(args) -> None:
@@ -602,9 +618,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     add("status", cmd_status, "one-shot team status")
 
-    sp = add("inbox", cmd_inbox, "alerts, pending approvals and messages for the human")
-    sp.add_argument("--days", type=int, default=7)
-    sp.add_argument("--limit", type=int, default=20)
+    sp = add("inbox", cmd_inbox, "what needs the human, what's new, and unread friction")
+    sp.add_argument("--days", type=int, default=DONE_DAYS, help=f"how far back to look (default {DONE_DAYS})")
+    sp.add_argument("--limit", type=int, default=20, help="rows per group (default 20)")
+    sp.add_argument("--seen", action="store_true", help="also list the friction you have already seen")
 
     sp = add("clear", cmd_clear, "dismiss an alert")
     sp.add_argument("key")

@@ -1,5 +1,5 @@
 /* lazygit-style look: terminal colours, single thin frames with titles in the border,
-   focus shown only by frame colour, dense rows, no stock header/footer. */
+   focus shown by frame colour and a reversed title, dense rows, no stock header/footer. */
 
 Screen {
     background: ansi_default;
@@ -45,10 +45,11 @@ Screen {
     scrollbar-size-horizontal: 0;
 }
 
+/* the focused panel: green frame and its title reversed (card #132) */
 .panel:focus, .panel:focus-within {
     border: solid ansi_green;
     border-title-color: ansi_green;
-    border-title-style: bold;
+    border-title-style: bold reverse;
 }
 
 #detail {

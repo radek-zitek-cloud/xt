@@ -121,29 +121,43 @@ class Notices:
 # --- the Inbox's "Done since you last looked" -----------------------------------------------------
 
 
+def load_seen(ctx: Ctx) -> dict:
+    """`state/inbox_seen.json`: the done marker (`upto`) and the friction marker (card #127)."""
+    try:
+        d = json.loads((ctx.paths.state / SEEN).read_text())
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def save_seen(ctx: Ctx, d: dict) -> None:
+    path = ctx.paths.state / SEEN
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(d))
+    tmp.replace(path)
+
+
 def seen_upto(ctx: Ctx) -> int:
     """The last message id the human has seen the Inbox's done goals up to. Starts at the current
     end of the log, so a team upgrading to 0.15.0 isn't shown its whole history."""
-    path = ctx.paths.state / SEEN
     try:
-        return int(json.loads(path.read_text())["upto"])
-    except (OSError, ValueError, KeyError, TypeError):
+        return int(load_seen(ctx)["upto"])
+    except (ValueError, KeyError, TypeError):
         upto = ctx.ledger.last_id()
         mark_seen(ctx, upto)
         return upto
 
 
 def mark_seen(ctx: Ctx, upto: int) -> None:
-    path = ctx.paths.state / SEEN
+    d = load_seen(ctx)
     try:
-        old = int(json.loads(path.read_text())["upto"])
-    except (OSError, ValueError, KeyError, TypeError):
-        old = 0
-    if upto > old or not path.exists():
-        path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"upto": max(upto, old)}))
-        tmp.replace(path)
+        old = int(d["upto"])
+    except (ValueError, KeyError, TypeError):
+        old = None
+    if old is None or upto > old:
+        d["upto"] = upto if old is None else max(upto, old)
+        save_seen(ctx, d)
 
 
 def done_since(ctx: Ctx, msgs: list[dict]) -> tuple[list[tuple[dict, dict]], int]:

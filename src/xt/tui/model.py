@@ -95,6 +95,7 @@ class Row:
     detail: Callable[[], Text]
     kind: str = ""
     data: dict = field(default_factory=dict)
+    age: str = ""  # shown dim at the row's right edge (card #132)
 
 
 @dataclass
@@ -104,6 +105,45 @@ class Snapshot:
     usage: str = ""  # line 2: today's usage and account allowance
     versions: str = ""  # the Status title: installed, running and published xt (card #58)
     done_upto: int = 0  # the Inbox's done goals are seen up to here once the human has looked (#125)
+    inbox_title: str = ""  # the Inbox's counts, `⚑ 1 · ✉ 2 · ✱ 1` (card #127)
+
+
+def age_text(secs: float) -> str:
+    """A row's relative age (card #132): whole units rounded down; under 10 s `now`, then seconds,
+    minutes, hours, days up to 59, and whole weeks from 60 days."""
+    s = max(0, int(secs))
+    if s < 10:
+        return "now"
+    if s < 60:
+        return f"{s}s"
+    if s < 3600:
+        return f"{s // 60}m"
+    if s < 86400:
+        return f"{s // 3600}h"
+    days = s // 86400
+    return f"{days}d" if days < 60 else f"{days // 7}w"
+
+
+def row_age(ts: str | None, now: dt.datetime) -> str:
+    return age_text((now - dt.datetime.fromisoformat(ts)).total_seconds()) if ts else ""
+
+
+def fit(text: Text, age: str, width: int) -> Text:
+    """One row at the pane's width in terminal cells: the text cut with `…` only when it doesn't fit,
+    the age dim at the right edge, never over the text (card #132)."""
+    line = text.copy()
+    line.no_wrap, line.end = True, ""
+    if width <= 0:
+        return line
+    if age and width < len(age) + 3:
+        age = ""  # too narrow for both: the text wins
+    room = width - (len(age) + 1 if age else 0)
+    if line.cell_len > room:
+        line.truncate(room, overflow="ellipsis")
+    if age:
+        line.append(" " * (width - len(age) - line.cell_len))
+        line.append(age, style="bright_black")
+    return line
 
 
 def _t(*parts) -> Text:
@@ -130,6 +170,11 @@ def _age(ts: str, now: dt.datetime) -> str:
 def _first_line(s: str, width: int = 70) -> str:
     line = s.strip().splitlines()[0] if s.strip() else ""
     return line if len(line) <= width else line[: width - 1] + "…"
+
+
+def _line(s: str) -> str:
+    """A list row's first line, uncut: the pane cuts it at its own width (card #132)."""
+    return s.strip().splitlines()[0] if s.strip() else ""
 
 
 def _msg_line(m: dict) -> Text:
@@ -221,8 +266,10 @@ def build(ctx: Ctx) -> Snapshot:
                 out.append_text(_file_text(ctx, brief.group(1)))
             return out
 
-        goal_rows.append(Row(f"goal:{g['id']}", _t((f"#{g['id']} ", "bright_black"), _first_line(g["body"], 60),
-                                                    mark), detail, "goal", {"id": g["id"]}))
+        ids = {g["id"], *(t["id"] for t in tasks)}
+        newest = max((m["ts"] for m in msgs if m["id"] in ids or m.get("ref") in ids), default=g["ts"])
+        goal_rows.append(Row(f"goal:{g['id']}", _t((f"#{g['id']} ", "bright_black"), _line(g["body"]), mark),
+                             detail, "goal", {"id": g["id"]}, row_age(newest, now)))
 
     # Team: roster with live state and context
     from .. import turns, usage
@@ -310,7 +357,6 @@ def build(ctx: Ctx) -> Snapshot:
     task_rows = []
     for t in open_tasks + list(reversed(closed_tasks)):
         is_open = t["id"] in open_items
-        age = _age(t["ts"], now)
 
         def detail(t=t, is_open=is_open):
             out = Text()
@@ -322,34 +368,41 @@ def build(ctx: Ctx) -> Snapshot:
             return out
 
         task_rows.append(Row(f"task:{t['id']}", _t((f"#{t['id']} ", "bright_black"), f"{t['to']:<10} ",
-                                                   _first_line(t["body"], 40),
-                                                   (f"  {age}", "yellow") if is_open else ("  ✓", "green")),
-                             detail, "task", {"id": t["id"]}))
+                                                   _line(t["body"]),
+                                                   ("  open", "yellow") if is_open else ("  ✓", "green")),
+                             detail, "task", {"id": t["id"]}, row_age(t["ts"], now)))
 
-    # Inbox: what needs the human; questions first, they're the only thing only the human can answer
-    inbox_rows = []
-    questions = [i for i in open_items.values() if i["type"] == "ask"]
-    for q in questions:
+    # Inbox: three groups, Needs you / New / Friction, empty groups hidden (card #127)
+    from .. import inbox as _inbox
+    from ..choices import options_of
+    from ..goaldone import first_line
+
+    box = _inbox.build(ctx, msgs, list(open_items.values()))
+    by_id = {m["id"]: m for m in msgs}
+    needs, new_rows, friction_rows = [], [], []
+    for q in box.questions:
         def qdetail(q=q):
             out = Text()
             out.append(f"Question #{q['id']} from {q['opener']} · waiting {_age(q['opened'], now)}\n", style="bold yellow")
-            m = next((m for m in msgs if m["id"] == q["id"]), None)
+            m = by_id.get(q["id"])
             out.append((m["body"] if m else q["title"]) + "\n")
             out.append(f"\ns: answer (goes to {q['opener']}) · or answer in {q['opener']}'s pane\n", style="bright_black")
             if q.get("about") is not None:
-                about = next((m for m in msgs if m["id"] == q["about"]), None)
+                about = by_id.get(q["about"])
                 if about:
                     out.append(_heading(f"about #{q['about']}"))
                     out.append_text(_msg_block(about))
             return out
 
-        inbox_rows.append(Row(f"question:{q['id']}", _t(("? ", "bold yellow"), f"#{q['id']} {q['opener']}: ",
-                                                        _first_line(q["title"], 44),
-                                                        (f"  {_age(q['opened'], now)}", "yellow")),
-                              qdetail, "question", {"id": q["id"], "opener": q["opener"],
-                                                    "text": next((m["body"] for m in msgs if m["id"] == q["id"]),
-                                                                 q["title"])}))
-    for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
+        body = by_id[q["id"]]["body"] if q["id"] in by_id else q["title"]
+        n_opts = len(options_of(body))
+        needs.append(Row(f"question:{q['id']}", _t(("⚑ ", "bold yellow"), f"#{q['id']} {q['opener']}: ",
+                                                   _line(q["title"]),
+                                                   (f"  {n_opts} options", "yellow") if n_opts else ""),
+                         qdetail, "question", {"id": q["id"], "opener": q["opener"], "text": body},
+                         row_age(q["opened"], now)))
+    for rid, r in box.approvals:
+        ts = by_id[int(rid)]["ts"] if int(rid) in by_id else None
         if r.get("kind") == "schedule":
             def sdetail(rid=rid, r=r):
                 out = Text()
@@ -365,9 +418,9 @@ def build(ctx: Ctx) -> Snapshot:
                     out.append_text(_file_text(ctx, f"roles/{agent.role}.md"))
                 return out
 
-            inbox_rows.append(Row(f"approval:{rid}", _t(("? ", "yellow"), f"#{rid} wake {r['name']} ",
-                                                        (f"every {r['every']}", "bright_black")),
-                                  sdetail, "approval", {"id": int(rid)}))
+            needs.append(Row(f"approval:{rid}", _t(("⚑ ", "yellow"), f"#{rid} wake {r['name']} ",
+                                                   (f"every {r['every']}", "bright_black")),
+                             sdetail, "approval", {"id": int(rid)}, row_age(ts, now)))
             continue
 
         def detail(rid=rid, r=r):
@@ -384,11 +437,11 @@ def build(ctx: Ctx) -> Snapshot:
             out.append_text(_file_text(ctx, f"roles/{r['role']}.md"))
             return out
 
-        inbox_rows.append(Row(f"approval:{rid}", _t(("? ", "yellow"), f"#{rid} spawn {r['name']} ",
-                                                    (f"({r['role']}, {harness_model(r['harness'], r.get('model'))})",
-                                                     "bright_black")),
-                              detail, "approval", {"id": int(rid)}))
-    for key, al in sorted(alerts.items(), key=lambda kv: kv[1].get("id", 0)):
+        needs.append(Row(f"approval:{rid}", _t(("⚑ ", "yellow"), f"#{rid} spawn {r['name']} ",
+                                               (f"({r['role']}, {harness_model(r['harness'], r.get('model'))})",
+                                                "bright_black")),
+                         detail, "approval", {"id": int(rid)}, row_age(ts, now)))
+    for key, al in box.alerts:
         def detail(key=key, al=al):
             out = Text()
             out.append(f"Alert #{al.get('id')} · {al.get('ts', '')[:16]}\n", style="bold red")
@@ -396,13 +449,15 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(f"\n({key}) c: clear once dealt with\n", style="bright_black")
             return out
 
-        inbox_rows.append(Row(f"alert:{key}", _t(("⚠ ", "red"), _first_line(al["text"], 60)), detail, "alert",
-                              {"key": key}))
-    from ..goaldone import done_since, first_line
+        needs.append(Row(f"alert:{key}", _t(("⚠ ", "red"), _line(al["text"])), detail, "alert", {"key": key},
+                         row_age(al.get("ts"), now)))
+    for m, goal in box.new:  # since the human last looked (cards #125, #127)
+        if goal is None:
+            new_rows.append(Row(f"msg:{m['id']}", _t(("✉ ", "cyan"), f"#{m['id']} {m['from']}: ", _line(m["body"])),
+                                lambda m=m: _msg_block(m), "message", {"id": m["id"]}, row_age(m["ts"], now)))
+            continue
 
-    done_goals, done_upto = done_since(ctx, msgs)
-    for goal, done in reversed(done_goals):  # "Done since you last looked" (card #125)
-        def ddetail(goal=goal, done=done):
+        def ddetail(goal=goal, done=m):
             out = Text()
             out.append(f"Goal #{goal['id']} done · {done['ts'][:16].replace('T', ' ')} by {done['from']}\n",
                        style="bold green")
@@ -413,28 +468,41 @@ def build(ctx: Ctx) -> Snapshot:
                        "leave it\n", style="bright_black")
             return out
 
-        inbox_rows.append(Row(f"done:{goal['id']}", _t(("✓ ", "green"), f"#{goal['id']} done: ",
-                                                      _first_line(goal["body"], 50),
-                                                      (f"  #{done['id']}", "bright_black")),
-                              ddetail, "done", {"id": goal["id"], "done": done["id"]}))
-    for m in [m for m in msgs if m["type"] == "friction"][-10:][::-1]:
-        inbox_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "magenta"), f"#{m['id']} {m['from']}: ",
-                                                        _first_line(m["body"], 50)),
-                              lambda m=m: _msg_block(m), "friction", {"id": m["id"]}))
-    to_human = [m for m in msgs if m["to"] == HUMAN and m["type"] not in ("system", "alert", "approval", "friction")
-                and m["id"] not in open_items][-10:]
-    for m in reversed(to_human):
-        inbox_rows.append(Row(f"msg:{m['id']}", _t(("✉ ", "cyan"), f"#{m['id']} {m['from']}: ",
-                                                   _first_line(m["body"], 50)),
-                              lambda m=m: _msg_block(m), "message", {"id": m["id"]}))
+        new_rows.append(Row(f"done:{goal['id']}", _t(("✓ ", "green"), f"#{goal['id']} done: ", _line(goal["body"]),
+                                                     (f"  #{m['id']}", "bright_black")),
+                            ddetail, "done", {"id": goal["id"], "done": m["id"]}, row_age(m["ts"], now)))
+    for m in box.unread:
+        friction_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "magenta"), f"#{m['id']} {m['from']}: ",
+                                                          _line(m["body"])),
+                                 lambda m=m: _msg_block(m), "friction", {"id": m["id"], "seen": False},
+                                 row_age(m["ts"], now)))
+    if box.seen:
+        friction_rows.append(Row("fold:friction", _t((f"({len(box.seen)} older, seen) ▸", "bright_black")),
+                                 lambda n=len(box.seen): Text(f"{n} older friction reports you have seen, newest "
+                                                              "first: enter shows or hides them\n",
+                                                              style="bright_black"),
+                                 "fold", {"n": len(box.seen)}))
+        for m in box.seen:
+            friction_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "bright_black"),
+                                                              (f"#{m['id']} {m['from']}: {_line(m['body'])}",
+                                                               "bright_black")),
+                                     lambda m=m: _msg_block(m), "friction",
+                                     {"id": m["id"], "seen": True, "folded": True}, row_age(m["ts"], now)))
+    inbox_rows = []
+    for heading, rows in (("NEEDS YOU", needs), ("NEW", new_rows), ("FRICTION", friction_rows)):
+        if rows:
+            inbox_rows.append(Row(f"heading:{heading}", Text(heading, style="bold"), lambda: Text(""), "heading"))
+            inbox_rows += rows
+    done_upto = box.upto
 
     # Log: newest first
     log_rows = []
     for m in reversed(msgs[-60:]):
-        log_rows.append(Row(f"log:{m['id']}", _t(_msg_line(m), ("  " + _first_line(m["body"], 40), "bright_black")),
-                            lambda m=m: _msg_block(m), "message", {"id": m["id"]}))
+        log_rows.append(Row(f"log:{m['id']}", _t(_msg_line(m), ("  " + _line(m["body"]), "bright_black")),
+                            lambda m=m: _msg_block(m), "message", {"id": m["id"]}, row_age(m["ts"], now)))
 
     running = sum(1 for n in live if ctx.team.agent(n))
+    questions = box.questions
     summary = status_line(ctx, running, len(open_items) - len(questions), len(questions), len(approvals),
                           len(alerts), queued, jobs, msgs, now)
     usage_line = usage_text(spend.team_today, turns.allowance_lines(ctx))
@@ -461,6 +529,7 @@ def build(ctx: Ctx) -> Snapshot:
         usage_line,
         vtitle,
         done_upto,
+        box.title(),
     )
 
 

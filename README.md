@@ -53,7 +53,7 @@ each one is in [the story so far](docs/story.md).
 - **Keep agents in bounds.** No desktop or browser control for agents; public output stays free
   of private details.
 
-Added since (0.11.0 to 0.15.0), each checked against its spec by the product team's quality
+Added since (0.11.0 to 0.16.0), each checked against its spec by the product team's quality
 analyst before its final release, some on staging teams rather than in daily use yet:
 
 - **No account connectors by default.** Agents start without your mail, files or calendar
@@ -80,6 +80,12 @@ analyst before its final release, some on staging teams rather than in daily use
   (progress on an open goal doesn't notify), and a "Done since you last looked" list in the Inbox ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 - **Short logs by default.** `xt log` prints the newest 20 messages; `--full` prints all
   ([`xt log`](docs/user-guide.md#xt-log)).
+- **An Inbox that shows what's new.** Three groups, Needs you, New and Friction, with their counts
+  in the panel title; friction you've seen folds away, in the TUI and in `xt inbox`
+  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **Rows that use the whole panel, with ages.** List rows are cut only at the panel's edge and show
+  how old they are (`now`, `45s`, `14m`, `3h`, `2d`, `8w`); the focused panel's title is reversed
+  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 
 What it can't do yet is in [Known limits](#known-limits).
 
@@ -165,11 +171,13 @@ release's **Upgrading** note in [CHANGELOG.md](CHANGELOG.md). From 0.14.0 on, `x
 
 `xt` (or `xt tui`) opens a lazygit-style view, refreshed every 2 seconds: **Goals** (with goal
 drafts the liaison is still shaping), **Team** (with each agent's context, e.g. `~211k/258k`),
-**Tasks**, **Inbox** and **Log** panels on the left,
+**Tasks**, **Inbox** (Needs you, New and unread Friction, with their counts in its title) and
+**Log** panels on the left,
 the detail pane on the right with the **Supervisor** panel under it (what `xt watch` did:
 deliveries, wake-ups, nudges, notifications, alerts), the Status pane on top (the team and only what
 needs you, highlighted; today's usage and allowance; the last action's result) and key hints at the
-bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
+bottom. Panels keep a fixed size; the focused one is shown by its frame colour and a reversed
+title. Rows use the panel's whole width and end with their age.
 
 | Key | What it does |
 |---|---|
@@ -178,7 +186,8 @@ bottom. Panels keep a fixed size; the focused one is shown by its frame colour.
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
 | `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says which (`s answer #288` or `s/S message liaison`). In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
 | `S` | Always message the liaison, even with a question selected |
-| `c` | Clear the selected alert |
+| `c` | Clear the selected alert, or mark the selected friction seen (Inbox) |
+| `enter` on `(N older, seen) ▸` | Show or hide the friction you've already seen (Inbox) |
 | `f` | Switch Herdr to the selected agent's workspace |
 | `u` / `U` | Start the selected stopped agent / every stopped agent |
 | `x` / `X` | Stop the selected agent / every agent (they stay in the roster) |
@@ -199,7 +208,7 @@ equivalent and when you'd use it.
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, context and today's usage per agent, team usage and allowance (Codex, and Claude's five-hour and weekly windows through `bin/xt-statusline`), open work, questions, queue, approvals, alerts |
-| `xt inbox` | What needs you: questions, alerts, approvals, goals done since you last looked, friction, recent messages |
+| `xt inbox` | The Inbox as in the TUI: what needs you (questions, approvals, alerts), what's new since you last looked (goals done, reports), unread friction (`--seen`: also the friction you've seen) |
 | `xt answer <id> "..."` | Answer a question the liaison asked you (a number picks one of its options) |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |
 | `xt clear <alert>` | Dismiss an alert |

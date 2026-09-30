@@ -11,7 +11,7 @@ from textual.widgets import Input, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from .. import __version__
-from .model import PANELS, Row, Snapshot
+from .model import PANELS, Row, Snapshot, fit
 
 REFRESH_SECONDS = 2.0
 INBOX = PANELS.index("Inbox") + 1  # its panel number
@@ -22,10 +22,15 @@ class Panel(OptionList):
     def __init__(self, title: str, number: int):
         super().__init__(id=f"panel-{number}", classes="panel")
         self.title = title
+        self.number = number
         self.rows: list[Row] = []
         self.all_rows: list[Row] = []
         self.filter = ""
+        self.unfolded = False  # the Inbox's seen friction, shown under its `(N older, seen)` row
         self.border_title = f"[{number}]─{title}"
+
+    def set_counts(self, counts: str) -> None:
+        self.border_title = f"[{self.number}]─{self.title}" + (f"─{counts}" if counts else "")
 
     def set_filter(self, text: str) -> None:
         self.filter = text.strip()
@@ -33,19 +38,42 @@ class Panel(OptionList):
 
     def set_rows(self, rows: list[Row]) -> None:
         """Replace rows (only those matching the filter, if any), keeping the selection on the
-        same item when it still exists."""
+        same item when it still exists. Each row is laid out at the panel's width (card #132)."""
         keep = self.current.key if self.current else None
         self.all_rows = rows
+        rows = [r for r in rows if self.unfolded or not r.data.get("folded")]
         if self.filter:
             needle = self.filter.lower()
-            rows = [r for r in rows if needle in r.text.plain.lower()]
+            rows = [r for r in rows if r.kind != "heading" and needle in r.text.plain.lower()]
         self.rows = rows
         self.clear_options()
-        self.add_options([Option(r.text) for r in rows])
+        width = self.content_size.width
+        self.add_options([Option(self.line(r, width), disabled=r.kind == "heading") for r in rows])
         if rows:
             idx = next((i for i, r in enumerate(rows) if r.key == keep), None)
-            self.highlighted = idx if idx is not None else 0
+            if idx is None:
+                idx = next((i for i, r in enumerate(rows) if r.kind != "heading"), None)
+            self.highlighted = idx
         self.update_subtitle()
+
+    def line(self, row: Row, width: int) -> Text:
+        text = row.text
+        if row.kind == "fold" and self.unfolded:
+            text = Text(text.plain.replace("▸", "▾"), style="bright_black")
+        return fit(text, row.age, width)
+
+    def on_resize(self) -> None:
+        self.set_rows(self.all_rows)  # re-cut every row at the new width
+
+    def toggle_fold(self) -> None:
+        self.unfolded = not self.unfolded
+        self.set_rows(self.all_rows)
+
+    def in_view(self) -> list[Row]:
+        """The rows on screen right now (one line each), and the highlighted one."""
+        top = self.scroll_offset.y
+        out = self.rows[top: top + self.content_size.height]
+        return out + ([self.current] if self.current and self.current not in out else [])
 
     @property
     def current(self) -> Row | None:
@@ -54,18 +82,22 @@ class Panel(OptionList):
         return self.rows[self.highlighted]
 
     def update_subtitle(self) -> None:
-        n = len(self.rows)
-        pos = f"{(self.highlighted or 0) + 1 if n else 0} of {n}"
+        items = [i for i, r in enumerate(self.rows) if r.kind != "heading"]
+        n = len(items)
+        pos = f"{sum(1 for i in items if i <= (self.highlighted or 0)) if n else 0} of {n}"
         self.border_subtitle = f"/{self.filter} · {pos}" if self.filter else pos
 
-    # Moving past the first or last item does nothing (Textual's OptionList wraps around by default).
+    # Moving past the first or last item does nothing (Textual's OptionList wraps around by default);
+    # group headings are skipped.
     def action_cursor_down(self) -> None:
-        if self.highlighted is not None and self.highlighted >= self.option_count - 1:
+        h = self.highlighted
+        if h is not None and not any(r.kind != "heading" for r in self.rows[h + 1:]):
             return
         super().action_cursor_down()
 
     def action_cursor_up(self) -> None:
-        if self.highlighted is not None and self.highlighted <= 0:
+        h = self.highlighted
+        if h is not None and not any(r.kind != "heading" for r in self.rows[:h]):
             return
         super().action_cursor_up()
 
@@ -198,7 +230,8 @@ class Help(ModalScreen[None]):
         ("esc", "back from the detail pane to the panels"),
         ("Inbox (4)", ""),
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
-        ("c", "clear the selected alert"),
+        ("c", "clear the selected alert; on unread friction: mark it seen"),
+        ("enter", "on the (N older, seen) row: show or hide the friction you've seen"),
         ("Team (2)", ""),
         ("u", "start the selected stopped agent (existing role and harness)"),
         ("U", "start every stopped agent in the roster"),
@@ -271,6 +304,7 @@ class XtTui(App):
         self.status = ""
         self.done_upto = 0  # newest message the Inbox's "done" rows were built from (card #125)
         self.inbox_looked = 0  # what the human saw while the Inbox had focus
+        self.friction_viewed: set[int] = set()  # unread friction on screen while the Inbox had focus (#127)
 
     def compose(self) -> ComposeResult:
         topbar = Static(id="topbar")
@@ -308,8 +342,10 @@ class XtTui(App):
         self.summary = snap.summary
         self.usage = snap.usage
         self.done_upto = snap.done_upto
+        self.panel(INBOX).set_counts(snap.inbox_title)
         if self.last_panel == INBOX:
             self.inbox_looked = self.done_upto
+            self.call_after_refresh(self.note_friction_in_view)
         if snap.versions:
             self.query_one("#topbar", Static).border_title = f"Status─xt {snap.versions}"
         self.render_hints()
@@ -358,11 +394,20 @@ class XtTui(App):
     # --- navigation -------------------------------------------------------------------------
 
     def on_option_list_option_highlighted(self, event: OptionList.OptionHighlighted) -> None:
-        if isinstance(event.option_list, Panel):
+        if isinstance(event.option_list, Panel) and self.is_running and self.screen_stack:
             event.option_list.update_subtitle()
             if event.option_list is self.focused:
                 self.show_detail(event.option_list)
                 self.render_hints()
+                if self.last_panel == INBOX:
+                    self.call_after_refresh(self.note_friction_in_view)
+
+    def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
+        """enter on the Inbox's `(N older, seen)` row shows or hides the seen friction (card #127)."""
+        if isinstance(event.option_list, Panel):
+            row = event.option_list.current
+            if row and row.kind == "fold":
+                event.option_list.toggle_fold()
 
     def on_descendant_focus(self, event) -> None:
         if isinstance(event.widget, Panel):
@@ -371,17 +416,33 @@ class XtTui(App):
                 self.mark_inbox_seen()
             elif n == INBOX:
                 self.inbox_looked = self.done_upto
+                self.call_after_refresh(self.note_friction_in_view)
             self.last_panel = n
             self.show_detail(event.widget)
             self.render_hints()
 
+    def note_friction_in_view(self) -> None:
+        """Unread friction on screen while the human has the Inbox open counts as seen once they
+        leave the Inbox or quit (card #127)."""
+        if self.last_panel != INBOX or not self.screen_stack:
+            return
+        self.friction_viewed |= {r.data["id"] for r in self.panel(INBOX).in_view()
+                                 if r.kind == "friction" and not r.data.get("seen")}
+
     def mark_inbox_seen(self) -> None:
-        """Leaving the Inbox (or quitting) clears the done goals the human has now seen (card #125)."""
-        if self.actions is not None and self.inbox_looked:
-            try:
+        """Leaving the Inbox (or quitting) clears the done goals and the friction the human has now
+        seen (cards #125, #127)."""
+        if self.actions is None:
+            return
+        self.note_friction_in_view()
+        try:
+            if self.inbox_looked:
                 self.actions.inbox_seen(self.inbox_looked)
-            except Exception as e:  # never let the marker break the TUI
-                self.set_status(f"couldn't mark the Inbox seen: {e}")
+            if self.friction_viewed:
+                self.actions.friction_seen(sorted(self.friction_viewed))
+                self.friction_viewed = set()
+        except Exception as e:  # never let the marker break the TUI
+            self.set_status(f"couldn't mark the Inbox seen: {e}")
 
     async def action_quit(self) -> None:
         if self.last_panel == INBOX:
@@ -464,9 +525,16 @@ class XtTui(App):
         self.call_from_thread(self.refresh_data)
 
     def action_clear_alert(self) -> None:
+        friction = self._selected("friction")
+        if friction is not None and not friction.data.get("seen"):
+            if self._need_live():  # c on unread friction: seen now (card #127)
+                self.actions.friction_seen([friction.data["id"]])
+                self.set_status(f"friction #{friction.data['id']} marked seen")
+                self.refresh_data()
+            return
         row = self._selected("alert")
         if row is None:
-            self.set_status("select an alert in the Inbox (4) first")
+            self.set_status("select an alert or unread friction in the Inbox (4) first")
             return
         if self._need_live():
             self.actions.clear(row.data["key"])
@@ -672,6 +740,11 @@ class LiveActions:
 
         mark_seen(self.ctx, upto)
 
+    def friction_seen(self, ids: list[int]) -> None:
+        from ..inbox import mark_friction_seen
+
+        mark_friction_seen(self.ctx, ids)
+
     def start(self, name: str) -> str:
         from ..spawn import request_spawn
         from ..team import HUMAN
@@ -737,10 +810,19 @@ def demo_snapshot() -> Snapshot:
                      "#42 task lead→carol\ningest station data", "task"),
             ],
             "Inbox": [
-                _row("a9", _t(("? ", "yellow"), "#9 spawn erin ", ("(evaluator, pi)", "bright_black")),
+                _row("hn", _t(("NEEDS YOU", "bold")), "", "heading"),
+                _row("a9", _t(("⚑ ", "yellow"), "#9 spawn erin ", ("(evaluator, pi)", "bright_black")),
                      "Approval #9: lead asks to spawn erin\n\nrole brief: …", "approval", id=9),
                 _row("al", _t(("⚠ ", "red"), "dave is blocked (usually an approval prompt)"),
                      "dave is blocked — f on dave in Team to jump there", "alert", key="blocked:dave"),
+                _row("hw", _t(("NEW", "bold")), "", "heading"),
+                _row("m47", _t(("✉ ", "cyan"), "#47 liaison: forecast team: 4 of 7 tasks done"),
+                     "#47 report liaison→human\nforecast team: 4 of 7 tasks done", "message", id=47),
+                _row("hf", _t(("FRICTION", "bold")), "", "heading"),
+                _row("f51", _t(("✱ ", "magenta"), "#51 carol: the sandbox refused a plain curl"),
+                     "#51 friction carol→human\nthe sandbox refused a plain curl", "friction", id=51),
+                _row("fold", _t(("(4 older, seen) ▸", "bright_black")), "4 older friction reports you have seen",
+                     "fold", n=4),
             ],
             "Supervisor": [
                 _row("s2", _t(("14:36 ", "bright_black"), "woke scout (every 60m, 05:00-21:00)"),
@@ -756,6 +838,7 @@ def demo_snapshot() -> Snapshot:
         summary=Text.assemble(("demo", "bold"), " · 3 running · 2 open · ", ("1 approval", "bold yellow"),
                               " · ", ("1 alert", "bold red")),
         usage="today 8.4M tokens · est. $2.46 (+1.1M unpriced) · codex account 20% of the week, resets Sat 19:24",
+        inbox_title="⚑ 2 · ✉ 1 · ✱ 1",
     )
 
 

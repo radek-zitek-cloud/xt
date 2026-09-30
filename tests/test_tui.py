@@ -48,7 +48,8 @@ def test_model_shows_goals_team_tasks_inbox_and_log(ctx):
     assert "research the chip" in detail and "Outcome: an article." in detail  # tasks + brief file
     assert [r.data["name"] for r in snap.panels["Team"]] == ["liaison", "lead", "carol"]
     assert snap.panels["Tasks"][0].key == f"task:{t['id']}"
-    approval = snap.panels["Inbox"][0]
+    heading, approval = snap.panels["Inbox"][:2]
+    assert heading.kind == "heading" and heading.text.plain == "NEEDS YOU"
     assert approval.kind == "approval" and "spawn dora" in approval.text.plain
     assert "Purpose: write the copy." in approval.detail().plain  # the role brief, to decide on
     assert snap.panels["Log"][0].data["id"] > snap.panels["Log"][-1].data["id"]  # newest first

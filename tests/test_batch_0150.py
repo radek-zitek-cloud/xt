@@ -583,7 +583,8 @@ def _human_inbox(ctx, monkeypatch, capsys, human=True):
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     cli.cmd_inbox(cli.build_parser().parse_args(["inbox"]))
     out = capsys.readouterr().out
-    return out[out.index("Done since you last looked:"):out.index("Friction")]
+    # v0.16.0 (card #127): the section is "New since you last looked", left out when empty
+    return out.split("New since you last looked:")[1].split("Friction")[0] if "New since" in out else "(none)"
 
 
 def test_the_inbox_lists_goals_done_since_the_last_look_until_seen(ctx, monkeypatch, capsys):

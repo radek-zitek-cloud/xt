@@ -245,8 +245,10 @@ class Supervisor:
         old backlog never floods the desktop; what arrives in quiet hours is not sent later (it's
         in the Inbox)."""
         from .goaldone import Notices, seen_upto
+        from .inbox import friction_marker
 
         seen_upto(self.ctx)  # the Inbox's "done since you last looked" counts from the first run
+        friction_marker(self.ctx)  # and so does unread friction (card #127)
         path = self.ctx.paths.state / "notified.json"
         seq = self.ctx.ledger.last_id()
         if not path.exists():

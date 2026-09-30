@@ -61,7 +61,8 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/ledger.py` | The message log (append-only daily JSONL) and the ledger of open goals, tasks and questions derived from it; rotation and archiving. |
 | `src/xt/dispatch.py` | `xt send`: the reporting-chain policy, the envelope and reply hint, delivery now or through the queue, and what's waiting on the human. |
 | `src/xt/goals.py` | Goal drafts and dispatch (`xt goal new`, `dispatch`, `list`). |
-| `src/xt/goaldone.py` | One notification per goal the human dispatched, and the Inbox's "Done since you last looked". |
+| `src/xt/goaldone.py` | One notification per goal the human dispatched, and the Inbox's done marker (`state/inbox_seen.json`). |
+| `src/xt/inbox.py` | The human's Inbox in three groups (Needs you, New, Friction) for the TUI and `xt inbox`, and friction's read marker. |
 | `src/xt/choices.py` | Decision questions with options: validation, rendering, and turning a numeric answer into the option's text. |
 | `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
@@ -331,8 +332,10 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    the notification; a closure without one within 5 minutes notifies with the closing summary's
    first line. Reports about a goal that's still open, or after its notification, don't notify.
    Other liaison reports to the human (not about a goal) notify once per `ref`. `state/inbox_seen.json` holds the message id
-   up to which the human has seen the Inbox's "Done since you last looked" (the TUI moves it when
-   the human leaves the Inbox panel, `xt inbox` in the human's terminal after printing).
+   up to which the human has seen the Inbox's New group (`upto`: the TUI moves it when the human
+   leaves the Inbox panel, `xt inbox` in the human's terminal after printing), and friction's read
+   marker (`friction_upto` and the ids seen one by one above it, `friction_seen`; see
+   `src/xt/inbox.py`). The supervisor's first run starts both at the end of the log.
 10. **Rotation**, hourly.
 
 Every event the supervisor prints in its pane is also appended to `state/watch.log`, which the
@@ -380,19 +383,21 @@ harness goes to the human with `xt friction`.
 - Talk to the liaison in its Herdr pane (or type into any agent's pane: that's unstamped and
   legitimate).
 - `xt tui` (also what bare `xt` opens after `xt up`), refreshed every 2 s. Six panels of fixed
-  size (focus shows only by frame colour; `/` filters the focused one): **Goals** (drafts, then
+  size (focus shows by frame colour and a reversed title; `/` filters the focused one; rows are
+  cut at the panel's width in cells and end with a dim age, `model.fit`): **Goals** (drafts, then
   open goals with task progress; detail shows the tasks and the goal brief, or the draft), **Team** (live
   state and schedules; detail shows open work, recent messages and the last lines of the agent's
-  screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox** (open
-  questions first, then pending approvals, alerts, goals done since the human last looked,
-  friction, messages to the human), **Log** (newest first),
+  screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox** (three
+  groups: Needs you with open questions, pending approvals and alerts; New with goals done and
+  reports to the human since they last looked; unread Friction, with seen friction folded; the
+  counts in its title), **Log** (newest first),
   and **Supervisor** under the detail pane (the supervisor's events, newest first). The Status pane on top shows the team and only what needs the human (highlighted), today's usage and allowance, and the last action's result in full; the bottom line is
   key hints; `h` lists every key (the README has the table). Slow actions (starting agents) run in
   the background. `xt tui --demo` shows sample data.
 - `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; warns if
   the supervisor isn't running.
-- `xt inbox`: questions, alerts, pending approvals, goals done since the human last looked,
-  friction, messages to the human. `xt answer <id> "..."` (a number picks a decision question's
+- `xt inbox`: the Inbox's three groups as in the TUI; in the human's terminal it clears New and
+  marks the friction it printed as seen. `xt answer <id> "..."` (a number picks a decision question's
   option), `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
 - `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM] [--at HH:MM]`.
 - `xt reset <name>`: a fresh context for one agent after it saved its notes (`xt checkpoint`).
