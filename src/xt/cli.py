@@ -7,7 +7,7 @@ from . import __version__
 from . import brief as brief_mod
 from . import goals, permissions
 from .adapters import load_adapters
-from .alerts import Alerts
+from .alerts import Alerts, repeats
 from .context import Ctx
 from .dispatch import Queue, done_recipient, send
 from .ledger import AGENT_TYPES
@@ -411,7 +411,7 @@ def cmd_inbox(args) -> None:
         for rid, r in box.approvals:
             print(f"  ⚑ #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
         for k, a in box.alerts:
-            print(f"  ⚠ #{a['id']} {a['ts'][5:16]} {a['text']}  (clear: xt clear {k})")
+            print(f"  ⚠ #{a['id']} {a['ts'][5:16]} {a['text']}{repeats(a)}  (clear: xt clear {k})")
         printed = True
 
     def more(n: int) -> None:

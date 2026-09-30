@@ -7,6 +7,18 @@ from .context import Ctx
 from .team import HUMAN, SYSTEM
 
 
+# Supervisor failures that raise one Inbox alert per kind (card #131): kind -> alert key
+FAILURES = {"wake-up": "failed:wake-up", "notification": "failed:notification",
+            "usage recording": "failed:usage-recording"}
+
+
+def repeats(alert: dict) -> str:
+    """`  ×3, last 14:05` for an alert that has repeated, else ``."""
+    n = int(alert.get("count", 1))
+    last = str(alert.get("last") or "")
+    return f"  ×{n}, last {last[11:16]}" if n > 1 and last else (f"  ×{n}" if n > 1 else "")
+
+
 class Alerts:
     def __init__(self, ctx: Ctx):
         self.ctx = ctx
@@ -35,6 +47,24 @@ class Alerts:
             d[key] = {"text": text, "ts": msg["ts"], "id": msg["id"]}
             self._save(d)
         return True
+
+    def raise_or_count(self, key: str, text: str) -> dict | None:
+        """Raise an alert, or, while one with this key is still open, count the repeat on it (count,
+        last time and the newest text) instead of adding another (card #131). Returns the new alert
+        message, or None for a repeat. Once the human clears it, the next call raises a new one."""
+        with self.ctx.ledger.lock():
+            d = self._load()
+            if key in d:
+                d[key].update(text=text, count=int(d[key].get("count", 1)) + 1,
+                              last=self.ctx.ledger.clock().isoformat(timespec="seconds"))
+                self._save(d)
+                return None
+        msg = self.ctx.ledger.append(SYSTEM, HUMAN, "alert", text)
+        with self.ctx.ledger.lock():
+            d = self._load()
+            d[key] = {"text": text, "ts": msg["ts"], "id": msg["id"], "count": 1, "last": msg["ts"]}
+            self._save(d)
+        return msg
 
     def resolve(self, key: str) -> bool:
         with self.ctx.ledger.lock():

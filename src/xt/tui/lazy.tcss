@@ -27,10 +27,6 @@ Screen {
     width: 1fr;
 }
 
-#panel-4 {                 /* Supervisor, under the detail pane */
-    height: 10;
-}
-
 .panel {
     background: ansi_default;
     border: solid ansi_bright_black;
@@ -139,6 +135,14 @@ ModalScreen {
 
 .popup.help {
     width: 84;
+}
+
+/* the supervisor's log on `v` (card #131): most of the screen, scrolls with j/k */
+.popup.supervisor {
+    width: 90%;
+    max-width: 160;
+    height: 80%;
+    scrollbar-size-vertical: 1;
 }
 
 .popup Input {

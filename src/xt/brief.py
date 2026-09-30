@@ -115,7 +115,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
 
 def waiting_on_human(ctx: Ctx) -> list[str]:
     """What only the human can resolve, with the exact commands, so the liaison can pass it on."""
-    from .alerts import Alerts
+    from .alerts import Alerts, repeats
     from .spawn import Approvals, approval_what
 
     approvals = Approvals(ctx).pending()
@@ -139,7 +139,7 @@ def waiting_on_human(ctx: Ctx) -> list[str]:
         out.append(f"  → the human approves with `xt approve {ids}` (or `a` on each in the TUI's Inbox), "
                    f"or denies with `xt deny <id>`")
     for key, a in sorted(alerts.items(), key=lambda kv: kv[1].get("id", 0)):
-        out.append(f"- alert: {a['text']}  (clear: `xt clear {key}`, or `c` in the TUI's Inbox)")
+        out.append(f"- alert: {a['text']}{repeats(a)}  (clear: `xt clear {key}`, or `c` in the TUI's Inbox)")
     if not approvals and not alerts and not questions:
         out.append("(nothing)")
     return out

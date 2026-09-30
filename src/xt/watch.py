@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import time
 
-from .alerts import Alerts
+from .alerts import FAILURES, Alerts
 from .context import Ctx
 from .dispatch import Queue, drain, send, waiting_on_human
 from .herdr import DELIVERABLE
@@ -112,6 +112,15 @@ class Supervisor:
         self.usage_error: str | None = None
         self.nudges_path = ctx.paths.state / "nudges.json"
         self.notify_error: str | None = None
+        self.quiet_ids: set[int] = set()  # alerts about a failed notification: never notified
+
+    def failed(self, kind: str, error: str) -> None:
+        """A failed wake-up, notification or usage recording raises an Inbox alert (card #131); a
+        repeat while it is open counts on the same alert. The supervisor log keeps the detail."""
+        first = (str(error).strip().splitlines() or ["(no error text)"])[0]
+        msg = self.alerts.raise_or_count(FAILURES[kind], f"{kind} failed: {first}")
+        if msg and kind == "notification":
+            self.quiet_ids.add(msg["id"])  # a notification about it would fail the same way
 
     def say(self, text: str) -> None:
         """Print an event in the supervisor's pane and keep it in .xt/state/watch.log (the TUI's
@@ -233,6 +242,7 @@ class Supervisor:
                 self.say(f"woke {a.name} ({schedule_text(a)})")
             except XtError as e:
                 self.say(f"wake-up for {a.name} failed: {e}")
+                self.failed("wake-up", f"{a.name}: {e}")
             last[a.name] = now
             changed = True
         if changed:
@@ -263,7 +273,13 @@ class Supervisor:
         send_now = bool(team.notify_setting("enabled")) and not (
             quiet and in_window(quiet, dt.datetime.fromtimestamp(now)))
         new = [m for m in self.ctx.ledger.messages(since_days=1) if m["id"] > last] if seq > last else []
+        if any(m["type"] == "alert" for m in new):  # also after a restart of the supervisor
+            quiet = self.alerts.active().get(FAILURES["notification"])
+            if quiet:
+                self.quiet_ids.add(quiet["id"])
         for m in new:
+            if m["id"] in self.quiet_ids:
+                continue
             if m["to"] == HUMAN and m["type"] in NOTIFY_TYPES:
                 note = NOTIFY_TYPES[m["type"]].format(from_=m["from"]), m["body"]
             else:
@@ -286,7 +302,9 @@ class Supervisor:
         err = run_notify(argv) if argv else "empty notify command"
         if err and err != self.notify_error:
             self.say(f"notification failed: {err} ([notify] in team.toml)")
-        elif not err:
+        if err:
+            self.failed("notification", err)
+        else:
             self.say(f"notified the human about {about}")
         self.notify_error = err
 
@@ -303,6 +321,7 @@ class Supervisor:
             if msg != self.usage_error:
                 self.say(msg)
             self.usage_error = msg
+            self.failed("usage recording", f"{type(e).__name__}: {e}")
 
     def _nudges(self) -> dict:
         return json.loads(self.nudges_path.read_text()) if self.nudges_path.exists() else {}

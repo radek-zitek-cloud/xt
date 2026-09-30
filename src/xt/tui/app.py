@@ -12,14 +12,15 @@ from textual.widgets.option_list import Option
 
 from . import teampane, work
 from .model import PANELS, Row, Snapshot, fit
+from .thread import ThreadDetail
 
 REFRESH_SECONDS = 2.0
 INBOX = PANELS.index("Inbox") + 1  # its panel number
 WORK = PANELS.index("Work") + 1
 TEAM = 0  # the Team pane has no number key (card #128); last_panel is 0 while it has focus
 PICK_AGENT = "select an agent in Team first (tab to it, then j/k)"
-HINTS = (f"h help · q quit · 1-{len(PANELS)} panels · tab Team · j/k move · enter read · / filter · "
-         "a/d approve/deny · c clear · f jump · u/U start · x/X stop · R retire")
+HINTS = (f"h help · q quit · 1-{len(PANELS)} panels · tab Team · j/k move · enter read · v supervisor · "
+         "/ filter · a/d approve/deny · c clear · f jump · u/U start · x/X stop · R retire")
 WORK_HINTS = "space fold · o open only"  # on the key line while Work has focus (card #129)
 
 
@@ -240,6 +241,20 @@ class TeamPane(Static):
             self.select(names[i])
 
 
+class DetailBody(Static):
+    """Detail's content. A thread is laid out for Detail's height at each draw, so a resize or a
+    refresh keeps the selected message in view (card #131)."""
+
+    def render(self):
+        view = self.content
+        if isinstance(view, ThreadDetail) and self.parent is not None:
+            view.height = self.parent.content_size.height or None
+        return super().render()
+
+    def on_resize(self) -> None:
+        self.refresh(layout=True)
+
+
 class Toast(Static):
     """The last action's result, one line at the bottom, gone after about ten seconds (card #128)."""
 
@@ -380,6 +395,42 @@ class Confirm(ModalScreen[bool]):
         self.dismiss(False)
 
 
+class SupervisorPopup(ModalScreen[None]):
+    """`v`: what the supervisor did, newest first, over the TUI (card #131); esc closes it. It follows
+    the refresh while it is open."""
+
+    BINDINGS = [Binding("escape,v", "close", show=False), Binding("j", "scroll(1)", show=False),
+                Binding("k", "scroll(-1)", show=False)]
+
+    def __init__(self, rows: list[Row]):
+        super().__init__()
+        self.rows = rows
+
+    def compose(self) -> ComposeResult:
+        box = VerticalScroll(id="supervisor", classes="popup supervisor")
+        box.border_title = "Supervisor"
+        box.border_subtitle = "newest first · j/k scroll · esc close"
+        with box:
+            yield Static(id="supervisor-body")
+
+    def on_mount(self) -> None:
+        self.show(self.rows)
+        self.query_one("#supervisor").focus()
+
+    def show(self, rows: list[Row]) -> None:
+        self.rows = rows
+        text = (Text("\n").join(r.text for r in rows) if rows
+                else Text("(the supervisor hasn't logged anything yet)", style="bright_black"))
+        self.query_one("#supervisor-body", Static).update(text)
+
+    def action_scroll(self, step: int) -> None:  # the app's j/k don't reach a pop-up
+        box = self.query_one("#supervisor", VerticalScroll)
+        (box.scroll_down if step > 0 else box.scroll_up)(animate=False)
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+
 class Help(ModalScreen[None]):
     BINDINGS = [Binding("escape,q,h,question_mark", "close", show=False)]
 
@@ -388,10 +439,11 @@ class Help(ModalScreen[None]):
         (f"1-{len(PANELS)}", "jump to a panel: " + ", ".join(PANELS)),
         ("tab / l", "next panel (Team, at the top, has no number: tab reaches it)"),
         ("shift+tab", "previous panel"),
-        ("j / k", "down / up (in the detail pane: scroll)"),
-        ("enter", "read the detail pane"),
+        ("j / k", "down / up (in the detail pane: the thread's hidden rows first, then scroll)"),
+        ("enter", "read the detail pane: the selected item and its thread"),
         ("/", "filter the focused panel (empty clears it)"),
         ("esc", "back from the detail pane to the panels"),
+        ("v", "the supervisor's log, newest first, in a pop-up (esc closes it)"),
         (f"Inbox ({INBOX})", ""),
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
         ("c", "clear the selected alert; on unread friction: mark it seen"),
@@ -462,6 +514,7 @@ class XtTui(App):
         Binding("slash", "filter", show=False),
         Binding("space", "fold", show=False),
         Binding("o", "open_only", show=False),
+        Binding("v", "supervisor", show=False),
         *[Binding(str(i), f"panel({i})", show=False) for i in range(1, len(PANELS) + 1)],
     ]
 
@@ -474,20 +527,21 @@ class XtTui(App):
         self.done_upto = 0  # newest message the Inbox's "done" rows were built from (card #125)
         self.inbox_looked = 0  # what the human saw while the Inbox had focus
         self.friction_viewed: set[int] = set()  # unread friction on screen while the Inbox had focus (#127)
+        self.snapshot: Snapshot | None = None
+        self.detail_view = None  # what Detail shows, and for which row (its thread window survives a refresh)
+        self.detail_key: str | None = None
 
     def compose(self) -> ComposeResult:
         yield TeamPane()
         with Horizontal(id="main"):
             with Vertical(id="left"):
-                for i, title in enumerate(PANELS[:-1], start=1):
+                for i, title in enumerate(PANELS, start=1):
                     yield (WorkPanel if i == WORK else Panel)(title, i)
             with Vertical(id="right"):
                 detail = VerticalScroll(id="detail", classes="panel")
                 detail.border_title = "Detail"
                 with detail:
-                    yield Static(id="detail-body")
-                # like lazygit's command log: what the supervisor did, under the detail pane
-                yield Panel(PANELS[-1], len(PANELS))
+                    yield DetailBody(id="detail-body")
         yield Toast()
         yield Static(id="hints")
 
@@ -506,6 +560,9 @@ class XtTui(App):
         except Exception as e:  # keep the TUI alive if one read fails; say so
             self.set_status(f"refresh failed: {e}")
             return
+        self.snapshot = snap
+        if isinstance(self.screen, SupervisorPopup):
+            self.screen.show(snap.panels.get("Supervisor", []))
         for i, title in enumerate(PANELS, start=1):
             self.query_one(f"#panel-{i}", Panel).set_rows(snap.panels.get(title, []))
         try:
@@ -534,17 +591,25 @@ class XtTui(App):
         return self.query_one("#team", TeamPane)
 
     def panel(self, n: int) -> Panel | TeamPane:
-        """Panel n (1-5), or the Team pane for TEAM (0)."""
+        """Panel n (1-3), or the Team pane for TEAM (0)."""
         return self.team if n == TEAM else self.query_one(f"#panel-{n}", Panel)
 
     def show_detail(self, panel: Panel | TeamPane) -> None:
+        """The selected row in Detail; a message's thread gets Detail's height, and keeps the window
+        the human moved it to while the same row stays selected (card #131)."""
         row = panel.current
         body = self.query_one("#detail-body", Static)
+        pane = self.query_one("#detail", VerticalScroll)
         try:
-            body.update(row.detail() if row else Text("(nothing here)", style="bright_black"))
+            view = row.detail() if row else Text("(nothing here)", style="bright_black")
         except Exception as e:
-            body.update(Text(f"(couldn't build detail: {e})", style="red"))
-        self.query_one("#detail", VerticalScroll).border_title = f"Detail─{panel.title}"
+            view = Text(f"(couldn't build detail: {e})", style="red")
+        key = row.key if row else None
+        if isinstance(view, ThreadDetail) and key == self.detail_key and isinstance(self.detail_view, ThreadDetail):
+            view.offset = self.detail_view.offset
+        self.detail_view, self.detail_key = view, key
+        body.update(view)
+        pane.border_title = f"Detail─{panel.title}"
 
     def set_status(self, text: str) -> None:
         """The last action's result goes to the toast, never into the Team pane (card #128)."""
@@ -580,14 +645,15 @@ class XtTui(App):
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
         """enter on the Inbox's `(N older, seen)` row shows or hides the seen friction (card #127);
-        enter in Work shows the selected row in the detail pane (card #129)."""
-        if isinstance(event.option_list, WorkPanel):
-            self.show_detail(event.option_list)
-            self.action_read()
-        elif isinstance(event.option_list, Panel):
+        enter on any other row of a list shows it, with its thread, in the detail pane (cards #129,
+        #131)."""
+        if isinstance(event.option_list, Panel):
             row = event.option_list.current
             if row and row.kind == "fold":
                 event.option_list.toggle_fold()
+                return
+            self.show_detail(event.option_list)
+            self.action_read()
 
     def on_descendant_focus(self, event) -> None:
         if not self.query("#detail-body"):
@@ -642,6 +708,12 @@ class XtTui(App):
             w.move(1 if direction == "down" else -1)
             self.show_detail(w)
         elif isinstance(w, VerticalScroll):
+            view = self.detail_view if w.id == "detail" else None
+            if isinstance(view, ThreadDetail):  # the thread's hidden rows first (card #131)
+                if direction == "down" and view.scroll(1):
+                    return self.query_one("#detail-body", Static).update(view)
+                if direction == "up" and w.scroll_y <= 0 and view.scroll(-1):
+                    return self.query_one("#detail-body", Static).update(view)
             (w.scroll_down if direction == "down" else w.scroll_up)()
 
     def action_read(self) -> None:
@@ -654,6 +726,10 @@ class XtTui(App):
 
     def action_help(self) -> None:
         self.push_screen(Help())
+
+    def action_supervisor(self) -> None:
+        if not isinstance(self.screen, SupervisorPopup):
+            self.push_screen(SupervisorPopup(self.snapshot.panels.get("Supervisor", []) if self.snapshot else []))
 
     def action_filter(self) -> None:
         panel = self.panel(self.last_panel)

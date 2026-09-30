@@ -17,7 +17,10 @@ and #132 (rows cut at pane width, with ages). **0.16.0-rc2** (2026-09-30) adds #
 replaces the Status pane and the Team panel); #127 and #132 are unchanged from rc1 except that the
 Inbox is now panel 3. **0.16.0-rc3** (2026-09-30) adds #129 (the Work outline replaces the Goals
 and Tasks panels); the earlier cards are unchanged from rc2 except the panel numbers (Inbox is now
-1) and the panel heights. The other cards (#131, #130) follow in later candidates.
+1) and the panel heights. **0.16.0-rc4** (2026-09-30) adds #131 (the detail pane shows the thread;
+the Supervisor panel becomes a pop-up on `v`, and three supervisor failures raise Inbox alerts);
+the earlier cards are unchanged from rc3 except that the Supervisor panel and its key `4` are
+gone. The last card (#130) follows in a later candidate.
 
 ### Added
 
@@ -37,8 +40,8 @@ and Tasks panels); the earlier cards are unchanged from rc2 except the panel num
 - **Ages on rows (#132, rc1).** Each row in the Goals, Tasks (Work from rc3), Inbox and Log panels ends with a dim
   age at its right edge, by one rule in whole units rounded down: `now` under 10 s, then `45s`,
   `14m`, `3h`, `2d` up to 59 days, and whole weeks from 60 days (`8w`). A goal's age is its newest
-  activity (the goal, its tasks and their replies). Team rows have none; Supervisor rows keep their
-  clock time.
+  activity (the goal, its tasks and their replies). Team rows have none; Supervisor rows (the `v`
+  pop-up from rc4) keep their clock time.
 - **The Team pane (#128, rc2)** at the top of the TUI replaces the Status pane and the Team panel.
   Its header line has the team, xt's version with `(latest)`, a newer published release or
   `running …: restart to update`, the agents running, open goals, `⚑ N needs you` and `✉ N new`
@@ -68,8 +71,33 @@ and Tasks panels); the earlier cards are unchanged from rc2 except the panel num
   refreshes. `enter` shows the selected row in
   the detail pane. The title counts the goals, `[2]─Work─1 open · 63 done`. An open goal older than
   the 30 days the TUI reads still shows.
+- **The detail pane shows the thread (#131, rc4).** The selected item comes with its thread in time
+  order: for anything under a goal (the root of its `ref` chain: a goal, a task, a question or
+  report about it, a done goal in New), the goal, its tasks and every reply; for a message without
+  a goal, the message and the messages that reply to it. Each thread row shows the time, sender →
+  receiver, type, id and first line; the selected message is marked `◀ you are here`. Below the
+  thread come the goal's usage and the keys that apply to the selected item (the `xt log --id`
+  hint is gone); a goal's brief follows at the end. A thread longer than the pane shows the part
+  around the selected message and says how many rows are hidden above and below; after `enter`,
+  `j`/`k` bring them in, and the place survives a refresh. A message whose ref points to one the TUI
+  doesn't have shows alone with its replies.
+- **The supervisor's log on `v` (#131, rc4).** `v` opens what the supervisor did, newest first, in
+  a pop-up over the TUI; `j`/`k` scroll it, `esc` closes it, and it follows the refresh while open.
+- **Supervisor failures raise Inbox alerts (#131, rc4).** A failed wake-up, a failed notification
+  and a failed usage recording, which until now appeared only in the supervisor's log, each raise
+  an alert under Needs you (`⚠ wake-up failed: scout: …`) with the first line of the error; it
+  counts in the Inbox's title and the Team header. While the alert is open, more failures of the
+  same kind update it instead of adding rows: the newest error's first line, the count (the TUI's
+  row starts `⚠ ×3` and its age is the last failure's; `xt inbox` and briefs say `×3, last 14:05`); after `c` (or `xt clear`), the next failure raises a new one. The
+  alert about a failed notification is never notified itself. Other alerts are unchanged.
 
 ### Changed
+
+- **Panels and keys (#131, rc4).** The Supervisor panel is gone (its contents are the `v` pop-up);
+  the keys are `1` Inbox, `2` Work, `3` Log (`4` did the Supervisor in rc3), and the key line and
+  `h` add `v supervisor`. The detail pane has the whole right-hand side. `enter` on a row in the
+  Inbox and Log now shows it in the detail pane too, as it did in Work (enter on the Inbox's
+  `(N older, seen)` row still folds).
 
 - **Panel keys (#129, rc3).** With Goals and Tasks merged into Work, the keys are `1` Inbox, `2`
   Work, `3` Log, `4` Supervisor (were `1` Goals, `2` Tasks, `3` Inbox, `4` Log, `5` Supervisor in
@@ -96,10 +124,11 @@ and Tasks panels); the earlier cards are unchanged from rc2 except the panel num
 
 ### Upgrading
 
-- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc3`), then `xt restart --all`
-  so the supervisor starts the friction marker. Friction from before that shows as seen. New keys
-  in `.xt/state/inbox_seen.json` (`friction_upto`, `friction_seen`); no state format change.
-  Scripts that parse `xt inbox` need the new section names.
+- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc4`), then `xt restart --all`
+  so the supervisor starts the friction marker and raises the new failure alerts. Friction from
+  before that shows as seen. New keys in `.xt/state/inbox_seen.json` (`friction_upto`,
+  `friction_seen`) and in `.xt/state/alerts.json` (`count`, `last`, on the failure alerts); no
+  state format change. Scripts that parse `xt inbox` need the new section names.
 
 ## [0.15.0] — 2026-09-30
 

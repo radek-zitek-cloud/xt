@@ -85,6 +85,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into panel rows, agents and the Team header. |
 | `src/xt/tui/teampane.py` | The Team pane's layout: harness blocks, window bars, aligned agent columns and short model names. |
 | `src/xt/tui/work.py` | The Work outline: which goal each task belongs to (the root of its `ref` chain), task states, goal order, and a Work row laid out at the pane's width. |
+| `src/xt/tui/thread.py` | The detail pane's thread: which messages belong to the selected one's thread, and the view that lays it out for the pane, with the selected message kept in view. |
 | `src/xt/tui/clipboard.py` | The system clipboard for the TUI's text boxes. |
 | `src/xt/tui/lazy.tcss` | The TUI's stylesheet. |
 | `src/xt/tui/__init__.py` | The TUI package. |
@@ -344,7 +345,11 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
 10. **Rotation**, hourly.
 
 Every event the supervisor prints in its pane is also appended to `state/watch.log`, which the
-TUI's Supervisor panel and `xt log --watch` show.
+TUI's supervisor pop-up (`v`) and `xt log --watch` show. A failed wake-up, notification or usage
+recording also raises an alert (card #131, `Alerts.raise_or_count`): one per kind (`failed:wake-up`,
+`failed:notification`, `failed:usage-recording`), whose count and last time go up while it is
+open, so a failure every minute stays one Inbox row; a cleared one is raised anew by the next
+failure. The alert about a failed notification is never itself notified.
 
 It **alerts, it never repairs**: no automatic restarts. A crash is a bug to look at.
 
@@ -395,7 +400,7 @@ harness goes to the human with `xt friction`.
   (short model, or for `default` the model the agent's session log names, `usage.Reading.model`;
   state; context as tokens, bar and share). `tui/teampane.py` lays it out at the pane's width:
   up to three columns, blocks side by side or stacked, whichever is shorter. `j`/`k` select an agent;
-  its detail shows open work, schedules, recent messages and the last lines of its screen. Four
+  its detail shows open work, schedules, recent messages and the last lines of its screen. Three
   numbered panels of fixed size (focus shows by frame colour and a reversed title; `/` filters the
   focused one; rows are cut at the panel's width in cells and end with a dim age, `model.fit`):
   **Inbox** (1: three groups: Needs you with open questions, pending approvals and alerts; New
@@ -404,10 +409,15 @@ harness goes to the human with `xt friction`.
   two-level outline, built by `tui/work.py`: a task goes under the goal at the root of its `ref`
   chain, or under a final `no goal` row; open goals first, expanded, newest activity first; the
   liaison's drafts; done goals under a collapsed `done (N)` fold; `space` folds, `o` shows open
-  work only, and the pane keeps both across refreshes; `N open · M done` in its title; detail
-  shows a goal's tasks and brief, a task's thread, or the draft), **Log** (3: newest first), and
-  **Supervisor** (4, under the detail pane: the supervisor's events, newest first). The last
-  action's result is a
+  work only, and the pane keeps both across refreshes; `N open · M done` in its title), and
+  **Log** (3: newest first). The detail pane on the right (card #131, `tui/thread.py`) shows the
+  selected item with its thread: for a message under a goal (the root of its `ref` chain) the whole
+  goal in time order, else the message and its replies through `ref`; one row per message with
+  the selected one marked, then the goal's usage and the keys that apply, then reference text such
+  as a goal's brief. The thread is laid out for the pane's height at each draw: a long one shows a
+  window around the selected message with counts of the hidden rows, and `j`/`k` in the focused
+  detail pane move the window. `v` opens the supervisor's events, newest first, in a pop-up. The
+  last action's result is a
   one-line toast that goes after about ten seconds; the bottom line is key hints; `h` lists every
   key (the README has the table). Slow actions (starting agents) run in the background.
   `xt tui --demo` shows sample data.

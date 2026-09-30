@@ -94,9 +94,9 @@ it isn't shown:
 | **NEEDS YOU** | Stays until you answer, decide or clear it | |
 | `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options` when it offers choices) | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
 | `⚑ #12 spawn …` / `⚑ #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
-| `⚠ …` | An **alert**: an agent crashed, is blocked or went silent | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
+| `⚠ …` | An **alert**: an agent crashed, is blocked or went silent; or (from 0.16.0) the supervisor failed to wake an agent, to send a notification or to record usage (`⚠ ×3 wake-up failed: …`) | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
 | **NEW** | Since you last looked, newest first; clears once you've looked | |
-| `✓ #210 done: Write the weekly digest  #260` | A goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) | Read it; `xt log --id 210` for the thread |
+| `✓ #210 done: Write the weekly digest  #260` | A goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) and the goal's whole thread | Read it |
 | `✉ #47 liaison: …` | A report to you | Read it |
 | **FRICTION** | Unread friction only, newest first | |
 | `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt. `c` marks it seen at once |
@@ -118,7 +118,7 @@ doesn't fit, and again when you resize the terminal. Each row in the Inbox, Work
 panels ends with its age, dim at the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`,
 `2d`, and whole weeks from 60 days (`8w`). A goal's age is that of its newest message (the goal, its
 tasks and their replies), so a stuck goal looks old; a task's is that of the task itself. Agents in
-the Team pane have no age, and Supervisor rows keep their clock time. The focused panel has a
+the Team pane have no age, and the supervisor's log (`v`) keeps its clock time. The focused panel has a
 green frame and a reversed title.
 
 **Work** (panel 2, from 0.16.0; it replaces the Goals and Tasks panels) shows goals with their
@@ -152,8 +152,9 @@ tasks under them:
 - `space` folds or unfolds the selected row (on a task: folds its goal). `o` shows open work only:
   it hides `done (N)` and the done tasks, and the panel's bottom edge says `open only`; `o` again
   shows them. Folds, `o` and the selected row stay
-  as they are when the TUI refreshes. `enter` shows the selected goal or task in the detail pane:
-  a goal with its tasks and brief, a task with its whole thread. `/` finds rows inside folds too.
+  as they are when the TUI refreshes. `enter` shows the selected goal or task in the detail pane
+  with the goal's whole thread (below); a goal's brief follows at the end. `/` finds rows inside
+  folds too.
 - The title counts the goals: `2 open · 63 done`.
 
 While a question waits for you, the work that depends on it isn't nudged. If you don't answer,
@@ -173,8 +174,42 @@ leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it h
 your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
 first run on 0.15.0, so older goals don't appear.
 
-The **Supervisor** panel (4) shows what xt did (deliveries, wake-ups, nudges, notifications). The
-key line at the bottom starts with what `s` will do.
+The **detail pane** (from 0.16.0) shows the selected item with its **thread**: for anything under
+a goal (a goal, a task, a question or report about it), the whole goal in time order: the goal, its
+tasks and every reply; for a message without a goal, the message and the replies to it. `enter` on
+a row in any list shows it there.
+
+```
+#1733 task · lead → pm · opened 14m ago · open
+Read-only site check (curl -LfsS) of the project site for #124
+
+thread (6)
+07:36  liaison → lead    goal     #1729 Site check for #124
+07:36  lead    → qa      task     #1731 Retry read-only curl for #124
+07:37  qa      → lead    done     #1735 BLOCKED: no network in sandbox
+07:37  lead    → pm      task     #1733 Read-only site check (curl -LfsS)  ◀ you are here
+07:38  pm      → lead    report   #1736 curl works from the supervisor's shell
+07:38  lead    → liaison ask      #1737 How should #1729 finish?
+
+usage (goal #1729): 212k tokens, est. $0.21
+space: fold its goal · o: open work only · S: message the liaison
+```
+
+Each thread row shows the time (with the date when the thread spans days), sender → receiver, type,
+id and first line; the selected message is marked `◀ you are here`. Below come the goal's usage and
+the keys that work on the selected item. A thread too long for the pane shows the part around the
+selected message and says how much is hidden (`↑ 24 earlier rows hidden`, `↓ 3 later rows
+hidden`); after `enter`, `j`/`k` bring the hidden rows in. A message whose `--ref` points to one
+the TUI doesn't have shows alone with its replies.
+
+The **supervisor's log** (what xt did: deliveries, wake-ups, nudges, notifications) is a pop-up on
+`v`, newest first; `j`/`k` scroll it and `esc` closes it. Its failures don't wait there: a failed
+wake-up, a failed notification and a failed usage recording each raise an alert in the Inbox (Needs
+you), with the first line of the error. While that alert is open, more failures of the same kind
+count on it instead of adding rows (the row starts `⚠ ×3` and its age is the last failure's;
+`xt inbox` says `×3, last 14:05`); once you clear it with `c`, the next failure
+raises a new one. A failed notification raises only the alert, never another notification. The key
+line at the bottom starts with what `s` will do.
 
 The **Team** pane on top (from 0.16.0; it replaces the Status pane and the Team panel) is as high
 as its content:
@@ -201,8 +236,8 @@ shown as the model its session log names.)
   of the model's window, yellow from 70 % and red from 85 %. Agents fill up to three columns as the
   width allows, so five take two lines.
 
-The panels' number keys (from 0.16.0) are `1` Inbox, `2` Work, `3` Log and `4` Supervisor; the TUI
-starts in Work. The Team pane has no number key: `tab` reaches it (it's before panel 1), `j`/`k` select an agent,
+The panels' number keys (from 0.16.0) are `1` Inbox, `2` Work and `3` Log, and `v` opens the
+supervisor's log; the TUI starts in Work. The Team pane has no number key: `tab` reaches it (it's before panel 1), `j`/`k` select an agent,
 the detail pane shows it, and `u`, `x`, `R` and `f` act on it. The result of your last action
 (`alert cleared`, `starting carol…`) shows for about ten seconds in a one-line toast at the bottom,
 then goes away on its own.
@@ -543,9 +578,9 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt friction`](#xt-friction) | agents | shown in Inbox (`✱`) |
 | [`xt goal`](#xt-goal) | agents (liaison) | Work panel (`2`) shows drafts and goals |
 | [`xt brief`](#xt-brief) | both | Team detail (partly) |
-| [`xt log`](#xt-log) | both | Log (`3`) and Supervisor (`4`) panels |
+| [`xt log`](#xt-log) | both | Log panel (`3`), the thread in the detail pane, and the supervisor's log (`v`) |
 | [`xt harnesses`](#xt-harnesses) | human | none |
-| [`xt watch`](#xt-watch) | (xt) | Supervisor panel shows its events |
+| [`xt watch`](#xt-watch) | (xt) | `v` shows its events |
 | [`xt tui`](#xt-tui) | human | is the TUI |
 
 ### `xt`
@@ -772,7 +807,8 @@ limits. **Use it** before choosing a harness for the liaison, lead or a new agen
 ### `xt watch`
 
 `xt watch` — the supervisor loop. `xt up` starts it in its own workspace; you don't run it by hand.
-Its events show in the Supervisor panel and `xt log --watch`.
+Its events show in the TUI's supervisor pop-up (`v`) and `xt log --watch`; a failed wake-up,
+notification or usage recording also raises an Inbox alert.
 
 ### `xt tui`
 

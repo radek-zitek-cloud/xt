@@ -89,6 +89,10 @@ analyst before its final release, some on staging teams rather than in daily use
 - **Goals and their tasks in one outline.** The TUI's Work panel lists open goals first with their
   tasks under them, so a stuck goal shows its age; done goals fold away under `done (N)`, and `o`
   shows open work only ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **The whole thread in the detail pane.** Select a task, a question or a report and the detail
+  pane shows its goal's whole conversation in time order, with the selected message marked; the
+  supervisor's log is a pop-up on `v`, and its failed wake-ups, notifications and usage recordings
+  raise Inbox alerts ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 
 What it can't do yet is in [Known limits](#known-limits).
 
@@ -179,15 +183,17 @@ aligned columns: short model such as `sonnet 5.5`, state, and context as tokens,
 percentage), **Inbox** (1: Needs you, New and unread Friction, with their counts in its title),
 **Work** (2: goals with their tasks under them, open goals first, done goals folded under
 `done (N)`, and goal drafts the liaison is still shaping) and **Log** (3) panels on the left, the
-detail pane on the right with the **Supervisor** panel (4) under it (what `xt watch` did: deliveries,
-wake-ups, nudges, notifications, alerts), and key hints at the bottom. The result of your last
+detail pane on the right (the selected item with its whole thread in time order), and key hints at
+the bottom. `v` opens the supervisor's log (what `xt watch` did: deliveries, wake-ups, nudges,
+notifications, alerts) in a pop-up. The result of your last
 action shows for about ten seconds in a one-line toast. The Team pane is as high as its content;
 the panels keep a fixed size, and the focused one is shown by its frame colour and a reversed
 title. Rows use the panel's whole width and end with their age.
 
 | Key | What it does |
 |---|---|
-| `1`–`4`, `tab`, `j`/`k`, `enter` | Switch panels (Team has no number: `tab` reaches it), move, read the detail |
+| `1`–`3`, `tab`, `j`/`k`, `enter` | Switch panels (Team has no number: `tab` reaches it), move, read the detail (`j`/`k` there bring a long thread's hidden rows in) |
+| `v` | The supervisor's log, newest first, in a pop-up (`esc` closes it) |
 | `/` | Filter the focused panel by text (empty clears it) |
 | `space` / `o` | Fold or unfold the selected goal, `done (N)` or `no goal` row / show open work only (Work) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |

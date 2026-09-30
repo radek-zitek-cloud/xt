@@ -1,9 +1,10 @@
 """v0.16.0: #127 Inbox groups and friction read state; #132 rows cut at pane width, with ages;
-#128 Team pane; #129 Work outline."""
+#128 Team pane; #129 Work outline; #131 Detail thread and the Supervisor pop-up."""
 
 import asyncio
 import io
 import json
+import re
 import sys
 
 import pytest
@@ -787,9 +788,9 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
     from xt.tui.app import HINTS, Help
 
     _team(ctx, fake_home)
-    assert "1-4 panels" in HINTS and "1-5" not in HINTS and "tab Team" in HINTS
+    assert "1-3 panels" in HINTS and "1-4" not in HINTS and "tab Team" in HINTS  # #131: no Supervisor pane
     keys = dict(Help.KEYS)
-    assert keys["1-4"] == "jump to a panel: Inbox, Work, Log, Supervisor"
+    assert keys["1-3"] == "jump to a panel: Inbox, Work, Log"
 
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
@@ -798,9 +799,9 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
                 await pilot.press(str(n))
                 await pilot.pause()
                 assert app.focused.title == title
-            await pilot.press("5")  # no fifth pane since card #129: nothing happens
-            assert app.focused.title == "Supervisor"
-            await pilot.press("tab")  # past the last panel: Team, at the top
+            await pilot.press("4")  # no fourth pane since card #131: nothing happens
+            assert app.focused.title == "Log"
+            await pilot.press("tab", "tab")  # past the last panel and Detail: Team, at the top
             await pilot.pause()
             assert app.focused is app.team and app.team.current.data["name"] == "pm"
             await pilot.press("j")
@@ -997,7 +998,7 @@ def test_enter_shows_the_selected_row_in_detail(ctx, clock):
             await pilot.press("enter")
             await pilot.pause()
             assert app.focused.id == "detail"
-            body = str(app.query_one("#detail-body").render())
+            body = app.detail_view.plain
             assert f"#{f['t_failed']} task · lead → carol" in body and "FAIL: the build breaks" in body
             assert app.query_one("#detail").border_title == "Detail─Work"
             await pilot.press("escape")  # back to Work, the row still selected
@@ -1006,8 +1007,8 @@ def test_enter_shows_the_selected_row_in_detail(ctx, clock):
             p.highlighted = 0
             await pilot.press("enter")
             await pilot.pause()
-            body = str(app.query_one("#detail-body").render())
-            assert f"#{f['busy']} goal" in body and "tasks (2/3 done)" in body
+            body = app.detail_view.plain
+            assert f"#{f['busy']} goal" in body and "tasks 2/3 done" in body
 
     _run(run())
 
@@ -1085,5 +1086,329 @@ def test_space_and_o_outside_work_say_where_they_work(ctx):
             await pilot.press(str(WORK))
             await pilot.pause()
             assert "space fold · o open only" in str(app.query_one("#hints").render())
+
+    _run(run())
+
+
+# --- #131 Detail shows the thread; Supervisor as a pop-up ------------------------------------------
+
+
+def _shown(app) -> list[str]:
+    """Detail's lines as drawn: the view laid out at Detail's width and height."""
+    from rich.console import Console
+
+    pane = app.query_one("#detail")
+    view = app.detail_view
+    view.height = pane.content_size.height
+    console = Console(width=pane.content_size.width, file=io.StringIO(), record=True, color_system=None)
+    console.print(view)
+    return console.export_text().rstrip("\n").split("\n")
+
+
+def _log_row(app, mid):
+    p = app.panel(PANELS.index("Log") + 1)
+    return p, next(i for i, r in enumerate(p.rows) if r.data.get("id") == mid)
+
+
+def test_selecting_a_task_shows_its_whole_goal_thread_in_time_order_marked(ctx, clock):
+    from xt.tui.thread import HERE
+
+    f = _work_fixture(ctx, clock)
+    under = [m["id"] for m in ctx.ledger.messages() if m["id"] >= f["busy"]
+             and (m["id"] in (f["busy"], f["t_open"], f["t_done"], f["t_failed"])
+                  or m.get("ref") in (f["t_open"], f["t_done"], f["t_failed"]))]
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            p = _work(app)
+            p.highlighted = _keys(p).index(f"task:{f['t_failed']}")
+            await pilot.press("enter")
+            await pilot.pause()
+            view = app.detail_view
+            assert [m["id"] for m in view.thread] == under  # the goal, its tasks, their replies
+            assert [m["id"] for m in view.thread] == sorted(m["id"] for m in view.thread)  # in time order
+            lines = _shown(app)
+            marked = [ln for ln in lines if HERE.strip() in ln]
+            assert len(marked) == 1 and f"#{f['t_failed']} the failing part" in marked[0]
+            assert " lead    → carol   task " in marked[0] and re.match(r"\d\d:\d\d  ", marked[0])
+            done = next(ln for ln in lines if "FAIL: the build breaks" in ln)
+            assert " carol   → lead    done " in done
+            # below the thread: the usage line and the keys, no `xt log --id` hint any more
+            tail = [ln for ln in lines if ln.strip()][-2:]
+            assert tail[0].startswith(f"usage (goal #{f['busy']}): ") and tail[1].startswith("space: fold its goal")
+            assert "xt log --id" not in view.plain
+
+    _run(run())
+
+
+def test_a_lone_message_shows_with_its_replies_and_a_broken_ref_alone(ctx):
+    ask = ctx.ledger.append("liaison", "human", "ask", "Tennis or chess?")["id"]
+    ctx.ledger.append("lead", "pm", "report", "unrelated")
+    answer = ctx.ledger.append("human", "liaison", "report", "tennis", ref=ask)["id"]
+    thanks = ctx.ledger.append("liaison", "human", "report", "booked the court", ref=answer)["id"]
+    broken = ctx.ledger.append("lead", "pm", "task", "a task whose ref is gone", ref=999)["id"]
+    rows = {r.data.get("id"): r for r in build(ctx).panels["Log"]}
+    view = rows[ask].detail()
+    assert [m["id"] for m in view.thread] == [ask, answer, thanks] and view.selected == ask
+    assert "usage: counted per goal" in view.plain
+    alone = rows[broken].detail()
+    assert [m["id"] for m in alone.thread] == [broken]
+
+
+@pytest.mark.parametrize("size", [(160, 40), (100, 30)])
+def test_a_sixty_message_thread_scrolls_keeps_the_selection_and_counts_the_hidden(ctx, clock, size):
+    from xt.tui.thread import HERE
+
+    goal = ctx.ledger.append("liaison", "lead", "goal", "A long conversation")["id"]
+    ids = [goal]
+    for i in range(59):
+        clock.advance(minutes=1)
+        ids.append(ctx.ledger.append("lead", "liaison", "report", f"step {i}", ref=goal)["id"])
+    selected = ids[30]
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=size) as pilot:
+            p, i = _log_row(app, selected)
+            await pilot.press("3")
+            p.highlighted = i
+            await pilot.press("enter")
+            await pilot.pause()
+            view = app.detail_view
+            assert len(view.thread) == 60
+            lines = _shown(app)
+            assert len(lines) <= app.query_one("#detail").content_size.height  # fits: nothing below the edge
+            start, end = view.window
+            assert 0 < start <= 30 < end < 60
+            assert f"↑ {start} earlier rows hidden" in "\n".join(lines)
+            assert f"↓ {60 - end} later rows hidden" in "\n".join(lines)
+            assert sum(HERE.strip() in ln for ln in lines) == 1  # the selection is in view
+            shown = [ln for ln in lines if re.match(r"\d\d:\d\d  ", ln)]  # the thread's rows
+            assert f"#{ids[start]} " in shown[0] and f"#{ids[end - 1]} " in shown[-1]
+            # j/k in Detail move through the hidden rows, and a refresh keeps the place
+            for _ in range(5):
+                await pilot.press("j")
+            await pilot.pause()
+            assert app.detail_view.window[0] == start + 5
+            await pilot.press("r")
+            await pilot.pause()
+            _shown(app)
+            assert app.detail_view.window[0] == start + 5
+            for _ in range(80):
+                await pilot.press("k")
+            await pilot.pause()
+            _shown(app)
+            assert app.detail_view.window[0] == 0 and "earlier rows hidden" not in "\n".join(_shown(app))
+            # the newest message: nothing hidden below it
+            await pilot.press("escape")
+            p.highlighted = _log_row(app, ids[-1])[1]
+            await pilot.pause()
+            lines = _shown(app)
+            assert "later rows hidden" not in "\n".join(lines) and "earlier rows hidden" in "\n".join(lines)
+            assert HERE.strip() in [ln for ln in lines if re.match(r"\d\d:\d\d  ", ln)][-1]
+
+    _run(run())
+
+
+def test_v_opens_the_supervisor_pop_up_newest_first_and_esc_closes_it(ctx):
+    from xt.tui.app import HINTS, Help, SupervisorPopup
+    from xt.watch import Supervisor
+
+    sup = Supervisor(ctx, out=lambda s: None)
+    for text in ("delivered #1 to lead", "woke scout (every 60m)", "nudged lead about #3"):
+        sup.say(text)
+    assert "Supervisor" not in PANELS and "v supervisor" in HINTS and "Supervisor" not in HINTS
+    assert dict(Help.KEYS)["v"].startswith("the supervisor's log")
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            assert not app.query("#panel-4") and "Supervisor" not in str(app.query_one("#hints").render()).replace(
+                "v supervisor", "")
+            await pilot.press("v")
+            await pilot.pause()
+            assert isinstance(app.screen, SupervisorPopup)
+            body = str(app.screen.query_one("#supervisor-body").render()).splitlines()
+            assert [ln[6:] for ln in body[:3]] == ["nudged lead about #3", "woke scout (every 60m)",
+                                                   "delivered #1 to lead"]
+            sup.say("a new event while it is open")
+            app.refresh_data()  # the 2 s refresh
+            await pilot.pause()
+            assert "a new event while it is open" in str(app.screen.query_one("#supervisor-body").render())
+            for i in range(60):
+                sup.say(f"event {i}")
+            app.refresh_data()
+            await pilot.pause()
+            box = app.screen.query_one("#supervisor")
+            await pilot.press("j", "j", "j")
+            await pilot.pause()
+            assert box.scroll_y == 3
+            await pilot.press("k")
+            await pilot.pause()
+            assert box.scroll_y == 2
+            await pilot.press("escape")
+            await pilot.pause()
+            assert not isinstance(app.screen, SupervisorPopup) and app.focused is _work(app)
+
+    _run(run())
+
+
+def _needs_you(ctx):
+    return _groups(build(ctx).panels["Inbox"]).get("NEEDS YOU", [])
+
+
+def _alerts_in_inbox(ctx, kind):
+    return [r for r in _needs_you(ctx) if r.kind == "alert" and re.match(rf"⚠ (×\d+ )?{kind} failed: ", r.text.plain)]
+
+
+def test_1a_a_failed_wake_up_raises_one_needs_you_alert_counted_in_title_and_header(ctx, monkeypatch):
+    from xt import watch
+    from xt.paths import XtError
+
+    add_member(ctx, "scout")
+    ctx.herdr.add("scout")
+    ctx.team.set_schedule("scout", "60m", "look around")
+    ctx.team.save()
+    ctx.reload_team()
+
+    def refuse(ctx_, sender, to, mtype, body, *a, **k):
+        if mtype == "wake":
+            raise XtError("the queue is locked\nsecond line of the error")
+        return send(ctx_, sender, to, mtype, body, *a, **k)
+
+    monkeypatch.setattr(watch, "send", refuse)
+    sup = watch.Supervisor(ctx, out=lambda s: None)
+    sup.wake_scheduled(ctx.herdr.agents(), 1000.0)  # the clock starts
+    sup.wake_scheduled(ctx.herdr.agents(), 1000.0 + 3601)  # due: the wake-up fails
+    (row,) = _alerts_in_inbox(ctx, "wake-up")
+    assert row.text.plain == "⚠ wake-up failed: scout: the queue is locked"  # the error's first line
+    assert row.age == "now" and "Alert #" in row.detail().plain
+    snap = build(ctx)
+    assert snap.inbox_title.startswith("⚑ 1") and "⚑ 1 needs you" in snap.header.plain
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            assert app.panel(INBOX).border_title.startswith(f"[{INBOX}]─Inbox─⚑ 1")
+            assert "⚑ 1 needs you" in str(app.team.render())
+
+    _run(run())
+
+
+def test_1b_a_failed_notification_raises_one_alert_and_no_second_notification(ctx, monkeypatch):
+    from xt import watch
+
+    calls = []
+
+    def failing(argv):
+        calls.append(argv)
+        return "notify-send not found"
+
+    monkeypatch.setattr(watch, "run_notify", failing)
+    ctx.herdr.add("liaison")
+    sup = watch.Supervisor(ctx, out=lambda s: None)
+    sup.notify_human(0)  # first run: counting starts
+    send(ctx, "liaison", "human", "ask", "Which story?")
+    sup.notify_human(0)
+    assert len(calls) == 1  # the question's notification, which failed
+    (row,) = _alerts_in_inbox(ctx, "notification")
+    assert row.text.plain == "⚠ notification failed: notify-send not found"
+    alert = next(m for m in ctx.ledger.messages() if m["type"] == "alert")
+    assert alert["to"] == "human"
+    sup.notify_human(0)  # the alert is new in the ledger: no notification about it
+    watch.Supervisor(ctx, out=lambda s: None).notify_human(0)  # nor after a supervisor restart
+    assert len(calls) == 1
+
+
+def test_1c_a_failed_usage_recording_raises_one_alert(ctx, monkeypatch):
+    from xt import turns, watch
+
+    def broken(ctx_):
+        raise ValueError("unexpected session log line\nat line 3")
+
+    monkeypatch.setattr(turns, "record", broken)
+    watch.Supervisor(ctx, out=lambda s: None).record_usage()
+    (row,) = _alerts_in_inbox(ctx, "usage recording")
+    assert row.text.plain == "⚠ usage recording failed: ValueError: unexpected session log line"
+
+
+def test_1d_three_failures_make_one_alert_of_3_and_after_c_the_next_raises_a_new_one(ctx, clock, monkeypatch,
+                                                                                       capsys):
+    from xt import turns, watch
+    from xt.brief import waiting_on_human
+
+    monkeypatch.setattr(turns, "record", lambda ctx_: (_ for _ in ()).throw(OSError("disk full")))
+    sup = watch.Supervisor(ctx, out=lambda s: None)
+    for _ in range(3):
+        sup.record_usage()
+        clock.advance(minutes=1)
+    (row,) = _alerts_in_inbox(ctx, "usage recording")
+    first = Alerts(ctx).active()["failed:usage-recording"]
+    assert first["count"] == 3 and row.text.plain.startswith("⚠ ×3 usage recording failed: ") and row.age == "1m"
+    assert "3 times since it was raised" in row.detail().plain
+    assert sum(m["type"] == "alert" for m in ctx.ledger.messages()) == 1  # one alert, not three
+    assert "usage recording failed: OSError: disk full  ×3, last 12:02" in _xt_inbox(ctx, monkeypatch, capsys)
+    assert any("×3, last 12:02" in ln for ln in waiting_on_human(ctx))
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(INBOX))
+            p = app.panel(INBOX)
+            p.highlighted = next(i for i, r in enumerate(p.rows) if r.kind == "alert")
+            await pilot.press("c")
+            await pilot.pause()
+            assert not any(r.kind == "alert" for r in p.rows)
+
+    _run(run())
+    sup.record_usage()
+    (row,) = _alerts_in_inbox(ctx, "usage recording")
+    again = Alerts(ctx).active()["failed:usage-recording"]
+    assert again["id"] != first["id"] and again["count"] == 1 and "×" not in row.text.plain
+
+
+def test_answer_approve_and_send_still_work_from_detail_and_esc_calls_nothing(ctx):
+    from xt.tui.app import Compose, Confirm
+
+    add_member(ctx, "carol")
+    for a in ("liaison", "lead"):
+        ctx.herdr.add(a)
+    q, _ = send(ctx, "liaison", "human", "ask", "Tennis or chess?")
+    (ctx.paths.roles / "author.md").write_text("# Role: author\n")
+    request_spawn(ctx, "lead", "dora", "claude", None, "author", None)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(INBOX))
+            p = app.panel(INBOX)
+            p.highlighted = next(i for i, r in enumerate(p.rows) if r.kind == "question")
+            await pilot.press("enter")
+            await pilot.pause()
+            assert app.focused.id == "detail" and "s: answer (goes to liaison)" in app.detail_view.plain
+            before = ctx.ledger.last_id()
+            await pilot.press("escape")  # back to the Inbox: no action, no message
+            await pilot.pause()
+            assert app.focused is p and ctx.ledger.last_id() == before and app.screen is app.screen_stack[0]
+            await pilot.press("enter", "s")
+            assert isinstance(app.screen, Compose) and app.screen.title_text.startswith(f"Answer question #{q['id']}")
+            await pilot.press(*"chess", "ctrl+s")
+            await pilot.pause()
+            answer = [m for m in ctx.ledger.messages() if m["id"] > before][0]
+            assert (answer["from"], answer["to"], answer["type"], answer["ref"], answer["body"]) == \
+                ("human", "liaison", "report", q["id"], "chess")
+            p.highlighted = next(i for i, r in enumerate(p.rows) if r.kind == "approval")
+            await pilot.press("enter", "a")
+            assert isinstance(app.screen, Confirm)
+            await pilot.press("y")
+            await app.workers.wait_for_complete()
+            await pilot.pause()
+            assert "dora" in ctx.herdr.live
+            await pilot.press("enter", "S")  # S from Detail: a message to the liaison
+            assert isinstance(app.screen, Compose) and app.screen.title_text == "Send to the liaison"
 
     _run(run())

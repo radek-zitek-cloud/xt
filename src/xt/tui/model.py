@@ -18,19 +18,22 @@ from ..context import Ctx
 from ..dispatch import Queue
 from ..jobs import Jobs
 from ..paths import XtError
-from ..team import HUMAN, harness_model, schedule_text
+from ..alerts import FAILURES
+from ..team import HUMAN, SYSTEM, harness_model, schedule_text
 from . import teampane
 from .teampane import Harness, shown_model
+from .thread import ThreadDetail, thread_of
 
-# the numbered list panels, 1-4; Team has no number. Work (card #129) replaced Goals and Tasks; the
-# final map is 1 Inbox, 2 Work, 3 Flow, and Log (3) and Supervisor (4) stay until #130 and #131.
-PANELS = ("Inbox", "Work", "Log", "Supervisor")
+# the numbered list panels, 1-3; Team has no number. Work (card #129) replaced Goals and Tasks; the
+# Supervisor is a pop-up on `v` (card #131); Log (3) stays until Flow replaces it (#130).
+PANELS = ("Inbox", "Work", "Log")
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
               "system": "bright_black"}
 HISTORY_DAYS = 30
 CONTINUED = "↳ "
+SEEN_KEYS = "clears from New once you leave the Inbox · S: message the liaison"
 
 
 def screen_lines(screen: str, keep: int = 25) -> list[tuple[str, int]]:
@@ -102,7 +105,7 @@ class Row:
 
 @dataclass
 class Snapshot:
-    panels: dict[str, list[Row]]  # the list panels, and "Team": the agents the Team pane shows
+    panels: dict[str, list[Row]]  # the list panels, "Team": the agents, "Supervisor": the pop-up's events
     header: Text  # the Team pane's first line: team, xt version, what's running, what needs the human
     spend: str = ""  # on its right: today's tokens and estimated cost
     harnesses: list[Harness] = field(default_factory=list)  # the Team pane's blocks and their windows
@@ -220,8 +223,15 @@ def build(ctx: Ctx) -> Snapshot:
         live = {}
     queued, jobs = Queue(ctx).pending(), Jobs(ctx).pending()
 
-    def thread(item_id: int) -> list[dict]:
-        return [m for m in msgs if m["id"] == item_id or m.get("ref") == item_id]
+    def thread(m: dict, head: Text, keys: str, more: Text | None = None) -> ThreadDetail:
+        """Detail for a message: its head, then its thread, the goal's usage and the keys (#131)."""
+        from .. import turns as _turns
+
+        th = thread_of(m, msgs)
+        root = th[0] if th[0]["type"] == "goal" else None
+        usage = (f"usage (goal #{root['id']}): {_turns.fmt(_turns.goal_totals(ctx, root['id'], root['ts']))}"
+                 if root else "usage: counted per goal; this thread has none")
+        return ThreadDetail(head, th, m["id"], usage, keys, more, now, TYPE_STYLE)
 
     work_rows, work_title = _work(ctx, msgs, open_items, live, now, thread)
 
@@ -314,15 +324,15 @@ def build(ctx: Ctx) -> Snapshot:
         def qdetail(q=q):
             out = Text()
             out.append(f"Question #{q['id']} from {q['opener']} · waiting {_age(q['opened'], now)}\n", style="bold yellow")
-            m = by_id.get(q["id"])
-            out.append((m["body"] if m else q["title"]) + "\n")
-            out.append(f"\ns: answer (goes to {q['opener']}) · or answer in {q['opener']}'s pane\n", style="bright_black")
-            if q.get("about") is not None:
-                about = by_id.get(q["about"])
-                if about:
-                    out.append(_heading(f"about #{q['about']}"))
-                    out.append_text(_msg_block(about))
-            return out
+            m = by_id.get(q["id"]) or {"id": q["id"], "ts": q["opened"], "type": "ask", "from": q["opener"],
+                                       "to": HUMAN, "body": q["title"]}
+            out.append(m["body"] + "\n")
+            more = None
+            if q.get("about") is not None and by_id.get(q["about"]):
+                more = _heading(f"about #{q['about']}")
+                more.append_text(_msg_block(by_id[q["about"]]))
+            return thread(m, out, f"s: answer (goes to {q['opener']}) · S: message the liaison instead · "
+                                  f"or answer in {q['opener']}'s pane", more)
 
         body = by_id[q["id"]]["body"] if q["id"] in by_id else q["title"]
         n_opts = len(options_of(body))
@@ -374,17 +384,27 @@ def build(ctx: Ctx) -> Snapshot:
     for key, al in box.alerts:
         def detail(key=key, al=al):
             out = Text()
-            out.append(f"Alert #{al.get('id')} · {al.get('ts', '')[:16]}\n", style="bold red")
+            out.append(f"Alert #{al.get('id')} · {al.get('ts', '')[:16].replace('T', ' ')}\n", style="bold red")
             out.append(al["text"] + "\n")
-            out.append(f"\n({key}) c: clear once dealt with\n", style="bright_black")
-            return out
+            if int(al.get("count", 1)) > 1:
+                out.append(f"{al['count']} times since it was raised, the last at "
+                           f"{str(al.get('last', ''))[:16].replace('T', ' ')}\n", style="yellow")
+            if key in FAILURES.values():
+                out.append("the supervisor's log has the detail: v opens it\n", style="bright_black")
+            m = by_id.get(al.get("id")) or {"id": al.get("id") or 0, "ts": al.get("ts") or now.isoformat(),
+                                             "type": "alert", "from": SYSTEM, "to": HUMAN, "body": al["text"]}
+            return thread(m, out, f"c: clear once dealt with ({key})")
 
-        needs.append(Row(f"alert:{key}", _t(("⚠ ", "red"), _line(al["text"])), detail, "alert", {"key": key},
-                         row_age(al.get("ts"), now)))
+        # a repeating supervisor failure shows its count first, where the row's cut never reaches it;
+        # its age is that of the last failure (card #131)
+        n = int(al.get("count", 1))
+        needs.append(Row(f"alert:{key}", _t(("⚠ ", "red"), (f"×{n} ", "yellow") if n > 1 else "", _line(al["text"])),
+                         detail, "alert", {"key": key}, row_age(al.get("last") or al.get("ts"), now)))
     for m, goal in box.new:  # since the human last looked (cards #125, #127)
         if goal is None:
             new_rows.append(Row(f"msg:{m['id']}", _t(("✉ ", "cyan"), f"#{m['id']} {m['from']}: ", _line(m["body"])),
-                                lambda m=m: _msg_block(m), "message", {"id": m["id"]}, row_age(m["ts"], now)))
+                                lambda m=m: thread(m, _msg_block(m), SEEN_KEYS), "message", {"id": m["id"]},
+                                row_age(m["ts"], now)))
             continue
 
         def ddetail(goal=goal, done=m):
@@ -394,9 +414,7 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(first_line(goal["body"], 200) + "\n", style="bold")
             out.append(_heading(f"closing summary: #{done['id']}"))
             out.append(done["body"] + "\n")
-            out.append(f"\nthe whole thread: xt log --id {goal['id']} · clears from the Inbox once you "
-                       "leave it\n", style="bright_black")
-            return out
+            return thread(done, out, SEEN_KEYS)
 
         new_rows.append(Row(f"done:{goal['id']}", _t(("✓ ", "green"), f"#{goal['id']} done: ", _line(goal["body"]),
                                                      (f"  #{m['id']}", "bright_black")),
@@ -404,7 +422,9 @@ def build(ctx: Ctx) -> Snapshot:
     for m in box.unread:
         friction_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "magenta"), f"#{m['id']} {m['from']}: ",
                                                           _line(m["body"])),
-                                 lambda m=m: _msg_block(m), "friction", {"id": m["id"], "seen": False},
+                                 lambda m=m: thread(m, _msg_block(m), "c: mark it seen now · seen once you leave "
+                                                                      "the Inbox with it on screen"),
+                                 "friction", {"id": m["id"], "seen": False},
                                  row_age(m["ts"], now)))
     if box.seen:
         friction_rows.append(Row("fold:friction", _t((f"({len(box.seen)} older, seen) ▸", "bright_black")),
@@ -416,7 +436,7 @@ def build(ctx: Ctx) -> Snapshot:
             friction_rows.append(Row(f"friction:{m['id']}", _t(("✱ ", "bright_black"),
                                                               (f"#{m['id']} {m['from']}: {_line(m['body'])}",
                                                                "bright_black")),
-                                     lambda m=m: _msg_block(m), "friction",
+                                     lambda m=m: thread(m, _msg_block(m), "seen already"), "friction",
                                      {"id": m["id"], "seen": True, "folded": True}, row_age(m["ts"], now)))
     inbox_rows = []
     for heading, rows in (("NEEDS YOU", needs), ("NEW", new_rows), ("FRICTION", friction_rows)):
@@ -429,7 +449,8 @@ def build(ctx: Ctx) -> Snapshot:
     log_rows = []
     for m in reversed(msgs[-60:]):
         log_rows.append(Row(f"log:{m['id']}", _t(_msg_line(m), ("  " + _line(m["body"]), "bright_black")),
-                            lambda m=m: _msg_block(m), "message", {"id": m["id"]}, row_age(m["ts"], now)))
+                            lambda m=m: thread(m, _msg_block(m), "S: message the liaison"), "message",
+                            {"id": m["id"]}, row_age(m["ts"], now)))
 
     # the Team pane's header and harness blocks (card #128)
     from .. import versions
@@ -447,7 +468,7 @@ def build(ctx: Ctx) -> Snapshot:
     except Exception:  # a bad reading must never take the pane with it
         windows = {}
     harnesses = [Harness(n, windows.get(n, [])) for n in sorted({r.data["harness"] for r in team_rows} | set(windows))]
-    # Supervisor: what xt watch did, newest first
+    # Supervisor: what xt watch did, newest first (the `v` pop-up, card #131)
     from ..watch import watch_log
 
     sup_rows = []
@@ -496,14 +517,13 @@ def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread)
 
             def detail(m=m, t=t, is_open=is_open):
                 o = Text()
-                o.append(f"#{m['id']} task · {m['from']} → {m['to']} · ", style="bright_black")
+                o.append(f"#{m['id']} task · {m['from']} → {m['to']} · opened {_age(m['ts'], now)} ago · ",
+                         style="bright_black")
                 o.append("open\n" if is_open else "done\n", style="yellow" if is_open else "green")
                 if t.state == work.FAILED:
                     o.append(f"{m['to']} is blocked\n" if is_open else "closed as failed or blocked\n", style="red")
-                o.append(_heading("thread"))
-                for x in thread(m["id"]):
-                    o.append_text(_msg_block(x))
-                return o
+                o.append(m["body"].rstrip() + "\n")
+                return thread(m, o, "space: fold its goal · o: open work only · S: message the liaison")
 
             rows.append(Row(f"task:{m['id']}", _t((t.state + " ", work.GLYPH_STYLE[t.state]),
                                                   (f"#{m['id']} ", "bright_black"), m["to"][:ow].ljust(ow) + "  ",
@@ -519,22 +539,15 @@ def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread)
             o = Text()
             o.append(f"#{m['id']} goal · {m['from']} → {m['to']} · opened {_age(m['ts'], now)} ago · ",
                      style="bright_black")
-            o.append("open\n" if g.open else "done\n", style="yellow" if g.open else "green")
+            o.append("open" if g.open else "done", style="yellow" if g.open else "green")
+            o.append(f" · tasks {count(g.tasks)} done\n", style="bright_black")
             o.append(_first_line(m["body"], 200) + "\n", style="bold")
-            from .. import turns as _turns
-
-            o.append(f"usage: {_turns.fmt(_turns.goal_totals(ctx, m['id'], m['ts']))}\n")
             brief = re.search(r"Brief:\s*(\S+\.md)", m["body"])
-            o.append(_heading(f"tasks ({count(g.tasks)} done)"))
-            for t in g.tasks:
-                o.append(f"{t.state} #{t.msg['id']} {t.msg['to']:<11} {_first_line(t.msg['body'], 90)}\n",
-                         style="yellow" if t.state == work.OPEN else "")
-            if not g.tasks:
-                o.append("(none yet)\n", style="bright_black")
-            if brief:
-                o.append(_heading(f"brief: {brief.group(1)}"))
-                o.append_text(_file_text(ctx, brief.group(1)))
-            return o
+            more = None
+            if brief:  # below the keys: the reference text, read by scrolling Detail
+                more = _heading(f"brief: {brief.group(1)}")
+                more.append_text(_file_text(ctx, brief.group(1)))
+            return thread(m, o, "space: fold · o: open work only · S: message the liaison", more)
 
         key = f"goal:{m['id']}"
         row = Row(key, _t((f"#{m['id']} ", "bright_black"), _line(m["body"])), detail, "goal",
