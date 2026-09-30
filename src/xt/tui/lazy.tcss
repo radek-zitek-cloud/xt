@@ -17,11 +17,12 @@ Screen {
     min-width: 30;
 }
 
-/* Fixed sizes: moving focus never shifts the layout; the focused panel shows only by colour.
-   Sizes follow how much each panel usually holds. */
-#panel-1 { height: 4fr; }  /* Inbox */
-#panel-2 { height: 4fr; }  /* Work (card #129: Goals and Tasks in one outline) */
-#panel-3 { height: 2fr; }  /* Log */
+/* Fixed sizes: moving focus never shifts the layout; the focused pane shows only by colour. The app
+   sets the heights for the terminal's (card #130: Inbox the tallest list, Flow about a third); these
+   are the proportions before it does. */
+#panel-1 { height: 3fr; }  /* Inbox */
+#panel-2 { height: 2fr; }  /* Work (card #129: Goals and Tasks in one outline) */
+#panel-3 { height: 35%; }  /* Flow (card #130), full width under the left column and Detail */
 
 #right {
     width: 1fr;
@@ -143,6 +144,19 @@ ModalScreen {
     max-width: 160;
     height: 80%;
     scrollbar-size-vertical: 1;
+}
+
+/* Flow's filter picker on `f` (card #130) */
+.popup.pick {
+    width: 70;
+    max-width: 90%;
+}
+
+.popup.pick OptionList {
+    height: auto;
+    max-height: 20;
+    border: none;
+    padding: 0;
 }
 
 .popup Input {

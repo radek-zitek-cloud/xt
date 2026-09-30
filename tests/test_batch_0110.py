@@ -20,6 +20,7 @@ def test_key_line_says_what_s_does_and_S_always_messages_the_liaison(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 45)) as pilot:
+            await pilot.press("2")  # the TUI starts in the Inbox since card #130
             await pilot.pause()
             hints = lambda: str(app.query_one("#hints").render())  # noqa: E731
             assert hints().startswith("s/S message liaison")  # Work focused: nothing to answer

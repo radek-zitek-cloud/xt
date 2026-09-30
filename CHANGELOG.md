@@ -20,7 +20,10 @@ and Tasks panels); the earlier cards are unchanged from rc2 except the panel num
 1) and the panel heights. **0.16.0-rc4** (2026-09-30) adds #131 (the detail pane shows the thread;
 the Supervisor panel becomes a pop-up on `v`, and three supervisor failures raise Inbox alerts);
 the earlier cards are unchanged from rc3 except that the Supervisor panel and its key `4` are
-gone. The last card (#130) follows in a later candidate.
+gone. **0.16.0-rc5** (2026-09-30) adds the last card, #130 (the Flow lane chart replaces the Log),
+and the final layout; the earlier cards are unchanged from rc4 except the pane heights, the start
+pane (the Inbox), a cap on the Team pane for small terminals, the key line's order and a thread
+window fix in the detail pane.
 
 ### Added
 
@@ -37,11 +40,11 @@ gone. The last card (#130) follows in a later candidate.
   folds into one row, `(12 older, seen) ▸`, that `enter` expands (newest first) and folds again;
   `xt inbox` prints `(12 older, seen; …)` and `--seen` lists them. On the first run after the
   upgrade all existing friction counts as seen. Friction stays in the log.
-- **Ages on rows (#132, rc1).** Each row in the Goals, Tasks (Work from rc3), Inbox and Log panels ends with a dim
+- **Ages on rows (#132, rc1).** Each row in the Goals, Tasks (Work from rc3), Inbox and Log (until rc4) panels ends with a dim
   age at its right edge, by one rule in whole units rounded down: `now` under 10 s, then `45s`,
   `14m`, `3h`, `2d` up to 59 days, and whole weeks from 60 days (`8w`). A goal's age is its newest
   activity (the goal, its tasks and their replies). Team rows have none; Supervisor rows (the `v`
-  pop-up from rc4) keep their clock time.
+  pop-up from rc4) and Flow rows (rc5) keep their clock time.
 - **The Team pane (#128, rc2)** at the top of the TUI replaces the Status pane and the Team panel.
   Its header line has the team, xt's version with `(latest)`, a newer published release or
   `running …: restart to update`, the agents running, open goals, `⚑ N needs you` and `✉ N new`
@@ -90,8 +93,45 @@ gone. The last card (#130) follows in a later candidate.
   same kind update it instead of adding rows: the newest error's first line, the count (the TUI's
   row starts `⚠ ×3` and its age is the last failure's; `xt inbox` and briefs say `×3, last 14:05`); after `c` (or `xt clear`), the next failure raises a new one. The
   alert about a failed notification is never notified itself. Other alerts are unchanged.
+- **The Flow lane chart (#130, rc5)** replaces the Log panel. Pane 3, across the bottom of the TUI,
+  draws the messages as a swim-lane chart: one lane per agent (`human`; `xt` when it sent a shown
+  message; the liaison, the lead and the rest of the roster in order; a dim lane at the end for a
+  retired or unknown agent while its messages are shown), time down the left (local `HH:MM`, a
+  `── Sep 29 ──` row where the day changes, the newest at the bottom), and one row per message: an
+  arrow from the sender's lane to the receiver's with the type's glyph and label at the sender end
+  (`◆` goal, `▸` task, `◇` done, `✉` report, `⚑` ask or approval, `✱` friction, `⚠` alert in amber,
+  `○` a note or a message the human typed), dotted into the human's lane, the label dropped when
+  the lanes are too close; `#id` and the first line on the right, cut at the pane's edge. Flow rows
+  show a clock time, not an age. System lines (xt's `system` lines, `wake`, `nudge`) are hidden;
+  `t` shows or hides them, and approval requests and alerts show either way. `f` filters to one
+  agent's messages or one goal and its `ref` chain (the lanes stay); the same pick again, `esc` in
+  the picker or `esc` in Flow clears it; `/` filters by the message text. `j`/`k`, the page keys and
+  `g`/`G` move; with the newest row selected Flow follows new messages. `enter` shows the message
+  and its thread in the detail pane. The title says `N of M` (rows in view of all that pass the
+  filters), whether system lines are shown, and the filter. Lanes that don't fit collapse into one
+  `+N` lane, and a message to or from a collapsed agent starts its text with the agent's name; a
+  pane under 60 cells lists one line per message (`time sender → receiver glyph #id first line`).
+  Only the rows in view are drawn: a 5,000-message ledger opens in about 0.3 s and each key takes
+  under 0.1 s in the Pilot test. `xt log` is unchanged.
 
 ### Changed
+
+- **The final layout (#130, rc5).** Team on top; Inbox over Work on the left, the detail pane on
+  the right; Flow across the bottom, full width; the key line last. The TUI sets the heights for the
+  terminal: Flow about a third (6 to 14 rows), the Team pane what it needs, and the Inbox the larger
+  part of the rest, so it is the tallest list pane (at least 8 rows at 160x40, 5 at 100x30; were 3
+  and 2 in rc1). On a small terminal a big team's Team pane is capped so the Inbox keeps 5 rows: it
+  shows the header and the lines around the selected agent, and its bottom edge says how many lines
+  are out of view. The TUI starts in the Inbox (was Work).
+- **Keys (#130, rc5).** `1` Inbox, `2` Work, `3` Flow (was Log); Team and the detail pane have no
+  number. New: `t` system lines, `f` in Flow its filter (`f` on an agent in Team still switches
+  Herdr), `g`/`G` and the page keys in Flow. The key line lists what `s` does, then `h`, `q`, `1-3`,
+  `j/k`, `space`, `enter`, `a/d`, `/`, `t`, `f`, `v`, and the other keys while they fit; on a narrow
+  terminal the keys keep their place and drop their words, from the end. `o open only` shows while
+  Work has focus and `g/G top/end` while Flow has. `h` has a Flow section.
+- **Detail's thread window (#131 fix, rc5).** In a detail pane only three or four rows high (the
+  100x30 layout), the window around the selected message could leave the message itself out of
+  view; it now keeps it in view.
 
 - **Panels and keys (#131, rc4).** The Supervisor panel is gone (its contents are the `v` pop-up);
   the keys are `1` Inbox, `2` Work, `3` Log (`4` did the Supervisor in rc3), and the key line and
@@ -124,7 +164,7 @@ gone. The last card (#130) follows in a later candidate.
 
 ### Upgrading
 
-- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc4`), then `xt restart --all`
+- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc5`), then `xt restart --all`
   so the supervisor starts the friction marker and raises the new failure alerts. Friction from
   before that shows as seen. New keys in `.xt/state/inbox_seen.json` (`friction_upto`,
   `friction_seen`) and in `.xt/state/alerts.json` (`count`, `last`, on the failure alerts); no

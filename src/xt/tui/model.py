@@ -20,13 +20,14 @@ from ..jobs import Jobs
 from ..paths import XtError
 from ..alerts import FAILURES
 from ..team import HUMAN, SYSTEM, harness_model, schedule_text
-from . import teampane
+from . import flow, teampane
+from .flow import Data as FlowData
 from .teampane import Harness, shown_model
 from .thread import ThreadDetail, thread_of
 
-# the numbered list panels, 1-3; Team has no number. Work (card #129) replaced Goals and Tasks; the
-# Supervisor is a pop-up on `v` (card #131); Log (3) stays until Flow replaces it (#130).
-PANELS = ("Inbox", "Work", "Log")
+# the numbered panes, 1-3; Team and Detail have no number. Work (card #129) replaced Goals and
+# Tasks, the Supervisor is a pop-up on `v` (card #131) and Flow replaced the Log (card #130).
+PANELS = ("Inbox", "Work", "Flow")
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
@@ -112,6 +113,7 @@ class Snapshot:
     done_upto: int = 0  # the Inbox's done goals are seen up to here once the human has looked (#125)
     inbox_title: str = ""  # the Inbox's counts, `⚑ 1 · ✉ 2 · ✱ 1` (card #127)
     work_title: str = ""  # the Work pane's counts, `1 open · 63 done` (card #129)
+    flow: FlowData = field(default_factory=FlowData)  # what the Flow chart draws (card #130)
 
 
 def age_text(secs: float) -> str:
@@ -181,12 +183,6 @@ def _first_line(s: str, width: int = 70) -> str:
 def _line(s: str) -> str:
     """A list row's first line, uncut: the pane cuts it at its own width (card #132)."""
     return s.strip().splitlines()[0] if s.strip() else ""
-
-
-def _msg_line(m: dict) -> Text:
-    ref = f" ref:#{m['ref']}" if m.get("ref") is not None else ""
-    return _t((f"#{m['id']} ", "bright_black"), (f"{m['type']} ", TYPE_STYLE.get(m["type"], "")),
-              f"{m['from']}→{m['to']}{ref}")
 
 
 def _msg_block(m: dict) -> Text:
@@ -445,12 +441,10 @@ def build(ctx: Ctx) -> Snapshot:
             inbox_rows += rows
     done_upto = box.upto
 
-    # Log: newest first
-    log_rows = []
-    for m in reversed(msgs[-60:]):
-        log_rows.append(Row(f"log:{m['id']}", _t(_msg_line(m), ("  " + _line(m["body"]), "bright_black")),
-                            lambda m=m: thread(m, _msg_block(m), "S: message the liaison"), "message",
-                            {"id": m["id"]}, row_age(m["ts"], now)))
+    # Flow (card #130, in place of the Log): every message read, oldest first; the pane filters,
+    # lays out and draws only the rows in view
+    flow_data = flow.Data(msgs, [(a.name, a.role, a.active) for a in ctx.team.agents() if a.kind != HUMAN],
+                          lambda m: thread(m, _msg_block(m), "Flow is read-only · S: message the liaison"), now)
 
     # the Team pane's header and harness blocks (card #128)
     from .. import versions
@@ -479,13 +473,14 @@ def build(ctx: Ctx) -> Snapshot:
                             lambda line=line: Text(line + "\n"), "event", {}))
 
     return Snapshot(
-        {"Inbox": inbox_rows, "Work": work_rows, "Team": team_rows, "Log": log_rows, "Supervisor": sup_rows},
+        {"Inbox": inbox_rows, "Work": work_rows, "Team": team_rows, "Supervisor": sup_rows},
         header,
         spend_text(spend.team_today),
         harnesses,
         done_upto,
         box.title(),
         work_title,
+        flow_data,
     )
 
 

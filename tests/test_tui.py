@@ -12,7 +12,7 @@ def test_tui_demo_navigation_and_popups():
     async def run():
         app = XtTui(demo_snapshot)
         async with app.run_test(size=(120, 40)) as pilot:
-            assert app.focused.id == "panel-2"  # Work
+            assert app.focused.id == "panel-1"  # the Inbox (card #130)
             await pilot.press("1", "j", "j")
             await pilot.pause()
             assert app.focused.id == "panel-1" and app.focused.border_subtitle == "3 of 5"
@@ -39,7 +39,7 @@ def _team_with_work(ctx):
     return g, t
 
 
-def test_model_shows_work_team_inbox_and_log(ctx):
+def test_model_shows_work_team_inbox_and_flow(ctx):
     g, t = _team_with_work(ctx)
     snap = build(ctx)
     goal = snap.panels["Work"][0]
@@ -52,7 +52,8 @@ def test_model_shows_work_team_inbox_and_log(ctx):
     assert heading.kind == "heading" and heading.text.plain == "NEEDS YOU"
     assert approval.kind == "approval" and "spawn dora" in approval.text.plain
     assert "Purpose: write the copy." in approval.detail().plain  # the role brief, to decide on
-    assert snap.panels["Log"][0].data["id"] > snap.panels["Log"][-1].data["id"]  # newest first
+    ids = [m["id"] for m in snap.flow.msgs]
+    assert ids == sorted(ids) and g["id"] in ids and t["id"] in ids  # Flow: oldest first, newest at the bottom
     assert "⚑ 1 needs you" in snap.header.plain
 
 
@@ -201,6 +202,7 @@ def test_long_rows_stay_on_one_line():
         async with app.run_test(size=(100, 40)) as pilot:
             await pilot.pause()
             assert len(app.panel(1)._lines) == 3  # one line per item, no wrapping
+            assert len(app.panel(2)._lines) == 3
 
     asyncio.run(run())
 

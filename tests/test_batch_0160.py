@@ -22,6 +22,7 @@ from .conftest import add_member
 
 INBOX = PANELS.index("Inbox") + 1
 WORK = PANELS.index("Work") + 1
+FLOW = PANELS.index("Flow") + 1
 
 
 def _run(coro):
@@ -383,10 +384,12 @@ def test_no_row_spills_outside_its_pane(ctx, size):
         async with app.run_test(size=size) as pilot:
             await pilot.press(str(INBOX))
             await pilot.pause()
-            for n in range(1, len(PANELS) + 1):
+            for n in (INBOX, WORK):
                 p = app.panel(n)
                 for i in range(p.option_count):
                     assert p.get_option_at_index(i).prompt.cell_len <= p.content_size.width, (n, i)
+            flow = app.panel(FLOW)  # Flow draws its own rows (card #130)
+            assert all(ln.cell_len <= flow.content_size.width for ln in flow.render().split("\n"))
 
     _run(run())
 
@@ -506,10 +509,13 @@ def test_the_focused_panels_title_is_reversed_and_follows_focus(ctx):
         async with app.run_test(size=(160, 40)) as pilot:
             await pilot.pause()
             style = lambda n: app.panel(n).styles.border_title_style
-            assert style(WORK).reverse and not style(INBOX).reverse
-            await pilot.press(str(INBOX))
+            assert style(INBOX).reverse and not style(WORK).reverse  # the Inbox first (card #130)
+            await pilot.press(str(WORK))
             await pilot.pause()
-            assert style(INBOX).reverse and not style(WORK).reverse
+            assert style(WORK).reverse and not style(INBOX).reverse
+            await pilot.press(str(FLOW))
+            await pilot.pause()
+            assert style(FLOW).reverse and not style(WORK).reverse
 
     _run(run())
 
@@ -704,16 +710,18 @@ def test_a_twelve_agent_team_takes_four_lines_at_160_and_fits_at_100(ctx, fake_h
         async with app.run_test(size=size) as pilot:
             await pilot.pause()
             lines = _pane(app)
-            agent_lines = [ln for ln in lines if "▕" in ln]
             width = app.team.content_size.width
             assert all(len(ln) <= width for ln in lines)
-            assert sum(ln.count("▕") for ln in agent_lines) == 12  # every agent shown
             assert app.team.outer_size.height == len(lines) + 2  # no empty space: content plus the frame
-            return len(agent_lines), app.team.outer_size.height, app.panel(INBOX).content_size.height
+            laid_out = [ln.plain for ln in _lines(ctx, width) if "▕" in ln.plain]
+            assert sum(ln.count("▕") for ln in laid_out) == 12  # every agent laid out
+            return len(laid_out), [ln for ln in lines if "▕" in ln], app.panel(INBOX).content_size.height
 
-    assert asyncio.run(run((160, 40)))[0] == 4
-    lines, height, inbox_rows = asyncio.run(run((100, 30)))
-    assert lines == 6 and height <= 12 and inbox_rows >= 1  # two columns, Claude's block over Codex's
+    lines, shown, _ = asyncio.run(run((160, 40)))
+    assert lines == 4 and len(shown) == 4  # all shown
+    lines, shown, inbox_rows = asyncio.run(run((100, 30)))
+    # two columns, Claude's block over Codex's; capped at 100x30 so the Inbox keeps 5 rows (card #130)
+    assert lines == 6 and len(shown) < 6 and inbox_rows >= 5
 
 
 def test_the_team_panes_height_follows_the_agent_count(ctx, fake_home):
@@ -788,9 +796,9 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
     from xt.tui.app import HINTS, Help
 
     _team(ctx, fake_home)
-    assert "1-3 panels" in HINTS and "1-4" not in HINTS and "tab Team" in HINTS  # #131: no Supervisor pane
+    assert "1-3 panes" in HINTS and "1-4" not in HINTS and "tab Team" in HINTS  # #131: no Supervisor pane
     keys = dict(Help.KEYS)
-    assert keys["1-3"] == "jump to a panel: Inbox, Work, Log"
+    assert keys["1-3"] == "jump to a pane: Inbox, Work, Flow"  # card #130: Flow in place of the Log
 
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
@@ -800,8 +808,8 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
                 await pilot.pause()
                 assert app.focused.title == title
             await pilot.press("4")  # no fourth pane since card #131: nothing happens
-            assert app.focused.title == "Log"
-            await pilot.press("tab", "tab")  # past the last panel and Detail: Team, at the top
+            assert app.focused.title == "Flow"
+            await pilot.press("tab")  # past Flow, the last pane: Team, at the top
             await pilot.pause()
             assert app.focused is app.team and app.team.current.data["name"] == "pm"
             await pilot.press("j")
@@ -863,6 +871,7 @@ def test_open_goals_first_expanded_done_under_a_collapsed_fold_orphan_under_no_g
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(WORK))  # the TUI starts in the Inbox since card #130
             await pilot.pause()
             p = _work(app)
             assert app.focused is p
@@ -926,6 +935,7 @@ def test_space_folds_o_hides_done_work_and_a_refresh_keeps_both(ctx, clock):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(WORK))
             await pilot.pause()
             p = _work(app)
             busy = f"goal:{f['busy']}"
@@ -991,6 +1001,7 @@ def test_enter_shows_the_selected_row_in_detail(ctx, clock):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(WORK))
             await pilot.pause()
             p = _work(app)
             p.highlighted = _keys(p).index(f"task:{f['t_failed']}")
@@ -1105,9 +1116,14 @@ def _shown(app) -> list[str]:
     return console.export_text().rstrip("\n").split("\n")
 
 
-def _log_row(app, mid):
-    p = app.panel(PANELS.index("Log") + 1)
-    return p, next(i for i, r in enumerate(p.rows) if r.data.get("id") == mid)
+def _flow_select(app, mid):
+    """Select message `mid` in Flow (card #130, in place of the Log) as j/k would."""
+    p = app.panel(FLOW)
+    p.selected = next(i for i, (kind, m) in enumerate(p.rows) if kind == "msg" and m["id"] == mid)
+    p.follow = p.selected == p.message_rows()[-1]
+    p.place()
+    app.show_detail(p)
+    return p
 
 
 def test_selecting_a_task_shows_its_whole_goal_thread_in_time_order_marked(ctx, clock):
@@ -1121,6 +1137,7 @@ def test_selecting_a_task_shows_its_whole_goal_thread_in_time_order_marked(ctx, 
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(WORK))
             await pilot.pause()
             p = _work(app)
             p.highlighted = _keys(p).index(f"task:{f['t_failed']}")
@@ -1149,11 +1166,12 @@ def test_a_lone_message_shows_with_its_replies_and_a_broken_ref_alone(ctx):
     answer = ctx.ledger.append("human", "liaison", "report", "tennis", ref=ask)["id"]
     thanks = ctx.ledger.append("liaison", "human", "report", "booked the court", ref=answer)["id"]
     broken = ctx.ledger.append("lead", "pm", "task", "a task whose ref is gone", ref=999)["id"]
-    rows = {r.data.get("id"): r for r in build(ctx).panels["Log"]}
-    view = rows[ask].detail()
+    data = build(ctx).flow
+    msgs = {m["id"]: m for m in data.msgs}
+    view = data.detail(msgs[ask])
     assert [m["id"] for m in view.thread] == [ask, answer, thanks] and view.selected == ask
     assert "usage: counted per goal" in view.plain
-    alone = rows[broken].detail()
+    alone = data.detail(msgs[broken])
     assert [m["id"] for m in alone.thread] == [broken]
 
 
@@ -1171,9 +1189,8 @@ def test_a_sixty_message_thread_scrolls_keeps_the_selection_and_counts_the_hidde
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=size) as pilot:
-            p, i = _log_row(app, selected)
-            await pilot.press("3")
-            p.highlighted = i
+            await pilot.press(str(FLOW))
+            _flow_select(app, selected)
             await pilot.press("enter")
             await pilot.pause()
             view = app.detail_view
@@ -1203,7 +1220,7 @@ def test_a_sixty_message_thread_scrolls_keeps_the_selection_and_counts_the_hidde
             assert app.detail_view.window[0] == 0 and "earlier rows hidden" not in "\n".join(_shown(app))
             # the newest message: nothing hidden below it
             await pilot.press("escape")
-            p.highlighted = _log_row(app, ids[-1])[1]
+            _flow_select(app, ids[-1])
             await pilot.pause()
             lines = _shown(app)
             assert "later rows hidden" not in "\n".join(lines) and "earlier rows hidden" in "\n".join(lines)
@@ -1251,7 +1268,7 @@ def test_v_opens_the_supervisor_pop_up_newest_first_and_esc_closes_it(ctx):
             assert box.scroll_y == 2
             await pilot.press("escape")
             await pilot.pause()
-            assert not isinstance(app.screen, SupervisorPopup) and app.focused is _work(app)
+            assert not isinstance(app.screen, SupervisorPopup) and app.focused is app.panel(INBOX)
 
     _run(run())
 

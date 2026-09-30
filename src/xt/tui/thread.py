@@ -101,7 +101,8 @@ class ThreadDetail:
             return 0, n
         room = max(3, room)  # a note above, a row, a note below
         if self.offset is None:
-            after = min(2, n - 1 - sel)  # a little of what came after, when there is any
+            # a little of what came after, when there is any and room for it beside the selection
+            after = min(2, n - 1 - sel, room - 3)
             start = sel + 1 + after - (room - 2)  # ends there, with both notes
         else:
             start = self.offset

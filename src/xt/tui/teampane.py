@@ -21,6 +21,7 @@ BAR_MAX, BAR_MIN = 8, 3  # the context bar's width in cells, shrunk before a col
 WINDOW_BAR = 10
 PCT_WIDTH = 4  # "100%"
 STATE_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
+SELECTED = "bold bright_white on blue"  # the selected agent's cell
 EIGHTHS = " ▏▎▍▌▋▊▉█"
 VENDOR = re.compile(r"^(?:[a-z0-9_.-]+/)?(?:claude-|anthropic[.-])?", re.I)
 VERSIONED = re.compile(r"^([a-z]+)-(\d+)-(\d+)(?:-\d{8})?$", re.I)
@@ -134,7 +135,7 @@ def cell(d: dict, w: Widths, bar: int, selected: bool = False) -> Text:
     out.append("▏", style="bright_black")
     out.append(f" {f'{pct:.0f}%' if pct is not None else '':>{PCT_WIDTH}}", style=style)
     if selected:
-        out.stylize("bold bright_white on blue")
+        out.stylize(SELECTED)
     return out
 
 

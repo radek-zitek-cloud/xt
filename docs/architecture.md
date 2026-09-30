@@ -81,8 +81,9 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/planusage.py` | Claude plan usage from the status line (standard library only). |
 | `src/xt/versions.py` | Published, installed and running xt versions. |
 | `src/xt/switch.py` | `xt version use` and `rollback`: state format checks, snapshots, merge and revert. |
-| `src/xt/tui/app.py` | The TUI (Textual): the Team pane, panels, keys, the toast, dialogs, and the actions it takes as the human. |
-| `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into panel rows, agents and the Team header. |
+| `src/xt/tui/app.py` | The TUI (Textual): the Team pane, the panes and their heights, the Flow pane's filters and scrolling, keys, the toast, dialogs, and the actions it takes as the human. |
+| `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into pane rows, Flow's messages and roster, agents and the Team header. |
+| `src/xt/tui/flow.py` | The Flow lane chart: lane order, which lanes fit and the `+N` lane, arrows with type glyphs, the margin, day separators and list mode, as pure functions of the messages and the width. |
 | `src/xt/tui/teampane.py` | The Team pane's layout: harness blocks, window bars, aligned agent columns and short model names. |
 | `src/xt/tui/work.py` | The Work outline: which goal each task belongs to (the root of its `ref` chain), task states, goal order, and a Work row laid out at the pane's width. |
 | `src/xt/tui/thread.py` | The detail pane's thread: which messages belong to the selected one's thread, and the view that lays it out for the pane, with the selected message kept in view. |
@@ -400,9 +401,13 @@ harness goes to the human with `xt friction`.
   (short model, or for `default` the model the agent's session log names, `usage.Reading.model`;
   state; context as tokens, bar and share). `tui/teampane.py` lays it out at the pane's width:
   up to three columns, blocks side by side or stacked, whichever is shorter. `j`/`k` select an agent;
-  its detail shows open work, schedules, recent messages and the last lines of its screen. Three
-  numbered panels of fixed size (focus shows by frame colour and a reversed title; `/` filters the
-  focused one; rows are cut at the panel's width in cells and end with a dim age, `model.fit`):
+  its detail shows open work, schedules, recent messages and the last lines of its screen; on a
+  terminal too small for a big team it is capped so the Inbox keeps its rows, and shows the lines
+  around the selected agent. Below it, Inbox over Work on the left, the detail pane on the right,
+  and Flow at the bottom, full width; `app.pane_heights` sets their heights for the terminal's
+  (card #130: Flow about a third, the Inbox the tallest list). The TUI starts in the Inbox. Three
+  numbered panes of fixed size (focus shows by frame colour and a reversed title; `/` filters the
+  focused one; list rows are cut at the pane's width in cells and end with a dim age, `model.fit`):
   **Inbox** (1: three groups: Needs you with open questions, pending approvals and alerts; New
   with goals done and reports to the human since they last looked; unread Friction, with seen
   friction folded; the counts in its title), **Work** (2, card #129: goals and their tasks as one
@@ -410,7 +415,15 @@ harness goes to the human with `xt friction`.
   chain, or under a final `no goal` row; open goals first, expanded, newest activity first; the
   liaison's drafts; done goals under a collapsed `done (N)` fold; `space` folds, `o` shows open
   work only, and the pane keeps both across refreshes; `N open · M done` in its title), and
-  **Log** (3: newest first). The detail pane on the right (card #131, `tui/thread.py`) shows the
+  **Flow** (3, card #130, in place of the Log: the messages read as a swim-lane chart, laid out by
+  `tui/flow.py`: one lane per agent, human first, then `xt` when it sent a shown message, the
+  chain and the roster, then dim lanes for retired or unknown agents; one row per message, an arrow
+  from sender to receiver with the type's glyph and label, dotted into the human's lane, `#id` and
+  the first line in the margin and a clock time on the left; lanes that don't fit collapse into a
+  `+N` lane, and a narrow pane lists one line per message. `app.FlowPane` keeps the filters, `t`
+  system lines, `f` one agent or one goal's thread, `/` the text, the selection, and follows new
+  messages while the newest is selected; it draws only the rows in view). The detail pane on the
+  right (card #131, `tui/thread.py`) shows the
   selected item with its thread: for a message under a goal (the root of its `ref` chain) the whole
   goal in time order, else the message and its replies through `ref`; one row per message with
   the selected one marked, then the goal's usage and the keys that apply, then reference text such

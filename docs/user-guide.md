@@ -58,7 +58,7 @@ set `[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notificati
 2. The liaison drafts the goal in `goals/drafts/<slug>.md` as you talk (the TUI's Work panel
    shows it as `✎ … draft`), reads it back, and dispatches it when you say so.
 3. The supervisor starts the lead, with the goal in its first prompt. From here the Work panel
-   shows the goal with its tasks under it, and the Log panel every message.
+   shows the goal with its tasks under it, and the Flow pane every message as a lane chart.
 
 The answer and message dialog takes about two-thirds of the screen (up to 160 columns wide), with
 the question above the text box. It's an ordinary editor: arrows, home/end, ctrl+←/→ by word,
@@ -114,11 +114,11 @@ friction stays in the log (`xt log --type friction`) and under the folded row. I
 supervisor's first run on 0.16.0, so friction from before the upgrade shows as seen.
 
 **Rows** (from 0.16.0) use the whole width of their panel: a line is cut with `…` only when it
-doesn't fit, and again when you resize the terminal. Each row in the Inbox, Work and Log
-panels ends with its age, dim at the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`,
+doesn't fit, and again when you resize the terminal. Each row in the Inbox and Work
+panes ends with its age, dim at the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`,
 `2d`, and whole weeks from 60 days (`8w`). A goal's age is that of its newest message (the goal, its
 tasks and their replies), so a stuck goal looks old; a task's is that of the task itself. Agents in
-the Team pane have no age, and the supervisor's log (`v`) keeps its clock time. The focused panel has a
+the Team pane have no age, and Flow's rows and the supervisor's log (`v`) keep their clock time. The focused pane has a
 green frame and a reversed title.
 
 **Work** (panel 2, from 0.16.0; it replaces the Goals and Tasks panels) shows goals with their
@@ -202,6 +202,51 @@ selected message and says how much is hidden (`↑ 24 earlier rows hidden`, `↓
 hidden`); after `enter`, `j`/`k` bring the hidden rows in. A message whose `--ref` points to one
 the TUI doesn't have shows alone with its replies.
 
+**Flow** (pane 3, from 0.16.0; it replaces the Log panel) runs across the bottom and shows the
+messages as a swim-lane chart, the newest at the bottom:
+
+```
+┌[3]─Flow─11 of 18 · system hidden (t)──────────────────────────────────────────────────────────────┐
+│time  human       xt          liaison     lead        pm          qa          builder              │
+│── Sep 29 ──                                                                                       │
+│07:36 ○─report────────────────▶                                   #1728 DNS fixed, ask QA to retry │
+│07:36                         ◆─goal──────▶                       #1729 Site check for #124        │
+│07:37                                     ▸─task──────▶           #1733 Read-only site check       │
+│07:37 ◀······································friction·✱           #1736 settings refuse plain curl │
+│07:38                                     ◀─done──────◇           #1737 Site checked, all good     │
+│07:38 ◀··approval·⚑                                               #1738 lead asks to spawn dora    │
+│07:39 ◀·····alert·⚠                                               #1739 qa is blocked              │
+│07:40                         ◀───────ask─⚑                       #1740 How should #1729 finish?   │
+│07:41 ◀···········report·✉                                        #1741 Site check done            │
+└───────────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+- One **lane** per agent: you (`human`) first, then `xt` when it sent a message that's shown, then
+  the liaison, the lead and the rest of the roster in order. An agent that has since retired (or
+  one the roster doesn't know) gets a dim lane at the end, while its messages are shown.
+- One **row** per message: the time on the left (local `HH:MM`; a `── Sep 29 ──` row where the day
+  changes), an arrow from the sender's lane to the receiver's with the type's glyph and label at
+  the sender end, and `#id` with the first line on the right, cut at the pane's edge. The glyphs:
+  `◆` goal, `▸` task, `◇` done, `✉` report, `⚑` ask or approval, `✱` friction, `⚠` alert (amber),
+  `○` a note or a message you typed. Messages to you are dotted (`·`), so they stand out; a note
+  to itself is just its glyph and label. The glyph and label say the type, so it reads without
+  colour. Flow rows show a time, not an age.
+- **System lines** (xt's starts, stops and settings lines, wake-ups and nudges) are hidden; `t`
+  shows or hides them (the title says which). Approval requests and alerts are always shown.
+- `f` picks **one agent** (every message it sent or received) or **one goal** (the goal and every
+  message whose `--ref` chain leads to it); the lanes stay, only rows are filtered, and the title
+  names the filter. The same pick again, `esc` in the picker, or `esc` in Flow clears it. `/`
+  filters by the message text.
+- `j`/`k` select a row, the page keys scroll, `g`/`G` go to the oldest or newest. While the newest
+  row is selected, Flow follows new messages; move up and it stays where you are. The title says
+  `N of M`: rows in view of all that pass the filters. `enter` shows the message with its thread in
+  the detail pane. Flow is read-only.
+- A team too wide for the pane: the lanes that don't fit collapse into one `+N` lane, and a message
+  to or from one of those agents starts its text with the agent's name. A narrow terminal (under
+  60 columns): one line per message instead, `time sender → receiver glyph #id first line`; widen it
+  and the chart comes back. Only the rows in view are drawn, so a long ledger scrolls without a
+  stall. `xt log` is unchanged.
+
 The **supervisor's log** (what xt did: deliveries, wake-ups, nudges, notifications) is a pop-up on
 `v`, newest first; `j`/`k` scroll it and `esc` closes it. Its failures don't wait there: a failed
 wake-up, a failed notification and a failed usage recording each raise an alert in the Inbox (Needs
@@ -236,9 +281,18 @@ shown as the model its session log names.)
   of the model's window, yellow from 70 % and red from 85 %. Agents fill up to three columns as the
   width allows, so five take two lines.
 
-The panels' number keys (from 0.16.0) are `1` Inbox, `2` Work and `3` Log, and `v` opens the
-supervisor's log; the TUI starts in Work. The Team pane has no number key: `tab` reaches it (it's before panel 1), `j`/`k` select an agent,
-the detail pane shows it, and `u`, `x`, `R` and `f` act on it. The result of your last action
+The layout (from 0.16.0): Team on top; Inbox over Work on the left, the detail pane on the right;
+Flow across the bottom, taking about a third of the height; the key line last. The Inbox is the
+tallest list pane (at least 8 rows at 160x40, 5 at 100x30). On a small terminal a big team's Team
+pane is capped so the Inbox keeps its rows: it shows the header and the lines around the selected
+agent, and its bottom edge says how many lines are out of view.
+
+The panes' number keys (from 0.16.0) are `1` Inbox, `2` Work and `3` Flow, and `v` opens the
+supervisor's log; the TUI starts in the Inbox. The Team pane has no number key: `tab` reaches it (it's before pane 1), `j`/`k` select an agent,
+the detail pane shows it, and `u`, `x`, `R` and `f` act on it (`f` in Flow is its filter). The
+key line lists what `s` does first, then `h`, `q`, `1-3`, `j/k`, `space`, `enter`, `a/d`, `/`, `t`,
+`f` and `v` (a narrow terminal keeps the keys and drops their words), and `g/G` while Flow has
+focus. The result of your last action
 (`alert cleared`, `starting carol…`) shows for about ten seconds in a one-line toast at the bottom,
 then goes away on its own.
 
@@ -578,7 +632,7 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt friction`](#xt-friction) | agents | shown in Inbox (`✱`) |
 | [`xt goal`](#xt-goal) | agents (liaison) | Work panel (`2`) shows drafts and goals |
 | [`xt brief`](#xt-brief) | both | Team detail (partly) |
-| [`xt log`](#xt-log) | both | Log panel (`3`), the thread in the detail pane, and the supervisor's log (`v`) |
+| [`xt log`](#xt-log) | both | Flow pane (`3`), the thread in the detail pane, and the supervisor's log (`v`) |
 | [`xt harnesses`](#xt-harnesses) | human | none |
 | [`xt watch`](#xt-watch) | (xt) | `v` shows its events |
 | [`xt tui`](#xt-tui) | human | is the TUI |
@@ -796,8 +850,8 @@ of them first, and a first line saying how many older ones were left out; `--lim
 newest N, `--full` all of them. `--id` alone still prints the whole thread (from 0.15.0; before, `xt
 log` always printed everything). `xt log --watch [--limit N]` shows the supervisor's newest events
 instead (50 by default). **Use it** to trace a goal (`--id 234` shows the goal and every message
-that refers to it directly) or an agent (`--member carol`); the TUI's Log (`3`) and Supervisor
-(`4`) panels show the recent part.
+that refers to it directly) or an agent (`--member carol`); the TUI's Flow pane (`3`) and the
+supervisor's pop-up (`v`) show the recent part.
 
 ### `xt harnesses`
 
