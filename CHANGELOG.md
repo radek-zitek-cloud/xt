@@ -9,6 +9,52 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.17.0] — not released yet
+
+TUI layout and consistency: three cards, #162, #151 and #133, to their approved specs. No protocol,
+ledger or state-file change.
+
+### Changed
+
+- **Three bands (#162).** The TUI is laid out in three bands: the Team pane and the Inbox side by
+  side on top, with the same height, which the team decides (up to 60 % of the terminal); Work or
+  Flow in one full-width pane in the middle; the detail pane full width at the bottom, shorter
+  than the others (4 to 8 rows), scrolling inside; the key line last. This replaces the 0.16.0
+  layout (Team on top, Inbox over Work on the left, Detail on the right, Flow at the bottom) and its
+  rule that the Inbox is the tallest list.
+- **Work and Flow share a pane (#162).** `2` shows Work and `3` shows Flow in the middle band; the
+  title shows both names like tabs, the one on screen with its counts, the other dim. Each keeps its
+  selection and scroll position while the other is shown. `tab` and `esc` work as before.
+- **Numbered titles (#162).** Every pane's title reads `[n] - Title - info`: `[0] - Team`,
+  `[1] - Inbox - ⚑ 2 · ✉ 1`, `[2] - Work - 1 open · 3 done`, `[3] - Flow - 12 of 40 · system hidden (t)`,
+  `[4] - Detail - Inbox`, where `n` is the pane's key.
+- **A one-column Team pane (#162).** The header (wrapped between its parts, so nothing that needs
+  you is cut off), today's tokens and cost, a line, then each harness's usage and its agents, one
+  per line, with a line between harnesses. It never scrolls: a team too big for it shows what fits
+  and a last line `+N more (widen the terminal)`, N being the agents and harness lines out of view;
+  `j`/`k` and the page keys reach the agents in view. This replaces 0.16.0's up-to-three columns and
+  its cap for a big team on a small terminal.
+- **NOTIFICATIONS (#162).** The Inbox's New section is called NOTIFICATIONS; its unread rows are
+  bold, and the title keeps the unread count. What it holds and when it clears don't change.
+  `xt inbox` still says New.
+- **A key line per pane (#162).** The bottom line shows the focused pane's own keys first (Inbox:
+  `a/d`, `s answer #N` while a question is selected, `c`, `space`; Team: `u/U`, `x/X`, `R`, `f`;
+  Work: `space`, `o`; Flow: `t`, `f`, `g/G`), then `S`, `/` and `v`, which work everywhere. Keys
+  for moving around (`0`-`4`, `j/k`, `tab`, `enter`, `esc`), `h` and `q` are left to the help
+  screen, which lists every key.
+- **Newest on top everywhere (#162).** Flow lists the newest message first (time runs upward, a
+  `── Sep 28 ──` row over an earlier day's messages); `g` goes to the newest (top) and `G` to the
+  oldest. The Inbox's Needs you and Work's tasks under a goal are newest first too. In every list,
+  with the top row selected the selection stays on the top row as new rows arrive; select another
+  row and it stays there. This replaces 0.16.0's newest-at-the-bottom Flow.
+- **The detail pane scrolls to a thread (#162).** In the short bottom pane a message's thread gets
+  the pane's height; `j` (or the wheel) first scrolls the thread into view, then moves through its
+  hidden rows as before.
+
+### Upgrading
+
+Nothing to do beyond `xt restart --all` (or restarting `xt tui`).
+
 ## [0.16.1] — 2026-09-30
 
 The release: the same code and docs as 0.16.1-rc2 (only the version and this changelog changed).

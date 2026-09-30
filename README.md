@@ -80,9 +80,12 @@ analyst before its final release, some on staging teams rather than in daily use
   (progress on an open goal doesn't notify), and a "Done since you last looked" list in the Inbox ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 - **Short logs by default.** `xt log` prints the newest 20 messages; `--full` prints all
   ([`xt log`](docs/user-guide.md#xt-log)).
-- **An Inbox that shows what's new.** Three groups, Needs you, New and Friction, with their counts
-  in the panel title; friction you've seen folds away, in the TUI and in `xt inbox`
+- **An Inbox that shows what's new.** Three groups, Needs you, Notifications and Friction, with
+  their counts in the panel title; friction you've seen folds away, in the TUI and in `xt inbox`
   ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **A TUI that reads the same everywhere.** Three bands (Team and Inbox, Work or Flow, the detail
+  pane), numbered titles `[n] - Title - info`, the newest on top in every pane, and a key line with
+  the focused pane's own keys ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 - **Rows that use the whole panel, with ages.** List rows are cut only at the panel's edge and show
   how old they are (`now`, `45s`, `14m`, `3h`, `2d`, `8w`); the focused panel's title is reversed
   ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
@@ -180,43 +183,45 @@ release's **Upgrading** note in [CHANGELOG.md](CHANGELOG.md). From 0.14.0 on, `x
 
 ## The TUI
 
-`xt` (or `xt tui`) opens a lazygit-style view, refreshed every 2 seconds: the **Team** pane on top
-(one header line with the team, xt's version, what's running and what needs you, and today's
-tokens and cost; then one block per harness with its account windows as bars and its agents in
-aligned columns: short model such as `sonnet 5.5`, state, and context as tokens, a bar and a
-percentage), **Inbox** (1: Needs you, New and unread Friction, with their counts in its title;
-where the TUI starts) over **Work** (2: goals with their tasks under them, open goals first, done
-goals folded under `done (N)`, and goal drafts the liaison is still shaping) on the left, the
-detail pane on the right (the selected item with its whole thread in time order), **Flow** (3)
-across the bottom, and key hints on the last line. Flow is the ledger as a swim-lane chart: one
+`xt` (or `xt tui`) opens a lazygit-style view, refreshed every 2 seconds, in three bands. On top,
+the **Team** pane (0) on the left, one column: a header with the team, xt's version, what's running
+and what needs you; today's tokens and cost; then per harness its account windows as bars and its
+agents, one per line (short model such as `sonnet 5.5`, state, and context as tokens, a bar and a
+percentage); a team too big for the pane ends with `+N more (widen the terminal)`. Beside it, as
+high, the **Inbox** (1: Needs you, Notifications and unread Friction, with their counts in its
+title; where the TUI starts). In the middle, full width, **Work** (2: goals with their tasks under
+them, open goals first, done goals folded under `done (N)`, and goal drafts the liaison is still
+shaping) or **Flow** (3), which share the pane like tabs. At the bottom, the detail pane (4: the
+selected item with its whole thread in time order), and key hints on the last line: the focused
+pane's own keys, then `S`, `/` and `v`. Every title reads `[n] - Title - info`, and every pane has
+the newest on top. Flow is the ledger as a swim-lane chart: one
 lane per agent (you first, then the liaison, the lead and the rest of the roster), one row per
 message with an arrow from sender to receiver, the type's glyph (`◆` goal, `▸` task, `◇` done,
 `✉` report, `⚑` ask or approval, `✱` friction, `⚠` alert, `○` note or your own message) and its
 label, a dotted line into your lane, `#id` and the first line on the right and the time on the
 left. `v` opens the supervisor's log (what `xt watch` did: deliveries, wake-ups, nudges,
 notifications, alerts) in a pop-up. The result of your last
-action shows for about ten seconds in a one-line toast. The Team pane is as high as its content
-(on a small terminal a big team's pane is capped, so the Inbox keeps its rows); the panes keep a
-fixed size, and the focused one is shown by its frame colour and a reversed title. List rows use
-the pane's whole width and end with their age.
+action shows for about ten seconds in a one-line toast. The panes keep a fixed size, and the
+focused one is shown by its frame colour and a reversed title. List rows use the pane's whole
+width and end with their age.
 
 | Key | What it does |
 |---|---|
-| `0`–`4`, `tab`, `j`/`k`, `enter`, `esc` | Switch panes: 0 Team, 1 Inbox, 2 Work, 3 Flow, 4 the detail pane (`tab` goes round them); move (the arrows too); read the detail (`j`/`k` there bring a long thread's hidden rows in); `esc` from the detail pane back to the pane you came from |
+| `0`–`4`, `tab`, `j`/`k`, `enter`, `esc` | Switch panes: 0 Team, 1 Inbox, 2 Work, 3 Flow (2 and 3 swap the middle pane), 4 the detail pane (`tab` goes round them); move (the arrows too); read the detail (`j`/`k` there bring a long thread's hidden rows in); `esc` from the detail pane back to the pane you came from |
 | Mouse | A click selects a row in any pane and focuses that pane (the detail pane follows without taking focus); the wheel scrolls Flow and the detail pane |
-| `Home` / `End`, page keys (Team) | The first / last agent, a page of agents up or down |
+| `Home` / `End`, page keys (Team) | The first / last agent in view |
 | `v` | The supervisor's log, newest first, in a pop-up (`esc` closes it) |
 | `/` | Filter the focused pane by text (empty clears it) |
 | `t` | Show or hide system lines (starts, stops, settings, wake-ups, nudges) in Flow |
 | `f` (Flow) | Show one agent's messages or one goal's thread; the same pick again, or `esc`, clears it |
-| `g` / `G`, page keys (Flow) | The oldest / newest message, a page up or down; with the newest selected, Flow follows new messages |
+| `g` / `G`, page keys (Flow) | The newest (top) / oldest message, a page up or down; with the newest selected, Flow follows new messages |
 | `space` / `o` | Fold or unfold the selected goal, `done (N)` or `no goal` row / show open work only (Work) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
-| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says which (`s answer #288` or `s/S message liaison`). In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
+| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says `s answer #288` while it answers. In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
 | `S` | Always message the liaison, even with a question selected |
 | `c` | Clear the selected alert, or mark the selected friction seen (Inbox) |
 | `enter` or `space` on `(N older, seen) ▸` | Show or hide the friction you've already seen (Inbox) |
-| `enter` or `space` on `(N earlier, seen) ▸` | Show or hide what New showed you in the last 7 days (Inbox) |
+| `enter` or `space` on `(N earlier, seen) ▸` | Show or hide what Notifications showed you in the last 7 days (Inbox) |
 | `enter` or `space` on `(N answered, last 7 days) ▸` | Show or hide the questions you answered in the last 7 days, each with your answer (Inbox, under Needs you) |
 | `f` (Team) | Switch Herdr to the selected agent's workspace |
 | `u` / `U` | Start the selected stopped agent / every stopped agent |

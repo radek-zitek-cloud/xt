@@ -1,7 +1,11 @@
 """v0.16.1, card #157: TUI fixes from the first live use of v0.16.0. Keys 0 and 4 and esc; arrows
 and page keys in Team and Flow; the state dot in the state's colour; space folds in the Inbox; seen
 New items folded under New for 7 days; clicks select without moving focus to Detail, and the
-wheel scrolls Flow and Detail."""
+wheel scrolls Flow and Detail.
+
+v0.17.0 (card #162): New is NOTIFICATIONS, Flow runs newest on top and shares its band with Work,
+the Team pane shows what fits and `+N more` instead of scrolling, and the key line lists no
+navigation keys; the checks below follow."""
 
 import asyncio
 import json
@@ -10,12 +14,13 @@ from rich.text import Text
 from textual import events
 
 from xt.tui import teampane
-from xt.tui.app import DETAIL, FLOW, HINTS, INBOX, TEAM, WORK, Help, LiveActions, XtTui
+from xt.tui.app import DETAIL, FLOW, INBOX, TEAM, WORK, Help, LiveActions, XtTui
 from xt.tui.model import ANSWERED_FOLD, EARLIER_FOLD, FRICTION_FOLD, build
 from xt.tui.thread import ThreadDetail
 
 from .test_batch_0160 import _fixture, _shown, _team, _work_fixture, _xt_inbox
 from .test_flow_0160 import _fixture as _flow_fixture
+from .test_flow_0160 import _title
 
 
 def _run(coro):
@@ -76,7 +81,7 @@ def test_1_zero_focuses_team_four_detail_and_esc_returns_to_the_pane_it_came_fro
                 await pilot.press(str(DETAIL))
                 await pilot.pause()
                 assert app.focused.id == "detail"
-                assert app.query_one("#detail").border_title == f"Detail─{pane.title}"
+                assert _title(app.query_one("#detail")) == f"[4] - Detail - {pane.title}"
                 await pilot.press("escape")
                 await pilot.pause()
                 assert app.focused is pane, key
@@ -84,9 +89,9 @@ def test_1_zero_focuses_team_four_detail_and_esc_returns_to_the_pane_it_came_fro
     _run(run())
 
 
-def test_1_the_key_line_and_the_help_list_0_to_4():
+def test_1_the_help_lists_0_to_4_and_the_key_line_leaves_them_to_it():
+    """Card #162: the key line lists no navigation keys; the help screen still has 0-4."""
     assert TEAM == 0 and DETAIL == 4
-    assert "0-4 panes" in HINTS
     keys = dict(Help.KEYS)
     assert keys["0-4"] == "jump to a pane: Team, Inbox, Work, Flow, Detail"
     assert "Team (0)" in keys
@@ -97,7 +102,7 @@ def test_1_the_key_line_and_the_help_list_0_to_4():
 
         app = XtTui(demo_snapshot)
         async with app.run_test(size=(100, 30)):
-            assert "0-4 panes" in str(app.query_one("#hints").render())
+            assert "0-4" not in str(app.query_one("#hints").render())
 
     _run(run())
 
@@ -126,13 +131,16 @@ def test_2_up_and_down_move_in_team_like_j_and_k(ctx, fake_home):
 
 
 def test_2_home_end_and_the_page_keys_in_team(ctx, fake_home):
-    _team(ctx, fake_home, extra_claude=9, extra_codex=6)  # 20 agents: capped at 100x24
+    """Card #162: the Team pane never scrolls, so the keys reach the agents in view; the rest are
+    under the `+N more` line."""
+    _team(ctx, fake_home, extra_claude=1)  # 6 agents: all in view at 160x40
 
     async def run():
         app = _app(ctx)
         async with app.run_test(size=(160, 40)) as pilot:  # every agent fits: a page is the whole team
             await pilot.press("0")
             order = [r.data["name"] for r in app.team.rows]
+            assert len(order) == 6 and app.team.hidden == 0
             await pilot.press("end")
             assert app.team.selected == order[-1]
             await pilot.press("home")
@@ -141,20 +149,31 @@ def test_2_home_end_and_the_page_keys_in_team(ctx, fake_home):
             assert app.team.selected == order[-1]
             await pilot.press("pageup")
             assert app.team.selected == order[0]
+
+    _run(run())
+
+
+def test_2_the_keys_reach_only_the_agents_in_view_when_the_team_does_not_fit(ctx, fake_home):
+    _team(ctx, fake_home, extra_claude=9, extra_codex=6)  # 20 agents: they don't fit at 100x24
+    everyone = [a.name for a in ctx.team.agents() if a.kind != "human"]
+
+    async def run():
         app = _app(ctx)
-        async with app.run_test(size=(100, 24)) as pilot:  # capped: a page is the agent lines in view
+        async with app.run_test(size=(100, 24)) as pilot:
             await pilot.press("0")
             await pilot.pause()
-            assert app.team.limit is not None
-            step = app.team.page_size()
-            assert 1 <= step < len(order)
+            team = app.team
+            order = [r.data["name"] for r in team.rows]
+            assert team.limit is not None and team.hidden > 0 and 1 <= len(order) < len(everyone)
+            assert team.page_size() == len(order)
             await pilot.press("pagedown")
-            assert app.team.selected == order[step]
+            assert team.selected == order[-1]
             await pilot.press("pageup")
-            assert app.team.selected == order[0]
-            await pilot.press("end")
-            assert app.team.selected == order[-1]
-            assert any(f" {order[-1]} " in ln for ln in str(app.team.render()).splitlines())  # in view
+            assert team.selected == order[0]
+            await pilot.press("end", "down", "j")  # the last agent in view stays selected
+            await pilot.pause()
+            assert team.selected == order[-1]
+            assert any(f" {order[-1]} " in ln for ln in str(team.render()).splitlines())  # in view
 
     _run(run())
 
@@ -168,13 +187,13 @@ def test_2_up_and_down_move_in_flow_like_j_and_k(ctx, clock):
             await pilot.press(str(FLOW))
             pane = app.panel(FLOW)
             msgs = pane.message_rows()
-            assert pane.selected == msgs[-1]
-            await pilot.press("up")
-            assert pane.selected == msgs[-2] and not pane.follow
-            await pilot.press("k")
-            assert pane.selected == msgs[-3]
-            await pilot.press("down", "j")
-            assert pane.selected == msgs[-1] and pane.follow
+            assert pane.selected == msgs[0]  # the newest, on top (card #162)
+            await pilot.press("down")
+            assert pane.selected == msgs[1] and not pane.follow
+            await pilot.press("j")
+            assert pane.selected == msgs[2]
+            await pilot.press("up", "k")
+            assert pane.selected == msgs[0] and pane.follow
 
     _run(run())
 
@@ -215,7 +234,8 @@ def test_3_the_team_panes_dots_follow_herdrs_states(ctx, fake_home):
     assert teampane.dot_style(rows["builder"].data) == "green"  # idle
     assert teampane.dot_style(rows["qa"].data) == "red"  # blocked
     assert teampane.dot_style(rows["pm"].data) == "bright_black" and rows["pm"].data["dot"] == "○"  # not running
-    lines = teampane.render(Text(""), "", [], [r.data for r in rows.values()], 160, ctx.ledger.clock())[0]
+    lines = [ln for ln, _ in teampane.render(Text(""), "", [], [r.data for r in rows.values()], 160,
+                                             ctx.ledger.clock())]
     lead = next(ln for ln in lines if " lead " in ln.plain)
     at = lead.plain.index("● lead")
     assert any(s.start == at and s.end == at + 1 and str(s.style) == "yellow" for s in lead.spans)
@@ -248,9 +268,9 @@ def test_5_seen_new_items_fold_under_new_after_a_restart(ctx):
     fold = next(r for r in rows if r.key == EARLIER_FOLD)
     assert fold.text.plain == "(2 earlier, seen) ▸"
     heads = [r.text.plain for r in rows if r.kind == "heading"]
-    assert heads == ["NEEDS YOU", "NEW", "FRICTION"]
+    assert heads == ["NEEDS YOU", "NOTIFICATIONS", "FRICTION"]  # New is NOTIFICATIONS since card #162
     i = rows.index(fold)
-    assert rows[i - 1].text.plain == "NEW"  # under New
+    assert rows[i - 1].text.plain == "NOTIFICATIONS"  # under it
     assert all(r.text.style == "" and {str(s.style) for s in r.text.spans} <= {"bright_black"} for r in new)  # dim
     assert "seen already" in new[0].detail().plain
     # nothing new is stored: the same marker keys as v0.16.0
@@ -339,7 +359,7 @@ def test_5b_an_answer_given_in_the_tui_is_in_the_answered_fold_after_a_restart(c
             assert heads[0] == "NEEDS YOU"
             fold = next(i for i, r in enumerate(rows) if r.key == ANSWERED_FOLD)
             assert rows[fold].text.plain == "(1 answered, last 7 days) ▸"
-            assert rows.index(next(r for r in rows if r.text.plain == "NEW")) > fold  # under Needs you
+            assert rows.index(next(r for r in rows if r.text.plain == "NOTIFICATIONS")) > fold  # under Needs you
             assert not [r for r in p.rows if r.kind == "answered"]  # folded at first
             p.highlighted = next(i for i, r in enumerate(p.rows) if r.key == ANSWERED_FOLD)
             await pilot.press("space")
@@ -417,8 +437,11 @@ def test_6_a_click_on_a_flow_row_selects_it_and_focuses_flow(ctx, clock):
     async def run():
         app = _app(ctx)
         async with app.run_test(size=(160, 40)) as pilot:
+            app.show_middle(FLOW)  # on screen, focus still in the Inbox
+            await pilot.pause()
             pane = app.panel(FLOW)
-            target = next(i for i in pane.message_rows()[:-1] if pane.top <= i and pane.rows[i][1]["id"] == m["done"])
+            target = next(i for i in pane.message_rows()[1:]
+                          if pane.top <= i < pane.top + pane.view_height() and pane.rows[i][1]["id"] == m["done"])
             await _click(pilot, *_flow_row_at(pane, target))
             assert app.focused is pane and pane.selected == target and not pane.follow
             assert f"#{m['done']}" in app.query_one("#detail-body").content.plain.split("\n")[0]
@@ -464,15 +487,16 @@ def test_6_the_wheel_scrolls_flow_and_the_selection_stays_in_view(ctx, clock):
     async def run():
         app = _app(ctx)
         async with app.run_test(size=(160, 40)) as pilot:
+            app.show_middle(FLOW)
+            await pilot.pause()
             pane = app.panel(FLOW)
-            bottom = pane.top
-            assert pane.follow and bottom > 0
-            await _wheel(pilot, pane, down=False)
-            assert pane.top == bottom - pane.WHEEL_ROWS and not pane.follow
+            assert pane.follow and pane.top == 0  # the newest on top (card #162)
+            await _wheel(pilot, pane, down=True)
+            assert pane.top == pane.WHEEL_ROWS and not pane.follow
             assert pane.top <= pane.selected < pane.top + pane.view_height()
             assert app.focused is app.panel(INBOX)  # the wheel doesn't move focus
-            await _wheel(pilot, pane, down=True)
-            assert pane.top == bottom
+            await _wheel(pilot, pane, down=False)
+            assert pane.top == 0
 
     _run(run())
 
@@ -485,13 +509,17 @@ def test_6_the_wheel_scrolls_a_long_thread_in_detail(ctx, clock):
     async def run():
         app = _app(ctx)
         async with app.run_test(size=(160, 40)) as pilot:
-            await pilot.press(str(FLOW), "g")  # the goal, oldest: the thread's later rows are hidden
+            await pilot.press(str(FLOW), "G")  # the goal, oldest: the thread's later rows are hidden
             await pilot.pause()
             assert isinstance(app.detail_view, ThreadDetail)
             body = lambda: "\n".join(_shown(app))
             before = body()
             assert "later rows hidden" in before
-            await _wheel(pilot, app.query_one("#detail"), down=True)
+            # the short bottom Detail (card #162) scrolls the thread into view, then moves it
+            for _ in range(10):
+                await _wheel(pilot, app.query_one("#detail"), down=True)
+                if app.detail_view.offset is not None:
+                    break
             assert body() != before and app.detail_view.offset is not None  # the thread moved
             assert app.focused is app.panel(FLOW)  # the wheel doesn't move focus
 

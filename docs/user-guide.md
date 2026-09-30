@@ -69,8 +69,8 @@ starts a new line, ctrl+s sends, esc cancels.
 
 You can also message the liaison from the TUI without switching workspaces: `S` always opens a
 message to the liaison. `s` does too, except when a question is selected in the Inbox: then it
-answers that question. The key line at the bottom of the TUI starts with what `s` will do right
-now (`s answer #288 · S message liaison`, or `s/S message liaison`).
+answers that question. The key line at the bottom of the TUI says `s answer #288` while it will do
+that (from 0.17.0, among the Inbox's keys, before `S message liaison`).
 
 ### 3. Hiring (approvals)
 
@@ -91,22 +91,22 @@ it isn't shown:
 
 | In the Inbox | What it is | What you do |
 |---|---|---|
-| **NEEDS YOU** | Stays until you answer, decide or clear it | |
+| **NEEDS YOU** | Stays until you answer, decide or clear it; newest first (from 0.17.0) | |
 | `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options` when it offers choices) | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
 | `⚑ #12 spawn …` / `⚑ #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
 | `⚠ …` | An **alert**: an agent crashed, is blocked or went silent; or (from 0.16.0) the supervisor failed to wake an agent, to send a notification or to record usage (`⚠ ×3 wake-up failed: …`) | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
 | `(2 answered, last 7 days) ▸` | (from 0.16.1) The questions you answered in the last 7 days, folded: `✓ #2098 v0.16.1 spec → 1: Approve and build`, newest first; the detail pane shows the question with its options, your answer and the thread | `enter` or `space` shows them; again folds them |
-| **NEW** | Since you last looked, newest first; clears once you've looked | |
+| **NOTIFICATIONS** | (called NEW before 0.17.0) Since you last looked, newest first, in bold; clears once you've looked | |
 | `✓ #210 done: Write the weekly digest  #260` | A goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) and the goal's whole thread | Read it |
 | `✉ #47 liaison: …` | A report to you | Read it |
-| `(3 earlier, seen) ▸` | (from 0.16.1) What New showed that you've since seen, from the last 7 days, folded | `enter` or `space` shows it (newest first, dim); again folds it |
+| `(3 earlier, seen) ▸` | (from 0.16.1) What Notifications showed that you've since seen, from the last 7 days, folded | `enter` or `space` shows it (newest first, dim); again folds it |
 | **FRICTION** | Unread friction only, newest first | |
 | `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt. `c` marks it seen at once |
 | `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` or `space` (from 0.16.1) shows it (newest first); again folds it |
 
-The Inbox's title counts what's in the groups: `[1]─Inbox─⚑ 2 · ✉ 1 · ✱ 3` is two items that need
-you, one new and three unread friction; a zero count is left out. The Team pane's header repeats
-the first two.
+The Inbox's title counts what's in the groups: `[1] - Inbox - ⚑ 2 · ✉ 1 · ✱ 3` is two items that
+need you, one unread notification and three unread friction; a zero count is left out. The Team
+pane's header repeats the first two.
 
 **Friction is unread until you've seen it.** In the TUI, friction counts as seen once you leave the
 Inbox panel (or quit) after it was on screen there; friction further down, which you never
@@ -124,13 +124,13 @@ the Team pane have no age, and Flow's rows and the supervisor's log (`v`) keep t
 green frame and a reversed title.
 
 **Work** (panel 2, from 0.16.0; it replaces the Goals and Tasks panels) shows goals with their
-tasks under them:
+tasks under them. From 0.17.0 it shares its pane with Flow: `2` shows Work, `3` Flow.
 
 ```
-┌[2]─Work─2 open · 63 done──────────────────────────────┐
-│▾ #1729 Site check for #124         lead     1/2    16m│
-│    ✓ #1731 qa    Retry read-only curl for #124     15m│
+┌[2] - Work - 2 open · 63 done │ [3] - Flow────────────┐
+│▾ #1729 Site check for #124         lead     1/2    14m│
 │    ● #1733 pm    Read-only site check (curl -LfsS) 14m│
+│    ✓ #1731 qa    Retry read-only curl for #124     15m│
 │▾ #1702 Weekly digest               lead     0/1     2d│
 │    ● #1705 carol Collect the week's links           2d│
 │✎ quarterly-report  draft                              │
@@ -145,6 +145,7 @@ tasks under them:
   activity, so a goal nobody has touched for two days reads `2d`.
 - A **task** shows `●` open, `✓` done or `✗` failed or blocked (closed with a `done` that starts
   with FAIL or BLOCKED, or open while its owner is blocked), then its id, owner, first line and age.
+  A goal's tasks are newest first (from 0.17.0).
   A task belongs to the goal at the root of its `--ref` chain, so a task sent with `--ref` to
   another task or to a report still sits under its goal; one that reaches no goal (no `--ref`, or
   a chain that ends outside the last 30 days) sits under **no goal**, the last row.
@@ -170,12 +171,12 @@ first line of the lead's closing summary instead. That is the goal's only notifi
 liaison's progress reports about a goal that's still open, and anything it sends about the goal
 afterwards, wait in the Inbox without one. Other reports the liaison sends you (not about a goal)
 notify, once per `--ref`. Tasks, goals the lead opens for sub-teams, and friction never notify, and quiet
-hours apply as for questions (what closes at night isn't sent later). The Inbox's New group lists
+hours apply as for questions (what closes at night isn't sent later). The Inbox's Notifications group lists
 closed goals, and from 0.16.0 the reports sent to you, until you've looked: in the TUI, until you
 leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it has printed them in
 your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
 first run on 0.15.0, so older goals don't appear. From 0.16.1 what you've seen isn't gone from the
-TUI: it folds under New as `(N earlier, seen)` for 7 days, also after you quit and start it again
+TUI: it folds under Notifications as `(N earlier, seen)` for 7 days, also after you quit and start it again
 (`xt inbox` still lists only what's new).
 
 The **detail pane** (from 0.16.0) shows the selected item with its **thread**: for anything under
@@ -203,25 +204,29 @@ Each thread row shows the time (with the date when the thread spans days), sende
 id and first line; the selected message is marked `◀ you are here`. Below come the goal's usage and
 the keys that work on the selected item. A thread too long for the pane shows the part around the
 selected message and says how much is hidden (`↑ 24 earlier rows hidden`, `↓ 3 later rows
-hidden`); after `enter`, `j`/`k` bring the hidden rows in. A message whose `--ref` points to one
-the TUI doesn't have shows alone with its replies.
+hidden`); after `enter`, `j`/`k` bring the hidden rows in. From 0.17.0 the detail pane is the short
+band at the bottom (4 to 8 rows), so it scrolls: `j` first scrolls the thread into view, then
+moves through its hidden rows. A message whose `--ref` points to one the TUI doesn't have shows
+alone with its replies.
 
-**Flow** (pane 3, from 0.16.0; it replaces the Log panel) runs across the bottom and shows the
-messages as a swim-lane chart, the newest at the bottom:
+**Flow** (pane 3, from 0.16.0; it replaces the Log panel) shares its pane with Work (from 0.17.0:
+`3` shows it, `2` shows Work again) and shows the messages as a swim-lane chart, the newest on top
+(from 0.17.0; time runs upward):
 
 ```
-┌[3]─Flow─11 of 18 · system hidden (t)──────────────────────────────────────────────────────────────┐
+┌[2] - Work │ [3] - Flow - 11 of 18 · system hidden (t)─────────────────────────────────────────────┐
 │time  human       xt          liaison     lead        pm          qa          builder              │
-│── Sep 29 ──                                                                                       │
-│07:36 ○─report────────────────▶                                   #1728 DNS fixed, ask QA to retry │
-│07:36                         ◆─goal──────▶                       #1729 Site check for #124        │
-│07:37                                     ▸─task──────▶           #1733 Read-only site check       │
-│07:37 ◀······································friction·✱           #1736 settings refuse plain curl │
-│07:38                                     ◀─done──────◇           #1737 Site checked, all good     │
-│07:38 ◀··approval·⚑                                               #1738 lead asks to spawn dora    │
-│07:39 ◀·····alert·⚠                                               #1739 qa is blocked              │
-│07:40                         ◀───────ask─⚑                       #1740 How should #1729 finish?   │
 │07:41 ◀···········report·✉                                        #1741 Site check done            │
+│07:40                         ◀───────ask─⚑                       #1740 How should #1729 finish?   │
+│07:39 ◀·····alert·⚠                                               #1739 qa is blocked              │
+│07:38 ◀··approval·⚑                                               #1738 lead asks to spawn dora    │
+│07:38                                     ◀─done──────◇           #1737 Site checked, all good     │
+│07:37 ◀······································friction·✱           #1736 settings refuse plain curl │
+│07:37                                     ▸─task──────▶           #1733 Read-only site check       │
+│07:36                         ◆─goal──────▶                       #1729 Site check for #124        │
+│07:36 ○─report────────────────▶                                   #1728 DNS fixed, ask QA to retry │
+│── Sep 28 ──                                                                                       │
+│18:02                                     ◀───────────report─✉    #1702 Weekly digest collected    │
 └───────────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -229,8 +234,8 @@ messages as a swim-lane chart, the newest at the bottom:
   the liaison, the lead and the rest of the roster in order. An agent that has since retired (or
   one the roster doesn't know) gets a dim lane at the end, only while one of its messages is in
   view: scroll, filter or resize it out of the pane and its lane goes too.
-- One **row** per message: the time on the left (local `HH:MM`; a `── Sep 29 ──` row where the day
-  changes), an arrow from the sender's lane to the receiver's with the type's glyph and label at
+- One **row** per message: the time on the left (local `HH:MM`; a `── Sep 28 ──` row over an
+  earlier day's messages), an arrow from the sender's lane to the receiver's with the type's glyph and label at
   the sender end, and `#id` with the first line on the right, cut at the pane's edge. The glyphs:
   `◆` goal, `▸` task, `◇` done, `✉` report, `⚑` ask or approval, `✱` friction, `⚠` alert (amber),
   `○` a note or a message you typed. Messages to you are dotted (`·`), so they stand out; a note
@@ -243,8 +248,9 @@ messages as a swim-lane chart, the newest at the bottom:
   names the filter. The same pick again, `esc` in the picker, or `esc` in Flow clears it. `/`
   filters by the message text.
 - `j`/`k` or the arrows select a row, the page keys scroll, `g`/`G` (or `Home`/`End`) go to the
-  oldest or newest; a click selects a row and the wheel scrolls (from 0.16.1). While the newest
-  row is selected, Flow follows new messages; move up and it stays where you are. The title says
+  newest (top) or oldest (bottom); a click selects a row and the wheel scrolls (from 0.16.1).
+  While the newest row (the top one) is selected, Flow follows new messages; move down and it
+  stays where you are. The title says
   `N of M`: rows in view of all that pass the filters. `enter` shows the message with its thread in
   the detail pane. Flow is read-only.
 - A team too wide for the pane: the lanes that don't fit collapse into one `+N` lane, and a message
@@ -259,51 +265,89 @@ wake-up, a failed notification and a failed usage recording each raise an alert 
 you), with the first line of the error. While that alert is open, more failures of the same kind
 count on it instead of adding rows (the row starts `⚠ ×3` and its age is the last failure's;
 `xt inbox` says `×3, last 14:05`); once you clear it with `c`, the next failure
-raises a new one. A failed notification raises only the alert, never another notification. The key
-line at the bottom starts with what `s` will do.
+raises a new one. A failed notification raises only the alert, never another notification.
 
-The **Team** pane on top (from 0.16.0; it replaces the Status pane and the Team panel) is as high
-as its content:
+The **Team** pane, top left (from 0.16.0; it replaces the Status pane and the Team panel; one
+column from 0.17.0):
 
 ```
-my-team · xt 0.16.0 (latest) · 5 running · 1 goal open · ⚑ 1 needs you · ✉ 1 new                                               today 3.6M tokens · est. $1.57
-CLAUDE  5h ▓░░░░░░░░░   6% resets 15:00                                                                   CODEX  7d ▓▓▓▓▓▓░░░░  64% resets Tue 12:00
-● pm      sonnet 5.5    idle      41k ▕▎     ▏   4%  ● qa      default       idle        — ▕      ▏       ● liaison default       idle        — ▕      ▏
-● builder opus 5.5      idle      41k ▕▎     ▏   4%                                                       ● lead    gpt-5.2-codex working ~181k ▕████▎ ▏  70%
+┌─ [0] - Team ───────────────────────────────────┐
+│my-team · xt 0.17.0 (latest) · 5 running        │
+│1 goal open · ⚑ 1 needs you · ✉ 1 new           │
+│today 3.6M tokens · est. $1.57                  │
+│────────────────────────────────────────────────│
+│CLAUDE  5h ▓░░░░░░░░░   6% resets 15:00         │
+│        7d ▓░░░░░░░░░  10% resets Wed 12:00     │
+│● pm      sonnet 5.5    idle      41k ▕▏  ▏   4%│
+│● builder opus 5.5      idle      41k ▕▏  ▏   4%│
+│● qa      default       idle        — ▕   ▏     │
+│────────────────────────────────────────────────│
+│CODEX  7d ▓▓▓▓▓▓░░░░  64% resets Tue 12:00      │
+│● liaison default       idle        — ▕   ▏     │
+│● lead    gpt-5.2-codex working ~181k ▕██▏▏  70%│
+└────────────────────────────────────────────────┘
 ```
 
-(160 columns: pm, builder and qa on Claude; liaison and lead on Codex, where lead's `default` is
+(100 columns: pm, builder and qa on Claude; liaison and lead on Codex, where lead's `default` is
 shown as the model its session log names.)
 
 - The **header**: the team; xt's version, with `(latest)`, a newer published release in yellow, or
   `running 0.15.0: restart to update` when something still runs an older one; how many agents run;
   open goals; `⚑ N needs you` and `✉ N new` (the Inbox's counts), or "nothing waiting for you";
-  messages or jobs stuck for over a minute; and today's tokens and estimate on the right.
-- One **block per harness**: its account windows as bars with the share used and the reset time
-  (`CLAUDE 5h …`, `CODEX 7d …`); a window without a current reading isn't shown (`xt status`
-  says why). Then its agents, in columns that line up: a dot in the state's colour (working
-  yellow, idle and done green, blocked red, dim when not running: your terminal's own named
-  colours, so your theme decides the shades), the name, the
+  messages or jobs stuck for over a minute. It wraps between its parts rather than cut them off.
+  Under it, today's tokens and estimate, then a line.
+- One **block per harness**, a line between them: its account windows as bars with the share used
+  and the reset time (`CLAUDE 5h …`, `CODEX 7d …`); a window without a current reading isn't shown
+  (`xt status` says why). Then its agents, one per line, in columns that line up: a dot in the
+  state's colour (working yellow, idle and done green, blocked red, dim when not running: your
+  terminal's own named colours, so your theme decides the shades), the name, the
   short model (`sonnet 5.5`; for an agent on `default`, the model its own session log names, else
   `default`), the state (`stopped` when not running), and the context: tokens, a bar and the share
-  of the model's window, yellow from 70 % and red from 85 %. Agents fill up to three columns as the
-  width allows, so five take two lines.
+  of the model's window, yellow from 70 % and red from 85 %.
+- The pane **never scrolls**. When the team doesn't fit its height, it shows what fits and a last
+  line `+3 more (widen the terminal)`, counting the agents and harness lines out of view; `j`/`k`
+  reach the agents in view. A team that large is better read with `xt status`.
 
-The layout (from 0.16.0): Team on top; Inbox over Work on the left, the detail pane on the right;
-Flow across the bottom, taking about a third of the height; the key line last. The Inbox is the
-tallest list pane (at least 8 rows at 160x40, 5 at 100x30). On a small terminal a big team's Team
-pane is capped so the Inbox keeps its rows: it shows the header and the lines around the selected
-agent, and its bottom edge says how many lines are out of view.
+**The layout** (from 0.17.0) has three bands and the key line:
+
+```
+┌─ [0] - Team ─────────────┐┌─ [1] - Inbox - ⚑ 2 · ✉ 1 ──────────────────┐
+│ header, today, harnesses ││ NEEDS YOU / NOTIFICATIONS / FRICTION       │
+│ and agents, one column   ││                                            │
+└──────────────────────────┘└────────────────────────────────────────────┘
+┌─ [2] - Work - 1 open · 0 done │ [3] - Flow ──────────────────────────────┐
+│ Work, or Flow after 3                                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+┌─ [4] - Detail - Inbox ───────────────────────────────────────────────────┐
+│ the selected row and its thread (4 to 8 rows; it scrolls)                │
+└──────────────────────────────────────────────────────────────────────────┘
+ a/d approve/deny · c clear · space fold · S message liaison · / filter · v supervisor
+```
+
+- **Top**: Team on the left, as wide as its agent lines need up to half the terminal, and the
+  Inbox on the right, the same height. The team decides that height (up to 60 % of the
+  terminal), so Work/Flow and Detail keep at least 4 rows each where the terminal allows.
+- **Middle**: Work or Flow, full width, the rest of the height. Both names show in the title like
+  tabs, the one on screen with its counts, the other dim. `2` and `3` switch, and each keeps its
+  selection and scroll while the other is shown.
+- **Bottom**: the detail pane, full width and shorter than the others.
+- Every title reads `[n] - Title - info`: `n` is the pane's key, `info` its counts or filter.
+- **Newest on top** in every pane (from 0.17.0): Needs you, Notifications, Friction, Work's goals
+  and tasks, and Flow. With the top row selected, the selection stays on the top row as new rows
+  arrive; select another row and it stays there.
 
 The panes' number keys (from 0.16.1) are `0` Team, `1` Inbox, `2` Work, `3` Flow and `4` the
 detail pane, and `v` opens the supervisor's log; the TUI starts in the Inbox, and `tab` goes round
 the panes. `esc` in the detail pane goes back to the pane you came from. In the Team pane `j`/`k`
-or the arrows select an agent (`Home`/`End`: the first and last; `PgUp`/`PgDn`: a page, the agent
-lines in view), the detail pane shows it, and `u`, `x`, `R` and `f` act on it (`f` in Flow is its
-filter). The
-key line lists what `s` does first, then `h`, `q`, `0-4`, `j/k`, `space`, `enter`, `a/d`, `/`, `t`,
-`f` and `v` (a narrow terminal keeps the keys and drops their words), and `g/G` while Flow has
-focus.
+or the arrows select an agent (`Home`/`End` or `PgUp`/`PgDn`: the first and last in view), the
+detail pane shows it, and `u`, `x`, `R` and `f` act on it (`f` in Flow is its filter).
+
+**The key line** (from 0.17.0) shows the focused pane's own keys first, then `S`, `/` and `v`,
+which work everywhere; a narrow terminal keeps the keys and drops their words. Inbox: `a/d`,
+`s answer #N` (only while a question is selected: otherwise `s`, like `S`, messages the liaison),
+`c`, `space`. Team: `u/U`, `x/X`, `R`, `f`. Work: `space`, `o`. Flow: `t`, `f`, `g/G`. The detail
+pane: only the keys that work everywhere. Keys for moving around (`0`-`4`, `j/k`, `tab`, `enter`,
+`esc`), `h` and `q` are left to the help screen (`h`), which lists every key.
 
 **The mouse** (from 0.16.1): a click selects a row in any pane (an agent in Team, a row in the
 Inbox, Work or Flow) and focuses that pane; the detail pane shows it but doesn't take focus, so the

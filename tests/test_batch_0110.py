@@ -23,14 +23,16 @@ def test_key_line_says_what_s_does_and_S_always_messages_the_liaison(ctx):
             await pilot.press("2")  # the TUI starts in the Inbox since card #130
             await pilot.pause()
             hints = lambda: str(app.query_one("#hints").render())  # noqa: E731
-            assert hints().startswith("s/S message liaison")  # Work focused: nothing to answer
+            # Work focused: its own keys, then S (card #162); nothing to answer
+            assert hints().startswith("space fold · o open only · S message liaison")
             for panel in ("2", "3", "4", "tab"):  # every pane but the Inbox (1), and Team
                 await pilot.press(panel, "S")
                 assert isinstance(app.screen, Compose) and app.screen.title_text == "Send to the liaison"
                 await pilot.press("escape")
             await pilot.press("1")
             await pilot.pause()
-            assert hints().startswith(f"s answer #{q['id']} · S message liaison")
+            assert hints().startswith(f"a/d approve/deny · s answer #{q['id']} · c clear · space fold · "
+                                      "S message liaison")
             await pilot.press("S")  # a question is selected, but S doesn't answer it
             assert isinstance(app.screen, Compose) and app.screen.title_text == "Send to the liaison"
             await pilot.press(*"Stop after this one", "ctrl+s")
@@ -44,7 +46,7 @@ def test_key_line_says_what_s_does_and_S_always_messages_the_liaison(ctx):
             await pilot.press("escape")
             await pilot.press("2")
             await pilot.pause()
-            assert hints().startswith("s/S message liaison")
+            assert hints().startswith("space fold · o open only · S message liaison")
 
     asyncio.run(run())
 

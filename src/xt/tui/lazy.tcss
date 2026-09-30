@@ -8,25 +8,14 @@ Screen {
     layers: base toast;
 }
 
-#main {
-    height: 1fr;
-}
-
-#left {
-    width: 36%;
-    min-width: 30;
-}
-
-/* Fixed sizes: moving focus never shifts the layout; the focused pane shows only by colour. The app
-   sets the heights for the terminal's (card #130: Inbox the tallest list, Flow about a third); these
-   are the proportions before it does. */
-#panel-1 { height: 3fr; }  /* Inbox */
-#panel-2 { height: 2fr; }  /* Work (card #129: Goals and Tasks in one outline) */
-#panel-3 { height: 35%; }  /* Flow (card #130), full width under the left column and Detail */
-
-#right {
-    width: 1fr;
-}
+/* Three bands (card #162), fixed sizes: moving focus never shifts the layout; the focused pane shows
+   only by colour. The app sets the heights and the Team pane's width for the terminal's; these are
+   the sizes before it does. */
+#top { height: 14; }  /* Team on the left, the Inbox on the right, the same height */
+#team { width: 50%; }
+#panel-1 { width: 1fr; }  /* Inbox */
+#middle { height: 1fr; }  /* Work (2) or Flow (3), one at a time */
+#detail { height: 6; }  /* Detail, full width at the bottom */
 
 .panel {
     background: ansi_default;
@@ -46,10 +35,6 @@ Screen {
     border: solid ansi_green;
     border-title-color: ansi_green;
     border-title-style: bold reverse;
-}
-
-#detail {
-    height: 1fr;
 }
 
 /* Lists: one line per item, never wrapped (cut with …; the detail pane has the rest),
@@ -84,11 +69,6 @@ OptionList > .option-list--option-hover {
 #detail-body {
     background: ansi_default;
     padding: 0;
-}
-
-/* Team pane on top (card #128): as high as its content, no empty space. */
-#team {
-    height: auto;
 }
 
 /* The last action's result: one line over the bottom frame, gone after about ten seconds. */

@@ -2,7 +2,8 @@
 
 Level 1 is goals, level 2 their tasks. A task belongs to the goal at the root of its `ref` chain
 (through other tasks or messages); a task with no goal the chain reaches sits under a final
-`no goal` row. Open goals come first, expanded, newest activity first; done goals sit under one
+`no goal` row. Open goals come first, expanded, newest activity first, their tasks newest first
+(card #162); done goals sit under one
 `done (N)` fold, collapsed. The model builds every row once; the pane decides which are shown
 (fold state, open-only) and lays each out at its width.
 """

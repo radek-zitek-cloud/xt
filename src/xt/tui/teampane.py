@@ -1,13 +1,11 @@
-"""The Team pane's layout (card #128): the header line, one block per harness with its account
-windows as bars, and the agents in fixed columns under it.
+"""The Team pane's layout: the header line, today's spend, then one block per harness, its account
+windows as bars and its agents under it, one column (card #162; card #128 had up to three).
 
 Pure functions of the snapshot and the pane width, so the layout is testable without a terminal.
-Agents flow into up to three columns, column by column; a harness block takes as many of them as
-its agents need, side by side while the blocks fit and stacked otherwise.
+The pane never scrolls: what doesn't fit its height gives way to a last `+N more` line (`clip`).
 """
 
 import datetime as dt
-import math
 import re
 from dataclasses import dataclass, field
 
@@ -16,9 +14,7 @@ from rich.text import Text
 
 from ..usage import short
 
-GAP = 2  # spaces between columns and between blocks
-MAX_COLUMNS = 3
-BAR_MAX, BAR_MIN = 8, 3  # the context bar's width in cells, shrunk before a column is given up
+BAR_MAX, BAR_MIN = 8, 3  # the context bar's width in cells, shrunk before the cell is cut
 WINDOW_BAR = 10
 PCT_WIDTH = 4  # "100%"
 STATE_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
@@ -148,44 +144,20 @@ def cell(d: dict, w: Widths, bar: int, selected: bool = False) -> Text:
     return out
 
 
-def fit_columns(n_agents: int, width: int, w: Widths) -> tuple[int, int]:
-    """(columns, bar width): as many columns (up to three) as the width allows, the bar shrunk
-    first. Never more columns than agents."""
-    for cols in range(min(MAX_COLUMNS, max(1, n_agents)), 0, -1):
-        for bar in range(BAR_MAX, BAR_MIN - 1, -1):
-            if cols * w.cell(bar) + GAP * (cols - 1) <= width:
-                return cols, bar
-    return 1, BAR_MIN
-
-
-def allot(counts: list[int], cols: int) -> list[int]:
-    """Columns per block, side by side: one each, then the rest to whichever block is tallest."""
-    k = [1] * len(counts)
-    for _ in range(cols - len(counts)):
-        rows = [math.ceil(n / c) if n else 0 for n, c in zip(counts, k)]
-        i = max(range(len(k)), key=lambda j: rows[j])
-        if math.ceil(counts[i] / (k[i] + 1)) >= rows[i]:
-            break  # another column wouldn't make the tallest block shorter
-        k[i] += 1
-    return k
+def fit_bar(width: int, w: Widths) -> int:
+    """The widest context bar with which an agent's cell fits `width`; the narrowest one when none
+    does (the cell is then cut at the pane's edge)."""
+    return next((bar for bar in range(BAR_MAX, BAR_MIN - 1, -1) if w.cell(bar) <= width), BAR_MIN)
 
 
 # --- the pane ---------------------------------------------------------------------------------
 
+HEADER = "header"  # the key of the header line; a harness line's is harness_key(name)
+MORE = "+{n} more (widen the terminal)"
 
-def header_lines(left: Text, spend: str, width: int) -> list[Text]:
-    """The team line with today's spend on the right; the spend on a line of its own when both
-    don't fit."""
-    from .model import fit
 
-    if not spend:
-        return [fit(left, "", width)]
-    if left.cell_len + 2 + len(spend) <= width:
-        line = left.copy()
-        line.append(" " * (width - left.cell_len - len(spend)))
-        line.append(spend, style="bright_black")
-        return [line]
-    return [fit(left, "", width), Text(spend.rjust(width), style="bright_black")]
+def harness_key(name: str) -> str:
+    return f"harness:{name}"
 
 
 def block_header(h: Harness, width: int, now: dt.datetime) -> list[Text]:
@@ -205,69 +177,58 @@ def block_header(h: Harness, width: int, now: dt.datetime) -> list[Text]:
     return [fit(ln, "", width) for ln in lines]
 
 
-def pad(t: Text, width: int) -> Text:
-    out = t.copy()
-    out.append(" " * max(0, width - out.cell_len))
-    return out
+def separator(width: int) -> Text:
+    return Text("─" * width, style="bright_black")
 
 
-def span(k: int, cw: int) -> int:
-    return k * cw + GAP * (k - 1)
+def wrap_header(header: Text, width: int) -> list[Text]:
+    """The header on as many lines as it needs, broken only between its ` · ` parts, so what needs
+    the human is never cut off at the pane's edge; a part longer than a line is cut with `…`."""
+    from .model import fit
 
-
-def height(groups, by_harness: dict, cw: int, now: dt.datetime) -> int:
-    """Lines the blocks take: each group's tallest header, then its tallest column."""
-    return sum(max(len(block_header(b, span(k, cw), now)) for b, k in g)
-               + max(math.ceil(len(by_harness[b.name]) / k) for b, k in g) for g in groups)
+    out: list[Text] = []
+    for part in header.split(" · ", allow_blank=True):
+        part.rstrip()
+        if out and out[-1].cell_len + 3 + part.cell_len <= width:
+            out[-1].append(" · ")
+            out[-1].append_text(part)
+        else:
+            out.append(part)
+    return [fit(ln, "", width) for ln in out] or [Text("")]
 
 
 def render(header: Text, spend: str, harnesses: list[Harness], agents: list[dict], width: int,
-           now: dt.datetime, selected: str | None = None) -> tuple[list[Text], list[str]]:
-    """The pane's lines at `width`, and the agents' names in display order (for j/k)."""
-    lines = header_lines(header, spend, width)
+           now: dt.datetime, selected: str | None = None) -> list[tuple[Text, str | None]]:
+    """The pane's lines at `width`, top to bottom, each with the key of the row it belongs to: the
+    header line (HEADER), a harness's lines (harness_key), an agent's line (its name), or None for
+    today's spend and the separators. In order: the header, today's spend, a separator, then per
+    harness its usage line and its agents, a separator between harnesses (card #162)."""
+    from .model import fit
+
+    out: list[tuple[Text, str | None]] = [(ln, HEADER) for ln in wrap_header(header, width)]
+    if spend:
+        out.append((fit(Text(spend, style="bright_black"), "", width), None))
     by_harness: dict[str, list[dict]] = {}
     for a in agents:
         by_harness.setdefault(a["harness"], []).append(a)
     blocks = [h for h in harnesses if by_harness.get(h.name)]
     blocks += [Harness(n) for n in sorted(by_harness) if n not in {h.name for h in harnesses}]
-    if not blocks:
-        return lines, []
     w = widths(agents)
-    cols, bar = fit_columns(len(agents), width, w)
-    cw = w.cell(bar)
-    counts = [len(by_harness[b.name]) for b in blocks]
-    # one block under the other, each with every column; or side by side when that is shorter
-    groups = [[(b, min(cols, n))] for b, n in zip(blocks, counts)]
-    if len(blocks) <= cols:
-        side = [list(zip(blocks, allot(counts, cols)))]
-        if height(side, by_harness, cw, now) <= height(groups, by_harness, cw, now):
-            groups = side
-    order: list[str] = []
-    for group in groups:
-        spans = [span(k, cw) for _, k in group]
-        heads = [block_header(b, sp, now) for (b, _), sp in zip(group, spans)]
-        for i in range(max(len(hd) for hd in heads)):
-            line = Text()
-            for j, (hd, sp) in enumerate(zip(heads, spans)):
-                line.append(" " * GAP if j else "")
-                line.append_text(pad(hd[i] if i < len(hd) else Text(), sp))
-            line.rstrip()
-            lines.append(line)
-        tall = [math.ceil(len(by_harness[b.name]) / k) for b, k in group]
-        grid = []
-        for (b, k), rows in zip(group, tall):
-            members = by_harness[b.name]
-            grid.append([members[c * rows:(c + 1) * rows] for c in range(k)])
-            order += [a["name"] for a in members]
-        for r in range(max(tall)):
-            line = Text()
-            for j, columns in enumerate(grid):
-                for c, column in enumerate(columns):
-                    line.append(" " * GAP if j or c else "")
-                    if r < len(column):
-                        line.append_text(cell(column[r], w, bar, column[r]["name"] == selected))
-                    else:
-                        line.append(" " * cw)
-            line.rstrip()
-            lines.append(line)
-    return lines, order
+    bar = fit_bar(width, w)
+    for b in blocks:
+        out.append((separator(width), None))
+        out += [(ln, harness_key(b.name)) for ln in block_header(b, width, now)]
+        out += [(fit(cell(a, w, bar, a["name"] == selected), "", width), a["name"]) for a in by_harness[b.name]]
+    return out
+
+
+def clip(lines: list[tuple[Text, str | None]], limit: int | None) -> tuple[list[tuple[Text, str | None]], int]:
+    """At most `limit` lines: when they don't all fit, the first `limit - 1` and a last `+N more
+    (widen the terminal)` line, N being the harnesses and agents with no line left in view. Also N.
+    A row cut in half (a harness's second usage line) counts as shown."""
+    if limit is None or len(lines) <= limit:
+        return lines, 0
+    kept = lines[:max(0, limit - 1)]
+    shown = {k for _, k in kept}
+    hidden = [k for k in dict.fromkeys(k for _, k in lines[len(kept):]) if k is not None and k not in shown]
+    return kept + [(Text(MORE.format(n=len(hidden)), style="bright_black"), None)], len(hidden)

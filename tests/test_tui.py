@@ -3,7 +3,7 @@ import asyncio
 from xt.dispatch import send
 from xt.spawn import request_spawn
 from xt.tui.app import INBOX, Compose, Confirm, Help, LiveActions, Panel, Prompt, XtTui, demo_snapshot
-from xt.tui.model import PANELS, build
+from xt.tui.model import build
 
 from .conftest import add_member
 
@@ -116,7 +116,8 @@ def test_summary_sits_on_top_and_keys_at_the_bottom(ctx):
             top = str(app.team.render())
             bottom = str(app.query_one("#hints").render())
             assert ctx.team.name in top and "running" in top
-            assert "h help" in bottom and "running" not in bottom
+            # the focused pane's keys, then the ones that work everywhere; h is in its own help (#162)
+            assert "S message liaison" in bottom and "h help" not in bottom and "running" not in bottom
 
     asyncio.run(run())
 
@@ -241,7 +242,9 @@ def test_panels_keep_their_size_when_focus_moves():
     async def run():
         app = XtTui(demo_snapshot)
         async with app.run_test(size=(140, 45)) as pilot:
-            sizes = lambda: [app.panel(i).size for i in range(0, len(PANELS) + 1)]
+            # Work and Flow take turns in the middle band (card #162), at the same size
+            middle = lambda: next(p for p in (app.panel(2), app.panel(3)) if p.display)
+            sizes = lambda: [app.panel(0).size, app.panel(1).size, middle().size, app.query_one("#detail").size]
             before = sizes()
             for key in ("1", "4", "3", "2", "tab"):
                 await pilot.press(key)

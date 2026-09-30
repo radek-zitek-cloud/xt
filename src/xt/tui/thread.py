@@ -9,7 +9,9 @@ Detail lays the thread out at its own size: the item's head (its summary and ful
 row per thread message (time, sender → receiver, type, first line), the selected one marked
 `◀ you are here`, then the usage line and the keys that apply, then any reference text (a goal's
 brief). A thread longer than the room left shows a window around the selected message and says how
-many rows are hidden above and below; j/k in the focused Detail move that window.
+many rows are hidden above and below; j/k in the focused Detail move that window. In a Detail too
+short for the head and the thread together (the bottom band, card #162) the window takes Detail's
+height less a row, and Detail scrolls to it first.
 """
 
 import datetime as dt
@@ -54,6 +56,7 @@ class ThreadDetail:
         self.height: int | None = None
         self.offset: int | None = None
         self.window = (0, len(thread))  # the rows drawn last time: [start, end)
+        self.rows_at, self.rows_n = 0, 0  # where the thread's lines start in Detail, and how many there are
 
     @property
     def index(self) -> int:
@@ -126,8 +129,8 @@ class ThreadDetail:
         head = [self.head, Text(f"\nthread ({len(self.thread)})", style="bold")]
         foot = [Text(""), Text(self.usage, no_wrap=True, overflow="ellipsis"),
                 Text(self.keys, style="bright_black", no_wrap=True, overflow="ellipsis")]
-        used = sum(len(console.render_lines(r, options.update(height=None), pad=False)) for r in head) + len(foot)
-        room = max(MIN_ROWS, (self.height or 10**6) - used)
+        above = sum(len(console.render_lines(r, options.update(height=None), pad=False)) for r in head)
+        room = max(MIN_ROWS, (self.height or 10**6) - above - len(foot), (self.height or 0) - 1)
         start, end = self.window = self.place(room)
         rows = []
         if start:
@@ -138,4 +141,5 @@ class ThreadDetail:
             rest = len(self.thread) - end
             rows.append(Text(f"  ↓ {rest} later row{'s' if rest != 1 else ''} hidden (enter, then j)",
                              style="bright_black"))
+        self.rows_at, self.rows_n = above, len(rows)
         yield Group(*head, *rows, *foot, *([Text(""), self.more] if self.more else []))

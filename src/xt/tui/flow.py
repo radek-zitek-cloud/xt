@@ -2,8 +2,8 @@
 
 One lane per agent, left to right: `human`, then `xt` when it sent a shown message, then the
 reporting chain (liaison, lead), then the other agents in roster order, then (dim) agents no longer
-on the team that appear in the rows on screen. Time runs down a 6-cell column on the left, newest at the
-bottom, with a `── Sep 29 ──` row where the day changes. Each message is one row: an arrow from the
+on the team that appear in the rows on screen. Time runs up a 6-cell column on the left, newest on
+top (card #162), with a `── Sep 29 ──` row over each day's rows. Each message is one row: an arrow from the
 sender's lane to the receiver's, its type glyph and label at the sender end, the arrowhead at the
 receiver end, dotted when the receiver is the human; then, in the right margin, `#id` and the body's
 first line cut at the pane width (the #132 row helper). Flow rows carry a clock time, not an age.
@@ -42,7 +42,8 @@ SELECTED = "bold bright_white on blue"
 
 @dataclass
 class Data:
-    """What Flow draws: the messages (oldest first), the roster, and each message's detail."""
+    """What Flow draws: the messages (oldest first; the pane lists them newest first), the roster,
+    and each message's detail."""
 
     msgs: list[dict] = field(default_factory=list)
     roster: list[tuple[str, str, bool]] = field(default_factory=list)  # (name, role, active), team order
@@ -141,8 +142,8 @@ def first_line(m: dict) -> str:
 
 
 def entries(msgs: list[dict], now: dt.datetime | None) -> list[tuple[str, object]]:
-    """The pane's rows: ("msg", message) and ("day", date) where the day changes (and above the
-    first row when it isn't today)."""
+    """The pane's rows, in the order of `msgs` (Flow passes them newest first): ("msg", message),
+    and ("day", date) over the first row of each day (over the first row too when it isn't today)."""
     today = (now or dt.datetime.now()).astimezone().date()
     out: list[tuple[str, object]] = []
     prev = None

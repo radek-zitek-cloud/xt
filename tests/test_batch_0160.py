@@ -20,6 +20,11 @@ from xt.tui.model import PANELS, Row, Snapshot, age_text, build, fit
 
 from .conftest import add_member
 
+
+def _title(widget) -> str:
+    """A pane's title as shown, `[n] - Title - info` since card #162."""
+    return widget._border_title.plain
+
 INBOX = PANELS.index("Inbox") + 1
 WORK = PANELS.index("Work") + 1
 FLOW = PANELS.index("Flow") + 1
@@ -91,10 +96,10 @@ def _marker(ctx):
 def test_the_three_groups_in_order_with_the_seen_friction_folded(ctx):
     f = _fixture(ctx)
     g = _groups(build(ctx).panels["Inbox"])
-    assert list(g) == ["NEEDS YOU", "NEW", "FRICTION"]
+    assert list(g) == ["NEEDS YOU", "NOTIFICATIONS", "FRICTION"]
     assert [r.kind for r in g["NEEDS YOU"]] == ["question", "alert"]
     assert "3 options" in g["NEEDS YOU"][0].text.plain and g["NEEDS YOU"][0].text.plain.startswith("⚑ ")
-    assert [(r.kind, r.data["id"]) for r in g["NEW"]] == [("message", f["report"]), ("done", f["goal"])]
+    assert [(r.kind, r.data["id"]) for r in g["NOTIFICATIONS"]] == [("message", f["report"]), ("done", f["goal"])]
     friction = g["FRICTION"]
     assert [r.data["id"] for r in friction if r.kind == "friction" and not r.data["seen"]] == f["unread"][::-1]
     fold = next(r for r in friction if r.kind == "fold")
@@ -132,12 +137,12 @@ def test_title_counts_equal_the_group_sizes_and_zero_is_left_out(ctx):
     snap = build(ctx)
     g = _groups(snap.panels["Inbox"])
     unread = [r for r in g["FRICTION"] if r.kind == "friction" and not r.data["seen"]]
-    assert snap.inbox_title == f"⚑ {len(g['NEEDS YOU'])} · ✉ {len(g['NEW'])} · ✱ {len(unread)}" == "⚑ 2 · ✉ 2 · ✱ 3"
+    assert snap.inbox_title == f"⚑ {len(g['NEEDS YOU'])} · ✉ {len(g['NOTIFICATIONS'])} · ✱ {len(unread)}" == "⚑ 2 · ✉ 2 · ✱ 3"
 
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)):
-            assert app.panel(INBOX).border_title == f"[{INBOX}]─Inbox─⚑ 2 · ✉ 2 · ✱ 3"
+            assert _title(app.panel(INBOX)) == f"[{INBOX}] - Inbox - ⚑ 2 · ✉ 2 · ✱ 3"
 
     _run(run())
 
@@ -152,7 +157,7 @@ def test_an_empty_group_and_its_count_are_not_shown(ctx):
 
     async def run():
         async with empty.run_test(size=(160, 40)):
-            assert empty.panel(INBOX).border_title == f"[{INBOX}]─Inbox"
+            assert _title(empty.panel(INBOX)) == f"[{INBOX}] - Inbox"
 
     _run(run())
 
@@ -390,6 +395,8 @@ def test_no_row_spills_outside_its_pane(ctx, size):
                 p = app.panel(n)
                 for i in range(p.option_count):
                     assert p.get_option_at_index(i).prompt.cell_len <= p.content_size.width, (n, i)
+            app.show_middle(FLOW)  # Flow takes Work's band (card #162)
+            await pilot.pause()
             flow = app.panel(FLOW)  # Flow draws its own rows (card #130)
             assert all(ln.cell_len <= flow.content_size.width for ln in flow.render().split("\n"))
 
@@ -603,9 +610,9 @@ def _lines(ctx, width):
     from xt.tui import teampane
 
     snap = build(ctx)
-    lines, _ = teampane.render(snap.header, snap.spend, snap.harnesses, [r.data for r in snap.panels["Team"]],
-                               width, ctx.ledger.clock())
-    return lines
+    lines = teampane.render(snap.header, snap.spend, snap.harnesses, [r.data for r in snap.panels["Team"]],
+                            width, ctx.ledger.clock())
+    return [ln for ln, _ in lines]
 
 
 def test_short_models_drop_the_vendor_and_default_becomes_the_real_model():
@@ -652,26 +659,27 @@ def test_status_and_team_panes_are_gone_and_team_shows_header_blocks_and_agents(
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
             await pilot.pause()
-            assert not app.query("#topbar") and app.team.border_title == "Team"
+            assert not app.query("#topbar") and _title(app.team) == "[0] - Team"
             titles = [app.panel(n).title for n in range(1, len(PANELS) + 1)]
             assert titles == list(PANELS) and "Team" not in titles
+            # one column since card #162: the header (wrapped between its parts), today's spend, then
+            # each harness's usage line and its agents, a separator before each harness
             lines = _pane(app)
-            head = lines[0]
+            spend = lines.index("today: no usage recorded yet")
+            head = " · ".join(lines[:spend])
             assert head.startswith("t · xt ") and "5 running" in head and "1 goal open" in head
-            assert "⚑ 1 needs you" in head and "✉ 1 new" in head and head.endswith("today: no usage recorded yet")
-            blocks = lines[1]
-            assert blocks.startswith("CLAUDE  5h ▓") and "6% resets 15:00" in blocks
-            assert "7d" not in blocks.split("CODEX")[0]  # Claude's stale 7d reading: no blank bar
-            assert "CODEX  7d ▓▓▓▓▓▓░░░░  64% resets Tue" in blocks
-            agents = lines[2:]
-            assert len(agents) == 2  # five agents, two lines
-            text = "\n".join(agents)
-            for name in ("liaison", "lead", "pm", "builder", "qa"):
-                assert f" {name} " in text
+            assert "⚑ 1 needs you" in head and "✉ 1 new" in head
+            codex = next(i for i, ln in enumerate(lines) if ln.startswith("CODEX"))
+            assert set(lines[spend + 1]) == set(lines[codex - 1]) == {"─"}
+            claude = lines[spend + 2]
+            assert claude.startswith("CLAUDE  5h ▓") and "6% resets 15:00" in claude
+            assert "7d" not in claude  # Claude's stale 7d reading: no blank bar
+            assert lines[codex].startswith("CODEX  7d ▓▓▓▓▓▓░░░░  64% resets Tue")
+            name = lambda ln: ln.split()[1]
+            assert [name(ln) for ln in lines[spend + 3:codex - 1]] == ["pm", "builder", "qa"]  # one per line
+            assert [name(ln) for ln in lines[codex + 1:]] == ["liaison", "lead"]
+            text = "\n".join(lines)
             assert "claude/" not in text and "codex/" not in text
-            # Claude's block on the left, Codex's under its own heading on the right
-            assert agents[0].index("pm") < blocks.index("CODEX") <= agents[0].index("liaison")
-            assert " lead " in agents[1][blocks.index("CODEX"):]
 
     _run(run())
 
@@ -680,15 +688,13 @@ def test_agent_columns_line_up_and_bars_match_tokens_and_window(ctx, fake_home):
     from xt.tui import teampane
 
     _team(ctx, fake_home)
-    lines = [ln.plain for ln in _lines(ctx, 158)[2:]]
-    assert len(lines) == 2
-    starts = [[i for i, ch in enumerate(ln) if ch == "▕"] for ln in lines]
-    assert len(starts[0]) == 3 and set(starts[1]) <= set(starts[0])  # bars line up, whatever the model
-    # after models of different lengths the state words still line up: sonnet 5.5 over opus 5.5 in
-    # the first column, default over gpt-5.2-codex in the Codex column
-    assert lines[0].index(" idle ") == lines[1].index(" idle ")
-    liaison, lead = lines[0].index("● liaison"), lines[1].index("● lead")
-    assert liaison == lead and lines[0].index(" idle ", liaison) == lines[1].index(" working ", lead)
+    lines = [ln.plain for ln in _lines(ctx, 60) if "▕" in ln.plain]
+    assert len(lines) == 5  # one line per agent (card #162)
+    assert len({ln.index("▕") for ln in lines}) == 1  # bars line up, whatever the model
+    # after models of different lengths the state words still line up: sonnet 5.5 over opus 5.5,
+    # default over gpt-5.2-codex, across the harnesses too
+    at = lambda name, state: next(ln for ln in lines if f" {name} " in ln).index(f" {state} ")
+    assert at("pm", "idle") == at("builder", "idle") == at("liaison", "idle") == at("lead", "working")
     team = {r.data["name"]: r.data for r in build(ctx).panels["Team"]}
     lead = team["lead"]  # ~181k of 258k
     assert teampane.context_pct(lead) == pytest.approx(100 * 181_000 / 258_000)
@@ -703,7 +709,9 @@ def test_agent_columns_line_up_and_bars_match_tokens_and_window(ctx, fake_home):
     assert " — ▕" in qa  # no reading: no bar, no percentage
 
 
-def test_a_twelve_agent_team_takes_four_lines_at_160_and_fits_at_100(ctx, fake_home):
+def test_a_twelve_agent_team_is_laid_out_one_line_each_and_the_pane_shows_what_fits(ctx, fake_home):
+    """Card #162 replaces #128's columns and the Team cap: one line per agent; the pane shows what
+    fits its band and never runs past its frame (the `+N more` line: test_tui_0170.py)."""
     _team(ctx, fake_home, extra_claude=5, extra_codex=2)  # 8 on Claude, 4 on Codex
     assert len([r for r in build(ctx).panels["Team"]]) == 12
 
@@ -716,14 +724,13 @@ def test_a_twelve_agent_team_takes_four_lines_at_160_and_fits_at_100(ctx, fake_h
             assert all(len(ln) <= width for ln in lines)
             assert app.team.outer_size.height == len(lines) + 2  # no empty space: content plus the frame
             laid_out = [ln.plain for ln in _lines(ctx, width) if "▕" in ln.plain]
-            assert sum(ln.count("▕") for ln in laid_out) == 12  # every agent laid out
-            return len(laid_out), [ln for ln in lines if "▕" in ln], app.panel(INBOX).content_size.height
+            assert len(laid_out) == 12 and all(ln.count("▕") == 1 for ln in laid_out)  # every agent, one line
+            return app.team.natural, app.team.outer_size.height
 
-    lines, shown, _ = asyncio.run(run((160, 40)))
-    assert lines == 4 and len(shown) == 4  # all shown
-    lines, shown, inbox_rows = asyncio.run(run((100, 30)))
-    # two columns, Claude's block over Codex's; capped at 100x30 so the Inbox keeps 5 rows (card #130)
-    assert lines == 6 and len(shown) < 6 and inbox_rows >= 5
+    natural, height = asyncio.run(run((160, 40)))
+    assert height == natural  # all twelve fit at 160x40
+    natural, height = asyncio.run(run((100, 30)))
+    assert height < natural  # it would need more than its band
 
 
 def test_the_team_panes_height_follows_the_agent_count(ctx, fake_home):
@@ -738,7 +745,7 @@ def test_the_team_panes_height_follows_the_agent_count(ctx, fake_home):
     ctx.team.upsert_agent("c9", "worker", "claude", "claude-sonnet-5-5", "lead")
     ctx.team.upsert_agent("c8", "worker", "claude", "claude-sonnet-5-5", "lead")
     ctx.team.save()
-    assert asyncio.run(height()) == five + 1  # 5 Claude agents in two columns: three lines
+    assert asyncio.run(height()) == five + 2  # one line per agent (card #162)
 
 
 def test_the_toast_shows_an_actions_result_and_goes_on_its_own(ctx, fake_home, monkeypatch):
@@ -795,12 +802,12 @@ def test_the_header_names_what_is_stuck_and_when_nothing_waits(ctx, clock):
 
 
 def test_keys_follow_the_panes_that_exist(ctx, fake_home):
-    from xt.tui.app import HINTS, Help
+    from xt.tui.app import Help
 
     _team(ctx, fake_home)
-    # #131: no Supervisor pane; #157: 0 is Team and 4 Detail
-    assert "0-4 panes" in HINTS and "1-3" not in HINTS and "tab next pane" in HINTS
+    # #131: no Supervisor pane; #157: 0 is Team and 4 Detail; #162: the help has them, not the key line
     keys = dict(Help.KEYS)
+    assert "1-3" not in keys and keys["tab / l"] == "next pane"
     assert keys["0-4"] == "jump to a pane: Team, Inbox, Work, Flow, Detail"  # card #130: Flow in place of the Log
 
     async def run():
@@ -814,13 +821,13 @@ def test_keys_follow_the_panes_that_exist(ctx, fake_home):
             assert app.focused.id == "detail"
             await pilot.press("escape")  # back to Flow, where it came from
             assert app.focused.title == "Flow"
-            await pilot.press("tab")  # past Flow, the last pane: Team, at the top
+            await pilot.press("tab", "tab")  # past Flow Detail, the last pane (#162); then Team, at the top
             await pilot.pause()
             assert app.focused is app.team and app.team.current.data["name"] == "pm"
             await pilot.press("j")
             await pilot.pause()
             assert app.team.current.data["name"] == "builder"
-            assert app.query_one("#detail").border_title == "Detail─Team"
+            assert _title(app.query_one("#detail")) == "[4] - Detail - Team"
             assert app.team.current.detail().plain.startswith("builder · worker · claude/claude-opus-5-5")
 
     _run(run())
@@ -882,8 +889,9 @@ def test_open_goals_first_expanded_done_under_a_collapsed_fold_orphan_under_no_g
             assert app.focused is p
             keys = _keys(p)
             # open goals first, newest activity first, each expanded with its tasks
-            assert keys[:10] == [f"goal:{f['busy']}", f"task:{f['t_open']}", f"task:{f['t_done']}",
-                                 f"task:{f['t_failed']}", f"goal:{f['sub_goal']}", f"task:{f['sub_task']}",
+            # tasks newest first (card #162)
+            assert keys[:10] == [f"goal:{f['busy']}", f"task:{f['t_failed']}", f"task:{f['t_done']}",
+                                 f"task:{f['t_open']}", f"goal:{f['sub_goal']}", f"task:{f['sub_task']}",
                                  f"goal:{f['stuck']}", f"task:{f['stuck_task']}", "fold:done", "nogoal"]
             assert keys[10:] == [f"task:{f['orphan']}"]  # the orphan, under `no goal`, the last row
             # the done goals only under `done (63)`, collapsed
@@ -929,7 +937,7 @@ def test_the_counts_and_the_title_equal_the_ledgers(ctx, clock):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)):
-            assert _work(app).border_title == f"[{WORK}]─Work─3 open · 63 done"
+            assert _title(_work(app)) == f"[{WORK}] - Work - 3 open · 63 done │ [3] - Flow"
 
     _run(run())
 
@@ -1016,7 +1024,7 @@ def test_enter_shows_the_selected_row_in_detail(ctx, clock):
             assert app.focused.id == "detail"
             body = app.detail_view.plain
             assert f"#{f['t_failed']} task · lead → carol" in body and "FAIL: the build breaks" in body
-            assert app.query_one("#detail").border_title == "Detail─Work"
+            assert _title(app.query_one("#detail")) == "[4] - Detail - Work"
             await pilot.press("escape")  # back to Work, the row still selected
             await pilot.pause()
             assert app.focused is p and p.current.key == f"task:{f['t_failed']}"
@@ -1051,8 +1059,12 @@ def test_no_work_row_spills_out_of_the_pane(ctx, clock, size):
             goal = next(i for i, r in enumerate(p.rows) if r.key == f"goal:{f['busy']}")
             shown = p.get_option_at_index(goal).prompt.plain
             assert shown.endswith(" now") and " 2/5 " in shown  # the count is never cut
-            assert (" lead " in shown) == (size == (160, 40))  # the owner gives way in a narrow pane
-            assert p.border_title.startswith(f"[{WORK}]─Work")
+            assert " lead " in shown  # Work is full width since card #162: room for the owner at 100 too
+            from xt.tui import work
+
+            narrow = work.line(p.rows[goal].text, p.rows[goal].data, "now", 40, True).plain
+            assert " lead " not in narrow and " 2/5 " in narrow  # the owner gives way in a narrow pane
+            assert _title(p).startswith(f"[{WORK}] - Work")
 
     _run(run())
 
@@ -1127,7 +1139,7 @@ def _flow_select(app, mid):
     """Select message `mid` in Flow (card #130, in place of the Log) as j/k would."""
     p = app.panel(FLOW)
     p.selected = next(i for i, (kind, m) in enumerate(p.rows) if kind == "msg" and m["id"] == mid)
-    p.follow = p.selected == p.message_rows()[-1]
+    p.follow = p.selected == p.message_rows()[0]  # the newest is on top (card #162)
     p.place()
     app.show_detail(p)
     return p
@@ -1157,7 +1169,8 @@ def test_selecting_a_task_shows_its_whole_goal_thread_in_time_order_marked(ctx, 
             marked = [ln for ln in lines if HERE.strip() in ln]
             assert len(marked) == 1 and f"#{f['t_failed']} the failing part" in marked[0]
             assert " lead    → carol   task " in marked[0] and re.match(r"\d\d:\d\d  ", marked[0])
-            done = next(ln for ln in lines if "FAIL: the build breaks" in ln)
+            # the whole thread (the short bottom Detail of card #162 shows a window of it)
+            done = next(ln for ln in view.plain.split("\n") if "FAIL: the build breaks" in ln)
             assert " carol   → lead    done " in done
             # below the thread: the usage line and the keys, no `xt log --id` hint any more
             tail = [ln for ln in lines if ln.strip()][-2:]
@@ -1203,7 +1216,11 @@ def test_a_sixty_message_thread_scrolls_keeps_the_selection_and_counts_the_hidde
             view = app.detail_view
             assert len(view.thread) == 60
             lines = _shown(app)
-            assert len(lines) <= app.query_one("#detail").content_size.height  # fits: nothing below the edge
+            pane = app.query_one("#detail")
+            height = pane.content_size.height
+            # card #162: Detail is the short bottom band; the thread's window fits its height, and
+            # Detail scrolls to it
+            assert view.rows_n <= height and 4 <= height
             start, end = view.window
             assert 0 < start <= 30 < end < 60
             assert f"↑ {start} earlier rows hidden" in "\n".join(lines)
@@ -1211,8 +1228,16 @@ def test_a_sixty_message_thread_scrolls_keeps_the_selection_and_counts_the_hidde
             assert sum(HERE.strip() in ln for ln in lines) == 1  # the selection is in view
             shown = [ln for ln in lines if re.match(r"\d\d:\d\d  ", ln)]  # the thread's rows
             assert f"#{ids[start]} " in shown[0] and f"#{ids[end - 1]} " in shown[-1]
-            # j/k in Detail move through the hidden rows, and a refresh keeps the place
-            for _ in range(5):
+            # j in Detail scrolls the thread into view, then moves through its hidden rows; a
+            # refresh keeps the place
+            for _ in range(view.rows_at + 1):
+                if app.detail_view.window[0] > start:
+                    break
+                await pilot.press("j")
+                await pilot.pause()
+            assert app.detail_view.window[0] == start + 1
+            assert pane.scroll_y <= view.rows_at and view.rows_at + view.rows_n <= pane.scroll_y + height
+            for _ in range(4):
                 await pilot.press("j")
             await pilot.pause()
             assert app.detail_view.window[0] == start + 5
@@ -1237,13 +1262,13 @@ def test_a_sixty_message_thread_scrolls_keeps_the_selection_and_counts_the_hidde
 
 
 def test_v_opens_the_supervisor_pop_up_newest_first_and_esc_closes_it(ctx):
-    from xt.tui.app import HINTS, Help, SupervisorPopup
+    from xt.tui.app import GLOBAL_KEYS, Help, SupervisorPopup
     from xt.watch import Supervisor
 
     sup = Supervisor(ctx, out=lambda s: None)
     for text in ("delivered #1 to lead", "woke scout (every 60m)", "nudged lead about #3"):
         sup.say(text)
-    assert "Supervisor" not in PANELS and "v supervisor" in HINTS and "Supervisor" not in HINTS
+    assert "Supervisor" not in PANELS and ("v", "supervisor") in GLOBAL_KEYS  # v works everywhere (#162)
     assert dict(Help.KEYS)["v"].startswith("the supervisor's log")
 
     async def run():
@@ -1317,7 +1342,7 @@ def test_1a_a_failed_wake_up_raises_one_needs_you_alert_counted_in_title_and_hea
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
             await pilot.pause()
-            assert app.panel(INBOX).border_title.startswith(f"[{INBOX}]─Inbox─⚑ 1")
+            assert _title(app.panel(INBOX)).startswith(f"[{INBOX}] - Inbox - ⚑ 1")
             assert "⚑ 1 needs you" in str(app.team.render())
 
     _run(run())

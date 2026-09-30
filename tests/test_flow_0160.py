@@ -1,6 +1,9 @@
-"""v0.16.0, card #130: the Flow lane chart replaces the Log; the final layout (its criterion 14).
+"""v0.16.0, card #130: the Flow lane chart replaces the Log.
 
 Each test names its criterion from the spec's "Done when" list and the terminal size it checks.
+v0.17.0 (card #162) replaced criterion 14 (the final layout, the Inbox-height rule and the Team cap)
+and "newest at the bottom" (criteria 3 and 9): Flow runs newest on top here, and the layout checks
+are in test_tui_0170.py.
 """
 
 import asyncio
@@ -14,8 +17,8 @@ from rich.text import Text
 from xt.alerts import Alerts
 from xt.spawn import request_spawn
 from xt.tui import flow as fl
-from xt.tui.app import (FLOW, HINTS, INBOX, WORK, FlowPane, FlowPick, Help, LiveActions, XtTui, demo_snapshot,
-                        key_line, pane_heights)
+from xt.tui.app import (FLOW, GLOBAL_KEYS, INBOX, PANE_KEYS, FlowPane, FlowPick, Help, LiveActions, XtTui,
+                        band_heights, key_line)
 from xt.tui.model import PANELS, Snapshot, build
 
 from .conftest import add_member
@@ -79,6 +82,10 @@ def _col(c: fl.Chart, name: str) -> int:
     return fl.TIME + c.where[name] * c.width
 
 
+def _title(widget) -> str:
+    return widget._border_title.plain
+
+
 def _local(m) -> str:
     return dt.datetime.fromisoformat(m["ts"]).astimezone().strftime("%H:%M")
 
@@ -108,6 +115,7 @@ def test_1_lanes_in_roster_order_and_a_retired_lane_only_with_its_rows(ctx, cloc
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(FLOW))  # Flow shares its band with Work (card #162)
             await pilot.pause()
             pane = _pane(app)
             c = pane.chart()
@@ -145,7 +153,8 @@ def _names(pane) -> list[str]:
 
 def test_1_a_retired_lane_follows_the_rows_in_view_when_scrolling(ctx, clock):
     """100x30, QA's failing case: the scout's only row is outside the rows in view, so no scout
-    lane; scrolled to the top it is in view and the dim lane appears; back to the end it goes."""
+    lane; scrolled to the bottom (the oldest, card #162) it is in view and the dim lane appears; back
+    to the newest it goes."""
     scout = _scout_then(ctx, 35)
 
     async def run():
@@ -156,15 +165,15 @@ def test_1_a_retired_lane_follows_the_rows_in_view_when_scrolling(ctx, clock):
             pane = _pane(app)
             assert scout not in [x["id"] for x in pane.in_view()] and len(pane.in_view()) < len(pane.items)
             assert "scout" not in _names(pane) and "scout" not in _lines(pane)[0]
-            await pilot.press("g")
+            await pilot.press("G")
             await pilot.pause()
             assert scout in [x["id"] for x in pane.in_view()]
             c = pane.chart()
             assert _names(pane)[-1] == "scout" and c.lanes[-1].dim and "scout" in _lines(pane)[0]
-            await pilot.press("G")
+            await pilot.press("g")
             await pilot.pause()
             assert "scout" not in _names(pane)
-            await pilot.press("g", *"j" * pane.view_height())  # j past the view: the scout row scrolls out
+            await pilot.press("G", *"k" * pane.view_height())  # k past the view: the scout row scrolls out
             await pilot.pause()
             assert scout not in [x["id"] for x in pane.in_view()] and "scout" not in _names(pane)
 
@@ -247,6 +256,7 @@ def test_2_each_type_has_its_glyph_label_and_arrowhead_and_to_the_human_is_dotte
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(FLOW))  # Flow shares its band with Work (card #162)
             await pilot.pause()
             pane = _pane(app)
             c, width = pane.chart(), pane.content_size.width
@@ -285,6 +295,7 @@ def test_15_a_supervisor_alert_is_an_amber_warning_from_xt_into_the_human_lane(c
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(FLOW))  # Flow shares its band with Work (card #162)
             await pilot.pause()
             pane = _pane(app)
             assert not pane.show_system and m["alert"] in [x["id"] for x in pane.items]
@@ -300,7 +311,7 @@ def test_15_a_supervisor_alert_is_an_amber_warning_from_xt_into_the_human_lane(c
             friction = fl.chart_row(_msg(ctx, m["friction"]), c, pane.content_size.width)
             amber, other = style_at(row, a), style_at(friction, _col(c, "pm"))
             assert "yellow" in amber and amber != other
-            assert "alert" in _lines(pane)[-1 - [x["id"] for x in reversed(pane.items)].index(m["alert"])]
+            assert any("alert" in ln and f"#{m['alert']} " in ln for ln in _lines(pane))
 
     _run(run())
 
@@ -308,7 +319,9 @@ def test_15_a_supervisor_alert_is_an_amber_warning_from_xt_into_the_human_lane(c
 # --- 3 time and days, 4 margin ------------------------------------------------------------------------
 
 
-def test_3_rows_in_time_order_a_day_change_inserts_a_separator_and_times_are_local(ctx, clock):
+def test_3_rows_newest_on_top_a_day_change_inserts_a_separator_and_times_are_local(ctx, clock):
+    """Card #162 reverses #130's order: the newest message is the top row and selected; the older
+    day's separator sits over that day's rows (its newest first)."""
     m = _fixture(ctx, clock)
 
     async def run():
@@ -318,14 +331,15 @@ def test_3_rows_in_time_order_a_day_change_inserts_a_separator_and_times_are_loc
             await pilot.pause()
             pane = _pane(app)
             ids = [x["id"] for x in pane.items]
-            assert ids == sorted(ids) and pane.message()["id"] == ids[-1]  # newest at the bottom, selected
+            shown = [x["id"] for k, x in pane.rows if k == "msg"]
+            assert shown == sorted(ids, reverse=True) and pane.message()["id"] == shown[0]  # newest on top, selected
             kinds = [k for k, _ in pane.rows]
             days = [x for k, x in pane.rows if k == "day"]
-            second = fl.local(_msg(ctx, m["typed"])).date()
-            assert days[-1] == second  # the separator before the second day's first row
-            at = kinds.index("day", 1) if kinds[0] == "day" else kinds.index("day")
-            assert pane.rows[at + 1][1]["id"] == m["typed"]
-            assert fl.separator(second, 60).plain == f"── {second:%b} {second.day} ──"
+            first = fl.local(_msg(ctx, m["goal"])).date()
+            assert days[-1] == first  # the separator over the first day's rows
+            at = len(kinds) - 1 - kinds[::-1].index("day")
+            assert pane.rows[at + 1][1]["id"] == m["wake"] and pane.rows[at - 1][1]["id"] == m["typed"]
+            assert fl.separator(first, 60).plain == f"── {first:%b} {first.day} ──"
             for x in pane.items:
                 assert fl.chart_row(x, pane.chart(), 158).plain[:6] == _local(x) + " "
 
@@ -340,6 +354,7 @@ def test_4_margin_has_id_and_first_line_cut_only_when_needed_and_a_time_never_an
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=size) as pilot:
+            await pilot.press(str(FLOW))  # Flow shares its band with Work (card #162)
             await pilot.pause()
             pane = _pane(app)
             c, width = pane.chart(), pane.content_size.width
@@ -373,6 +388,7 @@ def test_5_system_lines_hidden_by_default_t_shows_and_hides_them_approvals_and_a
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(FLOW))  # Flow shares its band with Work (card #162)
             await pilot.pause()
             pane = _pane(app)
             types = lambda: {x["type"] for x in pane.items}
@@ -494,9 +510,11 @@ def test_8_a_narrow_terminal_lists_one_row_per_message_and_widening_brings_the_c
             await pilot.pause()
             pane = _pane(app)
             assert pane.chart() is None  # list mode
-            # nothing runs past the terminal: the key line is its last row, Flow ends above it
-            assert app.query_one("#hints").region.y == size[1] - 1 and pane.region.bottom == size[1] - 1
-            assert app.team.outer_size.height == pane_heights(size[1], app.team.natural)[0]
+            # nothing runs past the terminal: the key line is its last row, Detail ends above it (#162)
+            detail = app.query_one("#detail")
+            assert app.query_one("#hints").region.y == size[1] - 1 and detail.region.bottom == size[1] - 1
+            assert pane.region.bottom == detail.region.y
+            assert app.team.outer_size.height == band_heights(size[1], app.team.natural)[0]
             width = pane.content_size.width
             lines = pane.render().split("\n")
             assert all(ln.cell_len <= width for ln in lines)  # nothing spills
@@ -525,6 +543,8 @@ def test_8_a_narrow_terminal_lists_one_row_per_message_and_widening_brings_the_c
 
 
 def test_9_j_k_g_G_and_following_and_enter_shows_the_message_in_detail(ctx, clock):
+    """Card #162: newest on top. The top row is followed; j moves to older messages and stops
+    following; g is the newest (top), G the oldest (bottom)."""
     m = _fixture(ctx, clock)
 
     async def run():
@@ -533,36 +553,43 @@ def test_9_j_k_g_G_and_following_and_enter_shows_the_message_in_detail(ctx, cloc
             await pilot.press(str(FLOW))
             await pilot.pause()
             pane = _pane(app)
-            ids = lambda: [x["id"] for x in pane.items]
-            assert pane.follow and pane.message()["id"] == ids()[-1]
-            await pilot.press("k")
-            assert not pane.follow and pane.message()["id"] == ids()[-2]
+            order = lambda: [x["id"] for x in reversed(pane.items)]  # the rows, top to bottom
+            assert pane.follow and pane.message()["id"] == order()[0] and pane.top == 0
+            await pilot.press("j")
+            assert not pane.follow and pane.message()["id"] == order()[1]
             new = ctx.ledger.append("lead", "qa", "task", "a new task while I read")["id"]
             await pilot.press("r")
             await pilot.pause()
-            assert pane.message()["id"] == ids()[-3] and ids()[-1] == new  # not following: stays put
-            await pilot.press("G")
-            assert pane.follow and pane.message()["id"] == new
+            assert pane.message()["id"] == order()[2] and order()[0] == new  # not following: stays put
+            await pilot.press("g")
+            assert pane.follow and pane.message()["id"] == new and pane.top == 0
             newer = ctx.ledger.append("qa", "lead", "report", "on it")["id"]
             await pilot.press("r")
             await pilot.pause()
-            assert pane.message()["id"] == newer  # following the newest
-            await pilot.press("g")
-            assert pane.message()["id"] == ids()[0] and pane.top == 0
-            await pilot.press("j", "j")
-            assert pane.message()["id"] == ids()[2]
-            await pilot.press("pagedown")
-            assert pane.message()["id"] == ids()[min(len(ids()) - 1, 2 + pane.view_height() - 1)]
+            assert pane.message()["id"] == newer and _lines(pane)[1].find(f"#{newer} ") > 0  # on top, followed
+            await pilot.press("G")
+            await pilot.pause()
+            assert pane.message()["id"] == order()[-1] and not pane.follow
+            await pilot.press("k", "k")
+            await pilot.pause()
+            assert pane.message()["id"] == order()[-3]
             await pilot.press("pageup")
-            assert pane.message()["id"] == ids()[2]
-            await pilot.press("k", "k", "k")  # past the top: stays on the first
-            assert pane.message()["id"] == ids()[0]
+            await pilot.pause()
+            page = pane.view_height() - 1
+            at = max(0, len(order()) - 3 - page)
+            assert pane.message()["id"] == order()[at]
+            await pilot.press("pagedown")
+            await pilot.pause()
+            assert pane.message()["id"] == order()[min(len(order()) - 1, at + page)]
+            await pilot.press("j", "j", "j")  # past the bottom: stays on the oldest
+            await pilot.pause()
+            assert pane.message()["id"] == order()[-1]
             pane.selected = next(i for i, (k, x) in enumerate(pane.rows) if k == "msg" and x["id"] == m["done"])
             pane.follow = False
             pane.place()
             await pilot.press("enter")
             await pilot.pause()
-            assert app.focused.id == "detail" and app.query_one("#detail").border_title == "Detail─Flow"
+            assert app.focused.id == "detail" and _title(app.query_one("#detail")) == "[4] - Detail - Flow"
             view = app.detail_view
             assert view.selected == m["done"] and [x["id"] for x in view.thread][:2] == [m["goal"], m["task"]]
             assert "Site checked, all good" in view.plain
@@ -595,12 +622,12 @@ def test_10_a_5000_message_ledger_opens_and_each_key_is_handled_without_a_stall(
             times["open"] = time.perf_counter() - start
             pane = _pane(app)
             assert len(pane.items) > 4000
-            for key in ("k", "k", "j", "pageup", "pageup", "pagedown", "g", "G", "t", "t", "r"):
+            for key in ("j", "j", "k", "pagedown", "pagedown", "pageup", "G", "g", "t", "t", "r"):
                 t0 = time.perf_counter()
                 await pilot.press(key)
                 await pilot.pause()
                 times[key] = max(times.get(key, 0), time.perf_counter() - t0)
-            assert pane.message()["id"] == pane.items[-1]["id"]
+            assert pane.message()["id"] == pane.items[-1]["id"]  # g: the newest, on top
 
     _run(run())
     with capsys.disabled():
@@ -658,7 +685,8 @@ def test_12_the_log_pane_and_its_key_are_gone_and_xt_log_still_prints_the_ledger
     from xt import cli
 
     m = _fixture(ctx, clock)
-    assert PANELS == ("Inbox", "Work", "Flow") and "Log" not in HINTS
+    keys = [pair for pairs in PANE_KEYS.values() for pair in pairs] + GLOBAL_KEYS
+    assert PANELS == ("Inbox", "Work", "Flow") and not any("Log" in k or "Log" in w for k, w in keys)
     assert not any("Log" in k or "Log" in w for k, w in Help.KEYS)
 
     async def run():
@@ -667,6 +695,7 @@ def test_12_the_log_pane_and_its_key_are_gone_and_xt_log_still_prints_the_ledger
             await pilot.press("3")
             await pilot.pause()
             assert app.focused is _pane(app) and app.focused.title == "Flow"
+            assert "Log" not in _title(app.focused)
             assert not [w for w in app.query("*") if getattr(w, "title", None) == "Log"]
             await pilot.press("4")  # no Log: since #157 the detail pane
             assert app.focused.id == "detail"
@@ -678,111 +707,7 @@ def test_12_the_log_pane_and_its_key_are_gone_and_xt_log_still_prints_the_ledger
     assert f"#{m['goal']}" in out and "Site check for #124" in out and f"#{m['system']}" in out
 
 
-# --- 14 the final layout -----------------------------------------------------------------------------------
-
-
-def _regions(app):
-    return {"team": app.team.region, "inbox": app.panel(INBOX).region, "work": app.panel(WORK).region,
-            "detail": app.query_one("#detail").region, "flow": app.panel(FLOW).region,
-            "hints": app.query_one("#hints").region}
-
-
-def _check_layout(app, w, h):
-    r = _regions(app)
-    assert r["team"].x == 0 and r["team"].y == 0 and r["team"].width == w  # Team: top, full width
-    assert r["inbox"].x == 0 and r["inbox"].y == r["team"].bottom  # Inbox: left, under Team
-    assert r["work"].x == 0 and r["work"].y == r["inbox"].bottom and r["work"].width == r["inbox"].width
-    assert r["detail"].x == r["inbox"].right and r["detail"].y == r["inbox"].y  # Detail: right, beside them
-    assert r["detail"].right == w and r["detail"].bottom == r["work"].bottom
-    assert r["flow"].x == 0 and r["flow"].y == r["work"].bottom and r["flow"].width == w  # Flow: bottom
-    assert r["hints"].y == h - 1 and r["hints"].height == 1 and r["flow"].bottom == h - 1  # the key line last
-    names = list(r)
-    for i, a in enumerate(names):
-        assert r[a].right <= w and r[a].bottom <= h, a
-        for b in names[i + 1:]:
-            assert not r[a].overlaps(r[b]), (a, b)
-    for pane in (app.team, app.panel(INBOX), app.panel(WORK), app.query_one("#detail"), app.panel(FLOW)):
-        assert pane.border_title and pane.content_size.height >= 2, pane
-    assert _pane(app).chart() is not None  # Flow in chart mode
-    ids = {w.id for w in app.query("*") if w.id}
-    assert not ids & {"topbar", "status", "panel-4", "panel-5", "panel-6", "supervisor"}
-    assert [app.panel(n).title for n in (1, 2, 3)] == ["Inbox", "Work", "Flow"]
-
-
-@pytest.mark.parametrize("size,inbox_min", [((160, 40), 8), ((100, 30), 5)])
-def test_14_the_final_layout_with_the_demo_fixture(size, inbox_min, tmp_path):
-    w, h = size
-
-    async def run():
-        app = XtTui(demo_snapshot)
-        async with app.run_test(size=size) as pilot:
-            await pilot.pause()
-            assert app.focused is app.panel(INBOX)  # the TUI starts in the Inbox
-            _check_layout(app, w, h)
-            inbox, work = app.panel(INBOX).content_size.height, app.panel(WORK).content_size.height
-            assert inbox >= inbox_min and work <= inbox  # the Inbox: the tallest list pane
-            keys = [item.split(" ")[0] for item in str(app.query_one("#hints").render()).split(" · ")]
-            for k in ("0-4", "j/k", "space", "enter", "s/S", "a/d", "/", "t", "f", "v", "h", "q"):
-                assert k in keys, k
-            if size == (160, 40):  # a Claude block with both its windows
-                team = str(app.team.render())
-                assert re.search(r"CLAUDE  5h ▓", team) and re.search(r"7d ▓[▓░]+ +10%", team)
-            app.save_screenshot(filename="layout.svg", path=str(tmp_path))
-            assert (tmp_path / "layout.svg").read_text().startswith("<svg")
-
-    _run(run())
-
-
-@pytest.mark.parametrize("size,inbox_min", [((160, 40), 8), ((100, 30), 5)])
-def test_14_the_final_layout_on_a_live_team_and_the_inbox_is_tallest(ctx, fake_home, clock, size, inbox_min):
-    _team(ctx, fake_home)
-    _fixture(ctx, clock)
-
-    async def run():
-        app = XtTui(lambda: build(ctx), LiveActions(ctx))
-        async with app.run_test(size=size) as pilot:
-            await pilot.pause()
-            assert app.focused is app.panel(INBOX)
-            _check_layout(app, *size)
-            assert app.panel(INBOX).content_size.height >= inbox_min
-            assert app.panel(WORK).content_size.height <= app.panel(INBOX).content_size.height
-
-    _run(run())
-
-
-def test_14_twelve_agents_at_100x30_the_team_pane_is_capped_so_the_inbox_keeps_five_rows(ctx, fake_home):
-    _team(ctx, fake_home, extra_claude=5, extra_codex=2)
-
-    async def run():
-        app = XtTui(lambda: build(ctx), LiveActions(ctx))
-        async with app.run_test(size=(100, 30)) as pilot:
-            await pilot.pause()
-            team = app.team
-            assert team.natural > team.outer_size.height  # it would need more
-            assert app.panel(INBOX).content_size.height >= 5
-            _check_layout(app, 100, 30)
-            assert "more lines" in team.border_subtitle
-            # every agent is still reachable: tab to Team, then j/k; the selected one is in view
-            team.focus()
-            await pilot.pause()
-            for _ in range(len(team.rows)):
-                await pilot.press("j")
-                await pilot.pause()
-                assert f" {team.current.data['name']} " in str(team.render())
-            assert team.current.data["name"] == team.rows[-1].data["name"]
-
-    _run(run())
-
-
-def test_pane_heights_keep_their_rules_at_every_size():
-    for total in range(15, 80):
-        for team in range(3, 20):
-            t, i, w, f = pane_heights(total, team)
-            assert t + i + w + f == total - 1 and min(t, i, w, f) >= 2
-            assert i >= w and t <= team
-            if total >= 30:
-                assert i - 2 >= 5 and w - 2 >= 2 and f - 3 >= 2
-    assert pane_heights(40, 6)[1] - 2 >= 8
+# --- 14 the final layout: replaced by card #162 (tests/test_tui_0170.py) -----------------------------
 
 
 def test_the_key_line_keeps_every_key_and_drops_words_from_the_end_first():
@@ -801,11 +726,11 @@ def test_the_key_line_lists_t_f_and_g_G_while_flow_has_focus(ctx, clock):
             await pilot.press(str(FLOW))
             await pilot.pause()
             line = str(app.query_one("#hints").render())
-            assert "t system" in line and "f filter" in line and "g/G top/end" in line
+            assert line.startswith("t system · f filter · g/G newest/oldest")
             await pilot.press(str(INBOX))
             await pilot.pause()
             line = str(app.query_one("#hints").render())
-            assert "f jump" in line and "g/G" not in line
+            assert "f " not in line and "g/G" not in line and "t system" not in line  # Flow's own keys only in Flow
             keys = dict(Help.KEYS)
             assert keys["g / G"] and keys["t"].startswith("show or hide system lines")
 

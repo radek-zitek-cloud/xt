@@ -45,7 +45,7 @@ TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "
               "system": "bright_black"}
 HISTORY_DAYS = 30
 CONTINUED = "↳ "
-SEEN_KEYS = "clears from New once you leave the Inbox · S: message the liaison"
+SEEN_KEYS = "clears from Notifications once you leave the Inbox · S: message the liaison"
 
 
 def screen_lines(screen: str, keep: int = 25) -> list[tuple[str, int]]:
@@ -345,7 +345,7 @@ def build(ctx: Ctx) -> Snapshot:
         needs.append(Row(f"question:{q['id']}", _t(("⚑ ", "bold yellow"), f"#{q['id']} {q['opener']}: ",
                                                    _line(q["title"]),
                                                    (f"  {n_opts} options", "yellow") if n_opts else ""),
-                         qdetail, "question", {"id": q["id"], "opener": q["opener"], "text": body},
+                         qdetail, "question", {"id": q["id"], "opener": q["opener"], "text": body, "ts": q["opened"]},
                          row_age(q["opened"], now)))
     for rid, r in box.approvals:
         ts = by_id[int(rid)]["ts"] if int(rid) in by_id else None
@@ -366,7 +366,7 @@ def build(ctx: Ctx) -> Snapshot:
 
             needs.append(Row(f"approval:{rid}", _t(("⚑ ", "yellow"), f"#{rid} wake {r['name']} ",
                                                    (f"every {r['every']}", "bright_black")),
-                             sdetail, "approval", {"id": int(rid)}, row_age(ts, now)))
+                             sdetail, "approval", {"id": int(rid), "ts": ts}, row_age(ts, now)))
             continue
 
         def detail(rid=rid, r=r):
@@ -386,7 +386,7 @@ def build(ctx: Ctx) -> Snapshot:
         needs.append(Row(f"approval:{rid}", _t(("⚑ ", "yellow"), f"#{rid} spawn {r['name']} ",
                                                (f"({r['role']}, {harness_model(r['harness'], r.get('model'))})",
                                                 "bright_black")),
-                         detail, "approval", {"id": int(rid)}, row_age(ts, now)))
+                         detail, "approval", {"id": int(rid), "ts": ts}, row_age(ts, now)))
     for key, al in box.alerts:
         def detail(key=key, al=al):
             out = Text()
@@ -405,7 +405,9 @@ def build(ctx: Ctx) -> Snapshot:
         # its age is that of the last failure (card #131)
         n = int(al.get("count", 1))
         needs.append(Row(f"alert:{key}", _t(("⚠ ", "red"), (f"×{n} ", "yellow") if n > 1 else "", _line(al["text"])),
-                         detail, "alert", {"key": key}, row_age(al.get("last") or al.get("ts"), now)))
+                         detail, "alert", {"key": key, "ts": al.get("last") or al.get("ts")},
+                         row_age(al.get("last") or al.get("ts"), now)))
+    needs.sort(key=lambda r: r.data.get("ts") or "", reverse=True)  # newest on top (card #162)
     if box.answered:  # the human's decisions stay in view for a week (card #157)
         n = len(box.answered)
         needs.append(Row(ANSWERED_FOLD, _t((f"({n} answered, last {_inbox.EARLIER_DAYS} days) ▸", "bright_black")),
@@ -429,14 +431,14 @@ def build(ctx: Ctx) -> Snapshot:
                                                    "under": ANSWERED_FOLD}, row_age(a["ts"], now)))
 
     def new_row(m: dict, goal: dict | None, seen: bool) -> Row:
-        """A New row: a report to the human, or a goal of theirs that closed. Seen ones (card #157)
-        are dim and folded under `(N earlier, seen)`."""
+        """A Notifications row: a report to the human, or a goal of theirs that closed. Unread ones
+        are bold (card #162); seen ones (card #157) are dim and folded under `(N earlier, seen)`."""
         keys = "seen already" if seen else SEEN_KEYS
         data = {"folded": True, "under": EARLIER_FOLD} if seen else {}
-        dim = "bright_black" if seen else None
+        dim = "bright_black" if seen else "bold"
         if goal is None:
-            return Row(f"msg:{m['id']}", _t(("✉ ", dim or "cyan"), (f"#{m['id']} {m['from']}: ", dim or ""),
-                                            (_line(m["body"]), dim or "")),
+            return Row(f"msg:{m['id']}", _t(("✉ ", "bright_black" if seen else "cyan"),
+                                            (f"#{m['id']} {m['from']}: ", dim), (_line(m["body"]), dim)),
                        lambda m=m: thread(m, _msg_block(m), keys), "message", {"id": m["id"], **data},
                        row_age(m["ts"], now))
 
@@ -449,8 +451,9 @@ def build(ctx: Ctx) -> Snapshot:
             out.append(done["body"] + "\n")
             return thread(done, out, keys)
 
-        return Row(f"done:{goal['id']}", _t(("✓ ", dim or "green"), (f"#{goal['id']} done: ", dim or ""),
-                                            (_line(goal["body"]), dim or ""), (f"  #{m['id']}", "bright_black")),
+        return Row(f"done:{goal['id']}", _t(("✓ ", "bright_black" if seen else "green"),
+                                            (f"#{goal['id']} done: ", dim), (_line(goal["body"]), dim),
+                                            (f"  #{m['id']}", "bright_black")),
                    ddetail, "done", {"id": goal["id"], "done": m["id"], **data}, row_age(m["ts"], now))
 
     new_rows = [new_row(m, goal, False) for m, goal in box.new]  # since the human last looked (#125, #127)
@@ -483,7 +486,7 @@ def build(ctx: Ctx) -> Snapshot:
                                      {"id": m["id"], "seen": True, "folded": True, "under": FRICTION_FOLD},
                                      row_age(m["ts"], now)))
     inbox_rows = []
-    for heading, rows in (("NEEDS YOU", needs), ("NEW", new_rows), ("FRICTION", friction_rows)):
+    for heading, rows in (("NEEDS YOU", needs), ("NOTIFICATIONS", new_rows), ("FRICTION", friction_rows)):
         if rows:
             inbox_rows.append(Row(f"heading:{heading}", Text(heading, style="bold"), lambda: Text(""), "heading"))
             inbox_rows += rows
@@ -555,7 +558,7 @@ def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread)
 
     def task_rows(tasks, parent: str) -> list[Row]:
         rows = []
-        for t in tasks:
+        for t in reversed(tasks):  # newest on top (card #162)
             m, is_open = t.msg, t.msg["id"] in open_items
 
             def detail(m=m, t=t, is_open=is_open):

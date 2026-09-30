@@ -1,6 +1,5 @@
 """`xt tui`: the lazygit-style overview of a running team (and `--demo` on static data)."""
 
-import math
 from typing import Callable
 
 from rich.style import Style
@@ -24,31 +23,61 @@ FLOW = PANELS.index("Flow") + 1
 TEAM = 0  # the Team pane's key (card #157); last_panel is 0 while it has focus
 DETAIL = len(PANELS) + 1  # Detail's key, 4 (card #157)
 PICK_AGENT = "select an agent in Team first (0, then j/k)"
-# The key line (card #130): what s does first (card #102), then the keys every pane shares, then the
-# rest while there is room. A pair loses its word, from the end, before a key is left out, so every
-# one of these fits at 100 columns.
-SEND_KEYS = [("s/S", "message liaison")]
-CORE_KEYS = [("h", "help"), ("q", "quit"), (f"{TEAM}-{DETAIL}", "panes"), ("j/k", "move"), ("space", "fold"),
-             ("enter", "read"), ("a/d", "approve/deny"), ("/", "filter"), ("t", "system"), ("f", "jump"),
-             ("v", "supervisor")]
-MORE_KEYS = [("tab", "next pane"), ("c", "clear"), ("u/U", "start"), ("x/X", "stop"), ("R", "retire")]
-HINTS = " · ".join(f"{k} {w}" for k, w in SEND_KEYS + CORE_KEYS + MORE_KEYS)
-# pane heights (criterion 14 of #130): Flow gets about a third, the Team pane what it needs up to what
-# leaves the Inbox and Work their minimum, and the Inbox the larger part of the rest
-FLOW_SHARE, FLOW_MIN, FLOW_MAX = 0.35, 6, 14
-MAIN_MIN = 11  # Inbox 5 rows and Work 2, with their frames
-INBOX_SHARE = 0.6
+# The key line (card #162): the focused pane's own keys first, then the keys that work everywhere.
+# Moving around (0-4, j/k, tab, enter, esc) and h and q are left to the help screen. In the Inbox, s
+# shows while a question is selected, as `s answer #N` (card #102).
+PANE_KEYS = {
+    TEAM: [("u/U", "start"), ("x/X", "stop"), ("R", "retire"), ("f", "jump")],
+    INBOX: [("a/d", "approve/deny"), ("s", "answer"), ("c", "clear"), ("space", "fold")],
+    WORK: [("space", "fold"), ("o", "open only")],
+    FLOW: [("t", "system"), ("f", "filter"), ("g/G", "newest/oldest")],
+    DETAIL: [],
+}
+GLOBAL_KEYS = [("S", "message liaison"), ("/", "filter"), ("v", "supervisor")]
+# The three bands (card #162), in outer rows: Detail about a fifth of the height (4 to 8 content rows),
+# the top band what the team needs, up to 60% of the height and never so much that Work/Flow gets
+# fewer than 4 content rows or is no taller than Detail; Work/Flow the rest. The key line takes the
+# last row.
+DETAIL_MIN, DETAIL_MAX, DETAIL_SHARE = 4, 8, 0.2
+MIDDLE_MIN = 4
+TOP_MIN, TOP_SHARE = 3, 0.6
+TEAM_MIN_WIDTH = 30
 
 
-def pane_heights(total: int, team: int) -> tuple[int, int, int, int]:
-    """(Team, Inbox, Work, Flow) outer heights for a terminal `total` rows high, the Team pane
-    needing `team` rows; the key line takes the last row."""
+def band_heights(total: int, team: int) -> tuple[int, int, int]:
+    """(top, middle, detail) outer heights for a terminal `total` rows high whose Team pane needs
+    `team` rows, frame included."""
     avail = max(0, total - 1)
-    flow_h = max(FLOW_MIN, min(FLOW_MAX, round(avail * FLOW_SHARE)))
-    team_h = max(3, min(team, avail - flow_h - MAIN_MIN))
-    main = max(0, avail - team_h - flow_h)
-    inbox = math.ceil(main * INBOX_SHARE)
-    return team_h, inbox, main - inbox, flow_h
+    detail = max(DETAIL_MIN + 2, min(DETAIL_MAX + 2, round(avail * DETAIL_SHARE)))
+    top = max(TOP_MIN + 2, min(team, int(avail * TOP_SHARE), avail - detail - max(MIDDLE_MIN + 2, detail + 1)))
+    middle = avail - top - detail
+    if middle < MIDDLE_MIN + 2:  # a small terminal: Detail and the top band give way too
+        detail = max(3, min(detail, avail // 4))
+        top = max(3, min(top, avail // 3))
+        middle = max(0, avail - top - detail)
+    return top, middle, detail
+
+
+def pane_title(number: int, title: str, info: str = "") -> Text:
+    """`[n] - Title - info` (card #162): the pane's key, its name, then its counts or filter."""
+    return Text(f"[{number}] - {title}" + (f" - {info}" if info else ""))
+
+
+def retitle(pane) -> None:
+    """A pane's title. Work and Flow share the middle band (card #162): both names show like tabs,
+    the one on screen with its info, the other dim."""
+    partner = getattr(pane, "partner", None)
+    if partner is None:
+        pane.border_title = pane_title(pane.number, pane.title, pane.info)
+        return
+    active = pane if pane.display else partner
+    out = Text()
+    for p in sorted((pane, partner), key=lambda p: p.number):
+        if out:
+            out.append(" │ ", style="dim")
+        out.append_text(pane_title(p.number, p.title, p.info) if p is active
+                        else Text(f"[{p.number}] - {p.title}", style="dim"))
+    pane.border_title = partner.border_title = out
 
 
 def key_line(pairs: list[tuple[str, str]], more: list[tuple[str, str]], width: int) -> str:
@@ -76,22 +105,31 @@ class Panel(OptionList):
         self.all_rows: list[Row] = []
         self.filter = ""
         # the Inbox's open folds, by fold key: seen friction under `(N older, seen)` (card #127), seen
-        # New items under `(N earlier, seen)` (card #157)
+        # notifications under `(N earlier, seen)` (card #157)
         self.open_folds: set[str] = set()
-        self.border_title = f"[{number}]─{title}"
+        self.info = ""  # the title's info part (card #162)
+        self.partner = None  # Work's is Flow: they share the middle band
+        retitle(self)
 
     def set_counts(self, counts: str) -> None:
-        self.border_title = f"[{self.number}]─{self.title}" + (f"─{counts}" if counts else "")
+        self.info = counts
+        retitle(self)
 
     def set_filter(self, text: str) -> None:
         self.filter = text.strip()
         self.set_rows(self.all_rows)
 
+    def top_row(self) -> int | None:
+        """The first row that can be selected."""
+        return next((i for i, r in enumerate(self.rows) if r.kind != "heading"), None)
+
     def set_rows(self, rows: list[Row]) -> None:
         """Replace rows (only those matching the filter, if any), keeping the selection on the
-        same item when it still exists, else on the nearest shown row above it in the outline. Each
-        row is laid out at the panel's width (card #132)."""
+        same item when it still exists, else on the nearest shown row above it in the outline. The
+        newest rows are on top (card #162): with the top row selected, the selection stays on the top
+        row, so it follows what arrives. Each row is laid out at the panel's width (card #132)."""
         keep = self.current.key if self.current else None
+        follow = keep is not None and self.highlighted == self.top_row()
         self.all_rows = rows
         rows = self.visible(rows)
         self.rows = rows
@@ -101,11 +139,11 @@ class Panel(OptionList):
         if rows:
             parents = {r.key: r.data.get("parent") for r in self.all_rows}
             idx = None
-            while keep is not None and idx is None:
+            while keep is not None and idx is None and not follow:
                 idx = next((i for i, r in enumerate(rows) if r.key == keep), None)
                 keep = parents.get(keep)
             if idx is None:
-                idx = next((i for i, r in enumerate(rows) if r.kind != "heading"), None)
+                idx = self.top_row()
             self.highlighted = idx
         self.update_subtitle()
 
@@ -245,9 +283,10 @@ class WorkPanel(Panel):
 
 
 class TeamPane(Static):
-    """The Team pane at the top (card #128): the header, the harness blocks and the agents. `0` (or
-    tab) reaches it; j/k or the arrows, the page keys and a click select an agent for the agent keys
-    and Detail (card #157)."""
+    """The Team pane, top left (cards #128, #162): the header, today's spend, then each harness's
+    usage line and its agents, one column. It never scrolls: what doesn't fit gives way to a
+    `+N more` line. `0` (or tab) reaches it; j/k or the arrows, the page keys and a click select an
+    agent in view for the agent keys and Detail (card #157)."""
 
     can_focus = True
     BINDINGS = [Binding("down", "step(1)", show=False), Binding("up", "step(-1)", show=False),
@@ -257,16 +296,19 @@ class TeamPane(Static):
     def __init__(self):
         super().__init__(id="team", classes="panel")
         self.title = "Team"
-        self.border_title = "Team"
+        self.number = TEAM
+        self.info = ""
+        retitle(self)
         self.header = Text("")
         self.spend = ""
         self.harnesses: list[teampane.Harness] = []
         self.all_rows: list[Row] = []
-        self.rows: list[Row] = []  # the agents in display order
+        self.rows: list[Row] = []  # the agents in view, in display order
         self.selected: str | None = None  # the selected agent's name
         self.now = None
         self.natural = 3  # the rows the whole pane needs, frame included
-        self.limit: int | None = None  # the content rows it gets (card #130's cap), None: all
+        self.limit: int | None = None  # the content rows it gets when that is fewer, else None
+        self.hidden = 0  # the harnesses and agents under the `+N more` line
 
     def set_data(self, snap: Snapshot, now) -> None:
         self.header, self.spend, self.harnesses = snap.header, snap.spend, snap.harnesses
@@ -274,38 +316,35 @@ class TeamPane(Static):
         self.now = now
         self.redraw()
 
-    def redraw(self) -> None:
+    def need_width(self) -> int:
+        """The width, frame included, at which an agent's line has its widest bar."""
+        return teampane.widths([r.data for r in self.all_rows]).cell(teampane.BAR_MAX) + 2
+
+    def lines(self, width: int) -> list[tuple[Text, str | None]]:
         import datetime as dt
 
-        width = self.content_size.width or max(20, self.app.size.width - 2)
         now = self.now or dt.datetime.now().astimezone()
+        return teampane.render(self.header, self.spend, self.harnesses, [r.data for r in self.all_rows],
+                               width, now, self.selected if self.has_focus else None)
+
+    def natural_at(self, width: int) -> int:
+        """The rows the whole pane needs at `width` (frame included), before it is that wide."""
+        return len(self.lines(max(1, width - 2))) + 2
+
+    def redraw(self) -> None:
+        width = self.content_size.width or max(20, self.app.size.width // 2 - 2)
         by_name = {r.data["name"]: r for r in self.all_rows}
-        lines, order = teampane.render(self.header, self.spend, self.harnesses,
-                                       [r.data for r in self.all_rows], width, now,
-                                       self.selected if self.has_focus else None)
-        self.rows = [by_name[n] for n in order]
-        if self.rows and self.selected not in order:
-            self.selected = order[0]
+        lines = self.lines(width)
+        shown, self.hidden = teampane.clip(lines, self.limit)
+        self.rows = [by_name[k] for k in dict.fromkeys(k for _, k in shown) if k in by_name]
+        if self.rows and self.selected not in {r.data["name"] for r in self.rows}:
+            self.selected = self.rows[0].data["name"]
             if self.has_focus:
                 return self.redraw()
         natural, self.natural = self.natural, len(lines) + 2
-        self.update(Text("\n").join(self.window(lines)))
+        self.update(Text("\n").join(line for line, _ in shown))
         if natural != self.natural and self.is_mounted:
             self.app.relayout()
-
-    def window(self, lines: list[Text]) -> list[Text]:
-        """Capped (a big team on a small terminal): the header line, then the lines around the
-        selected agent; the subtitle says how many are out of view."""
-        self.border_subtitle = ""
-        if self.limit is None or len(lines) <= self.limit:
-            return lines
-        room = max(0, self.limit - 1)  # 0 on a tiny terminal: the header line alone
-        rest = lines[1:]
-        at = next((i for i, ln in enumerate(rest) if any(str(s.style) == teampane.SELECTED for s in ln.spans)), 0)
-        start = max(0, min(at - room // 2, len(rest) - room))
-        hidden = len(rest) - room
-        self.border_subtitle = f"{hidden} more line{'s' if hidden != 1 else ''}: 0, then j/k"
-        return lines[:1] + rest[start:start + room]
 
     def on_resize(self) -> None:
         self.redraw()
@@ -331,8 +370,8 @@ class TeamPane(Static):
             self.select(names[i])
 
     def page_size(self) -> int:
-        """Agents a page key moves by: the agent lines in view when capped, else all of them."""
-        return max(1, self.limit - 1) if self.limit is not None else max(1, len(self.rows))
+        """Agents a page key moves by: all of them in view (the pane never scrolls)."""
+        return max(1, len(self.rows))
 
     def action_step(self, step: int) -> None:
         self.move(step)
@@ -354,10 +393,11 @@ class TeamPane(Static):
 
 
 class FlowPane(Widget):
-    """The Flow chart (card #130), full width at the bottom. It keeps which rows pass its filters
-    (system lines, one agent or goal, text), which one is selected and where the view starts; it
-    draws only the rows in view, so a ledger of thousands of messages scrolls without a stall. While
-    the newest row is selected it follows new messages."""
+    """The Flow chart (card #130), sharing the middle band with Work (card #162). It keeps which rows
+    pass its filters (system lines, one agent or goal, text), which one is selected and where the
+    view starts; it draws only the rows in view, so a ledger of thousands of messages scrolls without
+    a stall. The newest message is the top row (card #162); while it is selected Flow follows new
+    messages."""
 
     can_focus = True
     BINDINGS = [Binding("g,home", "edge(-1)", show=False), Binding("G,end", "edge(1)", show=False),
@@ -375,11 +415,13 @@ class FlowPane(Widget):
         self.filter = ""  # `/`: text in the body
         self.shown: list[dict] = []  # the messages that pass the system toggle
         self.lanes: list[flow.Lane] = []  # every agent `f` offers: the lanes of all of `shown`
-        self.items: list[dict] = []  # the messages that pass every filter
-        self.rows: list[tuple[str, object]] = []  # what the pane lists: messages and day separators
+        self.items: list[dict] = []  # the messages that pass every filter, oldest first
+        self.rows: list[tuple[str, object]] = []  # what the pane lists, newest first: messages and day separators
         self.selected: int | None = None  # index in rows
         self.top = 0
         self.follow = True
+        self.info = ""
+        self.partner = None  # Work: they share the middle band (card #162)
         self.update_title()
 
     # --- data and filters ---------------------------------------------------------------------------
@@ -389,8 +431,8 @@ class FlowPane(Widget):
         self.rebuild()
 
     def rebuild(self) -> None:
-        """Filter and lay out the rows again, keeping the selection on the same message (or the
-        newest one before it), or on the newest while following."""
+        """Filter and lay out the rows again, newest first, keeping the selection on the same message
+        (or the newest one before it), or on the newest while following."""
         keep = None if self.follow else self.message()
         shown = self.shown = [m for m in self.data.msgs if self.show_system or not flow.is_system(m)]
         self.lanes = flow.lanes(self.data.roster, shown)
@@ -404,16 +446,16 @@ class FlowPane(Widget):
             needle = self.filter.lower()
             shown = [m for m in shown if needle in (m.get("body") or "").lower()]
         self.items = shown
-        self.rows = flow.entries(shown, self.data.now)
+        self.rows = flow.entries(shown[::-1], self.data.now)
         msgs = self.message_rows()
         if not msgs:
             self.selected = None
         elif keep is None:
-            self.selected = msgs[-1]
+            self.selected = msgs[0]
         else:
             before = [i for i in msgs if self.rows[i][1].get("id", 0) <= keep.get("id", 0)]
-            self.selected = before[-1] if before else msgs[0]
-        self.follow = bool(msgs) and self.selected == msgs[-1]
+            self.selected = before[0] if before else msgs[-1]
+        self.follow = bool(msgs) and self.selected == msgs[0]
         self.place()
 
     def toggle_system(self) -> None:
@@ -475,10 +517,13 @@ class FlowPane(Widget):
         return max(1, self.content_size.height - (1 if self.width() >= flow.NARROW else 0))
 
     def place(self) -> None:
-        """Keep the selected row in view (the newest at the bottom while following), then retitle."""
+        """Keep the selected row in view (the top of the list while following), then retitle. While
+        Work has the band, the view stays where it was."""
+        if not self.display or not self.content_size.height:
+            return self.update_title()
         h, n = self.view_height(), len(self.rows)
         if self.follow:
-            self.top = max(0, n - h)
+            self.top = 0
         elif self.selected is not None:
             if self.selected < self.top:
                 self.top = self.selected
@@ -493,9 +538,9 @@ class FlowPane(Widget):
         msgs = self.message_rows()
         if not msgs:
             return
-        at = msgs.index(self.selected) if self.selected in msgs else len(msgs) - 1
+        at = msgs.index(self.selected) if self.selected in msgs else 0
         self.selected = msgs[max(0, min(len(msgs) - 1, at + step))]
-        self.follow = self.selected == msgs[-1]
+        self.follow = self.selected == msgs[0]
         self.place()
 
     def action_step(self, step: int) -> None:
@@ -508,7 +553,7 @@ class FlowPane(Widget):
 
     def scroll_view(self, step: int) -> None:
         """The wheel (card #157): the view moves `step` rows, the selection only as far as it must to
-        stay in view. Scrolled up from the newest row, Flow stops following."""
+        stay in view. Scrolled down from the newest row, Flow stops following."""
         msgs = self.message_rows()
         h, n = self.view_height(), len(self.rows)
         self.top = max(0, min(self.top + step, n - h))
@@ -516,7 +561,7 @@ class FlowPane(Widget):
             in_view = [i for i in msgs if self.top <= i < self.top + h]
             if in_view and self.selected not in in_view:
                 self.selected = in_view[0] if self.selected < in_view[0] else in_view[-1]
-            self.follow = self.selected == msgs[-1] and self.top >= n - h
+            self.follow = self.selected == msgs[0] and self.top == 0
         self.place()
         if self.has_focus:
             self.app.show_detail(self)
@@ -535,7 +580,7 @@ class FlowPane(Widget):
         if i is not None and 0 <= i < len(self.rows) and self.rows[i][0] == "msg":
             self.focus()
             self.selected = i
-            self.follow = i == self.message_rows()[-1]
+            self.follow = i == self.message_rows()[0]
             self.place()
             self.app.show_detail(self)
 
@@ -560,7 +605,8 @@ class FlowPane(Widget):
             parts.append(self.pick_text() + " (f)")
         if self.filter:
             parts.append(f"/{self.filter}")
-        self.border_title = f"[{self.number}]─{self.title}─" + " · ".join(parts)
+        self.info = " · ".join(parts)
+        retitle(self)
 
     def on_resize(self) -> None:
         self.place()
@@ -635,8 +681,8 @@ PANES = (Panel, TeamPane, FlowPane)  # what focus moves between (Detail is reach
 
 
 class DetailPane(VerticalScroll):
-    """The detail pane's frame. The wheel moves a thread like j/k: its hidden rows first, then the
-    scroll (card #157)."""
+    """The detail pane's frame, full width at the bottom (card #162). The wheel moves a thread like
+    j/k: its hidden rows first, then the scroll (card #157)."""
 
     def on_mouse_scroll_down(self, event) -> None:
         event.prevent_default()
@@ -845,6 +891,8 @@ class Help(ModalScreen[None]):
     KEYS = [
         ("Move", ""),
         (f"{TEAM}-{DETAIL}", "jump to a pane: " + ", ".join(["Team", *PANELS, "Detail"])),
+        (f"{WORK} / {FLOW}", "Work and Flow share the middle pane: 2 shows Work, 3 shows Flow; each keeps "
+                             "its selection"),
         ("tab / l", "next pane"),
         ("shift+tab", "previous pane"),
         ("j / k", "down / up; the arrows too (in the detail pane: the thread's hidden rows first, then scroll)"),
@@ -857,24 +905,25 @@ class Help(ModalScreen[None]):
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
         ("c", "clear the selected alert; on unread friction: mark it seen"),
         ("enter/space", "on (N older, seen): show or hide the friction you've seen; on (N earlier, seen): "
-                        "the New items you've seen in the last 7 days; on (N answered, last 7 days): "
+                        "the notifications you've seen in the last 7 days; on (N answered, last 7 days): "
                         "your answers"),
         (f"Work ({WORK})", ""),
         ("space", "fold or unfold the selected goal, done (N) or no goal row (on a task: fold its goal)"),
         ("o", "open work only: hide done (N) and done tasks; again: show them"),
         ("enter", "show the selected goal or task in the detail pane"),
         (f"Flow ({FLOW})", ""),
-        ("j / k", "select a message; with the newest selected, Flow follows new ones"),
+        ("j / k", "select a message (the newest is on top); with the newest selected, Flow follows new ones"),
         ("pgup/pgdn", "a page up / down"),
-        ("g / G", "the oldest / the newest message (home / end too)"),
+        ("g / G", "the newest (top) / the oldest (bottom) message (home / end too)"),
         ("enter", "show the selected message and its thread in the detail pane"),
-        ("t", "show or hide system lines (starts, stops, settings, wake-ups, nudges)"),
+        ("t", "show or hide system lines (starts, stops, settings, wake-ups, nudges); from any pane"),
         ("f", "filter to one agent's messages or one goal's thread; the same pick again, esc in the "
               "picker, or esc in Flow clears it"),
         ("/", "filter by the message's text"),
         (f"Team ({TEAM})", ""),
-        ("j / k", "select an agent (its details show in the detail pane)"),
-        ("pgup/pgdn", "a page of agents up / down; home / end: the first / the last agent"),
+        ("j / k", "select an agent (its details show in the detail pane); agents under the +N more "
+                  "line need a taller terminal"),
+        ("pgup/pgdn", "the first / the last agent in view (home / end too)"),
         ("u", "start the selected stopped agent (existing role and harness)"),
         ("U", "start every stopped agent in the roster"),
         ("x", "stop the selected agent; it stays in the roster (asks y/n)"),
@@ -883,7 +932,7 @@ class Help(ModalScreen[None]):
         ("f", "switch Herdr to the selected agent's workspace"),
         ("Anywhere", ""),
         ("s", "answer the question selected in Inbox; anywhere else: send a message to the liaison "
-              "(the key line says which; enter: new line, ctrl+s: send)"),
+              "(in the Inbox the key line says which; enter: new line, ctrl+s: send)"),
         ("S", "always send a message to the liaison, even with a question selected"),
         ("r", "refresh now (it also refreshes every 2 s)"),
         ("h / ?", "this help"),
@@ -958,23 +1007,26 @@ class XtTui(App):
         self.detail_key: str | None = None
 
     def compose(self) -> ComposeResult:
-        # the final layout (card #130): Team on top; Inbox over Work on the left, Detail on the
-        # right; Flow at the bottom, full width; the key line last
-        yield TeamPane()
-        with Horizontal(id="main"):
-            with Vertical(id="left"):
-                yield Panel("Inbox", INBOX)
-                yield WorkPanel("Work", WORK)
-            with Vertical(id="right"):
-                detail = DetailPane(id="detail", classes="panel")
-                detail.border_title = "Detail"
-                with detail:
-                    yield DetailBody(id="detail-body")
-        yield FlowPane("Flow", FLOW)
+        # three bands (card #162): Team and the Inbox side by side; Work or Flow, full width; Detail,
+        # full width; the key line last
+        with Horizontal(id="top"):
+            yield TeamPane()
+            yield Panel("Inbox", INBOX)
+        with Vertical(id="middle"):
+            work_pane, flow_pane = WorkPanel("Work", WORK), FlowPane("Flow", FLOW)
+            work_pane.partner, flow_pane.partner = flow_pane, work_pane
+            flow_pane.display = False
+            yield work_pane
+            yield flow_pane
+        detail = DetailPane(id="detail", classes="panel")
+        detail.border_title = pane_title(DETAIL, "Detail")
+        with detail:
+            yield DetailBody(id="detail-body")
         yield Toast()
         yield Static(id="hints")
 
     def on_mount(self) -> None:
+        retitle(self.panel(WORK))
         self.refresh_data()
         self.relayout()
         self.panel(INBOX).focus()  # what the human depends on most (criterion 14 of #130)
@@ -983,21 +1035,32 @@ class XtTui(App):
 
     def on_resize(self) -> None:
         self.relayout()
+        self.call_after_refresh(self.relayout)  # the screen has the new size only then
 
     def relayout(self) -> None:
-        """Set the panes' heights for the terminal's (see pane_heights); the Team pane shows only
-        what fits its share."""
-        if not self.query("#main"):
+        """Set the bands' heights for the terminal's (see band_heights) and the Team pane's width;
+        the Team pane shows what fits and a `+N more` line."""
+        if not self.query("#top"):
             return
-        team_h, inbox_h, work_h, flow_h = pane_heights(self.size.height, self.team.natural)
-        limit = None if team_h >= self.team.natural else max(1, team_h - 2)
+        team_w = max(TEAM_MIN_WIDTH, min(self.team.need_width(), self.size.width // 2))
+        natural = self.team.natural_at(team_w)
+        top, middle, detail = band_heights(self.size.height, natural)
+        limit = None if top >= natural else max(1, top - 2)
+        for widget, h in ((self.query_one("#top"), top), (self.query_one("#middle"), middle),
+                          (self.query_one("#detail"), detail)):
+            if widget.styles.height is None or widget.styles.height.value != h:
+                widget.styles.height = h
+        if self.team.styles.width is None or self.team.styles.width.value != team_w:
+            self.team.styles.width = team_w
         if limit != self.team.limit:
             self.team.limit = limit
             self.team.redraw()
-        for widget, h in ((self.query_one("#main"), inbox_h + work_h), (self.panel(INBOX), inbox_h),
-                          (self.panel(WORK), work_h), (self.panel(FLOW), flow_h)):
-            if widget.styles.height is None or widget.styles.height.value != h:
-                widget.styles.height = h
+
+    def show_middle(self, n: int) -> None:
+        """2 shows Work in the middle band, 3 Flow (card #162); the other keeps its state, hidden."""
+        work_pane, flow_pane = self.panel(WORK), self.panel(FLOW)
+        work_pane.display, flow_pane.display = n == WORK, n == FLOW
+        retitle(work_pane)
 
     # --- data -------------------------------------------------------------------------------
 
@@ -1060,26 +1123,28 @@ class XtTui(App):
             view.offset = self.detail_view.offset
         self.detail_view, self.detail_key = view, key
         body.update(view)
-        pane.border_title = f"Detail─{panel.title}"
+        pane.border_title = pane_title(DETAIL, "Detail", panel.title)
 
     def set_status(self, text: str) -> None:
         """The last action's result goes to the toast, never into the Team pane (card #128)."""
         self.status = text
         self.query_one(Toast).show(text)
 
+    def focused_number(self) -> int:
+        """The focused pane's key: DETAIL in Detail, else the last list pane."""
+        return DETAIL if isinstance(self.focused, DetailPane) else self.last_panel
+
     def render_hints(self) -> None:
-        """The bottom line, keys only: the shared keys, then the focused pane's own, then the rest
-        while they fit (card #130)."""
-        send = self.send_hint()  # what s does right now (card #102)
-        core = ([send, ("S", "message liaison")] if send else list(SEND_KEYS)) + CORE_KEYS
-        more = list(MORE_KEYS)
-        if self.last_panel == WORK:
-            core.insert(core.index(("space", "fold")) + 1, ("o", "open only"))
-        if self.last_panel == FLOW:
-            core[core.index(("f", "jump"))] = ("f", "filter")
-            core.insert(core.index(("f", "filter")) + 1, ("g/G", "top/end"))
+        """The bottom line (card #162): the focused pane's own keys, then S, / and v, which work
+        everywhere. No keys for moving around; the help screen has every key."""
+        n = self.focused_number()
+        own = list(PANE_KEYS.get(n, []))
+        if n == INBOX:  # s answers the selected question (card #102); else it is S's twin, left out
+            send = self.send_hint()
+            at = [k for k, _ in own].index("s")
+            own[at:at + 1] = [send] if send else []
         width = max(20, self.size.width - 2)
-        self.query_one("#hints", Static).update(Text(key_line(core, more, width), no_wrap=True,
+        self.query_one("#hints", Static).update(Text(key_line(own + GLOBAL_KEYS, [], width), no_wrap=True,
                                                      overflow="ellipsis"))
 
     def send_hint(self) -> tuple[str, str] | None:
@@ -1126,6 +1191,8 @@ class XtTui(App):
             self.last_panel = n
             self.show_detail(event.widget)
             self.render_hints()
+        elif isinstance(event.widget, DetailPane):
+            self.render_hints()
 
     def note_friction_in_view(self) -> None:
         """Unread friction on screen while the human has the Inbox open counts as seen once they
@@ -1156,6 +1223,8 @@ class XtTui(App):
         self.exit()
 
     def action_panel(self, n: int) -> None:
+        if n in (WORK, FLOW):
+            self.show_middle(n)
         self.panel(n).focus()
 
     def action_cursor(self, direction: str) -> None:
@@ -1171,16 +1240,19 @@ class XtTui(App):
             (w.scroll_down if direction == "down" else w.scroll_up)()
 
     def scroll_detail(self, direction: str) -> None:
-        """j/k in Detail, or the wheel over it: a thread's hidden rows first (card #131), then the
-        scroll."""
+        """j/k in Detail, or the wheel over it: a thread's hidden rows first (card #131) while its
+        rows are in view, else the scroll. In the short bottom Detail (card #162) the scroll brings
+        the thread into view first."""
         w = self.query_one("#detail", DetailPane)
         view = self.detail_view
+        down = direction == "down"
         if isinstance(view, ThreadDetail):
-            if direction == "down" and view.scroll(1):
+            top, h = round(w.scroll_y), w.content_size.height
+            in_view = top <= view.rows_at and view.rows_at + view.rows_n <= top + h
+            at_edge = (w.scroll_y >= w.max_scroll_y) if down else (w.scroll_y <= 0)
+            if (in_view or at_edge) and view.scroll(1 if down else -1):
                 return self.query_one("#detail-body", Static).update(view)
-            if direction == "up" and w.scroll_y <= 0 and view.scroll(-1):
-                return self.query_one("#detail-body", Static).update(view)
-        (w.scroll_down if direction == "down" else w.scroll_up)()
+        (w.scroll_down if down else w.scroll_up)(animate=False)
 
     def action_detail(self) -> None:
         """4: Detail, showing what the pane the human was in has selected (card #157)."""
@@ -1201,7 +1273,7 @@ class XtTui(App):
             self.panel(self.last_panel).focus()
 
     def action_system(self) -> None:
-        """t: show or hide Flow's system lines, from any pane (Flow is always on screen)."""
+        """t: show or hide Flow's system lines, from any pane (with Work on screen, the toast says so)."""
         pane = self.panel(FLOW)
         pane.toggle_system()
         self.set_status("Flow: system lines shown" if pane.show_system else "Flow: system lines hidden")
