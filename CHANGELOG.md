@@ -9,6 +9,53 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.16.0] — not released yet
+
+A TUI-focused release, built card by card to the approved specs of the TUI redesign.
+**0.16.0-rc1** (2026-09-30) has the first two cards: #127 (Inbox groups and friction read state)
+and #132 (rows cut at pane width, with ages). The other cards (#128, #129, #131, #130) follow in
+later candidates.
+
+### Added
+
+- **Inbox in three groups (#127, rc1).** The TUI's Inbox and `xt inbox` show **Needs you** (open
+  questions with `N options` when they have choices, approvals, alerts with `⚠`; they stay until
+  answered, decided or cleared), **New** (goals you dispatched that closed and reports to you, since
+  you last looked, newest first) and **Friction** (unread only). An empty group isn't shown. The
+  Inbox's title carries the counts, e.g. `[4]─Inbox─⚑ 1 · ✉ 2 · ✱ 1`, leaving out a zero.
+- **Friction read state (#127, rc1).** Friction is unread until you've seen it: in the TUI, once
+  you leave the Inbox (or quit) after it was on screen there; `c` on a friction row marks it seen
+  at once; `xt inbox` in your own terminal marks the friction it printed as seen. An agent's `xt
+  inbox` changes nothing (the same human-terminal rule as the done marker of #125). Seen friction
+  folds into one row, `(12 older, seen) ▸`, that `enter` expands (newest first) and folds again;
+  `xt inbox` prints `(12 older, seen; …)` and `--seen` lists them. On the first run after the
+  upgrade all existing friction counts as seen. Friction stays in the log.
+- **Ages on rows (#132, rc1).** Each row in the Goals, Tasks, Inbox and Log panels ends with a dim
+  age at its right edge, by one rule in whole units rounded down: `now` under 10 s, then `45s`,
+  `14m`, `3h`, `2d` up to 59 days, and whole weeks from 60 days (`8w`). A goal's age is its newest
+  activity (the goal, its tasks and their replies). Team rows have none; Supervisor rows keep their
+  clock time.
+
+### Changed
+
+- **Rows use the whole panel (#132, rc1).** List rows are cut at the panel's current width in
+  terminal cells, not at fixed widths (60, 50, 40 characters), with `…` only when text was cut, and
+  cut again when the terminal is resized. Wide characters never spill out of the panel.
+- **The focused panel's title is reversed (#132, rc1)**, as well as the frame colour.
+- **`xt inbox` output (#127, rc1).** The sections are now `Needs you:`, `New since you last
+  looked:` and `Friction reported about xt or a harness:`, left out when empty (`Nothing for you.`
+  when all are). Reports to you appear once, under New, instead of in a "Recent messages to you"
+  list that repeated them. `--days` defaults to 30 (was 7), as the TUI; `--limit` caps each group.
+- The TUI's Inbox rows for questions and approvals start with `⚑` (was `?`); open task rows say
+  `open` where they showed the age in yellow.
+
+### Upgrading
+
+- From 0.15.0: `git pull upstream main` (or `xt version use v0.16.0-rc1`), then `xt restart --all`
+  so the supervisor starts the friction marker. Friction from before that shows as seen. New keys
+  in `.xt/state/inbox_seen.json` (`friction_upto`, `friction_seen`); no state format change.
+  Scripts that parse `xt inbox` need the new section names.
+
 ## [0.15.0] — 2026-09-30
 
 The release: the same code and docs as 0.15.0-rc7 (only the version and this changelog changed).
