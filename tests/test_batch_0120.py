@@ -48,7 +48,8 @@ def test_three_versions_are_labelled_separately_everywhere(ctx, monkeypatch, cap
     args.func(args)
     assert "xt versions: published 0.12.0" in capsys.readouterr().out
     assert "xt versions: published 0.12.0" in brief.build(ctx, "lead")
-    assert build(ctx).versions == v.title()
+    # and the TUI's Team header (card #128): installed, what's published, what's still running
+    assert "xt 0.11.0 (0.12.0 published) · running mixed: restart to update" in build(ctx).header.plain
 
 
 def test_installed_but_not_yet_running(ctx):

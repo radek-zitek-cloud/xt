@@ -5,6 +5,7 @@ Screen {
     background: ansi_default;
     color: ansi_default;
     layout: vertical;
+    layers: base toast;
 }
 
 #main {
@@ -19,16 +20,15 @@ Screen {
 /* Fixed sizes: moving focus never shifts the layout; the focused panel shows only by colour.
    Sizes follow how much each panel usually holds. */
 #panel-1 { height: 2fr; }  /* Goals */
-#panel-2 { height: 3fr; }  /* Team */
-#panel-3 { height: 3fr; }  /* Tasks */
-#panel-4 { height: 2fr; }  /* Inbox */
-#panel-5 { height: 3fr; }  /* Log */
+#panel-2 { height: 3fr; }  /* Tasks */
+#panel-3 { height: 2fr; }  /* Inbox */
+#panel-4 { height: 3fr; }  /* Log */
 
 #right {
     width: 1fr;
 }
 
-#panel-6 {                 /* Supervisor, under the detail pane */
+#panel-5 {                 /* Supervisor, under the detail pane */
     height: 10;
 }
 
@@ -90,14 +90,27 @@ OptionList > .option-list--option-hover {
     padding: 0;
 }
 
-/* Status pane on top: same thin frame as the panels, title in the border, never focused. */
-#topbar {
+/* Team pane on top (card #128): as high as its content, no empty space. */
+#team {
     height: auto;
-    min-height: 4;
+}
+
+/* The last action's result: one line over the bottom frame, gone after about ten seconds. */
+#toast {
+    layer: toast;
+    dock: bottom;
+    offset: 1 -1;
+    width: auto;
+    max-width: 90%;
+    height: 1;
+    padding: 0 1;
     background: ansi_default;
-    border: solid ansi_bright_black;
-    border-title-color: ansi_default;
-    padding: 0;
+    color: ansi_yellow;
+    text-style: reverse;
+}
+
+#toast.fading {
+    text-style: reverse dim;
 }
 
 #hints {

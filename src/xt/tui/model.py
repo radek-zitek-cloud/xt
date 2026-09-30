@@ -14,15 +14,15 @@ from rich.text import Text
 
 from .. import permissions
 from ..adapters import load_adapters
-from ..alerts import Alerts
 from ..context import Ctx
 from ..dispatch import Queue
 from ..jobs import Jobs
 from ..paths import XtError
-from ..spawn import Approvals
 from ..team import HUMAN, harness_model, schedule_text
+from . import teampane
+from .teampane import Harness, shown_model
 
-PANELS = ("Goals", "Team", "Tasks", "Inbox", "Log", "Supervisor")
+PANELS = ("Goals", "Tasks", "Inbox", "Log", "Supervisor")  # the numbered list panels, 1-5; Team has no number
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
@@ -100,10 +100,10 @@ class Row:
 
 @dataclass
 class Snapshot:
-    panels: dict[str, list[Row]]
-    summary: Text  # line 1 of the Status pane: the team and what needs the human
-    usage: str = ""  # line 2: today's usage and account allowance
-    versions: str = ""  # the Status title: installed, running and published xt (card #58)
+    panels: dict[str, list[Row]]  # the list panels, and "Team": the agents the Team pane shows
+    header: Text  # the Team pane's first line: team, xt version, what's running, what needs the human
+    spend: str = ""  # on its right: today's tokens and estimated cost
+    harnesses: list[Harness] = field(default_factory=list)  # the Team pane's blocks and their windows
     done_upto: int = 0  # the Inbox's done goals are seen up to here once the human has looked (#125)
     inbox_title: str = ""  # the Inbox's counts, `⚑ 1 · ✉ 2 · ✱ 1` (card #127)
 
@@ -215,8 +215,6 @@ def build(ctx: Ctx) -> Snapshot:
         live = ctx.herdr.agents()
     except XtError:
         live = {}
-    approvals = Approvals(ctx).pending()
-    alerts = Alerts(ctx).active()
     queued, jobs = Queue(ctx).pending(), Jobs(ctx).pending()
 
     def thread(item_id: int) -> list[dict]:
@@ -337,18 +335,16 @@ def build(ctx: Ctx) -> Snapshot:
                     return Detail(out, ScreenPreview(screen_lines(screen)))
             return out
 
-        if la is None:
-            ctxr_row = None  # a stopped agent has no current context
-        else:
-            ctxr_row = ctxr
-        pct = ctxr_row.used / ctxr_row.window if ctxr_row and ctxr_row.known and ctxr_row.window else 0
-        team_rows.append(Row(f"agent:{a.name}", _t(dot, f" {a.name:<11} ",
-                                                   (f"{harness_model(a.harness, a.model):<16} ", "bright_black"),
-                                                   (f"{usage.compact(ctxr_row) if ctxr_row else '—':<11} ",
-                                                    "red" if pct >= 0.85 else "yellow" if pct >= 0.7 else "bright_black"),
-                                                   (f"{state}", STATUS_STYLE.get(state, "bright_black"))),
-                             detail, "agent", {"name": a.name, "workspace": la.workspace_id if la else None,
-                                               "running": la is not None, "active": a.active, "role": a.role}))
+        now_ctx = ctxr if la is not None and ctxr is not None and ctxr.known else None  # a stopped agent has none
+        data = {"name": a.name, "workspace": la.workspace_id if la else None, "running": la is not None,
+                "active": a.active, "role": a.role, "harness": a.harness or "?",
+                "model": shown_model(a.model, ctxr.model if ctxr else None),
+                "state": la.status if la else ("retired" if not a.active else "stopped"),
+                "dot": dot[0], "dot_style": dot[1],
+                "used": now_ctx.used if now_ctx else None, "window": now_ctx.window if now_ctx else None,
+                "approximate": now_ctx.approximate if now_ctx else False}
+        team_rows.append(Row(f"agent:{a.name}", teampane.cell(data, teampane.widths([data]), teampane.BAR_MAX),
+                             detail, "agent", data))
 
     # Tasks: open first, then the last few closed
     tasks = [m for m in msgs if m["type"] == "task"]
@@ -501,11 +497,22 @@ def build(ctx: Ctx) -> Snapshot:
         log_rows.append(Row(f"log:{m['id']}", _t(_msg_line(m), ("  " + _line(m["body"]), "bright_black")),
                             lambda m=m: _msg_block(m), "message", {"id": m["id"]}, row_age(m["ts"], now)))
 
+    # the Team pane's header and harness blocks (card #128)
+    from .. import versions
+
+    try:
+        vers = versions.current(ctx, live_names=set(live))
+    except Exception:  # never let a version read break the TUI
+        vers = None
     running = sum(1 for n in live if ctx.team.agent(n))
-    questions = box.questions
-    summary = status_line(ctx, running, len(open_items) - len(questions), len(questions), len(approvals),
-                          len(alerts), queued, jobs, msgs, now)
-    usage_line = usage_text(spend.team_today, turns.allowance_lines(ctx))
+    goals_open = sum(1 for i in open_items.values() if i["type"] == "goal")
+    needs_n, new_n, _ = box.counts
+    header = team_header(ctx, vers, running, goals_open, needs_n, new_n, queued, jobs, msgs, now)
+    try:
+        windows = turns.allowance_windows(ctx)
+    except Exception:  # a bad reading must never take the pane with it
+        windows = {}
+    harnesses = [Harness(n, windows.get(n, [])) for n in sorted({r.data["harness"] for r in team_rows} | set(windows))]
     # Supervisor: what xt watch did, newest first
     from ..watch import watch_log
 
@@ -516,18 +523,12 @@ def build(ctx: Ctx) -> Snapshot:
         sup_rows.append(Row(f"sup:{n}:{stamp}", _t((stamp[11:16] + " ", "bright_black"), (text, style)),
                             lambda line=line: Text(line + "\n"), "event", {}))
 
-    from .. import versions
-
-    try:
-        vtitle = versions.current(ctx, live_names=set(live)).title()
-    except Exception:  # never let a version read break the TUI
-        vtitle = ""
     return Snapshot(
         {"Goals": goal_rows, "Team": team_rows, "Tasks": task_rows, "Inbox": inbox_rows, "Log": log_rows,
          "Supervisor": sup_rows},
-        summary,
-        usage_line,
-        vtitle,
+        header,
+        spend_text(spend.team_today),
+        harnesses,
         done_upto,
         box.title(),
     )
@@ -536,25 +537,50 @@ def build(ctx: Ctx) -> Snapshot:
 STUCK_AFTER = 60  # seconds: queued messages and jobs are normally handled within seconds
 
 
-def status_line(ctx, running: int, open_n: int, questions: int, approvals: int, alerts: int,
+def version_text(vers) -> Text:
+    """`xt 0.16.0 (latest)`, with a newer published release or a restart still needed in yellow."""
+    from .. import __version__
+    from ..versions import display, parse
+
+    if vers is None:
+        return Text(f"xt {display(__version__)}")
+    out = Text(f"xt {display(vers.installed)}")
+    if not vers.published:
+        out.append(" (published ?)", style="bright_black")
+    elif vers.upgrade_available:
+        out.append(f" ({display(vers.published)} published)", style="yellow")
+    elif parse(vers.published) == parse(vers.installed):
+        out.append(" (latest)", style="bright_black")
+    else:
+        out.append(f" (published {display(vers.published)})", style="bright_black")
+    if vers.restart_needed:
+        out.append(f" · running {vers.running_label}: restart to update", style="yellow")
+    elif vers.running_label not in (display(vers.installed), "nothing running"):
+        out.append(f" · running {vers.running_label}", style="bright_black")
+    return out
+
+
+def team_header(ctx, vers, running: int, goals_open: int, needs: int, new: int,
                 queued: list, jobs: list, msgs: list, now) -> Text:
-    """Line 1 of the Status pane: the team, and only the counters that matter right now. What
-    needs the human stands out; routine zeros aren't shown."""
+    """The Team pane's header (card #128): the team and xt's version, what's running, open goals,
+    and what needs the human and what's new (the Inbox title's first two counts). What needs the
+    human stands out; routine zeros aren't shown."""
     out = Text(no_wrap=True, overflow="ellipsis")
     out.append(ctx.team.name, style="bold")
+    out.append(" · ")
+    out.append_text(version_text(vers))
     out.append(f" · {running} running")
-    if open_n:
-        out.append(f" · {open_n} open")
-    plural = lambda n, w: f"{n} {w}{'s' if n != 1 else ''}"
-    waiting = [(questions, "question", "bold yellow"), (approvals, "approval", "bold yellow"),
-               (alerts, "alert", "bold red")]
-    if any(n for n, _, _ in waiting):
-        for n, word, style in waiting:
-            if n:
-                out.append(" · ")
-                out.append(plural(n, word), style=style)
-    else:
+    if goals_open:
+        out.append(f" · {goals_open} goal{'s' if goals_open != 1 else ''} open")
+    if needs:
+        out.append(" · ")
+        out.append(f"⚑ {needs} needs you", style="bold yellow")
+    if new:
+        out.append(" · ")
+        out.append(f"✉ {new} new", style="cyan")
+    if not needs and not new:
         out.append(" · nothing waiting for you", style="green")
+    plural = lambda n, w: f"{n} {w}{'s' if n != 1 else ''}"
     ts = {m["id"]: m["ts"] for m in msgs}
     stuck_q = sum(1 for i in queued
                   if i["id"] in ts and (now - dt.datetime.fromisoformat(ts[i["id"]])).total_seconds() > STUCK_AFTER)
@@ -566,22 +592,15 @@ def status_line(ctx, running: int, open_n: int, questions: int, approvals: int, 
     return out
 
 
-def usage_text(team_today, allowance: list[str]) -> str:
-    """Line 2: today's usage, the estimate (with any unpriced part) and account allowance, in words."""
-    from .. import turns, usage
+def spend_text(team_today) -> str:
+    """The header's right side: today's tokens and the estimate, with any unpriced part."""
+    from .. import usage
 
-    parts = []
-    if team_today.turns:
-        money = ("est. unavailable" if team_today.unpriced_tokens == team_today.tokens
-                 else f"est. ${team_today.usd:,.2f}")
-        unpriced = (f" (+{usage.short(team_today.unpriced_tokens)} unpriced)"
-                    if team_today.unpriced_tokens and team_today.unpriced_tokens != team_today.tokens else "")
-        parts.append(f"today {usage.short(team_today.tokens)} tokens · {money}{unpriced}")
-    else:
-        parts.append("today: no usage recorded yet")
-    for line in allowance:  # "codex 20% of 7d, resets Sat 19:24 (account-wide)"
-        words = line.replace(" (account-wide)", "").replace("of 7d", "of the week").replace("of 1d", "of the day")
-        harness, _, rest = words.partition(" ")
-        parts.append(f"{harness} account {rest}")
-    return " · ".join(parts)
+    if not team_today.turns:
+        return "today: no usage recorded yet"
+    money = ("est. unavailable" if team_today.unpriced_tokens == team_today.tokens
+             else f"est. ${team_today.usd:,.2f}")
+    unpriced = (f" (+{usage.short(team_today.unpriced_tokens)} unpriced)"
+                if team_today.unpriced_tokens and team_today.unpriced_tokens != team_today.tokens else "")
+    return f"today {usage.short(team_today.tokens)} tokens · {money}{unpriced}"
 

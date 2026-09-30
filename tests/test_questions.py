@@ -114,10 +114,10 @@ def test_answering_a_question_from_the_tui_inbox(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("4")
-            row = app.panel(4).current
+            await pilot.press("3")  # the Inbox
+            row = app.panel(3).current
             assert row.kind == "question" and row.data["id"] == q["id"]
-            assert "1 question" in app.summary
+            assert "⚑ 1 needs you" in str(app.team.render())
             await pilot.press("s")
             assert isinstance(app.screen, Compose) and f"#{q['id']}" in app.screen.title_text
             assert "Which story?" in app.screen.context  # the question stays in view
@@ -125,6 +125,6 @@ def test_answering_a_question_from_the_tui_inbox(ctx):
             await pilot.pause()
             assert f"answer to #{q['id']}" in app.status
             assert ctx.ledger.item(q["id"]) is None
-            assert not any(r.kind == "question" for r in app.panel(4).rows)
+            assert not any(r.kind == "question" for r in app.panel(3).rows)
 
     asyncio.run(run())

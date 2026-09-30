@@ -404,6 +404,32 @@ def allowance_lines(ctx: Ctx) -> list[str]:
     return out
 
 
+def allowance_windows(ctx: Ctx) -> dict[str, list[tuple[str, float, int | None]]]:
+    """Each harness's account windows as (label, used %, resets_at) for the TUI's Team pane
+    (card #128): Codex's from its session logs, Claude Code's from its status line. A window
+    without a current reading is left out."""
+    from . import planusage
+
+    out: dict[str, list[tuple[str, float, int | None]]] = {}
+    try:
+        d = json.loads((ctx.paths.state / "allowance.json").read_text())
+    except (OSError, ValueError):
+        d = {}
+    for harness, rl in sorted(d.items() if isinstance(d, dict) else []):
+        for key in ("primary", "secondary"):
+            p = (rl or {}).get(key) if isinstance(rl, dict) else None
+            if not isinstance(p, dict) or not isinstance(p.get("used_percent"), (int, float)):
+                continue
+            win = p.get("window_minutes")
+            label = f"{round(win / 1440)}d" if win and win >= 1440 else f"{round(win / 60)}h" if win else "window"
+            out.setdefault(harness, []).append((label, float(p["used_percent"]), p.get("resets_at")))
+    now = ctx.ledger.clock().timestamp()
+    claude = [(label, w["used_percentage"], w["resets_at"]) for label, w in planusage.windows(ctx.paths.root, now)]
+    if claude:
+        out["claude"] = claude
+    return out
+
+
 def _codex_allowance(ctx: Ctx) -> list[str]:
     try:
         d = json.loads((ctx.paths.state / "allowance.json").read_text())

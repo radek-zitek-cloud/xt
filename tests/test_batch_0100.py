@@ -218,19 +218,20 @@ def test_status_pane_shows_only_what_matters(ctx):
 
     ctx.herdr.add("liaison")
     snap = build(ctx)
-    assert "nothing waiting for you" in snap.summary.plain and "0 " not in snap.summary.plain
+    assert "nothing waiting for you" in snap.header.plain and " 0 " not in snap.header.plain
     send(ctx, "liaison", "human", "ask", "Which story?")
     snap = build(ctx)
-    line = snap.summary
-    assert "1 question" in line.plain and "nothing waiting" not in line.plain
+    line = snap.header  # the Team pane's header since v0.16.0 (card #128)
+    assert "⚑ 1 needs you" in line.plain and "nothing waiting" not in line.plain
     assert any(span.style == "bold yellow" for span in line.spans)  # it stands out
-    assert "today: no usage recorded yet" in snap.usage
+    assert snap.spend == "today: no usage recorded yet"
 
 
-def test_long_action_results_are_shown_in_full(ctx):
+def test_long_action_results_stay_on_one_line(ctx):
+    """Since v0.16.0 (card #128) the result is a one-line toast: a long one is cut, not wrapped."""
     import asyncio
 
-    from xt.tui.app import LiveActions, XtTui
+    from xt.tui.app import LiveActions, Toast, XtTui
     from xt.tui.model import build
 
     async def run():
@@ -239,6 +240,8 @@ def test_long_action_results_are_shown_in_full(ctx):
             long = "started lead in workspace w8; " * 6 + "END"
             app.set_status(long)
             await pilot.pause()
-            assert "END" in str(app.query_one("#topbar").render())
+            toast = app.query_one(Toast)
+            assert toast.outer_size.height == 1 and str(toast.render()).startswith("started lead")
+            assert app.status == long
 
     asyncio.run(run())

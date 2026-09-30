@@ -85,5 +85,7 @@ def test_harness_and_model_show_in_status_brief_and_team(ctx, human, capsys):
     out = capsys.readouterr().out
     assert "claude/default" in out and "pi/kimi" in out
     assert "dave (worker, pi/kimi, reports to lead" in brief.build(ctx, "lead")
-    team = {r.data["name"]: r.text.plain for r in build(ctx).panels["Team"]}
-    assert "pi/kimi" in team["dave"] and "claude/default" in team["carol"]
+    team = {r.data["name"]: r for r in build(ctx).panels["Team"]}  # short models (card #128)
+    assert team["dave"].data["harness"] == "pi" and " kimi " in team["dave"].text.plain
+    assert team["carol"].data["harness"] == "claude" and " default " in team["carol"].text.plain
+    assert "pi/kimi" in team["dave"].detail().plain  # the detail keeps harness/model

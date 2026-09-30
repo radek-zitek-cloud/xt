@@ -23,11 +23,11 @@ def test_key_line_says_what_s_does_and_S_always_messages_the_liaison(ctx):
             await pilot.pause()
             hints = lambda: str(app.query_one("#hints").render())  # noqa: E731
             assert hints().startswith("s/S message liaison")  # Goals focused: nothing to answer
-            for panel in ("1", "2", "3", "5", "6"):
+            for panel in ("1", "2", "4", "5", "tab"):  # every pane but the Inbox (3), and Team
                 await pilot.press(panel, "S")
                 assert isinstance(app.screen, Compose) and app.screen.title_text == "Send to the liaison"
                 await pilot.press("escape")
-            await pilot.press("4")
+            await pilot.press("3")
             await pilot.pause()
             assert hints().startswith(f"s answer #{q['id']} · S message liaison")
             await pilot.press("S")  # a question is selected, but S doesn't answer it
@@ -220,13 +220,13 @@ def test_agent_detail_renders_the_preview_at_the_panes_width(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(120, 45)) as pilot:
-            await pilot.press("2")
+            app.team.focus()
             await pilot.pause()
-            row = app.panel(2).current
+            row = app.team.current
             assert row.data["name"] == "liaison"
             detail = row.detail()
             assert "(×2)" in detail.plain and detail.plain.count("Radek decision") == 1
-            app.show_detail(app.panel(2))  # the TUI accepts the richer detail
+            app.show_detail(app.team)  # the TUI accepts the richer detail
             console = Console(width=60, record=True, color_system=None, file=io.StringIO())
             console.print(detail)
             shown = console.export_text()

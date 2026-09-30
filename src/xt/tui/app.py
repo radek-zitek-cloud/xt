@@ -10,12 +10,15 @@ from textual.screen import ModalScreen
 from textual.widgets import Input, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
-from .. import __version__
+from . import teampane
 from .model import PANELS, Row, Snapshot, fit
 
 REFRESH_SECONDS = 2.0
 INBOX = PANELS.index("Inbox") + 1  # its panel number
-HINTS = "h help · q quit · 1-6 panels · j/k move · enter read · / filter · a/d approve/deny · c clear · f jump · u/U start · x/X stop · R retire"
+TEAM = 0  # the Team pane has no number key (card #128); last_panel is 0 while it has focus
+PICK_AGENT = "select an agent in Team first (tab to it, then j/k)"
+HINTS = (f"h help · q quit · 1-{len(PANELS)} panels · tab Team · j/k move · enter read · / filter · "
+         "a/d approve/deny · c clear · f jump · u/U start · x/X stop · R retire")
 
 
 class Panel(OptionList):
@@ -100,6 +103,96 @@ class Panel(OptionList):
         if h is not None and not any(r.kind != "heading" for r in self.rows[:h]):
             return
         super().action_cursor_up()
+
+
+class TeamPane(Static):
+    """The Team pane at the top (card #128): the header, the harness blocks and the agents. It has
+    no number key; tab reaches it, j/k select an agent for the agent keys and Detail."""
+
+    can_focus = True
+
+    def __init__(self):
+        super().__init__(id="team", classes="panel")
+        self.title = "Team"
+        self.border_title = "Team"
+        self.header = Text("")
+        self.spend = ""
+        self.harnesses: list[teampane.Harness] = []
+        self.all_rows: list[Row] = []
+        self.rows: list[Row] = []  # the agents in display order
+        self.selected: str | None = None  # the selected agent's name
+        self.now = None
+
+    def set_data(self, snap: Snapshot, now) -> None:
+        self.header, self.spend, self.harnesses = snap.header, snap.spend, snap.harnesses
+        self.all_rows = snap.panels.get("Team", [])
+        self.now = now
+        self.redraw()
+
+    def redraw(self) -> None:
+        import datetime as dt
+
+        width = self.content_size.width or max(20, self.app.size.width - 2)
+        now = self.now or dt.datetime.now().astimezone()
+        by_name = {r.data["name"]: r for r in self.all_rows}
+        lines, order = teampane.render(self.header, self.spend, self.harnesses,
+                                       [r.data for r in self.all_rows], width, now,
+                                       self.selected if self.has_focus else None)
+        self.rows = [by_name[n] for n in order]
+        if self.rows and self.selected not in order:
+            self.selected = order[0]
+            if self.has_focus:
+                return self.redraw()
+        self.update(Text("\n").join(lines))
+
+    def on_resize(self) -> None:
+        self.redraw()
+
+    def on_focus(self) -> None:
+        self.redraw()
+
+    def on_blur(self) -> None:
+        self.redraw()
+
+    @property
+    def current(self) -> Row | None:
+        return next((r for r in self.rows if r.data["name"] == self.selected), None)
+
+    def select(self, name: str) -> None:
+        self.selected = name
+        self.redraw()
+
+    def move(self, step: int) -> None:
+        names = [r.data["name"] for r in self.rows]
+        if self.selected in names:
+            i = max(0, min(len(names) - 1, names.index(self.selected) + step))
+            self.select(names[i])
+
+
+class Toast(Static):
+    """The last action's result, one line at the bottom, gone after about ten seconds (card #128)."""
+
+    SECONDS = 10.0
+
+    def __init__(self):
+        super().__init__(id="toast")
+        self.timers = []
+        self.display = False
+
+    def show(self, text: str) -> None:
+        for t in self.timers:
+            t.stop()
+        self.timers = []
+        self.remove_class("fading")
+        self.update(Text(text, no_wrap=True, overflow="ellipsis"))
+        self.display = bool(text)
+        if text:  # dim for the last fifth, then gone
+            self.timers = [self.set_timer(self.SECONDS * 0.8, lambda: self.add_class("fading")),
+                           self.set_timer(self.SECONDS, self.hide)]
+
+    def hide(self) -> None:
+        self.timers = []
+        self.display = False
 
 
 class Prompt(ModalScreen[str | None]):
@@ -221,18 +314,19 @@ class Help(ModalScreen[None]):
 
     KEYS = [
         ("Move", ""),
-        ("1-6", "jump to a panel: Goals, Team, Tasks, Inbox, Log, Supervisor"),
-        ("tab / l", "next panel"),
+        (f"1-{len(PANELS)}", "jump to a panel: " + ", ".join(PANELS)),
+        ("tab / l", "next panel (Team, at the top, has no number: tab reaches it)"),
         ("shift+tab", "previous panel"),
         ("j / k", "down / up (in the detail pane: scroll)"),
         ("enter", "read the detail pane"),
         ("/", "filter the focused panel (empty clears it)"),
         ("esc", "back from the detail pane to the panels"),
-        ("Inbox (4)", ""),
+        (f"Inbox ({INBOX})", ""),
         ("a / d", "approve / deny the selected spawn (asks y/n)"),
         ("c", "clear the selected alert; on unread friction: mark it seen"),
         ("enter", "on the (N older, seen) row: show or hide the friction you've seen"),
-        ("Team (2)", ""),
+        ("Team (tab)", ""),
+        ("j / k", "select an agent (its details show in the detail pane)"),
         ("u", "start the selected stopped agent (existing role and harness)"),
         ("U", "start every stopped agent in the roster"),
         ("x", "stop the selected agent; it stays in the roster (asks y/n)"),
@@ -299,17 +393,13 @@ class XtTui(App):
         self.source = source
         self.actions = actions  # None in the demo
         self.last_panel = 1
-        self.summary = Text("")
-        self.usage = ""
-        self.status = ""
+        self.status = ""  # the last action's result, shown in the toast
         self.done_upto = 0  # newest message the Inbox's "done" rows were built from (card #125)
         self.inbox_looked = 0  # what the human saw while the Inbox had focus
         self.friction_viewed: set[int] = set()  # unread friction on screen while the Inbox had focus (#127)
 
     def compose(self) -> ComposeResult:
-        topbar = Static(id="topbar")
-        topbar.border_title = f"Status─xt {__version__}"
-        yield topbar
+        yield TeamPane()
         with Horizontal(id="main"):
             with Vertical(id="left"):
                 for i, title in enumerate(PANELS[:-1], start=1):
@@ -321,6 +411,7 @@ class XtTui(App):
                     yield Static(id="detail-body")
                 # like lazygit's command log: what the supervisor did, under the detail pane
                 yield Panel(PANELS[-1], len(PANELS))
+        yield Toast()
         yield Static(id="hints")
 
     def on_mount(self) -> None:
@@ -339,23 +430,35 @@ class XtTui(App):
             return
         for i, title in enumerate(PANELS, start=1):
             self.query_one(f"#panel-{i}", Panel).set_rows(snap.panels.get(title, []))
-        self.summary = snap.summary
-        self.usage = snap.usage
+        try:
+            self.team.set_data(snap, self.source_now())
+        except Exception as e:  # a layout bug must not take the other panes with it
+            self.set_status(f"couldn't draw Team: {e}")
         self.done_upto = snap.done_upto
         self.panel(INBOX).set_counts(snap.inbox_title)
         if self.last_panel == INBOX:
             self.inbox_looked = self.done_upto
             self.call_after_refresh(self.note_friction_in_view)
-        if snap.versions:
-            self.query_one("#topbar", Static).border_title = f"Status─xt {snap.versions}"
         self.render_hints()
-        focused = self.focused if isinstance(self.focused, Panel) else self.panel(self.last_panel)
+        focused = self.focused if isinstance(self.focused, (Panel, TeamPane)) else self.panel(self.last_panel)
         self.show_detail(focused)
 
-    def panel(self, n: int) -> Panel:
-        return self.query_one(f"#panel-{n}", Panel)
+    def source_now(self):
+        """The clock for reset times: the team's own (a test's fake one) in live mode."""
+        try:
+            return self.actions.ctx.ledger.clock()
+        except Exception:
+            return None
 
-    def show_detail(self, panel: Panel) -> None:
+    @property
+    def team(self) -> TeamPane:
+        return self.query_one("#team", TeamPane)
+
+    def panel(self, n: int) -> Panel | TeamPane:
+        """Panel n (1-5), or the Team pane for TEAM (0)."""
+        return self.team if n == TEAM else self.query_one(f"#panel-{n}", Panel)
+
+    def show_detail(self, panel: Panel | TeamPane) -> None:
         row = panel.current
         body = self.query_one("#detail-body", Static)
         try:
@@ -365,19 +468,12 @@ class XtTui(App):
         self.query_one("#detail", VerticalScroll).border_title = f"Detail─{panel.title}"
 
     def set_status(self, text: str) -> None:
+        """The last action's result goes to the toast, never into the Team pane (card #128)."""
         self.status = text
-        self.render_hints()
+        self.query_one(Toast).show(text)
 
     def render_hints(self) -> None:
-        """The Status pane: the team and what needs you; today's usage; the last action's result on
-        its own line, wrapped rather than cut off. The bottom line is keys only."""
-        top = Text()
-        top.append_text(self.summary if self.summary.plain else Text("xt", style="bold"))
-        if self.usage:
-            top.append("\n" + self.usage, style="bright_black")
-        if self.status:
-            top.append("\n" + self.status, style="yellow")
-        self.query_one("#topbar", Static).update(top)
+        """The bottom line: keys only."""
         self.query_one("#hints", Static).update(Text(f"{self.send_hint()} · {HINTS}", no_wrap=True,
                                                      overflow="ellipsis"))
 
@@ -410,8 +506,8 @@ class XtTui(App):
                 event.option_list.toggle_fold()
 
     def on_descendant_focus(self, event) -> None:
-        if isinstance(event.widget, Panel):
-            n = int(event.widget.id.split("-")[1])
+        if isinstance(event.widget, (Panel, TeamPane)):
+            n = TEAM if isinstance(event.widget, TeamPane) else int(event.widget.id.split("-")[1])
             if self.last_panel == INBOX and n != INBOX:
                 self.mark_inbox_seen()
             elif n == INBOX:
@@ -456,15 +552,18 @@ class XtTui(App):
         w = self.focused
         if isinstance(w, OptionList):
             (w.action_cursor_down if direction == "down" else w.action_cursor_up)()
+        elif isinstance(w, TeamPane):
+            w.move(1 if direction == "down" else -1)
+            self.show_detail(w)
         elif isinstance(w, VerticalScroll):
             (w.scroll_down if direction == "down" else w.scroll_up)()
 
     def action_read(self) -> None:
-        if isinstance(self.focused, Panel):
+        if isinstance(self.focused, (Panel, TeamPane)):
             self.query_one("#detail", VerticalScroll).focus()
 
     def action_back(self) -> None:
-        if not isinstance(self.focused, Panel):
+        if not isinstance(self.focused, (Panel, TeamPane)):
             self.panel(self.last_panel).focus()
 
     def action_help(self) -> None:
@@ -472,6 +571,9 @@ class XtTui(App):
 
     def action_filter(self) -> None:
         panel = self.panel(self.last_panel)
+        if isinstance(panel, TeamPane):
+            self.set_status("Team has no filter; it shows every agent")
+            return
 
         def done(text: str | None) -> None:
             if text is not None:
@@ -500,7 +602,7 @@ class XtTui(App):
     def action_decide(self, approve: bool) -> None:
         row = self._selected("approval")
         if row is None:
-            self.set_status("select a spawn approval in the Inbox (4) first")
+            self.set_status(f"select a spawn approval in the Inbox ({INBOX}) first")
             return
         if not self._need_live():
             return
@@ -534,7 +636,7 @@ class XtTui(App):
             return
         row = self._selected("alert")
         if row is None:
-            self.set_status("select an alert or unread friction in the Inbox (4) first")
+            self.set_status(f"select an alert or unread friction in the Inbox ({INBOX}) first")
             return
         if self._need_live():
             self.actions.clear(row.data["key"])
@@ -590,7 +692,7 @@ class XtTui(App):
     def action_start_agent(self) -> None:
         row = self._selected("agent")
         if row is None:
-            self.set_status("select an agent in Team (2) first")
+            self.set_status(PICK_AGENT)
             return
         if not self._need_live():
             return
@@ -606,8 +708,7 @@ class XtTui(App):
     def action_start_all(self) -> None:
         if not self._need_live():
             return
-        panel = self.panel(2)
-        names = [r.data["name"] for r in panel.rows
+        names = [r.data["name"] for r in self.team.rows
                  if r.kind == "agent" and not r.data.get("running") and r.data.get("active", True)]
         if not names:
             self.set_status("every agent in the roster is already running")
@@ -623,7 +724,7 @@ class XtTui(App):
     def action_stop_agent(self) -> None:
         row = self._selected("agent")
         if row is None:
-            self.set_status("select an agent in Team (2) first")
+            self.set_status(PICK_AGENT)
             return
         if not self._need_live():
             return
@@ -642,7 +743,7 @@ class XtTui(App):
     def action_stop_all(self) -> None:
         if not self._need_live():
             return
-        names = [r.data["name"] for r in self.panel(2).rows if r.kind == "agent" and r.data.get("running")]
+        names = [r.data["name"] for r in self.team.rows if r.kind == "agent" and r.data.get("running")]
         if not names:
             self.set_status("no agents are running")
             return
@@ -657,7 +758,7 @@ class XtTui(App):
     def action_retire_agent(self) -> None:
         row = self._selected("agent")
         if row is None:
-            self.set_status("select an agent in Team (2) first")
+            self.set_status(PICK_AGENT)
             return
         if not self._need_live():
             return
@@ -680,7 +781,7 @@ class XtTui(App):
     def action_jump(self) -> None:
         row = self._selected("agent")
         if row is None:
-            self.set_status("select an agent in Team (2) first")
+            self.set_status(PICK_AGENT)
             return
         if not self._need_live():
             return
@@ -797,13 +898,10 @@ def demo_snapshot() -> Snapshot:
                 _row("g5", _t(("#5 ", "bright_black"), "q3 close", ("  ✓", "green")), "#5 q3 close · done", "goal"),
             ],
             "Team": [
-                _row("liaison", _t(("● ", "green"), "liaison     ", ("codex  ", "bright_black"), ("idle", "green")),
-                     "liaison · codex · reports to human", "agent", name="liaison", workspace="w2"),
-                _row("lead", _t(("● ", "yellow"), "lead        ", ("codex  ", "bright_black"), ("working", "yellow")),
-                     "lead · codex · reports to liaison", "agent", name="lead", workspace="w3"),
-                _row("dave", _t(("● ", "red"), "dave        ", ("pi     ", "bright_black"), ("blocked", "red")),
-                     "dave · pi · modeler · BLOCKED on an approval prompt in its pane", "agent", name="dave",
-                     workspace="w5"),
+                _agent("liaison", "codex", "gpt-5.2", "idle", 58_000, 258_000, "liaison · codex · reports to human"),
+                _agent("lead", "codex", "gpt-5.2", "working", 181_000, 258_000, "lead · codex · reports to liaison"),
+                _agent("dave", "pi", "kimi", "blocked", 12_000, None,
+                       "dave · pi · modeler · BLOCKED on an approval prompt in its pane"),
             ],
             "Tasks": [
                 _row("t42", _t(("#42 ", "bright_black"), "carol      ingest stations", ("  12m", "yellow")),
@@ -835,11 +933,20 @@ def demo_snapshot() -> Snapshot:
                      "#47 report liaison→human\nforecast team: 4 of 7 tasks done", "message"),
             ],
         },
-        summary=Text.assemble(("demo", "bold"), " · 3 running · 2 open · ", ("1 approval", "bold yellow"),
-                              " · ", ("1 alert", "bold red")),
-        usage="today 8.4M tokens · est. $2.46 (+1.1M unpriced) · codex account 20% of the week, resets Sat 19:24",
+        header=Text.assemble(("demo", "bold"), " · xt demo · 3 running · 1 goal open · ",
+                             ("⚑ 2 needs you", "bold yellow"), " · ", ("✉ 1 new", "cyan")),
+        spend="today 8.4M tokens · est. $2.46 (+1.1M unpriced)",
+        harnesses=[teampane.Harness("codex", [("7d", 20.0, None)])],
         inbox_title="⚑ 2 · ✉ 1 · ✱ 1",
     )
+
+
+def _agent(name: str, harness: str, model: str, state: str, used: int, window: int | None, detail: str) -> Row:
+    data = {"name": name, "harness": harness, "model": model, "state": state, "running": True,
+            "dot": "●", "dot_style": teampane.STATE_STYLE.get(state, ""), "used": used, "window": window,
+            "workspace": f"w-{name}", "active": True}
+    return Row(name, teampane.cell(data, teampane.widths([data]), teampane.BAR_MAX), lambda: Text(detail),
+               "agent", data)
 
 
 def run_demo() -> None:

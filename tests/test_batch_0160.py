@@ -133,7 +133,7 @@ def test_title_counts_equal_the_group_sizes_and_zero_is_left_out(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(160, 40)):
-            assert app.panel(INBOX).border_title == "[4]─Inbox─⚑ 2 · ✉ 2 · ✱ 3"
+            assert app.panel(INBOX).border_title == f"[{INBOX}]─Inbox─⚑ 2 · ✉ 2 · ✱ 3"
 
     _run(run())
 
@@ -148,7 +148,7 @@ def test_an_empty_group_and_its_count_are_not_shown(ctx):
 
     async def run():
         async with empty.run_test(size=(160, 40)):
-            assert empty.panel(INBOX).border_title == "[4]─Inbox"
+            assert empty.panel(INBOX).border_title == f"[{INBOX}]─Inbox"
 
     _run(run())
 
@@ -522,5 +522,286 @@ def test_group_headings_are_skipped_by_the_cursor(ctx):
             await pilot.press("j", "j")
             await pilot.pause()
             assert p.current.kind == "message"  # past the NEW heading
+
+    _run(run())
+
+
+# --- #128 Team pane replaces Status and Team -------------------------------------------------------
+
+CLAUDE_MEMBERS = [("pm", "claude-sonnet-5-5"), ("builder", "claude-opus-5-5"), ("qa", None)]
+
+
+def _codex_session(home, ctx, name, used, model="gpt-5.2-codex", window=258000):
+    """A Codex session log whose turn_context names the real model (`default` in team.toml)."""
+    from .test_context_usage import _prompt
+
+    d = home / ".codex/sessions/2026/09/28"
+    d.mkdir(parents=True, exist_ok=True)
+    lines = [{"type": "session_meta", "payload": {"cwd": str(ctx.paths.root), "source": "vscode"}},
+             {"type": "response_item", "payload": {"role": "user", "content": [{"text": _prompt(ctx, name)}]}}]
+    if model:
+        lines.append({"type": "turn_context", "payload": {"model": model}})
+    lines.append({"timestamp": "2026-09-28T08:00:00Z", "type": "event_msg",
+                  "payload": {"type": "token_count", "info": {"total_token_usage": {"total_tokens": used},
+                                                              "last_token_usage": {"total_tokens": used},
+                                                              "model_context_window": window}}})
+    (d / f"rollout-{name}-m.jsonl").write_text("\n".join(json.dumps(x) for x in lines) + "\n")
+
+
+def _windows(ctx):
+    """Real usage windows: Codex's 7d from its logs, Claude's 5h; Claude's 7d reading is stale (missing)."""
+    now = ctx.ledger.clock().timestamp()
+    ctx.paths.state.mkdir(parents=True, exist_ok=True)
+    (ctx.paths.state / "allowance.json").write_text(json.dumps({"codex": {
+        "primary": {"used_percent": 64.0, "window_minutes": 10080, "resets_at": int(now + 3 * 86400)}}}))
+    (ctx.paths.state / "claude_plan.json").write_text(json.dumps({
+        "five_hour": {"used_percentage": 6.0, "resets_at": int(now + 3 * 3600), "observed_at": int(now - 120)},
+        "seven_day": {"used_percentage": 10.0, "resets_at": int(now + 4 * 86400), "observed_at": int(now - 5 * 3600)},
+    }))
+
+
+def _team(ctx, home, extra_claude=0, extra_codex=0):
+    """Five agents on two harnesses: liaison and lead on Codex (`default`, one with a session log
+    naming its model), pm, builder and qa on Claude (qa on `default` with no session log)."""
+    from .test_context_usage import claude_session
+
+    for name, model in CLAUDE_MEMBERS + [(f"c{i}", "claude-sonnet-5-5") for i in range(extra_claude)]:
+        (ctx.paths.roles / "worker.md").write_text("# Role: worker\n")
+        ctx.team.upsert_agent(name, "worker", "claude", model, "lead")
+    for i in range(extra_codex):
+        ctx.team.upsert_agent(f"x{i}", "worker", "codex", None, "lead")
+    ctx.team.save()
+    ctx.reload_team()
+    for a in ctx.team.agents():
+        if a.kind != "human":
+            ctx.herdr.add(a.name, "working" if a.name == "lead" else "idle")
+    _codex_session(home, ctx, "lead", 181_000)
+    claude_session(home, ctx, "pm", model="claude-sonnet-5-5")
+    claude_session(home, ctx, "builder", model="claude-opus-5-5")
+    _windows(ctx)
+
+
+def _pane(app):
+    return [ln.rstrip() for ln in str(app.team.render()).splitlines()]
+
+
+def _lines(ctx, width):
+    from xt.tui import teampane
+
+    snap = build(ctx)
+    lines, _ = teampane.render(snap.header, snap.spend, snap.harnesses, [r.data for r in snap.panels["Team"]],
+                               width, ctx.ledger.clock())
+    return lines
+
+
+def test_short_models_drop_the_vendor_and_default_becomes_the_real_model():
+    from xt.tui.teampane import short_model, shown_model
+
+    assert short_model("claude-sonnet-5-5") == "sonnet 5.5"
+    assert short_model("claude-opus-5-5") == "opus 5.5"
+    assert short_model("claude-haiku-4-5-20251001") == "haiku 4.5"
+    assert short_model("anthropic/claude-opus-4-8") == "opus 4.8"
+    assert short_model("gpt-5.2-codex") == "gpt-5.2-codex" and short_model("kimi") == "kimi"
+    assert shown_model("default", "gpt-5.2-codex") == "gpt-5.2-codex"
+    assert shown_model(None, "claude-opus-5-5") == "opus 5.5"
+    assert shown_model("default", None) == "default"
+    assert shown_model("claude-sonnet-5-5", "claude-opus-5-5") == "sonnet 5.5"  # configured wins
+
+
+def test_codex_default_shows_the_model_from_its_own_session_log(ctx, fake_home):
+    _team(ctx, fake_home)
+    team = {r.data["name"]: r.data for r in build(ctx).panels["Team"]}
+    assert team["lead"]["model"] == "gpt-5.2-codex"  # `default` in team.toml, turn_context in the log
+    assert team["liaison"]["model"] == "default"  # no session log to read it from
+    assert team["qa"]["model"] == "default"
+    assert team["pm"]["model"] == "sonnet 5.5" and team["builder"]["model"] == "opus 5.5"
+
+
+def test_the_codex_model_is_found_in_the_head_when_the_tail_has_none(ctx, fake_home, monkeypatch):
+    from xt import usage
+
+    _team(ctx, fake_home)
+    monkeypatch.setattr(usage, "codex_model", lambda lines, real=usage.codex_model:
+                        None if len(lines) == 4 and '"token_count"' in lines[0] else real(lines))
+    assert usage.reading(ctx, "lead").model == "gpt-5.2-codex"
+
+
+def test_status_and_team_panes_are_gone_and_team_shows_header_blocks_and_agents(ctx, fake_home):
+    _team(ctx, fake_home)
+    _first_run(ctx)
+    send(ctx, "liaison", "human", "ask", "Which story?")
+    ctx.ledger.append("liaison", "human", "report", "halfway")
+    send(ctx, "liaison", "lead", "goal", "Build it")
+    assert "Team" not in PANELS and not any("Status" in p for p in PANELS)
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            assert not app.query("#topbar") and app.team.border_title == "Team"
+            titles = [app.panel(n).title for n in range(1, len(PANELS) + 1)]
+            assert titles == list(PANELS) and "Team" not in titles
+            lines = _pane(app)
+            head = lines[0]
+            assert head.startswith("t · xt ") and "5 running" in head and "1 goal open" in head
+            assert "⚑ 1 needs you" in head and "✉ 1 new" in head and head.endswith("today: no usage recorded yet")
+            blocks = lines[1]
+            assert blocks.startswith("CLAUDE  5h ▓") and "6% resets 15:00" in blocks
+            assert "7d" not in blocks.split("CODEX")[0]  # Claude's stale 7d reading: no blank bar
+            assert "CODEX  7d ▓▓▓▓▓▓░░░░  64% resets Tue" in blocks
+            agents = lines[2:]
+            assert len(agents) == 2  # five agents, two lines
+            text = "\n".join(agents)
+            for name in ("liaison", "lead", "pm", "builder", "qa"):
+                assert f" {name} " in text
+            assert "claude/" not in text and "codex/" not in text
+            # Claude's block on the left, Codex's under its own heading on the right
+            assert agents[0].index("pm") < blocks.index("CODEX") <= agents[0].index("liaison")
+            assert " lead " in agents[1][blocks.index("CODEX"):]
+
+    _run(run())
+
+
+def test_agent_columns_line_up_and_bars_match_tokens_and_window(ctx, fake_home):
+    from xt.tui import teampane
+
+    _team(ctx, fake_home)
+    lines = [ln.plain for ln in _lines(ctx, 158)[2:]]
+    assert len(lines) == 2
+    starts = [[i for i, ch in enumerate(ln) if ch == "▕"] for ln in lines]
+    assert len(starts[0]) == 3 and set(starts[1]) <= set(starts[0])  # bars line up, whatever the model
+    # after models of different lengths the state words still line up: sonnet 5.5 over opus 5.5 in
+    # the first column, default over gpt-5.2-codex in the Codex column
+    assert lines[0].index(" idle ") == lines[1].index(" idle ")
+    liaison, lead = lines[0].index("● liaison"), lines[1].index("● lead")
+    assert liaison == lead and lines[0].index(" idle ", liaison) == lines[1].index(" working ", lead)
+    team = {r.data["name"]: r.data for r in build(ctx).panels["Team"]}
+    lead = team["lead"]  # ~181k of 258k
+    assert teampane.context_pct(lead) == pytest.approx(100 * 181_000 / 258_000)
+    row = next(ln for ln in lines if " lead " in ln)
+    cell = row[row.index("● lead"):]
+    assert "~181k ▕" in cell and cell.split("▏")[1].split()[0] == "70%"
+    bar = cell.split("▕")[1].split("▏")[0]
+    assert bar == teampane.context_bar(181 / 258, len(bar)) and bar.count("█") == int(181 / 258 * len(bar))
+    pm = next(ln for ln in lines if " pm " in ln)
+    assert "41k ▕" in pm and "4%" in pm.split(" pm ")[1].split("▏")[1]  # 41k of 1M
+    qa = next(ln for ln in lines if " qa " in ln)
+    assert " — ▕" in qa  # no reading: no bar, no percentage
+
+
+def test_a_twelve_agent_team_takes_four_lines_at_160_and_fits_at_100(ctx, fake_home):
+    _team(ctx, fake_home, extra_claude=5, extra_codex=2)  # 8 on Claude, 4 on Codex
+    assert len([r for r in build(ctx).panels["Team"]]) == 12
+
+    async def run(size):
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=size) as pilot:
+            await pilot.pause()
+            lines = _pane(app)
+            agent_lines = [ln for ln in lines if "▕" in ln]
+            width = app.team.content_size.width
+            assert all(len(ln) <= width for ln in lines)
+            assert sum(ln.count("▕") for ln in agent_lines) == 12  # every agent shown
+            assert app.team.outer_size.height == len(lines) + 2  # no empty space: content plus the frame
+            return len(agent_lines), app.team.outer_size.height, app.panel(INBOX).content_size.height
+
+    assert asyncio.run(run((160, 40)))[0] == 4
+    lines, height, inbox_rows = asyncio.run(run((100, 30)))
+    assert lines == 6 and height <= 12 and inbox_rows >= 1  # two columns, Claude's block over Codex's
+
+
+def test_the_team_panes_height_follows_the_agent_count(ctx, fake_home):
+    async def height():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.pause()
+            return app.team.outer_size.height
+
+    _team(ctx, fake_home)
+    five = asyncio.run(height())
+    ctx.team.upsert_agent("c9", "worker", "claude", "claude-sonnet-5-5", "lead")
+    ctx.team.upsert_agent("c8", "worker", "claude", "claude-sonnet-5-5", "lead")
+    ctx.team.save()
+    assert asyncio.run(height()) == five + 1  # 5 Claude agents in two columns: three lines
+
+
+def test_the_toast_shows_an_actions_result_and_goes_on_its_own(ctx, fake_home, monkeypatch):
+    from xt.tui.app import Toast
+
+    assert Toast.SECONDS == 10.0  # about ten seconds in real use; shortened here
+    monkeypatch.setattr(Toast, "SECONDS", 0.3)
+    _team(ctx, fake_home)
+    Alerts(ctx).raise_("blocked:pm", "pm is blocked (usually an approval prompt)")
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            await pilot.press(str(INBOX))
+            p = app.panel(INBOX)
+            p.highlighted = next(i for i, r in enumerate(p.rows) if r.kind == "alert")
+            await pilot.pause()
+            await pilot.press("c")
+            await pilot.pause()
+            toast = app.query_one(Toast)
+            assert toast.display and "alert cleared" in str(toast.render())
+            assert toast.size.height == 1
+            assert not any("alert cleared" in ln for ln in _pane(app))  # never part of Team
+            await pilot.pause(0.6)
+            assert not toast.display  # gone without a key press
+            assert not any("alert cleared" in ln for ln in _pane(app))
+
+    _run(run())
+
+
+def test_the_header_keeps_the_version_notices(ctx, fake_home):
+    from xt import versions
+    from xt.tui.model import version_text
+
+    V = versions.Versions
+    assert version_text(V("0.16.0", "", "0.16.0", "0.16.0")).plain == "xt 0.16.0 (latest)"
+    assert version_text(V("0.17.0", "", "0.16.0", "0.16.0")).plain == "xt 0.16.0 (0.17.0 published)"
+    assert version_text(V(None, "", "0.16.0", "0.16.0")).plain == "xt 0.16.0 (published ?)"
+    old = version_text(V("0.16.0", "", "0.16.0", "0.15.0", {"lead": "0.16.0"}))
+    assert old.plain == "xt 0.16.0 (latest) · running mixed: restart to update"
+    assert version_text(V("0.15.0", "", "0.16.0rc2", None, {"lead": None})).plain == \
+        "xt 0.16.0-rc2 (published 0.15.0) · running unknown"
+
+
+def test_the_header_names_what_is_stuck_and_when_nothing_waits(ctx, clock):
+    ctx.herdr.add("liaison")
+    assert "nothing waiting for you" in build(ctx).header.plain
+    from xt.dispatch import Queue
+
+    msg = ctx.ledger.append("liaison", "lead", "report", "hello")
+    Queue(ctx).add(msg["id"], "lead", "busy")
+    clock.advance(minutes=2)
+    assert "1 queued over a minute" in build(ctx).header.plain
+
+
+def test_keys_follow_the_panes_that_exist(ctx, fake_home):
+    from xt.tui.app import HINTS, Help
+
+    _team(ctx, fake_home)
+    assert "1-5 panels" in HINTS and "1-6" not in HINTS and "tab Team" in HINTS
+    keys = dict(Help.KEYS)
+    assert keys["1-5"] == "jump to a panel: Goals, Tasks, Inbox, Log, Supervisor"
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(160, 40)) as pilot:
+            for n, title in enumerate(PANELS, start=1):
+                await pilot.press(str(n))
+                await pilot.pause()
+                assert app.focused.title == title
+            await pilot.press("6")  # no sixth pane: nothing happens
+            assert app.focused.title == "Supervisor"
+            await pilot.press("tab")  # past the last panel: Team, at the top
+            await pilot.pause()
+            assert app.focused is app.team and app.team.current.data["name"] == "pm"
+            await pilot.press("j")
+            await pilot.pause()
+            assert app.team.current.data["name"] == "builder"
+            assert app.query_one("#detail").border_title == "Detail─Team"
+            assert app.team.current.detail().plain.startswith("builder · worker · claude/claude-opus-5-5")
 
     _run(run())

@@ -85,7 +85,7 @@ the role the lead wrote, and you get a desktop notification.
 
 ### 4. Day to day: questions, approvals, alerts, friction
 
-Everything that needs you lands in the **Inbox** (TUI panel 4, or `xt inbox`), most with a desktop
+Everything that needs you lands in the **Inbox** (TUI panel 3, or `xt inbox`), most with a desktop
 notification. From 0.16.0 it has three groups, each under its heading, and a group with nothing in
 it isn't shown:
 
@@ -102,8 +102,9 @@ it isn't shown:
 | `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt. `c` marks it seen at once |
 | `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` shows it (newest first); `enter` again folds it |
 
-The Inbox's title counts what's in the groups: `[4]─Inbox─⚑ 2 · ✉ 1 · ✱ 3` is two items that need
-you, one new and three unread friction; a zero count is left out.
+The Inbox's title counts what's in the groups: `[3]─Inbox─⚑ 2 · ✉ 1 · ✱ 3` is two items that need
+you, one new and three unread friction; a zero count is left out. The Team pane's header repeats
+the first two.
 
 **Friction is unread until you've seen it.** In the TUI, friction counts as seen once you leave the
 Inbox panel (or quit) after it was on screen there; friction further down, which you never
@@ -116,8 +117,8 @@ supervisor's first run on 0.16.0, so friction from before the upgrade shows as s
 doesn't fit, and again when you resize the terminal. Each row in the Goals, Tasks, Inbox and Log
 panels ends with its age, dim at the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`,
 `2d`, and whole weeks from 60 days (`8w`). A goal's age is that of its newest message (the goal, its
-tasks and their replies), so a stuck goal looks old. Team rows have no age, and Supervisor rows
-keep their clock time. The focused panel has a green frame and a reversed title.
+tasks and their replies), so a stuck goal looks old. Agents in the Team pane have no age, and
+Supervisor rows keep their clock time. The focused panel has a green frame and a reversed title.
 
 While a question waits for you, the work that depends on it isn't nudged. If you don't answer,
 nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
@@ -136,12 +137,40 @@ leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it h
 your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
 first run on 0.15.0, so older goals don't appear.
 
-The **Supervisor** panel (6) shows what xt did (deliveries, wake-ups, nudges, notifications). The
-Status pane on top has three lines: the team with only what needs you (questions and approvals in
-yellow, alerts in red, or "nothing waiting for you"); today's usage and account allowance; and the
-result of your last action, in full. The key line at the bottom starts with what `s` will do.
+The **Supervisor** panel (5) shows what xt did (deliveries, wake-ups, nudges, notifications). The
+key line at the bottom starts with what `s` will do.
 
-An agent's detail (Team panel, 2) ends with the last lines of its screen, laid out like the
+The **Team** pane on top (from 0.16.0; it replaces the Status pane and the Team panel) is as high
+as its content:
+
+```
+my-team · xt 0.16.0 (latest) · 5 running · 1 goal open · ⚑ 1 needs you · ✉ 1 new                                               today 3.6M tokens · est. $1.57
+CLAUDE  5h ▓░░░░░░░░░   6% resets 15:00                                                                   CODEX  7d ▓▓▓▓▓▓░░░░  64% resets Tue 12:00
+● pm      sonnet 5.5    idle      41k ▕▎     ▏   4%  ● qa      default       idle        — ▕      ▏       ● liaison default       idle        — ▕      ▏
+● builder opus 5.5      idle      41k ▕▎     ▏   4%                                                       ● lead    gpt-5.2-codex working ~181k ▕████▎ ▏  70%
+```
+
+(160 columns: pm, builder and qa on Claude; liaison and lead on Codex, where lead's `default` is
+shown as the model its session log names.)
+
+- The **header**: the team; xt's version, with `(latest)`, a newer published release in yellow, or
+  `running 0.15.0: restart to update` when something still runs an older one; how many agents run;
+  open goals; `⚑ N needs you` and `✉ N new` (the Inbox's counts), or "nothing waiting for you";
+  messages or jobs stuck for over a minute; and today's tokens and estimate on the right.
+- One **block per harness**: its account windows as bars with the share used and the reset time
+  (`CLAUDE 5h …`, `CODEX 7d …`); a window without a current reading isn't shown (`xt status`
+  says why). Then its agents, in columns that line up: a dot in the state's colour, the name, the
+  short model (`sonnet 5.5`; for an agent on `default`, the model its own session log names, else
+  `default`), the state (`stopped` when not running), and the context: tokens, a bar and the share
+  of the model's window, yellow from 70 % and red from 85 %. Agents fill up to three columns as the
+  width allows, so five take two lines.
+
+The Team pane has no number key: `tab` reaches it (it's before panel 1), `j`/`k` select an agent,
+the detail pane shows it, and `u`, `x`, `R` and `f` act on it. The result of your last action
+(`alert cleared`, `starting carol…`) shows for about ten seconds in a one-line toast at the bottom,
+then goes away on its own.
+
+An agent's detail (select it in the Team pane) ends with the last lines of its screen, laid out like the
 terminal: each line starts on its own line, a line too long for the pane continues on indented
 lines marked `↳`, blank lines are dropped, and a line repeated in a row is shown once with `(×3)`.
 
@@ -388,7 +417,8 @@ percentages as the agent's status line (`Sonnet 5.5 · 5h 5% · 7d 7%`). `xt sta
 allowance: claude 5% of 5h, resets Tue 21:30; 7% of 7d, resets Mon 08:00; read 2m ago (account-wide)
 ```
 
-and the TUI's Status pane shows the same next to the Codex allowance. The plan is shared with you
+and the TUI's Team pane shows each window as a bar in the Claude block (from 0.16.0; a window
+without a current reading isn't drawn). The plan is shared with you
 and anyone else on the account, so the numbers include your own use; they are not one agent's
 share.
 
@@ -406,13 +436,15 @@ share.
   Claude Code only prints `xt` as the status line.
 - Seen on Claude Code 2.1.284; another version that changes the fields shows `unknown`.
 
-**How full is an agent's context?** The Team panel shows it per agent (`~211k/258k`: tokens in
-the conversation after its latest turn, out of the model's window), yellow from 70% and red from
-85%; the agent's detail, `xt status` and the lead's and liaison's briefs show it too. xt reads it
+**How full is an agent's context?** The Team pane shows it per agent (`~211k ▕████▎ ▏ 82%`:
+tokens in the conversation after its latest turn, a bar and the share of the model's window),
+yellow from 70% and red from 85%; the agent's detail (`~211k/258k`), `xt status` and the lead's and
+liaison's briefs show it too. xt reads it
 from the harness's own session log (only the counters, never the conversation) and links each
 agent to its log by its first prompt, so a restarted agent starts again from its new session. A
-`~` means approximate (Codex reports the latest turn's usage, not a live figure); `?` means the
-window isn't known for that model; `—` means nothing is recorded yet, or the agent isn't running
+`~` means approximate (Codex reports the latest turn's usage, not a live figure); tokens with no
+bar and no share mean the window isn't known for that model (`?` in the detail); `—` means nothing
+is recorded yet, or the agent isn't running
 (its detail then shows the last session's figure, labelled as such). Supported: Codex, Claude
 Code, pi. The window comes from where it's reliable: Codex writes the usable window of the session
 into its log (258,400 tokens for the current models, well below an API model's published maximum,
@@ -422,14 +454,15 @@ window leaves it unknown rather than borrowing an API figure.
 
 **What does the team cost?** The supervisor records every model call from the agents' session
 logs (once a minute; counters only) and attributes it to the goal the agent was working on. You
-see tokens and an estimate in dollars: today's team total in the Status pane and `xt status`,
+see tokens and an estimate in dollars: today's team total in the Team pane's header and `xt status`,
 each agent's day in its detail, each goal's total in its detail, and the team's day in the lead's
 and liaison's briefs. The estimate uses public list prices from `prices.toml` (or pi's own cost)
 and is always labelled "est.": on a subscription you don't pay per token, and nothing here is a
 bill. Tokens of a model with no listed price are shown as unpriced, never as zero; calls made on
 an agent's behalf (Codex's automatic reviewer, Claude subagents) are counted and shown as
 auxiliary. Where a harness reports your account's allowance (Codex: percent of its window and
-when it resets), the Status pane and `xt status` show it once per harness. `prices.toml` lists
+when it resets), the Team pane (as bars in that harness's block) and `xt status` show it once per
+harness. `prices.toml` lists
 the current Codex and Claude models at the providers' **Standard** API rates, each row with its
 source page and the date it was checked
 (2026-09-29 for the table shipped with 0.13.0); xt can't see which tier or plan you're actually
@@ -458,8 +491,8 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt down`](#xt-down) | human | `X` stops agents only |
 | [`xt restart`](#xt-restart) | human | `x` then `u` for one agent |
 | [`xt version`](#xt-version) | show: both; use/rollback: human | none |
-| [`xt status`](#xt-status) | both | Status pane + Team panel |
-| [`xt inbox`](#xt-inbox) | human | Inbox panel (`4`) |
+| [`xt status`](#xt-status) | both | Team pane (on top) |
+| [`xt inbox`](#xt-inbox) | human | Inbox panel (`3`) |
 | [`xt answer`](#xt-answer) | human | `s` on a question |
 | [`xt approve`, `xt deny`](#xt-approve-xt-deny) | human | `a` / `d` on an approval |
 | [`xt clear`](#xt-clear) | human | `c` on an alert |
@@ -473,7 +506,7 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt friction`](#xt-friction) | agents | shown in Inbox (`✱`) |
 | [`xt goal`](#xt-goal) | agents (liaison) | Goals panel shows drafts and goals |
 | [`xt brief`](#xt-brief) | both | Team detail (partly) |
-| [`xt log`](#xt-log) | both | Log (`5`) and Supervisor (`6`) panels |
+| [`xt log`](#xt-log) | both | Log (`4`) and Supervisor (`5`) panels |
 | [`xt harnesses`](#xt-harnesses) | human | none |
 | [`xt watch`](#xt-watch) | (xt) | Supervisor panel shows its events |
 | [`xt tui`](#xt-tui) | human | is the TUI |
@@ -691,8 +724,8 @@ of them first, and a first line saying how many older ones were left out; `--lim
 newest N, `--full` all of them. `--id` alone still prints the whole thread (from 0.15.0; before, `xt
 log` always printed everything). `xt log --watch [--limit N]` shows the supervisor's newest events
 instead (50 by default). **Use it** to trace a goal (`--id 234` shows the goal and every message
-that refers to it directly) or an agent (`--member carol`); the TUI's Log (`5`) and Supervisor
-(`6`) panels show the recent part.
+that refers to it directly) or an agent (`--member carol`); the TUI's Log (`4`) and Supervisor
+(`5`) panels show the recent part.
 
 ### `xt harnesses`
 

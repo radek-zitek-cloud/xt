@@ -336,7 +336,9 @@ def test_malformed_snapshot_numbers_show_unknown_and_status_still_works(state, m
     cli.cmd_status(cli.build_parser().parse_args(["status"]))
     out = capsys.readouterr().out
     assert "allowance: claude 5h unknown" in out and "carol" in out  # the rest of status is there
-    assert "claude account 5h unknown" in build(ctx).usage
+    snap = build(ctx)  # the TUI's Team pane: a bad window is left out, never a broken bar (card #128)
+    assert [w[0] for h in snap.harnesses if h.name == "claude" for w in h.windows] in ([], ["7d"])
+    assert "carol" in {r.data["name"] for r in snap.panels["Team"]}
 
 
 @pytest.mark.parametrize("bad", BAD_VALUES + [101], ids=repr)
@@ -429,10 +431,14 @@ def test_status_and_tui_show_the_claude_windows(state, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert "allowance: claude 42% of 5h, resets " in out and "11% of 7d" in out and "read just now" in out
     assert "team " in out  # the rest of status is there
-    usage = build(ctx).usage
-    assert "claude account 42% of 5h" in usage and "11% of the week" in usage
+    # the TUI's Team pane (card #128) reads the same snapshot at the team's clock
+    at = ctx.ledger.clock().timestamp()
+    _feed(ctx, {"rate_limits": {"five_hour": {"used_percentage": 42, "resets_at": int(at) + 3600},
+                                "seven_day": {"used_percentage": 11, "resets_at": int(at) + 86400}}}, at)
+    claude = next(h for h in build(ctx).harnesses if h.name == "claude")
+    assert [(label, pct) for label, pct, _ in claude.windows] == [("5h", 42.0), ("7d", 11.0)]
     planusage.snapshot_path(ctx.paths.root).write_text("garbage")
-    assert "claude account 5h unknown; 7d unknown" in build(ctx).usage
+    assert not any(h.windows for h in build(ctx).harnesses if h.name == "claude")  # unknown: no bars
 
 
 def test_the_guide_documents_the_status_line_setting():
@@ -619,8 +625,8 @@ def test_the_tui_inbox_shows_done_goals_and_clears_them_after_a_look(ctx):
     async def run():
         app = XtTui(lambda: build(ctx), LiveActions(ctx))
         async with app.run_test(size=(140, 45)) as pilot:
-            await pilot.press("4")
-            row = next(r for r in app.panel(4).rows if r.kind == "done")
+            await pilot.press("3")  # the Inbox (card #128 renumbered the panes)
+            row = next(r for r in app.panel(3).rows if r.kind == "done")
             assert row.data == {"id": goal, "done": done}
             detail = row.detail().plain
             assert "Write the weekly digest" in detail and f"closing summary: #{done}" in detail
@@ -628,7 +634,7 @@ def test_the_tui_inbox_shows_done_goals_and_clears_them_after_a_look(ctx):
             await pilot.press("1")  # leaving the Inbox: seen
             await pilot.pause()
             app.refresh_data()
-            assert not any(r.kind == "done" for r in app.panel(4).rows)
+            assert not any(r.kind == "done" for r in app.panel(3).rows)
 
     asyncio.run(run())
     assert goaldone.seen_upto(ctx) >= done

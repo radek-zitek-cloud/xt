@@ -129,23 +129,48 @@ def _age(seconds: float) -> str:
     return "just now" if m < 1 else f"{m}m ago" if m < 60 else f"{m // 60}h {m % 60:02d}m ago"
 
 
-def window_text(label: str, w, now: float) -> tuple[str, float | None]:
-    """One window for status — `5% of 5h, resets Tue 14:30` — and when that reading was taken;
-    or why there's no number (and None). Never raises: a snapshot is only data."""
+def usable(w, now: float) -> tuple[dict | None, str]:
+    """A snapshot window that can be shown now, or None and why not (`unknown`, …)."""
     w = window(w, observed=True)
     # Malformed, or read after now: the script and xt run on the same machine, so any reading
     # timestamped later than now is wrong, with no tolerance (QA on rc4).
     if w is None or w["observed_at"] > now:
-        return f"{label} unknown", None
+        return None, "unknown"
     if w["resets_at"] <= now:
-        return f"{label} window reset, no reading since", None
+        return None, "window reset, no reading since"
     if now - w["observed_at"] > STALE_SECONDS:
-        return f"{label} unknown (last reading {_age(now - w['observed_at'])})", None
+        return None, f"unknown (last reading {_age(now - w['observed_at'])})"
     try:
-        reset = dt.datetime.fromtimestamp(w["resets_at"]).strftime("%a %H:%M")
+        dt.datetime.fromtimestamp(w["resets_at"])
     except (OverflowError, OSError, ValueError):
-        return f"{label} unknown", None
+        return None, "unknown"
+    return w, ""
+
+
+def window_text(label: str, w, now: float) -> tuple[str, float | None]:
+    """One window for status — `5% of 5h, resets Tue 14:30` — and when that reading was taken;
+    or why there's no number (and None). Never raises: a snapshot is only data."""
+    w, why = usable(w, now)
+    if w is None:
+        return f"{label} {why}", None
+    reset = dt.datetime.fromtimestamp(w["resets_at"]).strftime("%a %H:%M")
     return f"{w['used_percentage']:.0f}% of {label}, resets {reset}", w["observed_at"]
+
+
+def windows(team_root: Path, now: float | None = None) -> list[tuple[str, dict]]:
+    """The windows that can be shown now, as (label, reading), for the TUI's Team pane (card #128).
+    Unknown ones are left out; never raises."""
+    now = time.time() if now is None else now
+    try:
+        snap = _load(snapshot_path(team_root))
+    except Exception:
+        return []
+    out = []
+    for key, label in WINDOWS:
+        w, _ = usable(snap.get(key), now)
+        if w:
+            out.append((label, w))
+    return out
 
 
 def line(team_root: Path, now: float | None = None) -> str:

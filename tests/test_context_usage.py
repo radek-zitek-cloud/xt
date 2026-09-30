@@ -136,7 +136,8 @@ def test_context_shows_in_team_row_detail_status_and_lead_brief(ctx, fake_home, 
     codex_session(fake_home, ctx, "lead", 211000)
     claude_session(fake_home, ctx, "carol")
     team = {r.data["name"]: r for r in build(ctx).panels["Team"]}
-    assert "~211k/258k" in team["lead"].text.plain and "41k/1M" in team["carol"].text.plain
+    lead, carol = team["lead"].text.plain, team["carol"].text.plain  # tokens, a bar and the share (card #128)
+    assert "~211k ▕" in lead and lead.endswith(" 82%") and "41k ▕" in carol and carol.endswith(" 4%")
     assert "82%" in team["lead"].detail().plain
 
     class Tty(io.StringIO):

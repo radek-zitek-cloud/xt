@@ -35,6 +35,7 @@ class Reading:
     observed: str | None = None  # ISO timestamp of the usage record
     source: str = ""  # e.g. "codex session log"
     reason: str = ""  # why it's unknown, when it is
+    model: str | None = None  # the model the session log names (card #128: `default` made real)
 
     @property
     def known(self) -> bool:
@@ -174,7 +175,23 @@ def _tail_lines(path: str) -> list[str]:
     return [ln for ln in reversed(lines) if ln.strip()]
 
 
+def codex_model(lines: list[str]) -> str | None:
+    """The model of the newest `turn_context` record (Codex writes one per turn; `lines` newest
+    first), the same record usage recording prices turns by."""
+    for ln in lines:
+        if '"turn_context"' not in ln:
+            continue
+        try:
+            model = json.loads(ln)["payload"].get("model")
+        except (ValueError, KeyError, AttributeError, TypeError):
+            continue
+        if isinstance(model, str) and model:
+            return model
+    return None
+
+
 def _codex(lines: list[str], adapter: Adapter) -> Reading:
+    model = codex_model(lines)
     for ln in lines:
         if '"token_count"' not in ln:
             continue
@@ -186,8 +203,8 @@ def _codex(lines: list[str], adapter: Adapter) -> Reading:
         if not info or not info.get("last_token_usage"):
             continue
         return Reading(used=info["last_token_usage"].get("total_tokens"), window=info.get("model_context_window"),
-                       approximate=True, observed=d.get("timestamp"), source="codex session log")
-    return Reading(source="codex session log", reason="no usage recorded yet")
+                       approximate=True, observed=d.get("timestamp"), source="codex session log", model=model)
+    return Reading(source="codex session log", reason="no usage recorded yet", model=model)
 
 
 def _claude(lines: list[str], adapter: Adapter) -> Reading:
@@ -205,7 +222,8 @@ def _claude(lines: list[str], adapter: Adapter) -> Reading:
         used = sum(int(u.get(k) or 0) for k in
                    ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens", "output_tokens"))
         return Reading(used=used, window=adapter.context_windows.get(msg.get("model", "")),
-                       observed=d.get("timestamp"), source="claude session log")
+                       observed=d.get("timestamp"), source="claude session log",
+                       model=msg.get("model") if isinstance(msg.get("model"), str) else None)
     return Reading(source="claude session log", reason="no usage recorded yet")
 
 
@@ -251,7 +269,7 @@ def _pi(lines: list[str], adapter: Adapter, ctx: Ctx | None = None) -> Reading:
         key = f"{msg.get('provider', '')}/{msg.get('model', '')}"
         window = adapter.context_windows.get(key) or (_pi_windows(ctx).get(key) if ctx else None)
         return Reading(used=used, window=window, observed=_iso(msg.get("timestamp") or d.get("timestamp")),
-                       source="pi session log")
+                       source="pi session log", model=msg.get("model") if isinstance(msg.get("model"), str) else None)
     return Reading(source="pi session log", reason="no usage recorded yet")
 
 
@@ -272,7 +290,13 @@ def reading(ctx: Ctx, name: str, adapters: dict[str, Adapter] | None = None,
     except OSError as e:
         return Reading(source=f"{adapter.name} session log", reason=f"can't read it: {e.strerror}")
     if adapter.session_format == "codex":
-        return _codex(lines, adapter)
+        r = _codex(lines, adapter)
+        if r.model is None:  # one very long turn: the session's first turn_context is in the head
+            try:
+                r.model = codex_model(_head(path).split("\n")[:-1])
+            except OSError:
+                pass
+        return r
     if adapter.session_format == "claude":
         return _claude(lines, adapter)
     if adapter.session_format == "pi":

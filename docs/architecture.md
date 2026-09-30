@@ -77,12 +77,13 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
 | `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. |
 | `src/xt/usage.py` | Live context per agent, from its harness's session log. |
-| `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines. |
+| `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines and windows. |
 | `src/xt/planusage.py` | Claude plan usage from the status line (standard library only). |
 | `src/xt/versions.py` | Published, installed and running xt versions. |
 | `src/xt/switch.py` | `xt version use` and `rollback`: state format checks, snapshots, merge and revert. |
-| `src/xt/tui/app.py` | The TUI (Textual): panels, keys, dialogs, and the actions it takes as the human. |
-| `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into panel rows and the Status pane. |
+| `src/xt/tui/app.py` | The TUI (Textual): the Team pane, panels, keys, the toast, dialogs, and the actions it takes as the human. |
+| `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into panel rows, agents and the Team header. |
+| `src/xt/tui/teampane.py` | The Team pane's layout: harness blocks, window bars, aligned agent columns and short model names. |
 | `src/xt/tui/clipboard.py` | The system clipboard for the TUI's text boxes. |
 | `src/xt/tui/lazy.tcss` | The TUI's stylesheet. |
 | `src/xt/tui/__init__.py` | The TUI package. |
@@ -222,9 +223,12 @@ reviewer) repeat the prompt and are skipped. The link is kept in `state/sessions
 log's tail xt takes the latest usage record: Codex's `token_count` (latest turn's total out of
 `model_context_window`, marked approximate), Claude Code's `message.usage` (input, cache and
 output tokens, skipping subagent turns; window from the adapter's table), pi's message `usage`
-(window from `pi --list-models`, cached a day). Only counters are read. Anything missing is
-reported as unknown, never guessed. The TUI's Team panel and agent detail, `xt status` and the
-lead's and liaison's briefs show it; members' briefs don't.
+(window from `pi --list-models`, cached a day). The same read keeps the model the log names
+(Codex's newest `turn_context`, else the session's first in its head; Claude Code's and pi's
+`message.model`), which the TUI's Team pane shows for an agent configured as `default`. Only
+counters and the model name are read. Anything missing is reported as unknown, never guessed. The
+TUI's Team pane and agent detail, `xt status` and the lead's and liaison's briefs show it;
+members' briefs don't.
 
 ## Usage and cost
 
@@ -382,18 +386,26 @@ harness goes to the human with `xt friction`.
 
 - Talk to the liaison in its Herdr pane (or type into any agent's pane: that's unstamped and
   legitimate).
-- `xt tui` (also what bare `xt` opens after `xt up`), refreshed every 2 s. Six panels of fixed
-  size (focus shows by frame colour and a reversed title; `/` filters the focused one; rows are
-  cut at the panel's width in cells and end with a dim age, `model.fit`): **Goals** (drafts, then
-  open goals with task progress; detail shows the tasks and the goal brief, or the draft), **Team** (live
-  state and schedules; detail shows open work, recent messages and the last lines of the agent's
-  screen), **Tasks** (open, then recently closed; detail shows the thread), **Inbox** (three
-  groups: Needs you with open questions, pending approvals and alerts; New with goals done and
-  reports to the human since they last looked; unread Friction, with seen friction folded; the
-  counts in its title), **Log** (newest first),
-  and **Supervisor** under the detail pane (the supervisor's events, newest first). The Status pane on top shows the team and only what needs the human (highlighted), today's usage and allowance, and the last action's result in full; the bottom line is
-  key hints; `h` lists every key (the README has the table). Slow actions (starting agents) run in
-  the background. `xt tui --demo` shows sample data.
+- `xt tui` (also what bare `xt` opens after `xt up`), refreshed every 2 s. The **Team** pane on top
+  (card #128; no number key, `tab` reaches it) is as high as its content: a header (team, xt's
+  version and published or restart notices, running agents, open goals, the Inbox's needs-you and
+  new counts, stuck messages or jobs, today's tokens and estimate), then one block per harness with
+  its account windows as bars (`turns.allowance_windows`) and its agents in aligned columns
+  (short model, or for `default` the model the agent's session log names, `usage.Reading.model`;
+  state; context as tokens, bar and share). `tui/teampane.py` lays it out at the pane's width:
+  up to three columns, blocks side by side or stacked, whichever is shorter. `j`/`k` select an agent;
+  its detail shows open work, schedules, recent messages and the last lines of its screen. Five
+  numbered panels of fixed size (focus shows by frame colour and a reversed title; `/` filters the
+  focused one; rows are cut at the panel's width in cells and end with a dim age, `model.fit`):
+  **Goals** (1: drafts, then open goals with task progress; detail shows the tasks and the goal
+  brief, or the draft), **Tasks** (2: open, then recently closed; detail shows the thread),
+  **Inbox** (3: three groups: Needs you with open questions, pending approvals and alerts; New
+  with goals done and reports to the human since they last looked; unread Friction, with seen
+  friction folded; the counts in its title), **Log** (4: newest first), and **Supervisor** (5,
+  under the detail pane: the supervisor's events, newest first). The last action's result is a
+  one-line toast that goes after about ten seconds; the bottom line is key hints; `h` lists every
+  key (the README has the table). Slow actions (starting agents) run in the background.
+  `xt tui --demo` shows sample data.
 - `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; warns if
   the supervisor isn't running.
 - `xt inbox`: the Inbox's three groups as in the TUI; in the human's terminal it clears New and
