@@ -19,9 +19,13 @@ limits = [
 sessions = "~/.pi/agent/sessions/*/*.jsonl"
 session_format = "pi"
 
-# pi takes input a moment after Herdr reports it started: a first prompt typed at once lost its
-# first five characters on a first start (card #167). xt waits until pi's screen has stayed
-# unchanged for this many checks (a second apart), then checks the session log for the prompt's
-# opening and alerts when it arrived incomplete.
+# pi has lost the first five characters of a first prompt on some first starts (card #167). xt
+# waits until pi's screen has stayed unchanged for `ready_settle` checks (a second apart), then
+# checks the session log for the prompt's opening (`check_prompt_in_log`). Waiting is not enough:
+# rc3 lost five characters after a 3 s still screen, while a cold start captured on 2026-10-01
+# lost none. So xt types `first_prompt_prefix` as the prompt's first line, and a lost start eats
+# that line instead of the opening. A prompt still damaged is resent whole once, when the agent is
+# idle, and a second failure raises the partprompt alert.
 ready_settle = 3
 check_prompt_in_log = true
+first_prompt_prefix = "(xt: this line only guards your first prompt against lost characters; ignore it. The prompt follows.)"

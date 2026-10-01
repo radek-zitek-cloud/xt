@@ -13,7 +13,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 **0.19.0-rc1** has #167, #169 and #135; **0.19.0-rc2** adds #166; **0.19.0-rc3** adds #156 (the
 docs and site caught up) and three findings from the rc1 live run and QA's rc2 check (below);
-**0.19.0-rc4** fixes two #166 findings from the rc3 live run. No protocol or ledger format
+**0.19.0-rc4** fixes two #166 findings from the rc3 live run; **0.19.0-rc5** prevents #167's lost
+characters instead of only reporting them (reopened by Radek). No protocol or ledger format
 change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
 `.xt/state/operators.json` (+ `.xt/operators/`), and the agents' start records in
 `.xt/state/versions.json` may carry `codex_options`.
@@ -71,6 +72,19 @@ change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
   `check_prompt_in_log`, set in `harnesses/pi.toml` only: Claude Code and Codex starts are
   unchanged. `xt status` now says `no session log found for <name>: its context and today's usage
   can't be read` under a running agent whose log xt can't find, for any harness.
+- **pi's first prompt arrives whole after all (#167, rc5).** The readiness wait didn't prevent the
+  loss: rc3 lost the same five characters after a 3-second still screen, and a cold start captured
+  later lost none, with pi's screen up at 0.9 s. xt now types one guard line before pi's first
+  prompt: `(xt: this line only guards your first prompt against lost characters; ignore it. The
+  prompt follows.)`. Lost characters come out of that line, and a damaged guard line doesn't count
+  as damage. A prompt whose opening is still missing in pi's session log is resent whole once,
+  by the supervisor, when the agent is idle and before any queued message reaches it. The resend
+  has the guard line and a note that it replaces the damaged one: a second reading of the prompt,
+  about 25k tokens for a lead, only when it triggers. The `partprompt:<name>` alert is now the last
+  resort: it is raised if the resent prompt is damaged too (checked for 2 minutes) or Herdr refuses
+  the resend. xt searches the first 2 MB of a pi session log for the prompt, since a resent one
+  comes after the agent's first turn. New adapter key `first_prompt_prefix` (pi only; Claude Code
+  and Codex prompts are unchanged); new state file `.xt/state/prompt_resends.json`.
 - **The board watch's alert shows Fizzy's error (#135, rc3, from the rc1 live run).** A failing
   command with empty error output now puts the first lines of its standard output in the alert
   (Fizzy prints its error JSON there); before, the alert gave only the exit code.

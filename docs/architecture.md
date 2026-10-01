@@ -66,9 +66,9 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/choices.py` | Decision questions with options: validation, rendering, and turning a numeric answer into the option's text. |
 | `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
-| `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, first prompt, landed check), spawn requests and their approvals, stop and retire. |
+| `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and their approvals, stop and retire. |
 | `src/xt/permissions.py` | Claude Code settings files: which file applies (`effective`), the preflight check, the start note. |
-| `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`), limits. |
+| `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`, `first_prompt_prefix`), limits. |
 | `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |
 | `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor. |
 | `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. |
@@ -110,6 +110,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `goal_notices.json`, `inbox_seen.json`, `watch.pid`, `lock` |
 | | `state/resets.json`: queued resets and each agent's last reset, for the automatic policy's cool-down |
 | | `state/board_watch.json` (+ `.out`, `.err` of the last run): the board watch's last success or current failure, for status |
+| | `state/prompt_resends.json`: pi first prompts that arrived damaged, waiting to be resent once or checked after the resend |
 | | `state/operators.json`: registered operators (pid, start time, token hash) and their delegation grants; `operators/<name>.token`: an operator's token (mode 600) |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
@@ -173,9 +174,13 @@ supervisor, never inside an agent's shell.
 4. **Landed check.** The prompt counts as delivered only if Herdr sees the agent start working
    *and* the prompt's text appears on the agent's screen. Otherwise xt retries once, then raises a
    `noprompt:<name>` alert. (Without this, a codex liaison twice ran with no identity and acted as
-   a plain assistant.) With `check_prompt_in_log` (pi), xt then reads the harness's session log: a
-   log with the prompt's later parts but not its opening raises `partprompt:<name>` (the prompt
-   lost its first characters, so `usage.find_session` can't link the log).
+   a plain assistant.) An adapter's `first_prompt_prefix` (pi only) is typed as the prompt's first
+   line (`spawn.guarded`), so characters lost at the start come out of that line (card #167, rc5).
+   With `check_prompt_in_log` (pi), xt then reads the harness's session log (`usage.prompt_in_log`,
+   the first 2 MB of each log written since the start): the opening `You are **name**, an agent in
+   the xt team "team"` anywhere in it is whole; the first paragraph's later parts (the team repo's
+   path and `Always pass --as name`) without the opening are damaged. A damaged prompt goes into
+   `state/prompt_resends.json`, and the supervisor resends it (below).
 5. The agent is added to the "expected" set, so the supervisor can tell a crash from a stop.
 
 **What goes into the start command.** Before step 1, `permissions.effective` picks the agent's
@@ -324,6 +329,11 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
 2. **Run jobs**: spawns, lazy lead starts, and retires that agents asked for. Then message the
    requester "Done: …" or "Failed: …".
 3. Read `herdr agent list`; save it to `state/live.json` (agents in sandboxes read it there).
+   **Damaged first prompts** (card #167 rc5, `spawn.run_resends`), before any queued message: an
+   agent in `state/prompt_resends.json` that is idle gets its whole first prompt again, once, behind
+   the guard line and a note that it replaces the damaged one; later ticks read its session log
+   until the opening shows (then the entry goes) or 2 minutes pass (then `partprompt:<name>`). A
+   stopped agent's entry is dropped; a new start clears it.
 4. **Drain the queue**: batch-deliver to every recipient that is idle.
 5. **Check agents** and raise alerts once each, clearing them when resolved:
    - an agent blocked (usually an approval prompt in its pane);

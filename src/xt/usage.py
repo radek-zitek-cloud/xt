@@ -97,9 +97,18 @@ def last_starts(ctx: Ctx) -> dict[str, float]:
     return out
 
 
-def _head(path: str) -> str:
+RESEND_HEAD_BYTES = 2 * 1024 * 1024  # card #167 rc5: a resent first prompt follows the agent's first turn
+
+
+def _head(path: str, size: int = HEAD_BYTES) -> str:
     with open(path, "rb") as fh:
-        return fh.read(HEAD_BYTES).decode("utf-8", "replace")
+        return fh.read(size).decode("utf-8", "replace")
+
+
+def _head_size(adapter: Adapter) -> int:
+    """How much of a log's start to search for the first prompt: more where xt may resend it whole
+    after the agent's first turn (`check_prompt_in_log`, pi)."""
+    return RESEND_HEAD_BYTES if adapter.check_prompt_in_log else HEAD_BYTES
 
 
 def _is_main_session(fmt: str, head: str) -> bool:
@@ -146,7 +155,7 @@ def find_session(ctx: Ctx, adapter: Adapter, name: str, since: float | None) -> 
     marker = _marker_re(name, ctx.team.name)
     for path in _recent_logs(adapter, since):
         try:
-            head = _head(path)
+            head = _head(path, _head_size(adapter))
         except OSError:
             continue
         if marker.search(head) and _is_main_session(adapter.session_format, head):
@@ -159,14 +168,17 @@ WHOLE, INCOMPLETE = "whole", "incomplete"
 
 def prompt_in_log(ctx: Ctx, adapter: Adapter, name: str, since: float) -> str | None:
     """How the agent's first prompt arrived, read from its session log (card #167): WHOLE when its
-    opening is there, INCOMPLETE when only its later parts are, None when no log has it yet."""
+    opening (`You are **name**, an agent in the xt team "team"`) is anywhere in the log's start, so
+    a guard line that lost characters, or a damaged copy followed by a whole resend, is WHOLE;
+    INCOMPLETE when only two later parts of the first paragraph are (the team repo's path and
+    `Always pass --as name`); None when no log since `since` has either."""
     if not adapter.sessions:
         return None
     marker = _marker_re(name, ctx.team.name)
     later = _later_markers(ctx, name)
     for path in _recent_logs(adapter, since):
         try:
-            head = _head(path)
+            head = _head(path, _head_size(adapter))
         except OSError:
             continue
         if not _is_main_session(adapter.session_format, head):

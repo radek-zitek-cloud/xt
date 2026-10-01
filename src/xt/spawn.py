@@ -89,11 +89,12 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     set_stopped(ctx, name, False)
     Alerts(ctx).resolve(f"launch:{name}")  # xt started it, with its settings (card #165)
     Alerts(ctx).resolve(f"partprompt:{name}")  # a new start sends a new first prompt (card #167)
+    Resends(ctx).drop(name)
     answered += answer_startup_dialogs(ctx, adapter, pane)
     for dialog in answered:
         ctx.ledger.append(SYSTEM, HUMAN, "system", f"answered {a.harness}'s '{dialog}' dialog for {name}")
     settled = wait_settled(ctx, adapter, pane)
-    landed = send_first_prompt(ctx, name, pane, adapter, first_prompt(ctx, name))
+    landed = send_first_prompt(ctx, name, pane, adapter, guarded(adapter, first_prompt(ctx, name)))
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     if landed and adapter.check_prompt_in_log:
         note = check_prompt_in_log(ctx, name, adapter, began, settled)
@@ -206,10 +207,22 @@ def wait_settled(ctx: Ctx, adapter, pane: str) -> bool:
     return False
 
 
+def guarded(adapter, text: str) -> str:
+    """The prompt as typed: after the adapter's `first_prompt_prefix` line, if it has one (pi, card
+    #167 rc5), so characters lost at the start come out of that line, not the prompt's opening."""
+    return f"{adapter.first_prompt_prefix}\n{text}" if adapter.first_prompt_prefix else text
+
+
+RESEND_NOTE = ("(xt: your first prompt reached you with its start missing. Here it is again, whole; it "
+               "replaces the damaged one. Carry on from it, and don't redo what you've already done or "
+               "reported.)")
+
+
 def check_prompt_in_log(ctx: Ctx, name: str, adapter, since: float, settled: bool) -> str:
-    """Whether the first prompt reached the harness whole, from its session log (card #167): an
-    incomplete one raises an alert, since status can't read the agent's context or usage then. The
-    result is a note for the start record."""
+    """Whether the first prompt reached the harness whole, from its session log (card #167). A
+    damaged one is resent whole, once, when the agent is next idle: the supervisor does it (see
+    `run_resends`), so a start never waits on the agent's first turn. The result is a note for the
+    start record."""
     from . import usage
 
     deadline = time.monotonic() + LANDED_WAIT
@@ -221,15 +234,110 @@ def check_prompt_in_log(ctx: Ctx, name: str, adapter, since: float, settled: boo
     if found == usage.WHOLE:
         return ""
     if found == usage.INCOMPLETE:
-        Alerts(ctx).raise_(
-            f"partprompt:{name}",
-            f"{name}'s first prompt reached {adapter.name} without its opening (the harness wasn't ready "
-            f"for input{'' if settled else '; its screen never settled'}). It has its identity and "
-            f"protocol, but xt can't find its session log, so `xt status` can't show its context or "
-            f"today's usage. `xt stop {name}` and `xt spawn {name}` start it again.",
-        )
-        return " — FIRST PROMPT ARRIVED INCOMPLETE, see alert"
+        Resends(ctx).add(name, since, settled)
+        return (" — FIRST PROMPT ARRIVED DAMAGED (its opening missing): xt resends it whole once the agent "
+                "is idle")
     return " — first prompt not checked: no session log showed it yet"
+
+
+def _partprompt(ctx: Ctx, name: str, harness: str, settled: bool) -> None:
+    Alerts(ctx).raise_(
+        f"partprompt:{name}",
+        f"{name}'s first prompt reached {harness} without its opening, and so did xt's one resend "
+        f"(the harness wasn't ready for input{'' if settled else '; its screen never settled'}). It has "
+        f"its identity and protocol, but xt can't find its session log, so `xt status` can't show its "
+        f"context or today's usage. `xt stop {name}` and `xt spawn {name}` start it again.",
+    )
+
+
+RESEND_CHECK = 120  # seconds after the resend for the whole prompt to show up in the session log
+
+
+class Resends:
+    """First prompts to resend whole, once (card #167 rc5): `.xt/state/prompt_resends.json`,
+    name -> {since, settled, sent (epoch seconds, once sent)}."""
+
+    def __init__(self, ctx: Ctx):
+        self.ctx = ctx
+        self.path = ctx.paths.state / "prompt_resends.json"
+
+    def load(self) -> dict:
+        try:
+            return json.loads(self.path.read_text())
+        except (OSError, ValueError):
+            return {}
+
+    def _save(self, d: dict) -> None:
+        tmp = self.path.with_suffix(".tmp")
+        tmp.write_text(json.dumps(d, indent=1))
+        os.replace(tmp, self.path)
+
+    def add(self, name: str, since: float, settled: bool) -> None:
+        with self.ctx.ledger.lock():
+            d = self.load()
+            d[name] = {"since": since, "settled": settled}
+            self._save(d)
+
+    def drop(self, name: str) -> None:
+        with self.ctx.ledger.lock():
+            d = self.load()
+            if d.pop(name, None) is not None:
+                self._save(d)
+
+    def update(self, name: str, **fields) -> None:
+        with self.ctx.ledger.lock():
+            d = self.load()
+            if name in d:
+                d[name].update(fields)
+                self._save(d)
+
+
+def run_resends(ctx: Ctx, live: dict, now: float | None = None) -> list[str]:
+    """The supervisor's step for damaged first prompts (card #167 rc5): resend the whole prompt to
+    an agent that is idle, once; then read its session log until the whole opening shows up, and
+    raise the partprompt alert if it doesn't. Never waits."""
+    from . import usage
+    from .adapters import load_adapters
+    from .herdr import DELIVERABLE
+
+    resends = Resends(ctx)
+    pending = resends.load()
+    if not pending:
+        return []
+    now = now if now is not None else time.time()
+    adapters = load_adapters(ctx.paths)
+    out = []
+    for name, rec in pending.items():
+        a, agent = ctx.team.agent(name), live.get(name)
+        adapter = adapters.get(a.harness) if a else None
+        if agent is None or adapter is None:
+            resends.drop(name)  # stopped, retired or gone: a new start sends a new prompt
+            continue
+        if "sent" not in rec:
+            if agent.status not in DELIVERABLE:
+                continue  # still working on the damaged prompt
+            text = f"{RESEND_NOTE}\n{first_prompt(ctx, name)}"
+            try:
+                ctx.herdr.prompt(name, guarded(adapter, text), confirm=True)
+            except XtError as e:
+                resends.drop(name)
+                _partprompt(ctx, name, adapter.name, rec.get("settled", True))
+                out.append(f"resend of {name}'s first prompt failed: {e}")
+                continue
+            resends.update(name, sent=now)
+            ctx.ledger.append(SYSTEM, HUMAN, "system",
+                              f"resent {name}'s first prompt whole (it arrived with its opening missing)")
+            out.append(f"resent {name}'s first prompt")
+            continue
+        if usage.prompt_in_log(ctx, adapter, name, rec["since"]) == usage.WHOLE:
+            resends.drop(name)
+            ctx.ledger.append(SYSTEM, HUMAN, "system", f"{name}'s resent first prompt arrived whole")
+            out.append(f"{name}'s resent first prompt arrived whole")
+        elif now - rec["sent"] >= RESEND_CHECK:
+            resends.drop(name)
+            _partprompt(ctx, name, adapter.name, rec.get("settled", True))
+            out.append(f"alert: {name}'s resent first prompt arrived damaged too")
+    return out
 
 
 def send_first_prompt(ctx: Ctx, name: str, pane: str, adapter, text: str) -> bool:

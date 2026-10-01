@@ -162,6 +162,10 @@ class Supervisor:
             self.say(line)
         live = self.ctx.herdr.agents()
         self.ctx.herdr.save_snapshot(live, self.ctx.ledger.clock().isoformat(timespec="seconds"))
+        from .spawn import run_resends
+
+        for line in run_resends(self.ctx, live, now):  # card #167: before any queued message reaches it
+            self.say(line)
         for line in drain(self.ctx):
             self.say(line)
         self.check_agents(live)

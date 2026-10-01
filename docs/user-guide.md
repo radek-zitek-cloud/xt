@@ -588,7 +588,7 @@ xt alerts, it never repairs. Alerts appear in the Inbox (red `⚠`) and as notif
 | `missing:<name>` | An agent xt started isn't running any more (crashed, or its workspace was closed outside xt) | Find out why (its pane, `xt log --member <name>`), then `u` / `xt spawn <name>` |
 | `missing:lead` with goals open | The lead isn't running though there's work | `xt up` |
 | `noprompt:<name>` | An agent started but its first prompt never showed up on its screen, so it doesn't know who it is | Stop and start it again (`xt restart <name>`) |
-| `partprompt:<name>` | (from 0.19.0, pi) The agent's first prompt reached it without its opening: the harness wasn't ready for input yet. It has its identity and protocol, but xt can't link its session log, so its context and today's usage stay empty | Stop and start it again (`xt restart <name>`); clears at its next start |
+| `partprompt:<name>` | (from 0.19.0, pi) The agent's first prompt reached it without its opening, and so did xt's one resend of it. It has its identity and protocol, but xt can't link its session log, so its context and today's usage stay empty | Stop and start it again (`xt restart <name>`); clears at its next start |
 | `silent:<id>` | The owner of an open item ignored two nudges | Look at its pane; ask the liaison or restart the agent |
 | `volume:<date>` | Today's message log is unusually big: probably two agents in a loop | `xt log` to see who; stop them |
 | `launch:<name>` | The agent runs without xt's launch settings: something other than xt started it, typically the terminal multiplexer restoring its session after a reboot or power cycle and resuming the agent's old conversation | `xt restart <name>`, or `xt restart --all` for the whole team; clears by itself |
@@ -780,10 +780,15 @@ bar and no share mean the window isn't known for that model (`?` in the detail);
 is recorded yet, or the agent isn't running
 (its detail then shows the last session's figure, labelled as such). When a running agent has no
 session log xt can link, `xt status` says so under its row (`no session log found for <name>: its
-context and today's usage can't be read`; from 0.19.0). pi takes input a moment after it appears
-to have started, so for pi xt waits until its screen has stopped changing before it types the first
-prompt, then checks the session log for the prompt's opening; an incomplete prompt raises
-`partprompt:<name>`. Supported: Codex, Claude
+context and today's usage can't be read`; from 0.19.0). pi has lost the first few characters of a
+first prompt on some first starts, which hid its log from xt. So for pi (from 0.19.0) xt waits until
+its screen has stopped changing, and types one guard line before the prompt: `(xt: this line only
+guards your first prompt against lost characters; ignore it. The prompt follows.)`. A lost start
+eats that line, not the prompt. xt then checks pi's session log for the prompt's opening. If it's
+still missing, the start record says so, and the supervisor resends the whole prompt once the agent
+is idle, behind a note that it replaces the damaged one (a second reading of the prompt: about 25k
+tokens for a lead, only when this happens). If the resend arrives damaged too, `partprompt:<name>`
+is raised. Claude Code and Codex agents get no guard line. Supported: Codex, Claude
 Code, pi. The window comes from where it's reliable: Codex writes the usable window of the session
 into its log (258,400 tokens for the current models, well below an API model's published maximum,
 such as gpt-6-astra's 1.05M); Claude Code doesn't, so xt uses the table in

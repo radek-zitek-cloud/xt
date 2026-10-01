@@ -43,6 +43,9 @@ class Adapter:
     # second apart; with `check_prompt_in_log`, it checks the session log for the prompt's opening.
     ready_settle: int = 0
     check_prompt_in_log: bool = False
+    # A line typed before the first prompt (and before a resent one) that a lost start eats instead
+    # of the prompt's opening (card #167, rc5). None: the prompt is typed as it is.
+    first_prompt_prefix: str | None = None
 
     @property
     def installed(self) -> bool:
@@ -168,6 +171,7 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
             settings_flag=d.get("settings_flag"),
             ready_settle=int(d.get("ready_settle", 0)),
             check_prompt_in_log=bool(d.get("check_prompt_in_log", False)),
+            first_prompt_prefix=d.get("first_prompt_prefix") or None,
         )
     return out
 
