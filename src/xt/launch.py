@@ -172,6 +172,20 @@ def alert(ctx: Ctx, results: dict[str, tuple[str, str]], live: dict) -> list[str
     return raised
 
 
+def codex_options_line(ctx: Ctx, agent, running: bool) -> str:
+    """'codex options: … ' for status, the brief and the detail (card #169), with what the running
+    start has when team.toml has changed since: the options apply at the next start."""
+    from .adapters import codex_options_text
+    from .versions import started_codex_options
+
+    line = f"codex options: {codex_options_text(agent.codex_options)}" if agent.codex_options else ""
+    started = started_codex_options(ctx, agent.name) if running else None
+    if started is not None and started != agent.codex_options:
+        line = (line or "codex options: none") + (
+            f" (running with {', '.join(started) or 'none'}; `xt restart {agent.name}` applies it)")
+    return line
+
+
 def flagged(ctx: Ctx) -> set[str]:
     """Agents with an open launch-settings alert (the Team pane marks them)."""
     return {k[len(ALERT):] for k in Alerts(ctx).active() if k.startswith(ALERT)}

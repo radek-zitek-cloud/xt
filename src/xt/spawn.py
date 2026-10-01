@@ -7,7 +7,7 @@ import shlex
 import time
 
 from . import brief, permissions, skills
-from .adapters import get_adapter
+from .adapters import codex_option_args, codex_options_text, get_adapter
 from .alerts import Alerts
 from .herdr import HerdrError
 from .context import Ctx
@@ -65,8 +65,9 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     adapter = get_adapter(ctx.paths, a.harness)
     rel, skipped = permissions.effective(ctx.team, a, adapter)  # may refuse a `permissions` line
     settings = permissions.preflight(ctx.paths.root, rel) if rel else None  # refuses a bad file
+    options = codex_option_args(name, a.harness, a.codex_options)  # refuses one off the allowlist (#169)
     args = adapter.start_args(a.model, a.connectors, str(ctx.paths.root),
-                              str(settings.path) if settings else None)  # may refuse an opt-in
+                              str(settings.path) if settings else None, options)  # may refuse an opt-in
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
     # Before the harness starts, so it and every shell it opens inherit it (card #103).
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
@@ -97,9 +98,11 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         note = check_prompt_in_log(ctx, name, adapter, began, settled)
     from . import __version__, versions
 
-    versions.record_agent_start(ctx, name, ctx.ledger.clock())
+    versions.record_agent_start(ctx, name, ctx.ledger.clock(), a.codex_options)
     ctx.ledger.append(SYSTEM, HUMAN, "system",
                       f"started {name} ({a.role}, {a.harness}) in workspace {workspace} with xt {versions.display(__version__)}{note}")
+    if a.codex_options:
+        ctx.ledger.append(SYSTEM, HUMAN, "system", f"{name}: Codex options {codex_options_text(a.codex_options)}")
     if a.connectors:
         ctx.ledger.append(SYSTEM, HUMAN, "system",
                           f"{name}: account connectors opted in: {', '.join(a.connectors)}"

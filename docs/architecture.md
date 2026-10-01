@@ -176,7 +176,10 @@ supervisor, never inside an agent's shell.
 settings file (its own `permissions` line, else `[defaults] permissions` when the harness takes one;
 a Codex or pi agent with its own line is refused), `permissions.preflight` checks it (inside the
 repo, JSON, known `defaultMode`, well-formed rules; a bad file refuses the start) and
-`Adapter.start_args` builds the arguments: the adapter's own `args`, then `--settings <file>` (the
+`Adapter.start_args` builds the arguments: the adapter's own `args`, then a Codex agent's
+`codex_options` as `-c key=value` (checked by `adapters.codex_option_args` against the allowlist
+`CODEX_OPTIONS`, which is the sandbox network switch alone; anything else, or the line on another
+harness, refuses the start; card #169), then `--settings <file>` (the
 adapter's `settings_flag`), then the connector block (or, for an opt-in, a refusal of every other
 connector's tools), then the adapter's `model_flag` with the agent's `model`. The start note in the
 ledger records the file's path, a short hash of its content and its mode. A spawn *request*

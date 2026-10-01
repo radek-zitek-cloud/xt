@@ -33,6 +33,7 @@ class Agent:
     connectors: list[str] = field(default_factory=list)  # account connectors opted in (card #101)
     permissions: str | None = None  # settings file for the harness, relative to the team repo (card #117)
     auto_reset_tokens: int | str | None = None  # card #114: this agent's threshold, or "off"; None = the team's
+    codex_options: list[str] = field(default_factory=list)  # `-c` overrides for a Codex agent (card #169)
 
     @property
     def active(self) -> bool:
@@ -100,6 +101,8 @@ class Team:
                     connectors=[str(c) for c in a.get("connectors", [])],
                     permissions=str(a["permissions"]) if a.get("permissions") else None,
                     auto_reset_tokens=a.get("auto_reset_tokens"),
+                    codex_options=([str(a["codex_options"])] if isinstance(a.get("codex_options"), str)
+                                   else [str(o) for o in a.get("codex_options", [])]),
                 )
             )
         return out

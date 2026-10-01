@@ -662,6 +662,31 @@ Rules:
 - Your own `~/.claude/settings.json` still applies to every Claude agent on top of the file: its
   hooks, and its `allow` and `deny` rules. A user-level `allow` rule widens every agent.
 
+**Options for a Codex agent** (from 0.19.0). Every Codex agent runs in Codex's sandbox:
+workspace-write, no network. One agent can get network with a line in its `team.toml` entry:
+
+```toml
+[[agent]]
+name = "qa"
+harness = "codex"
+codex_options = ["sandbox_workspace_write.network_access=true"]
+```
+
+xt passes each option as `-c key=value` when it starts the agent (`xt restart <name>` applies a
+changed line). Rules:
+- Only xt's allowlist is accepted, and in this release that's the network switch alone:
+  `sandbox_workspace_write.network_access`, `true` or `false`. Any other key or value refuses the
+  start with the allowed list, because Codex may silently take a key it doesn't know. The list is
+  part of xt, not something a team extends.
+- Codex only: the line on a Claude Code or pi agent refuses its start. `xt harnesses` says which
+  harness takes it.
+- Codex has no per-host limit: with network on, the agent can reach **any host**. Give it to an
+  agent that works in a clean clone holding no credentials (the intended user is the quality
+  analyst). That's a team rule: xt doesn't check it.
+- The start note, `xt status`, the brief and the agent's detail show the options, and say
+  `(running with …; xt restart <name> applies it)` when `team.toml` changed after the agent started.
+- An agent without the line runs as before.
+
 **Claude plan usage in status** (from 0.15.0). Claude Code doesn't write its plan's rate limits to
 its session logs; it hands them only to a status-line command. xt ships one, `bin/xt-statusline`.
 To use it, add a `statusLine` entry to a Claude agent's settings file (one agent is enough; the

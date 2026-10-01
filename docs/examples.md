@@ -375,3 +375,34 @@ tokens; policy auto_reset): the supervisor runs it when builder is idle with no 
 `xt reset builder --cancel` removes a queued one (the cool-down then applies). The trade-off: a fresh
 context costs a turn re-reading the first prompt, the brief and the agent's notes, and whatever
 isn't in its notes is gone. See the [user guide](user-guide.md#8-pausing-and-resuming-the-team).
+
+## 7. Network for one Codex agent
+
+**Context.** Every Codex agent runs in Codex's sandbox without network. A quality analyst that runs
+the project's test suite and `uv run` in its own clean clone needs packages and local sockets that
+the sandbox refuses. Give that one agent network, and nobody else (from 0.19.0).
+
+In `team.toml` (yours to edit; agents never do):
+
+```toml
+[[agent]]
+name = "qa"
+role = "quality-analyst"
+harness = "codex"
+reports_to = "lead"
+status = "active"
+codex_options = ["sandbox_workspace_write.network_access=true"]
+```
+
+Then `xt restart qa`: options apply at the next start. xt passes the option as
+`-c sandbox_workspace_write.network_access=true`, and the start note, `xt status`, the brief and the
+agent's detail show `codex options: sandbox_workspace_write.network_access=true (network on: it can
+reach any host)`.
+
+- Codex opens the network wholesale: the agent can reach any host, not just a package index.
+  Give it only to an agent whose workspace holds no credentials (here a clean clone). xt doesn't
+  check that; it's your rule.
+- xt accepts only the network switch (`=true` or `=false`). Any other key or value refuses the
+  agent's start and names what is allowed, because Codex may silently accept a key it doesn't know.
+- An agent without the line runs as before, with no network. See the
+  [user guide](user-guide.md#11-memory-and-recovery).

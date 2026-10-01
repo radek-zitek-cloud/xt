@@ -52,6 +52,8 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         from . import usage
 
         contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
+    from .launch import codex_options_line
+
     for a in ctx.team.agents():
         if a.kind == HUMAN or not a.active:
             continue
@@ -60,7 +62,9 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
         cx = (f", context {usage.compact(contexts[a.name])}"
               if la and a.name in contexts and contexts[a.name].known else "")
-        out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}): {state}")
+        opts = codex_options_line(ctx, a, la is not None)  # card #169
+        opts = f", {opts}" if opts else ""
+        out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}{opts}): {state}")
     if show_context:
         from . import turns
         from .reset import suggestion

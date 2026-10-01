@@ -6,7 +6,7 @@ import sys
 from . import __version__
 from . import brief as brief_mod
 from . import goals, permissions
-from .adapters import load_adapters
+from .adapters import CODEX, allowed_codex_options, load_adapters
 from .alerts import Alerts, repeats
 from .context import Ctx
 from .dispatch import Queue, done_recipient, send
@@ -346,6 +346,9 @@ def cmd_status(args) -> None:
         settings_path = permissions.shown(ctx.team, a, adapters.get(a.harness))
         if settings_path:
             print(f"  {'':<12} settings: {settings_path}")
+        opts = launch.codex_options_line(ctx, a, a.name in live)
+        if opts:
+            print(f"  {'':<12} {opts}")
         if a.name in resets:
             print(f"  {'':<12} {queued_text(resets[a.name])}")
         state_launch, why = launched.get(a.name, (None, ""))
@@ -546,6 +549,8 @@ def cmd_harnesses(args) -> None:
               + (f" ({a.connectors_note})" if a.connectors_note else ""))
         print(f"   per-agent settings file (`permissions` in team.toml): "
               + (f"yes, passed with {a.settings_flag}" if a.settings_flag else "not supported"))
+        print(f"   per-agent options (`codex_options` in team.toml, Codex only): "
+              + (f"yes, passed with -c; allowed: {allowed_codex_options()}" if a.name == CODEX else "not supported"))
 
 
 def cmd_goal(args) -> None:

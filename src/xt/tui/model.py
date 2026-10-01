@@ -289,6 +289,11 @@ def build(ctx: Ctx) -> Snapshot:
             settings_path = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness))
             if settings_path:
                 out.append(f"settings file: {settings_path}\n")
+            from ..launch import codex_options_line
+
+            opts = codex_options_line(ctx, a, la is not None)  # card #169
+            if opts:
+                out.append(opts + "\n", style="yellow" if "network on" in opts else "")
             from ..reset import queued, queued_text, suggestion
 
             entry = queued(ctx).get(a.name)

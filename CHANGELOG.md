@@ -11,6 +11,17 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [0.19.0] — not released yet
 
+### Added
+
+- **Network for one Codex agent (#169).** `codex_options = ["sandbox_workspace_write.network_access=true"]`
+  on an agent's `team.toml` entry passes `-c sandbox_workspace_write.network_access=true` when xt
+  starts it. Only xt's allowlist is accepted, which in this release is that network switch alone
+  (`true` or `false`): any other key or value, or the line on a non-Codex agent, refuses the start
+  and names what's allowed. The start note, `xt status`, the brief and the agent's detail show the
+  options (with "network on: it can reach any host"), and say when the running start has other
+  options than `team.toml`; `xt harnesses` says the key is for Codex only. The options are kept
+  with the agent's start record (`.xt/state/versions.json`). Without the line nothing changes.
+
 ### Fixed
 
 - **pi gets its first prompt whole (#167).** On a first start pi takes input a moment after Herdr
