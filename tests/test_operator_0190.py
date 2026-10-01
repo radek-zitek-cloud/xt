@@ -187,6 +187,34 @@ def test_with_a_grant_each_delegable_command_works_and_is_recorded(team, monkeyp
         "restart lead", "reset lead --when-idle", "reset lead --cancel", "spawn lead", "up"]
 
 
+def test_a_failed_delegated_command_is_recorded_as_failed_not_as_run(team, monkeypatch):
+    # rc3 live run: `spawn lead` on a running lead failed, yet the log said it ran
+    register(team, monkeypatch)
+    human(monkeypatch, "delegate", "op", "--for", "20m")
+    with pytest.raises(XtError, match="lead is already running: spawn starts an agent that isn't running"):
+        agent(monkeypatch, "spawn", "lead", "--as", "op")
+    with pytest.raises(XtError, match="not an active agent: ghost"):
+        agent(monkeypatch, "restart", "ghost", "--as", "op")
+    recorded = [b for b in _system(team) if b.startswith("op, delegated by human")]
+    assert len(recorded) == 2
+    assert recorded[0].endswith("xt spawn lead (failed: lead is already running: spawn starts an agent that "
+                                "isn't running (`xt restart lead` restarts a running one))")
+    assert recorded[1].endswith("xt restart ghost (failed: not an active agent: ghost)")
+    assert not [b for b in _system(team) if b.startswith("started lead")][1:]  # started once, at setup
+
+
+def test_a_refused_delegated_command_is_not_recorded(team, monkeypatch):
+    register(team, monkeypatch)
+    with pytest.raises(XtError, match="no active delegation"):
+        agent(monkeypatch, "restart", "lead", "--as", "op")
+    assert not [b for b in _system(team) if b.startswith("op, delegated")]
+
+
+def test_spawn_help_matches_what_it_does():
+    helptext = cli.build_parser()._subparsers._group_actions[0].choices["spawn"].description
+    assert "restarts it)" not in helptext and "if it isn't running" in helptext
+
+
 def test_spawn_under_a_grant_is_for_an_existing_agent_as_it_is(team, monkeypatch):
     register(team, monkeypatch)
     human(monkeypatch, "delegate", "op")

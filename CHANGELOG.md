@@ -12,8 +12,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.19.0] — not released yet
 
 **0.19.0-rc1** has #167, #169 and #135; **0.19.0-rc2** adds #166; **0.19.0-rc3** adds #156 (the
-docs and site caught up) and three findings from the rc1 live run and QA's rc2 check (below). No
-protocol or ledger format
+docs and site caught up) and three findings from the rc1 live run and QA's rc2 check (below);
+**0.19.0-rc4** fixes two #166 findings from the rc3 live run. No protocol or ledger format
 change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
 `.xt/state/operators.json` (+ `.xt/operators/`), and the agents' start records in
 `.xt/state/versions.json` may carry `codex_options`.
@@ -74,6 +74,15 @@ change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
 - **The board watch's alert shows Fizzy's error (#135, rc3, from the rc1 live run).** A failing
   command with empty error output now puts the first lines of its standard output in the alert
   (Fizzy prints its error JSON there); before, the alert gave only the exit code.
+- **A delegated command is logged after it ran, or as failed (#166, rc4, from the rc3 live run).**
+  An operator's `xt spawn lead` on a running lead failed, yet the log said `helper, delegated by
+  human until …: xt spawn lead` as if it had run. The line is now written once the command has run;
+  one that fails gets `(failed: <reason>)`, and a refused one (no grant, not delegable) none. An
+  operator's `xt restart` of a name that isn't an active agent now fails instead of being logged as
+  a restart.
+- **`xt spawn`'s help says what it does (rc4).** It said "existing: restarts it", but spawn has
+  always refused an agent that is running. The help and the refusal now say: spawn starts an agent
+  that isn't running; `xt restart <name>` restarts a running one.
 
 ### Documentation
 

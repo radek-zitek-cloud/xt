@@ -61,7 +61,8 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     if not ctx.paths.role_file(a.role).exists():
         raise XtError(f"role file {ctx.paths.role_file(a.role)} doesn't exist — write it first")
     if name in ctx.herdr.agents():
-        raise XtError(f"{name} is already running")
+        raise XtError(f"{name} is already running: spawn starts an agent that isn't running "
+                      f"(`xt restart {name}` restarts a running one)")
     adapter = get_adapter(ctx.paths, a.harness)
     rel, skipped = permissions.effective(ctx.team, a, adapter)  # may refuse a `permissions` line
     settings = permissions.preflight(ctx.paths.root, rel) if rel else None  # refuses a bad file

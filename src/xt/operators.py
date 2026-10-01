@@ -324,8 +324,9 @@ def active_grants(ctx: Ctx) -> list[str]:
     return [grant_text(n, g) for n in names(ctx.paths) if (g := active_grant(ctx, n))]
 
 
-def delegated(ctx: Ctx, name: str, command: str, what: str) -> None:
-    """Allow operator NAME to run a delegable command now, and record it; refuse otherwise."""
+def allowed(ctx: Ctx, name: str, command: str) -> dict:
+    """The grant under which operator NAME may run a delegable command now; refuses otherwise.
+    Nothing is recorded yet: `record` says what happened once the command has run (rc4)."""
     if command not in DELEGABLE:
         raise XtError(f"`xt {command}` is never delegated (never: {NEVER}); only the human runs it")
     g = active_grant(ctx, name)
@@ -334,5 +335,12 @@ def delegated(ctx: Ctx, name: str, command: str, what: str) -> None:
                       f"(the human grants one with `xt delegate {name} --for 30m`)")
     if command not in g["commands"]:
         raise XtError(f"operator {name}'s delegation covers {', '.join(g['commands'])}, not {command}")
-    ctx.ledger.append(SYSTEM, HUMAN, "system",
-                      f"{name}, delegated by human until {_local(g['until']):%H:%M}: xt {what}")
+    return g
+
+
+def record(ctx: Ctx, name: str, g: dict, what: str, failed: str | None = None) -> None:
+    """The log line for a delegated command, written after it ran: as it ran, or as failed."""
+    line = f"{name}, delegated by human until {_local(g['until']):%H:%M}: xt {what}"
+    if failed:
+        line += f" (failed: {' '.join(failed.split())})"
+    ctx.ledger.append(SYSTEM, HUMAN, "system", line)

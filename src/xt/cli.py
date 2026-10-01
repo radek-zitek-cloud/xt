@@ -1,4 +1,5 @@
 import argparse
+import contextlib
 import datetime as dt
 import os
 import sys
@@ -134,24 +135,35 @@ def cmd_init(args) -> None:
         print(line)
 
 
-def _delegated(ctx: Ctx, who: str, command: str, what: str, refusal: str) -> None:
-    """The human runs it; an operator only under an active delegation (card #166, recorded);
-    anyone else gets the command's usual refusal."""
+@contextlib.contextmanager
+def _delegated(ctx: Ctx, who: str, command: str, what: str, refusal: str):
+    """Around a command's work: the human runs it; an operator only under an active delegation
+    (card #166); anyone else gets the command's usual refusal. An operator's command is recorded
+    once it has run, or as failed with the reason (rc4: a failed spawn was logged as if it ran)."""
     if who == HUMAN:
+        yield
         return
     if not operators.is_operator(ctx.paths, who):
         raise XtError(refusal)
-    operators.delegated(ctx, who, command, what)
+    grant = operators.allowed(ctx, who, command)
+    try:
+        yield
+    except XtError as e:
+        operators.record(ctx, who, grant, what, failed=str(e))
+        raise
+    operators.record(ctx, who, grant, what)
 
 
 def cmd_up(args) -> None:
     from .up import up
 
     ctx = Ctx.load()
+    who = HUMAN
     if getattr(args, "as_", None) and operators.is_operator(ctx.paths, args.as_):  # card #166
-        _delegated(ctx, _who(args, operator=True), "up", "up", "")
-    for line in up(ctx):
-        print(line)
+        who = _who(args, operator=True)
+    with _delegated(ctx, who, "up", "up", ""):
+        for line in up(ctx):
+            print(line)
 
 
 def cmd_schedule(args) -> None:
@@ -431,9 +443,14 @@ def cmd_restart(args) -> None:
     ctx = Ctx.load()
     if args.all and who != HUMAN:  # --all takes the team down first: `down` is never delegated (#166)
         raise XtError("only the human restarts agents with --all (it takes the team down first)")
-    _delegated(ctx, who, "restart", f"restart {' '.join(args.names)}", "only the human restarts agents")
-    for line in restart(ctx, args.names, args.all):
-        print(line)
+    with _delegated(ctx, who, "restart", f"restart {' '.join(args.names)}", "only the human restarts agents"):
+        if who != HUMAN:  # a name restart() would only mention must not be logged as restarted (rc4)
+            bad = [n for n in args.names if not (ctx.team.agent(n) and ctx.team.agent(n).kind != HUMAN
+                                                 and ctx.team.agent(n).active)]
+            if bad:
+                raise XtError(f"not an active agent: {', '.join(bad)}")
+        for line in restart(ctx, args.names, args.all):
+            print(line)
 
 
 def cmd_reset(args) -> None:
@@ -442,21 +459,21 @@ def cmd_reset(args) -> None:
 
     ctx = Ctx.load()
     what = f"reset {args.name}" + (" --when-idle" if args.when_idle else " --cancel" if args.cancel else "")
-    _delegated(ctx, who, "reset", what, "only the human resets an agent's context")
-    if args.cancel:
-        print(cancel(ctx, args.name))
-        return
-    if args.when_idle:  # card #134
-        from .watch import watch_pid
+    with _delegated(ctx, who, "reset", what, "only the human resets an agent's context"):
+        if args.cancel:
+            print(cancel(ctx, args.name))
+            return
+        if args.when_idle:  # card #134
+            from .watch import watch_pid
 
-        print(queue(ctx, args.name))
-        if not watch_pid(ctx):
-            print("the supervisor isn't running: the queued reset waits for it (`xt up`)")
-        return
-    preflight(ctx, args.name)  # refuse before announcing anything (rc1 QA)
-    print(f"asking {args.name} to save a checkpoint (up to {int(args.timeout)} s)…", flush=True)
-    for line in reset(ctx, args.name, timeout=args.timeout):
-        print(line)
+            print(queue(ctx, args.name))
+            if not watch_pid(ctx):
+                print("the supervisor isn't running: the queued reset waits for it (`xt up`)")
+            return
+        preflight(ctx, args.name)  # refuse before announcing anything (rc1 QA)
+        print(f"asking {args.name} to save a checkpoint (up to {int(args.timeout)} s)…", flush=True)
+        for line in reset(ctx, args.name, timeout=args.timeout):
+            print(line)
 
 
 def cmd_checkpoint(args) -> None:
@@ -568,8 +585,9 @@ def cmd_spawn(args) -> None:
         if args.harness or args.model or args.role or args.reports_to or args.permissions:
             raise XtError(f"operator {who} starts {args.name} as it is in team.toml: no --harness, --model, "
                           f"--role, --reports-to or --permissions")
-        _delegated(ctx, who, "spawn", f"spawn {args.name}", "")
-        who = HUMAN
+        with _delegated(ctx, who, "spawn", f"spawn {args.name}", ""):
+            print(request_spawn(ctx, HUMAN, args.name, None, None, None, None, None))
+        return
     print(request_spawn(ctx, who, args.name, args.harness, args.model, args.role, args.reports_to,
                         args.permissions))
 
@@ -770,7 +788,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("deny", lambda a: cmd_approve(a, False), "deny pending hires and schedules (one or more ids)")
     sp.add_argument("ids", type=int, nargs="*", metavar="id")
 
-    sp = add("spawn", cmd_spawn, "start an agent (new: needs --harness and --role; existing: restarts it)")
+    sp = add("spawn", cmd_spawn, "start an agent (new: needs --harness and --role; existing: starts it again "
+                                 "if it isn't running; `xt restart` restarts a running one)")
     sp.add_argument("name")
     sp.add_argument("--harness")
     sp.add_argument("--model")

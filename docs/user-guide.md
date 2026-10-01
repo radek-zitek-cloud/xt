@@ -853,7 +853,9 @@ xt delegate --revoke                         # end it now (or: xt delegate helpe
 Until the grant ends, the operator may run `xt restart <name>…`, `xt reset <name>` (and
 `--when-idle`, `--cancel`), `xt spawn <name>` for an agent already in `team.toml`, as it is (no
 `--harness`, `--model`, `--role`, `--reports-to` or `--permissions`), and `xt up`, each with `--as
-helper`. Each is recorded as `helper, delegated by human until 14:45: xt restart lead`. A grant over
+helper`. Each is recorded once it has run, as `helper, delegated by human until 14:45: xt restart
+lead`; one that fails (say, `spawn` of an agent that is already running) is recorded with `(failed:
+…)` and the reason. A grant over
 60 minutes is refused; grant again when it ends. It expires by itself: xt compares the end time at
 each command, so there's nothing to clean up. `xt status` (`delegation: delegated to helper until
 14:45: …`) and the TUI's Team header show an active grant.
@@ -1050,7 +1052,7 @@ to change a schedule's hours, or to switch one off.
 
 `xt spawn <name> [--harness H --role R [--model M] [--reports-to NAME]] [--permissions FILE]` —
 starts an agent. For an agent already in the roster (stopped), it starts it again with its role and
-harness. For a new one, `--harness` and `--role` are needed and `roles/<role>.md` must exist. The
+harness; a running one is refused (`xt restart <name>` restarts it). For a new one, `--harness` and `--role` are needed and `roles/<role>.md` must exist. The
 lead's spawns become approval requests; yours start immediately. **Use it** to bring back a stopped
 agent (`u` in the TUI), or to add an agent yourself.
 
