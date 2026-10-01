@@ -9,13 +9,19 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.18.0] — not released yet
+## [0.18.0] — 2026-10-01
 
+The release: the same code and docs as 0.18.0-rc6 (only the version and this changelog changed).
 Agent lifecycle: fewer manual resets, and a warning when agents run without xt's launch settings.
-**0.18.0-rc1** has #134 and #114; **0.18.0-rc2** adds #165; **0.18.0-rc3** fixes rc1's queued
-reset (QA) and adds the policy example; **0.18.0-rc4** makes #165 say "not checked" from a sandbox; **0.18.0-rc5** makes its warning need
-positive evidence; **0.18.0-rc6** ignores harness helpers and recognises Codex's sandbox by its PID 1. No protocol or ledger format change;
-one new state file, `.xt/state/resets.json`.
+Five cards: #134, #114 and #165 to their approved specs, and two verification cards with recorded
+checks and no code change: #62 (the human-identity guard holds in an interactive Codex session,
+through the agent and through Codex's own shell) and #55 (the pi adapter's smoke test; a
+first-prompt and session-log defect found there is left for a separate card). **0.18.0-rc1** has
+#134 and #114; **0.18.0-rc2** adds #165; **0.18.0-rc3** fixes rc1's queued reset (QA) and adds
+the policy example; **0.18.0-rc4** makes #165 say "not checked" from a sandbox; **0.18.0-rc5**
+makes its warning need positive evidence; **0.18.0-rc6** ignores harness helpers and recognises
+Codex's sandbox by its PID 1. No protocol or ledger format change; one new state file,
+`.xt/state/resets.json`.
 
 ### Added
 
@@ -25,8 +31,8 @@ one new state file, `.xt/state/resets.json`.
   checkpoint it checks again: the session is replaced only once the agent is idle again, and an
   open item, a message waiting for it or one delivered since it was asked sends the reset back to
   waiting (it stays queued; a fresh checkpoint is asked for later). No checkpoint, or still busy,
-  5 minutes after asking drops it, leaving the session as it was. The queue survives a supervisor restart, holds one reset per agent (queueing again shows the
-  existing one), and shows as `reset queued (by human at HH:MM): …` in `xt status` and the agent's
+  5 minutes after asking drops it, leaving the session as it was. The queue survives a supervisor
+  restart, holds one reset per agent (queueing again shows the existing one), and shows as `reset queued (by human at HH:MM): …` in `xt status` and the agent's
   detail in the TUI. `xt reset <name> --cancel` removes it; stopping or retiring the agent drops it.
   Each step is a line in the message log. Human only, like `xt reset`. A plain `xt reset` is
   unchanged (it replaces a queued one).
@@ -45,9 +51,8 @@ one new state file, `.xt/state/resets.json`.
   a minute), `xt status` and `xt up` now look for each running agent's harness process in the team
   repo with its `XT_AGENT` in the environment (read from `/proc`). A warning needs evidence: visible
   harness processes of the agent's kind without `XT_AGENT`, at least as many as the agents of that
-  kind left without a match (rc5); then they say `<name> is
-  running without xt's launch settings (restored by the multiplexer?) … Run xt restart <name> (or
-  --all)`, raise one `launch:<name>` Inbox alert per agent, and the Team pane shows a red `!` in
+  kind left without a match (rc5); then they say `<name> is running without xt's launch settings
+  (restored by the multiplexer?) … Run xt restart <name> (or --all)`, raise one `launch:<name>` Inbox alert per agent, and the Team pane shows a red `!` in
   place of the agent's dot. The alert clears when xt starts the agent again. When xt can't look
   properly, the agent is `not checked` in `xt status`, never a match or a warning, and no alert is
   raised or cleared for it: a harness process of its kind it can't inspect, its process not
