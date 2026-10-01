@@ -5,7 +5,7 @@ import sys
 
 from . import __version__
 from . import brief as brief_mod
-from . import goals, permissions
+from . import goals, operators, permissions
 from .adapters import CODEX, allowed_codex_options, load_adapters
 from .alerts import Alerts, repeats
 from .context import Ctx
@@ -16,9 +16,21 @@ from .spawn import AGENT_ENV, Approvals, approval_what, decide, request_spawn, r
 from .team import ALWAYS, HUMAN, harness_model, parse_window, schedule_text
 
 
-def _who(args) -> str:
+def _who(args, operator: bool = False) -> str:
+    """Who runs this command. A registered operator's name (card #166) is accepted only from the
+    operator itself (token and registered process) and only where `operator` says the command
+    takes one: sending a report to the liaison and the delegable commands."""
     who = getattr(args, "as_", None)
     if who and who != HUMAN:
+        try:
+            paths = Paths(find_root())
+        except XtError:
+            return who
+        if operators.is_operator(paths, who):
+            operators.verify(paths, who)
+            if not operator:
+                raise XtError(f"{who} is an operator: it sends reports to the liaison and, under the human's "
+                              f"delegation, runs {', '.join(operators.DELEGABLE)}; nothing else")
         return who
     # Acting as the human needs the human's own terminal, so an agent can't simply claim
     # `--as human` to skip approvals. Soft, but it closes the easy paths (card #103).
@@ -122,10 +134,23 @@ def cmd_init(args) -> None:
         print(line)
 
 
+def _delegated(ctx: Ctx, who: str, command: str, what: str, refusal: str) -> None:
+    """The human runs it; an operator only under an active delegation (card #166, recorded);
+    anyone else gets the command's usual refusal."""
+    if who == HUMAN:
+        return
+    if not operators.is_operator(ctx.paths, who):
+        raise XtError(refusal)
+    operators.delegated(ctx, who, command, what)
+
+
 def cmd_up(args) -> None:
     from .up import up
 
-    for line in up(Ctx.load()):
+    ctx = Ctx.load()
+    if getattr(args, "as_", None) and operators.is_operator(ctx.paths, args.as_):  # card #166
+        _delegated(ctx, _who(args, operator=True), "up", "up", "")
+    for line in up(ctx):
         print(line)
 
 
@@ -219,7 +244,11 @@ def cmd_send(args) -> None:
         from .choices import render
 
         body = render(body, args.option or [], args.recommend)  # refuses a malformed set before sending
-    msg, status = send(ctx, _who(args), args.to, args.type, body, args.ref)
+    who = _who(args, operator=True)
+    if operators.is_operator(ctx.paths, who):  # card #166: a report to the liaison, marked as such
+        msg, status = operators.send(ctx, who, args.to, args.type, body, args.ref)
+    else:
+        msg, status = send(ctx, who, args.to, args.type, body, args.ref)
     print(f"#{msg['id']} {msg['type']} → {msg['to']}: {status}")
 
 
@@ -379,6 +408,8 @@ def cmd_status(args) -> None:
     board = status_line(ctx)  # card #135
     if board:
         print(board)
+    for line in operators.active_grants(ctx):  # card #166
+        print(f"delegation: {line}")
     from .watch import recently_ticked
 
     if not watch_pid(ctx) and not recently_ticked(ctx):  # said plainly whenever it's down (card #165)
@@ -392,22 +423,26 @@ def cmd_status(args) -> None:
 
 
 def cmd_restart(args) -> None:
-    if _who(args) != HUMAN:
-        raise XtError("only the human restarts agents")
+    who = _who(args, operator=True)
     from .up import restart
 
     if bool(args.names) == args.all:
         raise XtError("name the agents to restart, or pass --all (the whole team and the supervisor)")
-    for line in restart(Ctx.load(), args.names, args.all):
+    ctx = Ctx.load()
+    if args.all and who != HUMAN:  # --all takes the team down first: `down` is never delegated (#166)
+        raise XtError("only the human restarts agents with --all (it takes the team down first)")
+    _delegated(ctx, who, "restart", f"restart {' '.join(args.names)}", "only the human restarts agents")
+    for line in restart(ctx, args.names, args.all):
         print(line)
 
 
 def cmd_reset(args) -> None:
-    if _who(args) != HUMAN:
-        raise XtError("only the human resets an agent's context")
+    who = _who(args, operator=True)
     from .reset import cancel, preflight, queue, reset
 
     ctx = Ctx.load()
+    what = f"reset {args.name}" + (" --when-idle" if args.when_idle else " --cancel" if args.cancel else "")
+    _delegated(ctx, who, "reset", what, "only the human resets an agent's context")
     if args.cancel:
         print(cancel(ctx, args.name))
         return
@@ -525,8 +560,59 @@ def cmd_approve(args, approve: bool = True) -> None:
 
 def cmd_spawn(args) -> None:
     ctx = Ctx.load()
-    print(request_spawn(ctx, _who(args), args.name, args.harness, args.model, args.role, args.reports_to,
+    who = _who(args, operator=True)
+    if operators.is_operator(ctx.paths, who):  # card #166: an existing agent, as it is, under a grant
+        a = ctx.team.agent(args.name)
+        if a is None or a.kind == HUMAN or not a.active:
+            raise XtError(f"operator {who} may only start an existing agent; {args.name!r} isn't one")
+        if args.harness or args.model or args.role or args.reports_to or args.permissions:
+            raise XtError(f"operator {who} starts {args.name} as it is in team.toml: no --harness, --model, "
+                          f"--role, --reports-to or --permissions")
+        _delegated(ctx, who, "spawn", f"spawn {args.name}", "")
+        who = HUMAN
+    print(request_spawn(ctx, who, args.name, args.harness, args.model, args.role, args.reports_to,
                         args.permissions))
+
+
+def cmd_operator(args) -> None:
+    """Card #166: register, list and remove operators (human only, except `pid` and `list`)."""
+    if args.action == "pid":  # run by the operator itself: what the human registers
+        found = operators.harness_ancestor()
+        if found is None:
+            print(f"no harness process above this one; this shell's own process is {os.getppid()}")
+        else:
+            print(f"{found[0]} ({found[1]}): give the human this pid for `xt operator add NAME --pid {found[0]}`")
+        return
+    ctx = Ctx.load()
+    if args.action == "list":
+        for line in operators.listing(ctx):
+            print(line)
+        return
+    if _who(args) != HUMAN:
+        raise XtError("only the human registers or removes operators, from their own terminal")
+    if not args.name:
+        raise XtError(f"name the operator: xt operator {args.action} NAME")
+    if args.action == "add":
+        if args.pid is None:
+            raise XtError("pass the operator's process: --pid PID (the operator's `xt operator pid` prints it)")
+        for line in operators.add(ctx, args.name, args.pid):
+            print(line)
+    else:
+        print(operators.remove(ctx, args.name))
+
+
+def cmd_delegate(args) -> None:
+    """Card #166: a time-bound grant of the delegable commands to an operator (human only)."""
+    if _who(args) != HUMAN:
+        raise XtError("only the human grants or revokes delegation, from their own terminal")
+    ctx = Ctx.load()
+    if args.revoke:
+        print(operators.revoke(ctx, args.name))
+        return
+    if not args.name:
+        raise XtError("name the operator: xt delegate NAME --for 30m")
+    only = [c for part in (args.only or []) for c in part.split(",")]
+    print(operators.grant(ctx, args.name, args.for_, only))
 
 
 def cmd_retire(args) -> None:
@@ -717,6 +803,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = add("stop", cmd_stop, "close an agent's workspace, keep it in the roster (human only)")
     sp.add_argument("name")
+
+    sp = add("operator", cmd_operator,
+             "outside operators acting for the human: add NAME --pid PID, remove NAME, list (add/remove: "
+             "human only); pid: run by the operator, prints the process to register")
+    sp.add_argument("action", choices=("add", "remove", "list", "pid"))
+    sp.add_argument("name", nargs="?")
+    sp.add_argument("--pid", type=int, help="for add: the operator's process (its harness)")
+
+    sp = add("delegate", cmd_delegate,
+             f"let an operator run {', '.join(operators.DELEGABLE)} for a while (human only): "
+             f"xt delegate NAME [--for 30m] [--only restart,reset]; xt delegate [NAME] --revoke")
+    sp.add_argument("name", nargs="?")
+    sp.add_argument("--for", dest="for_", metavar="DURATION",
+                    help=f"how long, at most 60m (default {operators.DEFAULT_GRANT})")
+    sp.add_argument("--only", action="append", metavar="COMMANDS",
+                    help=f"limit the grant to some of: {', '.join(operators.DELEGABLE)} (comma-separated)")
+    sp.add_argument("--revoke", action="store_true", help="end the grant now (without NAME: every grant)")
 
     add("harnesses", cmd_harnesses, "which harnesses xt can use here")
 

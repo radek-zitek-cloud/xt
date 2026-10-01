@@ -77,6 +77,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
 | `src/xt/launch.py` | Card #165: whether each running agent is the process xt started, by its `XT_AGENT` in `/proc` (a harness process working in the team repo); the warning and one Inbox alert per agent running without xt's launch settings. |
+| `src/xt/operators.py` | Card #166: named operators acting for the human. Registration (`xt operator add NAME --pid PID`: a harness process that isn't a team agent, its start time, and a token in `.xt/operators/NAME.token`, mode 600), recognition (token in `XT_OPERATOR_TOKEN` *and* the registered process among the command's ancestors), the operator's reports to the liaison, and time-bound grants of `restart`, `reset`, `spawn` (existing agent) and `up` (at most 60 minutes, checked against the stored end time at each command). |
 | `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. The queued reset (`--when-idle`, `state/resets.json`), the supervisor's non-blocking step that runs it, and the opt-in automatic policy that queues one above a token threshold. |
 | `src/xt/usage.py` | Live context per agent, from its harness's session log. |
 | `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines and windows. |
@@ -109,6 +110,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `goal_notices.json`, `inbox_seen.json`, `watch.pid`, `lock` |
 | | `state/resets.json`: queued resets and each agent's last reset, for the automatic policy's cool-down |
 | | `state/board_watch.json` (+ `.out`, `.err` of the last run): the board watch's last success or current failure, for status |
+| | `state/operators.json`: registered operators (pid, start time, token hash) and their delegation grants; `operators/<name>.token`: an operator's token (mode 600) |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
 `roles/liaison.md`, `prices.toml`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
@@ -505,6 +507,20 @@ harness goes to the human with `xt friction`.
   retiring), `xt spawn <name>`, `xt retire <name>`,
   `xt down` (stop the supervisor, then every agent, cleanly, so neither the last tick nor the next
   `xt up` raises false alerts; `herdr session stop` bypasses xt and does leave them).
+- **Operators and delegation** (card #166, `src/xt/operators.py`). `xt operator add NAME --pid PID`
+  registers an outside process acting for the human (its harness: claude, codex or pi, not a team
+  agent's) with its start time, and writes a token readable by the human's user only. `cli._who`
+  accepts `--as NAME` for a registered operator only when `XT_OPERATOR_TOKEN` holds that token and
+  the registered pid with the same start time is the command's own process or an ancestor; either
+  alone is refused, and so is the name on any command but `send` (a `report` to the liaison, marked
+  as sent on the human's behalf, shown in the human's Inbox and in its own Flow lane; no reply hint)
+  and the delegable ones. `xt delegate NAME [--for ≤60m, default 30m] [--only …]` grants
+  `restart`, `reset`, `spawn` of an existing agent as it is, and `up`; `cli._delegated` checks the
+  stored end time at each command and records `NAME, delegated by human until HH:MM: xt …`.
+  `down`, `restart --all` (it takes the team down), answers, approvals, version switches,
+  registering and granting stay the human's. `xt status` and the Team header show an active grant.
+  The process check needs the operator's process tree to be visible: a command run in Codex's
+  sandbox (its own PID namespace) can't be recognised.
 
 ## Harnesses
 

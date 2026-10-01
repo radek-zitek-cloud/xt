@@ -13,7 +13,7 @@ for installing, the [README](../README.md).
   [pausing and resuming](#8-pausing-and-resuming-the-team) ·
   [when something goes wrong](#9-when-something-goes-wrong) ·
   [shrinking the team](#10-shrinking-the-team) · [memory and recovery](#11-memory-and-recovery) ·
-  [ending a team](#12-ending-a-team)
+  [ending a team](#12-ending-a-team) · [an operator acting for you](#13-an-operator-acting-for-you)
 - [Command reference](#command-reference)
 
 ## Who's who
@@ -22,7 +22,8 @@ for installing, the [README](../README.md).
   answer questions. Your commands need your own terminal: xt treats a command run from a terminal
   as you, unless it runs inside an agent's session. Every agent xt starts carries `XT_AGENT` in its
   environment, and most agents' shells have no terminal at all, so agents can't act as you. This
-  is enforced by xt, not a sandbox: it closes the easy paths.
+  is enforced by xt, not a sandbox: it closes the easy paths. A process working for you outside
+  the team (an **operator**) gets its own name instead, and only what you delegate to it (see 13).
 - **The liaison** turns what you want into goals and relays questions and results. It never does
   the work and never hires.
 - **The lead** plans each goal, writes roles and skills, asks to hire members, hands out tasks and
@@ -809,6 +810,57 @@ underestimate beyond it. To price another model, add it to
 and, if you're done with it, the folder. The repo holds the whole history (`.xt/log/`), so keep it
 if you might want to look back.
 
+### 13. An operator acting for you
+
+(From 0.19.0.) Sometimes another process works for you outside the team: today, typically your own
+coding-agent session helping with a staging check. It is not you, so `--as human` stays refused
+for it, as for every process but your own terminal. Instead you register it as a named
+**operator**, per team and per operator session:
+
+1. In the operator's session, it runs `xt operator pid`. That prints its harness process, e.g.
+   `48213 (claude): give the human this pid …`.
+2. In **your own terminal**: `xt operator add helper --pid 48213`. xt checks that this is a harness
+   process (claude, codex or pi) and not one of the team's agents, records its start time, and
+   writes a secret token to `.xt/operators/helper.token`, readable by your user only.
+3. The operator runs xt with that token in `XT_OPERATOR_TOKEN` and `--as helper`, from commands
+   its registered process started. **Both** are needed: the token alone could be read by an agent
+   under your account, and the process alone could be any command it runs. Either alone is refused,
+   and so is any other process using `--as helper`.
+4. When the operator's session ends, its process is gone and the registration no longer matches:
+   register the next session again (`xt operator add` replaces it). `xt operator list` shows who is
+   registered; `xt operator remove helper` removes one.
+
+**What an operator may do on its own.** Send a report to the liaison: `xt send liaison --as helper
+--type report <<'XT_END' … XT_END`. It's recorded under the operator's own name and in its own
+Flow lane (`helper → liaison`), ends with `(sent by helper, an operator, on the human's behalf)`,
+and shows in your Inbox's Notifications. It sends to the liaison only and reports only: it never
+answers questions, approves anything or opens work.
+
+**Delegation.** For a while, you can let it run some of your commands:
+
+```sh
+xt delegate helper --for 45m                 # restart, reset, spawn and up; at most 60m, 30m by default
+xt delegate helper --only restart,reset      # fewer commands
+xt delegate --revoke                         # end it now (or: xt delegate helper --revoke)
+```
+
+Until the grant ends, the operator may run `xt restart <name>…`, `xt reset <name>` (and
+`--when-idle`, `--cancel`), `xt spawn <name>` for an agent already in `team.toml`, as it is (no
+`--harness`, `--model`, `--role`, `--reports-to` or `--permissions`), and `xt up`, each with `--as
+helper`. Each is recorded as `helper, delegated by human until 14:45: xt restart lead`. A grant over
+60 minutes is refused; grant again when it ends. It expires by itself: xt compares the end time at
+each command, so there's nothing to clean up. `xt status` (`delegation: delegated to helper until
+14:45: …`) and the TUI's Team header show an active grant.
+
+**Never delegated:** `xt down` and `xt restart --all` (only you stop the team), answers, approvals,
+`xt version use`/`rollback`, registering operators and granting delegation. Without a grant, after
+it expires or after a revoke, the operator's commands are refused as before.
+
+Limits: the process check needs to see the operator's process tree. A command run inside Codex's
+sandbox (its own PID namespace) can't be matched, so use an operator whose commands run in your
+normal process tree (e.g. Claude Code without a sandbox). Operators are per team; there's one grant
+per operator at a time.
+
 ## Command reference
 
 Who: **human** = your terminal only; **both** = you or agents (agents pass `--as <name>`);
@@ -839,6 +891,8 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt brief`](#xt-brief) | both | Team detail (partly) |
 | [`xt log`](#xt-log) | both | Flow pane (`3`), the thread in the detail pane, and the supervisor's log (`v`) |
 | [`xt harnesses`](#xt-harnesses) | human | none |
+| [`xt operator`](#xt-operator) | add/remove: human; pid: the operator; list: both | none |
+| [`xt delegate`](#xt-delegate) | human | Team header shows an active grant |
 | [`xt watch`](#xt-watch) | (xt) | `v` shows its events |
 | [`xt tui`](#xt-tui) | human | is the TUI |
 
@@ -885,6 +939,21 @@ instructions; `--all` does the whole team and the supervisor, and brings back ev
 running (right after an `xt down`: the agents that were running before it). **Use it** after updating xt (`git pull upstream main`), after changing a role, or to give
 a confused or heavy agent a clean session.
 
+### `xt operator`
+
+`xt operator add NAME --pid PID` | `xt operator remove NAME` | `xt operator list` | `xt operator
+pid` — registers an outside process acting for you (from 0.19.0; see 13). `add` and `remove` are
+yours, in your own terminal. `add` takes the operator's harness process, which the operator's own
+`xt operator pid` prints, and writes the token to `.xt/operators/NAME.token`. Run it again after
+each operator session. `list` shows the registrations and any active grant.
+
+### `xt delegate`
+
+`xt delegate NAME [--for 30m] [--only restart,reset,spawn,up]` | `xt delegate [NAME] --revoke` —
+lets a registered operator run `restart`, `reset`, `spawn` of an existing agent and `up` for at
+most 60 minutes (default 30), recorded in the log; `--revoke` ends it early. Human only. `down`,
+answers, approvals, version switches, registering and granting are never delegated. See 13.
+
 ### `xt version`
 
 `xt version` | `xt version check` | `xt version use <tag> [--candidate]` | `xt version rollback` —
@@ -901,7 +970,8 @@ reverts the last switch. **Use it** to upgrade to a chosen release, or to go bac
 context (e.g. `~211k/258k`) and today's usage; today's team total and, where reported, the
 account allowance (Codex from its logs; Claude's five-hour and weekly windows through the status
 line, see **Claude plan usage in status**);
-counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts; a
+counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts; the
+board watch (from 0.19.0, see 5) and an active delegation to an operator (see 13); a
 warning if the supervisor isn't running. **Use it** for a quick look without the TUI (e.g. over
 ssh), or in scripts.
 

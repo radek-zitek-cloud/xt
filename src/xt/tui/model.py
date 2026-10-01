@@ -510,7 +510,11 @@ def build(ctx: Ctx) -> Snapshot:
 
     # Flow (card #130, in place of the Log): every message read, oldest first; the pane filters,
     # lays out and draws only the rows in view
-    flow_data = flow.Data(msgs, [(a.name, a.role, a.active) for a in ctx.team.agents() if a.kind != HUMAN],
+    from .. import operators
+
+    roster = [(a.name, a.role, a.active) for a in ctx.team.agents() if a.kind != HUMAN]
+    roster += [(n, "operator", True) for n in operators.names(ctx.paths)]  # its own lane (card #166)
+    flow_data = flow.Data(msgs, roster,
                           lambda m: thread(m, _msg_block(m), "Flow is read-only · S: message the liaison"), now)
 
     # the Team pane's header and harness blocks (card #128)
@@ -846,6 +850,10 @@ def team_header(ctx, vers, running: int, goals_open: int, needs: int, new: int,
         out.append(f" · {stuck_q} queued over a minute", style="yellow")
     if stuck_j:
         out.append(f" · {plural(stuck_j, 'job')} waiting over a minute", style="yellow")
+    from .. import operators
+
+    for line in operators.active_grants(ctx):  # card #166
+        out.append(f" · {line}", style="bold magenta")
     return out
 
 

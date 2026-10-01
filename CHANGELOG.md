@@ -38,6 +38,22 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
   `xt status` shows the last success or the failure. xt contains no board code: Fizzy is an
   example (`docs/examples.md` §8). New state: `.xt/state/board_watch.json` and the last run's
   `.out`/`.err`.
+- **An operator sender and time-bound delegation (#166).** The human registers an outside process
+  acting for them (typically their own coding-agent session) from their own terminal: `xt operator
+  add NAME --pid PID`, where PID is the operator's harness process (claude, codex or pi, not a team
+  agent's) as its own `xt operator pid` prints it. xt records the process's start time and writes a
+  token to `.xt/operators/NAME.token` (mode 600). `--as NAME` is then accepted only when both match:
+  `XT_OPERATOR_TOKEN` holds the token, and the registered process is the command's own or an
+  ancestor; either alone is refused, and the operator re-registers after each of its sessions. An
+  operator sends reports to the liaison only, under its own name and Flow lane, marked `(sent by
+  NAME, an operator, on the human's behalf)` and shown in the human's Inbox; any other command is
+  refused. `xt delegate NAME [--for 30m] [--only …]` (human only; at most 60 minutes, 30 by default;
+  `xt delegate --revoke` ends it) lets it run `restart`, `reset`, `spawn` of an existing agent as it
+  is, and `up`, each recorded as `NAME, delegated by human until HH:MM: xt …`; expiry is checked at
+  each command. `down`, `restart --all`, answers, approvals, version switches, registering operators
+  and granting delegation are never delegated. `xt status` and the TUI's Team header show an active
+  grant. The `--as human` guard is unchanged. New state: `.xt/state/operators.json`,
+  `.xt/operators/`.
 
 ### Fixed
 

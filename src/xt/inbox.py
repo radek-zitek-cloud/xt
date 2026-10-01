@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from .alerts import Alerts
 from .context import Ctx
 from .goaldone import done_since, liaison_goal, load_seen, save_seen, seen_upto
+from .operators import is_operator_message
 from .spawn import Approvals
 from .team import HUMAN
 
@@ -118,7 +119,7 @@ def earlier(ctx: Ctx, msgs: list[dict], open_ids: set[int], upto: int) -> list[t
             continue
         if m["type"] == "done" and (goal := liaison_goal(ctx, m.get("ref"), msgs)):
             out.append((m, goal))
-        elif m["to"] == HUMAN and m["type"] in NEW_TYPES and m["id"] not in open_ids:
+        elif ((m["to"] == HUMAN and m["type"] in NEW_TYPES) or is_operator_message(m)) and m["id"] not in open_ids:
             out.append((m, None))
     return out[::-1]
 
@@ -135,8 +136,8 @@ def build(ctx: Ctx, msgs: list[dict], open_items: list[dict] | None = None) -> I
     done, box.upto = done_since(ctx, msgs)
     upto = seen_upto(ctx)  # the marker before this look (done_since has set it on a first run)
     new = [(d, g) for g, d in done]
-    new += [(m, None) for m in msgs if m["id"] > upto and m["to"] == HUMAN and m["type"] in NEW_TYPES
-            and m["id"] not in open_ids]
+    new += [(m, None) for m in msgs if m["id"] > upto and m["id"] not in open_ids
+            and ((m["to"] == HUMAN and m["type"] in NEW_TYPES) or is_operator_message(m))]
     box.new = sorted(new, key=lambda p: -p[0]["id"])
     box.earlier = earlier(ctx, msgs, open_ids, upto)
     box.answered = answered(ctx, msgs, open_ids)

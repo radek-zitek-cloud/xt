@@ -111,6 +111,11 @@ analyst before its final release, some on staging teams rather than in daily use
   the supervisor runs it every few minutes and tells the lead about each card that enters, with one
   alert if the command fails. xt stays independent of the board tool
   ([Periodic work](docs/user-guide.md#5-periodic-work-schedules-quiet-hours-standing-rules)).
+- **An operator that acts for you, within limits.** Register an outside process (your own coding
+  agent, say) under its own name: it sends reports to the liaison as itself, and for up to an hour
+  at a time you can delegate `restart`, `reset`, `spawn` and `up` to it, each one logged. Taking
+  the team down, answers and approvals stay yours, and `--as human` stays your terminal's
+  ([An operator acting for you](docs/user-guide.md#13-an-operator-acting-for-you)).
 - **Network for one Codex agent.** `codex_options` gives a single Codex agent the sandbox's network
   switch (an allowlist of one), shown in its start note, `xt status` and the brief
   ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
@@ -273,6 +278,8 @@ equivalent and when you'd use it.
 | `xt goal new\|dispatch\|list` | Goal drafts and dispatch (normally the liaison does this) |
 | `xt brief [name]`, `xt log` | Recovery summary and the newest 20 messages (`--limit N`, `--full` for the whole history; `xt log --watch`: the supervisor's events) |
 | `xt harnesses` | Installed harnesses and their known limits |
+| `xt operator add NAME --pid PID` / `remove` / `list` / `pid` | Register an outside process acting for you under its own name (`pid`: the operator prints what to register) |
+| `xt delegate NAME [--for 30m] [--only …]` / `xt delegate --revoke` | Let an operator run `restart`, `reset`, `spawn` and `up` for at most an hour, each one logged |
 | `xt watch` | The supervisor loop (`xt up` runs it in its own pane) |
 | `xt --version` | The xt version |
 
