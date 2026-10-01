@@ -17,7 +17,7 @@ and accepts its releases. Most runs so far used Codex for every agent. **Using i
 [docs/user-guide.md](docs/user-guide.md)** (lifecycles and every command); how it works inside:
 [docs/architecture.md](docs/architecture.md).
 
-![The xt-team in Herdr: the lead's pane on the left, just handed the v0.18.0 proposal to the product manager; the xt 0.17.0 TUI on the right in three bands: Team and Inbox on top, the Flow lane chart in the middle, the answered publish question in Detail at the bottom](docs/screen.png)
+![The xt-team in Herdr: the lead's pane on the left, just handed the v0.18.0 proposal to the product manager; the xt 0.17.0 TUI on the right in three bands: Team and Inbox on top, the Flow lane chart in the middle, the answered publish question in Detail at the bottom](docs/screen-v0170.png)
 
 *The xt-team building xt, on 0.17.0. On the left the lead has just passed the v0.18.0 proposal goal
 to the product manager. On the right the TUI in three bands: on top the team grouped by harness
