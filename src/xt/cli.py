@@ -372,7 +372,7 @@ def cmd_status(args) -> None:
 
     if not watch_pid(ctx) and not recently_ticked(ctx):  # said plainly whenever it's down (card #165)
         if launch.isolated():  # its pid is invisible from a sandbox, so its absence proves nothing
-            print("the supervisor: not checked (this shell runs in a PID namespace, a sandbox?, and the "
+            print("the supervisor: not checked (this shell runs in a sandbox, with its own PID namespace or /proc, and the "
                   "supervisor hasn't saved live state in the last 30 s); `xt status` in your own terminal tells")
         else:
             waiting = " Queued messages and jobs wait for it." if q or jobs else ""

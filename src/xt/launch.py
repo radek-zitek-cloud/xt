@@ -38,21 +38,31 @@ class Scan:
     unreadable: dict[str, str] = field(default_factory=dict)  # harness -> why one couldn't be read
 
 
-ISOLATED = "xt runs in a PID namespace here (a sandbox?), so the agents' processes aren't visible"
+ISOLATED = "xt runs in a sandbox here (its own PID namespace or /proc), so the agents' processes aren't visible"
 INVISIBLE = "its process isn't visible from here (a sandbox?)"
 
 
+INITS = {"systemd", "init", "runit", "s6-svscan", "openrc-init", "dinit"}  # a whole system's PID 1
+
+
 def isolated(proc: str | None = None) -> bool:
-    """Whether this process sits in a nested PID namespace, as in some sandboxes: /proc then shows
-    only the namespace's few processes, so an agent's absence there says nothing (rc2 staging)."""
+    """Whether this process sees only a sandbox's processes, so an agent's absence says nothing (rc2
+    and rc4 staging): a nested PID namespace (NSpid with two levels), or a PID 1 that isn't a
+    system's init (Codex's sandbox mounts its own /proc, NSpid shows one level, and PID 1 is
+    codex-linux-sandbox). An unreadable PID 1 says nothing either way."""
+    proc = proc or PROC
     try:
-        with open(f"{proc or PROC}/self/status") as fh:
+        with open(f"{proc}/self/status") as fh:
             for line in fh:
-                if line.startswith("NSpid:"):
-                    return len(line.split()) > 2  # one pid per namespace level
+                if line.startswith("NSpid:") and len(line.split()) > 2:  # one pid per namespace level
+                    return True
     except OSError:
         pass
-    return False
+    try:
+        first = open(f"{proc}/1/comm").read().strip()
+    except OSError:
+        return False
+    return first not in INITS
 
 
 def _names(pid_dir: str) -> set[str]:
@@ -62,7 +72,9 @@ def _names(pid_dir: str) -> set[str]:
 
 
 def _harness(names: set[str]) -> str | None:
-    return next((h for h in HARNESSES for n in names if n == h or n.startswith(h + "-")), None)
+    """The harness whose own program this is: exactly claude, codex or pi, so a helper such as
+    codex-linux-sandbox (no XT_AGENT, cwd the repo; rc4 staging) never counts as an agent."""
+    return next((h for h in HARNESSES if h in names), None)
 
 
 def scan_proc(root: str, proc: str | None = None) -> Scan:

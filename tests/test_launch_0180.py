@@ -18,6 +18,7 @@ def _proc(tmp_path, root, procs):
     env None makes the environment unreadable."""
     proc = tmp_path / "proc"
     proc.mkdir(parents=True, exist_ok=True)
+    procs = {1: (["/usr/lib/systemd/systemd"], {}, "/"), **procs}  # the host's init, unless given
     for pid, (argv, env, cwd) in procs.items():
         d = proc / str(pid)
         d.mkdir()
@@ -93,7 +94,7 @@ def test_an_agent_xt_started_raises_nothing(tmp_path, ctx, monkeypatch, capsys):
     _team(ctx)
     root = ctx.paths.root
     _use(monkeypatch, _proc(tmp_path, root, {
-        1: (["/usr/bin/claude"], {"XT_AGENT": "carol"}, None),
+        21: (["/usr/bin/claude"], {"XT_AGENT": "carol"}, None),
         2: (["/usr/local/bin/codex"], {"XT_AGENT": "dave"}, None)}))
     out = _cli(ctx, monkeypatch, capsys)("status")
     assert "launch settings" not in out and _launch_alerts(ctx) == {}
@@ -156,7 +157,7 @@ def test_an_unreadable_process_is_not_checked_never_a_match(tmp_path, ctx, monke
     _team(ctx)
     root = ctx.paths.root
     _use(monkeypatch, _proc(tmp_path, root, {
-        1: (["/usr/bin/claude"], {"XT_AGENT": "carol"}, None),
+        21: (["/usr/bin/claude"], {"XT_AGENT": "carol"}, None),
         2: (["/usr/bin/claude"], None, None)}))  # someone else's: its environment can't be read
     out = _cli(ctx, monkeypatch, capsys)("status")
     assert "launch settings: not checked (no permission to read process 2's environment)" in out
@@ -188,7 +189,7 @@ def test_from_a_sandbox_every_agent_is_not_checked_and_no_alert_changes(tmp_path
     _use(monkeypatch, _sandboxed(tmp_path, ctx))
     run = _cli(ctx, monkeypatch, capsys)
     out = run("status")
-    assert out.count("launch settings: not checked (xt runs in a PID namespace here (a sandbox?)") == 2
+    assert out.count("launch settings: not checked (xt runs in a sandbox here (its own PID namespace or /proc)") == 2
     assert "WARNING" not in out
     assert list(_launch_alerts(ctx)) == ["launch:dave"]  # neither raised nor cleared
     Supervisor(ctx, out=lambda _: None).check_launch(ctx.herdr.agents())
@@ -198,7 +199,7 @@ def test_from_a_sandbox_every_agent_is_not_checked_and_no_alert_changes(tmp_path
 def test_no_agent_process_visible_at_all_is_not_checked(tmp_path, ctx, monkeypatch, capsys):
     _team(ctx)
     # no namespace marker, but /proc shows no harness process in the team repo at all
-    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {1: (["/usr/bin/bash"], {}, None)}))
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {21: (["/usr/bin/bash"], {}, None)}))
     out = _cli(ctx, monkeypatch, capsys)("status")
     assert out.count("launch settings: not checked (its process isn't visible from here (a sandbox?))") == 2
     assert _launch_alerts(ctx) == {}
@@ -227,6 +228,28 @@ def test_qa_sandbox_shape_a_foreign_xt_agent_process_is_no_evidence(tmp_path, ct
     assert list(_launch_alerts(ctx)) == ["launch:lead"]
 
 
+def test_codex_sandbox_shape_its_wrapper_as_pid_1_is_not_an_agent(tmp_path, ctx, monkeypatch, capsys):
+    """rc4 staging, operator's detail (#2388): Codex's sandbox mounts its own /proc (NSpid one
+    level); PID 1 is codex-linux-sandbox, cwd the team repo, no XT_AGENT; only it and the command
+    are visible. A team with one codex agent must not be warned about."""
+    ctx.herdr.add("liaison")  # the only running agent, on codex
+    proc = _proc(tmp_path, ctx.paths.root, {
+        1: (["/usr/local/bin/codex-linux-sandbox", "--"], {"HOME": "/h"}, None),
+        2: (["/usr/bin/python3", "/tmp/xt-stg165/bin/xt", "status"], {}, None)})
+    (tmp_path / "proc" / "self").mkdir()
+    (tmp_path / "proc" / "self" / "status").write_text("Name:\tpython3\nNSpid:\t2\n")
+    assert launch.isolated(proc)  # PID 1 isn't an init
+    s = launch.scan_proc(str(ctx.paths.root), proc)
+    assert s.whole == launch.ISOLATED
+    monkeypatch.setattr(launch, "isolated", lambda p=None: False)  # even without the PID-1 guard:
+    s = launch.scan_proc(str(ctx.paths.root), proc)
+    assert s.unlaunched == {} and s.names == set()  # the wrapper is no codex agent
+    _use(monkeypatch, proc)
+    out = _cli(ctx, monkeypatch, capsys)("status")
+    assert "WARNING" not in out and "launch settings: not checked" in out
+    assert _launch_alerts(ctx) == {}
+
+
 def test_restored_shape_warns_for_exactly_the_agent_without_a_matching_process(tmp_path, ctx, monkeypatch, capsys):
     """rc2 staging, the real case: the lead resumed outside xt (codex without XT_AGENT in the repo),
     the liaison started by xt."""
@@ -243,7 +266,7 @@ def test_restored_shape_warns_for_exactly_the_agent_without_a_matching_process(t
 
 def test_fewer_unlaunched_processes_than_unmatched_agents_is_not_checked(tmp_path, ctx, monkeypatch, capsys):
     _team(ctx)  # carol and dave on claude, neither matched; one claude without XT_AGENT
-    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {1: (["/usr/bin/claude", "--resume"], {}, None)}))
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {21: (["/usr/bin/claude", "--resume"], {}, None)}))
     out = _cli(ctx, monkeypatch, capsys)("status")
     assert out.count("not checked (1 claude process(es) in the team repo run without XT_AGENT, for 2 agents "
                      "without one: xt can't tell which is whose)") == 2
@@ -254,7 +277,7 @@ def test_an_unlaunched_process_counts_only_for_agents_of_its_harness(tmp_path, c
     _team(ctx)  # carol and dave on claude
     ctx.herdr.add("lead")  # on codex
     _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {
-        1: (["/usr/bin/claude"], {"XT_AGENT": "carol"}, None),
+        21: (["/usr/bin/claude"], {"XT_AGENT": "carol"}, None),
         2: (["/usr/bin/claude"], {"XT_AGENT": "dave"}, None),
         3: (["/usr/local/bin/codex", "resume"], {}, None)}))
     out = _cli(ctx, monkeypatch, capsys)("status")
@@ -267,7 +290,7 @@ def test_the_restored_case_still_warns_when_only_some_processes_have_xt_agent(tm
     _team(ctx)
     # both restored: their processes are visible, neither has XT_AGENT
     _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {
-        1: (["/usr/bin/claude", "--resume"], {}, None), 2: (["/usr/bin/claude", "--resume"], {}, None)}))
+        21: (["/usr/bin/claude", "--resume"], {}, None), 22: (["/usr/bin/claude", "--resume"], {}, None)}))
     out = _cli(ctx, monkeypatch, capsys)("status")
     assert "WARNING: carol is running without" in out and "WARNING: dave is running without" in out
     assert set(_launch_alerts(ctx)) == {"launch:carol", "launch:dave"}
@@ -289,7 +312,7 @@ def test_from_a_sandbox_the_supervisor_is_not_checked_unless_it_saved_live_state
     monkeypatch.setattr(launch, "isolated", lambda proc=None: True)
     run = _cli(ctx, monkeypatch, capsys)
     out = run("status")
-    assert "the supervisor: not checked (this shell runs in a PID namespace" in out
+    assert "the supervisor: not checked (this shell runs in a sandbox" in out
     assert "supervisor isn't running" not in out
     (ctx.paths.state / "live.json").write_text(json.dumps({"ts": ctx.ledger.clock().isoformat(), "agents": {}}))
     out = run("status")

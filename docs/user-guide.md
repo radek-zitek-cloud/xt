@@ -565,8 +565,10 @@ xt starts the agent again. When xt can't look properly, `xt status` shows `launc
 checked (…)` for the agent and raises or clears nothing; it never counts as a match. That happens
 when a harness process's environment can't be read (another user's), when the agent's process isn't
 visible (from a sandbox, which may show only its own agent's process), when there are fewer such
-processes than agents left without a match (xt can't tell which is whose), and from a shell in its
-own PID namespace. From such
+processes than agents left without a match (xt can't tell which is whose), and from a sandboxed
+shell (its own PID namespace, or a `/proc` whose PID 1 isn't the system's init, as in Codex's
+sandbox). Only the harness programs themselves count, never helpers such as `codex-linux-sandbox`.
+From such
 a shell `xt status` also says `the supervisor: not checked` rather than "isn't running", unless
 the supervisor saved Herdr's agent list in the last 30 seconds (then it's running). Run `xt status`
 in your own terminal for the real answer.

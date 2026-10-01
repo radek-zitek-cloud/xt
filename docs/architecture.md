@@ -329,8 +329,9 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    cleared when xt starts the agent again or it stops running) only on positive evidence, when at
    least as many processes of their harness run there without `XT_AGENT` (as after a restored
    multiplexer session). Otherwise (process not visible, fewer such processes than agents, a
-   harness process that can't be read, or a nested PID namespace from `NSpid`) the agent is "not
-   checked" and its alert is left as it was. `xt status` and `xt up` run the same check.
+   harness process that can't be read, or a sandbox: a nested PID namespace from `NSpid`, or a
+   PID 1 that isn't an init) the agent is "not checked" and its alert is left as it was. Only
+   programs named exactly claude, codex or pi count (not helpers like `codex-linux-sandbox`). `xt status` and `xt up` run the same check.
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
 7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item it hasn't worked on for
    that long (no report or ask about it, no task sent under it; a new item counts from when it

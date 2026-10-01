@@ -14,7 +14,7 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 Agent lifecycle: fewer manual resets, and a warning when agents run without xt's launch settings.
 **0.18.0-rc1** has #134 and #114; **0.18.0-rc2** adds #165; **0.18.0-rc3** fixes rc1's queued
 reset (QA) and adds the policy example; **0.18.0-rc4** makes #165 say "not checked" from a sandbox; **0.18.0-rc5** makes its warning need
-positive evidence. No protocol or ledger format change;
+positive evidence; **0.18.0-rc6** ignores harness helpers and recognises Codex's sandbox by its PID 1. No protocol or ledger format change;
 one new state file, `.xt/state/resets.json`.
 
 ### Added
@@ -52,8 +52,10 @@ one new state file, `.xt/state/resets.json`.
   properly, the agent is `not checked` in `xt status`, never a match or a warning, and no alert is
   raised or cleared for it: a harness process of its kind it can't inspect, its process not
   visible (a sandbox, which may show only another agent's process), fewer unlaunched processes
-  than unmatched agents, or a shell in its own PID namespace (`NSpid`). (rc4 and rc5, from the rc2
-  and rc4 staging: a Codex sandbox reported every agent as restored.)
+  than unmatched agents, or a sandboxed shell (a nested PID namespace in `NSpid`, or a PID 1 that
+  isn't a system's init, as in Codex's sandbox). Only the harness programs themselves count, so a
+  helper such as `codex-linux-sandbox` is never taken for an agent. (rc4 to rc6, from the rc2 and
+  rc4 staging: a Codex sandbox reported every agent as restored.)
 
 ### Changed
 
