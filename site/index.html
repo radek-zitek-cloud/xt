@@ -32,7 +32,7 @@
 <header class="hero">
   <div class="grid-bg"></div>
   <div class="wrap">
-    <div class="eyebrow">open source · MIT · v0.17.0</div>
+    <div class="eyebrow">open source · MIT · v0.18.0</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You approve, decide and correct, and every step is on record.</p>
     <div class="cta">
@@ -161,7 +161,7 @@
           <li><b>Context per agent</b> (<code class="mono">~211k/258k</code>, yellow at 70%, red at 85%), tokens and estimated cost per turn and per goal, and the subscription allowance: Codex's week, Claude's five-hour and weekly windows.</li>
           <li><b>No desktop or browser control</b> for agents, and none of your account connectors (mail, files, calendar) unless you opt one in. Claude Code agents get a checked permissions file each.</li>
           <li><b>Upgrades you can undo:</b> <code class="mono">xt version use</code> switches to a release after checks and a verified snapshot; <code class="mono">xt version rollback</code> goes back.</li>
-          <li><b>Survives restarts:</b> <code class="mono">xt down</code> and <code class="mono">xt restart --all</code> bring back the team that was running; agents recover from files and a brief, not from memory.</li>
+          <li><b>Survives restarts:</b> <code class="mono">xt down</code> and <code class="mono">xt restart --all</code> bring back the team that was running; agents recover from files and a brief, not from memory. An agent resumed outside xt, without its settings (say, by the terminal multiplexer after a power cycle), is flagged with <code class="mono">xt restart</code> as the fix.</li>
         </ul>
       </div>
       <div class="frame"><div class="frame-inner" style="padding:10px">
@@ -182,7 +182,7 @@
     </div><div class="caption"><code class="mono">xt tui --demo</code> at 160×40: made-up data, not a live team</div></div>
     <div class="grid">
       <div class="cell"><div class="k">Inbox</div><h4>Three groups</h4><p><b>Needs you</b> (questions, approvals, alerts, until you act), <b>Notifications</b> (done goals and reports since you last looked) and unread <b>Friction</b>. Your answers and what you've seen stay a week, folded: <code class="mono">space</code> opens them.</p></div>
-      <div class="cell"><div class="k">Team</div><h4>By harness</h4><p>One column: each harness's account windows as bars with their reset time, then its agents: a dot in the state's colour, model and context used. Select the header or a harness line for versions, reading ages and why a window is unknown.</p></div>
+      <div class="cell"><div class="k">Team</div><h4>By harness</h4><p>One column: each harness's account windows as bars with their reset time, then its agents: a dot in the state's colour (a red <code class="mono">!</code> for one running without xt's launch settings), model and context used. Select the header or a harness line for versions, reading ages and why a window is unknown.</p></div>
       <div class="cell"><div class="k">Work</div><h4>An outline</h4><p>Goals with their tasks under them, open, done or failed, and how many are done; fold them, or show open work only.</p></div>
       <div class="cell"><div class="k">Flow</div><h4>A lane chart</h4><p>One lane per agent and one arrow per message, newest on top, marked by its type; filter to an agent, a goal or some text. It shares the middle pane with Work: <code class="mono">2</code> and <code class="mono">3</code> switch.</p></div>
       <div class="cell"><div class="k">Detail</div><h4>The whole thread</h4><p>The selected item with its goal, tasks and every reply in time order, and where you are in it.</p></div>
@@ -218,7 +218,7 @@
     <div class="grid four">
       <div class="cell"><div class="k">13</div><h4>Which xt is running</h4><p>Published, installed and running versions shown apart, so a half-finished upgrade is visible.</p></div>
       <div class="cell"><div class="k">14</div><h4>Choose a version, roll back</h4><p><code class="mono">xt version use</code> checks the state format and takes a verified snapshot; <code class="mono">rollback</code> undoes it.</p></div>
-      <div class="cell"><div class="k">15</div><h4>A fresh context, safely</h4><p><code class="mono">xt reset</code> waits until the agent has saved its notes and has no open work.</p></div>
+      <div class="cell"><div class="k">15</div><h4>A fresh context, safely</h4><p><code class="mono">xt reset</code> waits until the agent has saved its notes and has no open work; <code class="mono">--when-idle</code> queues it until the agent is free, and an opt-in policy resets idle agents above a token threshold.</p></div>
       <div class="cell"><div class="k">16</div><h4>Decisions with options</h4><p>Numbered options, each with its consequence, and a recommendation; answer with a number.</p></div>
       <div class="cell"><div class="k">17</div><h4>Per-agent permissions</h4><p>A checked settings file for each Claude Code agent; a hire's approval warns when one is missing.</p></div>
       <div class="cell"><div class="k">18</div><h4>Claude plan usage</h4><p>The five-hour and weekly windows in status, through a shipped status-line script.</p></div>
