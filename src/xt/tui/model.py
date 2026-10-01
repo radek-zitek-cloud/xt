@@ -284,9 +284,12 @@ def build(ctx: Ctx) -> Snapshot:
             settings_path = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness))
             if settings_path:
                 out.append(f"settings file: {settings_path}\n")
-            if la:
-                from ..reset import suggestion
+            from ..reset import queued, queued_text, suggestion
 
+            entry = queued(ctx).get(a.name)
+            if entry:  # card #134
+                out.append(queued_text(entry) + f"  (cancel: xt reset {a.name} --cancel)\n", style="yellow")
+            elif la:
                 tip = suggestion(a.name, ctxr, dt.datetime.now(dt.timezone.utc).astimezone())
                 if tip:
                     out.append(tip + "\n", style="yellow")

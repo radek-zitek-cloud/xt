@@ -320,6 +320,9 @@ def cmd_status(args) -> None:
     contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
     adapters = load_adapters(ctx.paths)
     spend = turns.today(ctx)
+    from .reset import queued, queued_text
+
+    resets = queued(ctx)
     for a in ctx.team.agents():
         if a.kind == HUMAN:
             continue
@@ -336,6 +339,8 @@ def cmd_status(args) -> None:
         settings_path = permissions.shown(ctx.team, a, adapters.get(a.harness))
         if settings_path:
             print(f"  {'':<12} settings: {settings_path}")
+        if a.name in resets:
+            print(f"  {'':<12} {queued_text(resets[a.name])}")
     from .jobs import Jobs
     from .reset import suggestion
     from .watch import watch_pid
@@ -372,9 +377,19 @@ def cmd_restart(args) -> None:
 def cmd_reset(args) -> None:
     if _who(args) != HUMAN:
         raise XtError("only the human resets an agent's context")
-    from .reset import preflight, reset
+    from .reset import cancel, preflight, queue, reset
 
     ctx = Ctx.load()
+    if args.cancel:
+        print(cancel(ctx, args.name))
+        return
+    if args.when_idle:  # card #134
+        from .watch import watch_pid
+
+        print(queue(ctx, args.name))
+        if not watch_pid(ctx):
+            print("the supervisor isn't running: the queued reset waits for it (`xt up`)")
+        return
     preflight(ctx, args.name)  # refuse before announcing anything (rc1 QA)
     print(f"asking {args.name} to save a checkpoint (up to {int(args.timeout)} s)…", flush=True)
     for line in reset(ctx, args.name, timeout=args.timeout):
@@ -661,6 +676,10 @@ def build_parser() -> argparse.ArgumentParser:
              "checkpoint to its notes first (human only; `restart` is the route without a checkpoint)")
     sp.add_argument("name")
     sp.add_argument("--timeout", type=float, default=300, help="seconds to wait for the checkpoint (default 300)")
+    when = sp.add_mutually_exclusive_group()
+    when.add_argument("--when-idle", action="store_true",
+                      help="queue the reset and return: the supervisor runs it when the agent is idle with no open work")
+    when.add_argument("--cancel", action="store_true", help="remove a queued reset")
     sp = add("checkpoint", cmd_checkpoint,
              "confirm that your notes hold what a fresh session needs (asked for by `xt reset`); "
              "text on stdin: what the next session should know first")

@@ -12,7 +12,9 @@ SYSTEM = "xt"
 LOG_DEFAULTS = {"raw_days": 30, "delete_after_days": 0, "daily_alert_mb": 5, "message_max_kb": 4}
 NOTIFY_DEFAULTS = {"enabled": True, "command": "notify-send --app-name=xt {title} {body}", "quiet": ""}
 POLICY_DEFAULTS = {"spawn_approval": True, "max_agents": 8, "heartbeat_minutes": 15,
-                   "schedule_approval": True, "min_wake_minutes": 15}
+                   "schedule_approval": True, "min_wake_minutes": 15,
+                   # card #114: reset idle agents above an absolute context size (off by default)
+                   "auto_reset": False, "auto_reset_tokens": 150_000, "auto_reset_cooldown_hours": 6}
 
 
 @dataclass
@@ -30,6 +32,7 @@ class Agent:
     wake_at: str | None = None  # "09:30": for daily (or longer) schedules, the local time to wake
     connectors: list[str] = field(default_factory=list)  # account connectors opted in (card #101)
     permissions: str | None = None  # settings file for the harness, relative to the team repo (card #117)
+    auto_reset_tokens: int | str | None = None  # card #114: this agent's threshold, or "off"; None = the team's
 
     @property
     def active(self) -> bool:
@@ -96,6 +99,7 @@ class Team:
                     wake_at=a.get("wake_at") or None,
                     connectors=[str(c) for c in a.get("connectors", [])],
                     permissions=str(a["permissions"]) if a.get("permissions") else None,
+                    auto_reset_tokens=a.get("auto_reset_tokens"),
                 )
             )
         return out
@@ -200,6 +204,9 @@ max_agents = 8                    # soft cap; beyond it the lead must ask the hu
 heartbeat_minutes = 15            # supervisor checks for silent agents this often
 schedule_approval = true          # an agent's `xt schedule` waits for human approval (each wake-up costs)
 min_wake_minutes = 15             # shortest schedule an agent may request; only the human goes lower
+auto_reset = false                # reset idle agents without open work whose context is above:
+auto_reset_tokens = 150000        #   this many tokens (an agent's own auto_reset_tokens, or "off", wins)
+auto_reset_cooldown_hours = 6     #   at most once per agent in this many hours
 
 [log]
 raw_days = 30                     # keep daily jsonl files uncompressed this long

@@ -390,9 +390,12 @@ def retire(ctx: Ctx, requester: str, name: str) -> str:
 
 def retire_now(ctx: Ctx, requester: str, name: str) -> str:
     """Close the agent's workspace and mark it retired (the human, or the supervisor for a job)."""
+    from .reset import drop
+
     live = ctx.herdr.agents().get(name)
     set_expected(ctx, name, False)
     set_stopped(ctx, name, False)
+    drop(ctx, name, f"{name} was retired")  # card #134
     if live:
         ctx.herdr.close_workspace(live.workspace_id)
     ctx.team.set_status(name, "retired")
@@ -404,9 +407,12 @@ def retire_now(ctx: Ctx, requester: str, name: str) -> str:
 
 def stop(ctx: Ctx, name: str) -> str:
     """Close an agent's workspace without changing the roster (it can be started again)."""
+    from .reset import drop
+
     live = ctx.herdr.agents().get(name)
     set_expected(ctx, name, False)
     set_stopped(ctx, name, True)
+    drop(ctx, name, f"{name} was stopped")  # card #134
     if not live:
         return f"{name} isn't running"
     ctx.herdr.close_workspace(live.workspace_id)

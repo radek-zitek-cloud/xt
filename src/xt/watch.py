@@ -114,6 +114,7 @@ class Supervisor:
         self.nudges_path = ctx.paths.state / "nudges.json"
         self.notify_error: str | None = None
         self.quiet_ids: set[int] = set()  # alerts about a failed notification: never notified
+        self.policy_problems: set[str] = set()  # bad auto-reset settings already said (card #114)
 
     def failed(self, kind: str, error: str) -> None:
         """A failed wake-up, notification or usage recording raises an Inbox alert (card #131); a
@@ -147,6 +148,7 @@ class Supervisor:
         for line in drain(self.ctx):
             self.say(line)
         self.check_agents(live)
+        self.run_resets()
         self.check_volume()
         if now - self.last_heartbeat >= 60 * int(self.ctx.team.policy("heartbeat_minutes")):
             self.last_heartbeat = now
@@ -156,6 +158,7 @@ class Supervisor:
         if now - self.last_usage >= USAGE_EVERY:
             self.last_usage = now
             self.record_usage()
+            self.auto_reset()
         self.check_published()
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
@@ -205,6 +208,36 @@ class Supervisor:
         # Resolve only after every check has had its say, so an alert raised above isn't
         # cleared in the same pass and raised again on the next one (it spammed every 3 s).
         self.alerts.resolve_prefix("missing:", keep)
+
+    def run_resets(self) -> None:
+        """Queued resets (card #134): one non-blocking step each. Live state is read again, after
+        this tick's deliveries, so an agent that just got a message isn't asked for a checkpoint."""
+        from . import reset
+
+        if not reset.queued(self.ctx):
+            return
+        pending_to = {i["to"] for i in Queue(self.ctx).pending()}
+        for line in reset.advance(self.ctx, self.ctx.herdr.agents(), pending_to):
+            self.say(line)
+
+    def auto_reset(self) -> None:
+        """The automatic reset policy (card #114, off by default): queues resets that run_resets
+        then performs. A bad setting is said once in the log, not on every check."""
+        from . import reset, usage
+
+        team = self.ctx.team
+        if team.policy("auto_reset") is not True:
+            return
+        live = self.ctx.herdr.agents()
+        names = [a.name for a in team.agents() if a.kind != HUMAN and a.active and a.name in live]
+        pending_to = {i["to"] for i in Queue(self.ctx).pending()}
+        lines, problems = reset.apply_policy(self.ctx, live, pending_to, usage.readings(self.ctx, names))
+        for line in lines:
+            self.say(line)
+        for p in problems:
+            if p not in self.policy_problems:
+                self.say(f"auto reset: {p}")
+        self.policy_problems = set(problems)
 
     def check_volume(self) -> None:
         limit = int(self.ctx.team.log_setting("daily_alert_mb")) * 1024 * 1024

@@ -66,7 +66,9 @@ analyst before its final release, some on staging teams rather than in daily use
   after checking the state format and taking a verified snapshot; `xt version rollback` undoes it
   ([`xt version`](docs/user-guide.md#xt-version)).
 - **Give one agent a fresh context safely.** `xt reset <name>` waits until the agent has saved its
-  notes and has no open work ([`xt reset`](docs/user-guide.md#xt-reset)).
+  notes and has no open work ([`xt reset`](docs/user-guide.md#xt-reset)). `--when-idle` queues it
+  until the agent is free, and an opt-in policy resets idle agents above a context size in tokens
+  ([Resetting automatically](docs/user-guide.md#8-pausing-and-resuming-the-team)).
 - **Decide with options.** A decision question shows numbered options, each with its consequence,
   and a recommendation; you answer with a number or your own words
   ([`xt answer`](docs/user-guide.md#xt-answer)).
@@ -252,7 +254,7 @@ equivalent and when you'd use it.
 | `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00] [--at 09:30]` | Wake an agent periodically when idle, optionally only within local hours or at a set time |
 | `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent (`xt spawn … --permissions FILE`: a Claude agent's settings file) |
 | `xt restart <name>…` / `xt restart --all` | Restart agents with fresh instructions; `--all` restarts the supervisor too and brings the team back as it was |
-| `xt reset <name>` / `xt checkpoint` | A fresh context for one agent, only after it saved its notes (the agent confirms with `xt checkpoint`) |
+| `xt reset <name>` / `xt checkpoint` | A fresh context for one agent, only after it saved its notes (the agent confirms with `xt checkpoint`); `--when-idle` queues it until the agent is free, `--cancel` removes the queued one |
 | `xt version` / `xt version check` / `xt version use <tag>` / `xt version rollback` | The team's versions; ask the upstream for the published one now; switch to a release (a candidate with `--candidate`) or undo the last switch |
 | `xt send <to> --type <t> "..."`, `xt done <id> "..."`, `xt note "..."` | Messages, closing work, notes (agents add `--as <name>`) |
 | `xt friction "..."` | An agent's feedback about xt or its harness; lands in your Inbox |
@@ -273,6 +275,9 @@ max_agents = 8              # soft cap; beyond it the lead must ask you first
 heartbeat_minutes = 15      # how often the supervisor checks for silent agents
 schedule_approval = true    # agent-set schedules wait for you
 min_wake_minutes = 15       # shortest schedule an agent may request
+auto_reset = false          # true: reset idle agents without open work above auto_reset_tokens
+auto_reset_tokens = 150000  # (an agent's own auto_reset_tokens, or "off", wins); at most once
+auto_reset_cooldown_hours = 6   # per agent in this many hours
 
 [notify]                    # questions, approvals, alerts, done goals and the liaison's reports for you
 enabled = true

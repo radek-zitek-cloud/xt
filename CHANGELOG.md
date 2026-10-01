@@ -9,6 +9,37 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.18.0] — not released yet
+
+Agent lifecycle: fewer manual resets. **0.18.0-rc1** has #134 and #114. No protocol or ledger
+format change; one new state file, `.xt/state/resets.json`.
+
+### Added
+
+- **Queue a reset until the agent is free (#134).** `xt reset <name> --when-idle` records the reset
+  and returns at once; the supervisor runs it, through the same checkpoint as a plain reset, the
+  next time the agent is idle, owns no open goal or task and has no messages waiting. Work arriving
+  while it saves keeps it queued; no checkpoint within 5 minutes drops it, leaving the session as it
+  was. The queue survives a supervisor restart, holds one reset per agent (queueing again shows the
+  existing one), and shows as `reset queued (by human at HH:MM): …` in `xt status` and the agent's
+  detail in the TUI. `xt reset <name> --cancel` removes it; stopping or retiring the agent drops it.
+  Each step is a line in the message log. Human only, like `xt reset`. A plain `xt reset` is
+  unchanged (it replaces a queued one).
+- **Reset idle agents automatically above a context size (#114).** Off by default. With `[policy]
+  auto_reset = true` the supervisor queues a reset (#134's path) for an agent that is idle, owns no
+  open work, and has a known context reading from the last 2 hours above `auto_reset_tokens`
+  (default 150,000 tokens, whatever the window), unless a reset ran for it within
+  `auto_reset_cooldown_hours` (default 6). An agent's own `auto_reset_tokens` overrides the team's;
+  `"off"` exempts it. The ledger says why (context and threshold in tokens, the policy). A cancelled
+  or abandoned automatic reset also waits for the cool-down. A bad setting is said once in the
+  supervisor's log and resets nobody.
+
+### Upgrading
+
+- From 0.17.0: `git pull upstream main` (or `xt version use v0.18.0`), then `xt restart --all` so
+  the supervisor runs queued resets. The automatic policy stays off until you add `auto_reset =
+  true` to `[policy]` in `team.toml`.
+
 ## [0.17.0] — 2026-09-30
 
 The release: the same code and docs as 0.17.0-rc1 (only the version and this changelog changed).

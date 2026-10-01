@@ -75,7 +75,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/alerts.py` | Alerts for the human, raised and cleared by key. |
 | `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
-| `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. |
+| `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. The queued reset (`--when-idle`, `state/resets.json`), the supervisor's non-blocking step that runs it, and the opt-in automatic policy that queues one above a token threshold. |
 | `src/xt/usage.py` | Live context per agent, from its harness's session log. |
 | `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines and windows. |
 | `src/xt/planusage.py` | Claude plan usage from the status line (standard library only). |
@@ -105,6 +105,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | | `state/sessions.json`: which harness session log belongs to which agent (per start); `state/model_windows.json`: pi's model windows, cached a day |
 | | `usage/YYYY-MM-DD.jsonl`: per-turn usage records; `state/usage_offsets.json`, `state/allowance.json`, `state/claude_plan.json` (Claude plan windows from the status line) |
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `goal_notices.json`, `inbox_seen.json`, `watch.pid`, `lock` |
+| | `state/resets.json`: queued resets and each agent's last reset, for the automatic policy's cool-down |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
 `roles/liaison.md`, `prices.toml`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
@@ -114,13 +115,15 @@ upstream and aren't edited by the team, so upstream merges rarely conflict.
 
 ```toml
 [team]      name, session (the Herdr session this team lives in)
-[policy]    spawn_approval, max_agents, heartbeat_minutes, schedule_approval, min_wake_minutes
+[policy]    spawn_approval, max_agents, heartbeat_minutes, schedule_approval, min_wake_minutes,
+            auto_reset (default false), auto_reset_tokens (150000), auto_reset_cooldown_hours (6)
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [notify]    enabled, command (e.g. "notify-send --app-name=xt {title} {body}"), quiet (e.g. "21:00-07:00")
 [defaults]  liaison / lead harness (and optional model); permissions? (settings file for every Claude agent)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
             wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"), wake_at? (e.g. "09:30"; set with `xt schedule`),
-            permissions? (e.g. "settings/carol.json"; Claude Code only), connectors? (account connectors opted in)
+            permissions? (e.g. "settings/carol.json"; Claude Code only), connectors? (account connectors opted in),
+            auto_reset_tokens? (this agent's threshold, or "off")
 ```
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
@@ -311,6 +314,14 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    - an agent blocked (usually an approval prompt in its pane);
    - an expected agent missing (crashed, or closed outside xt);
    - goals open but the lead not running (no job starting it, and not stopped by the human).
+   **Queued resets** (card #134, `reset.advance`), one step each, never waiting: with live state
+   read again after this tick's deliveries, an agent that is idle, owns no open goal or task and
+   has no messages waiting is asked for a checkpoint; once it is confirmed the session is
+   replaced; work arriving first sends the reset back to waiting; no checkpoint within 5 minutes
+   drops it. About once a minute (with usage recording), the **automatic reset policy** (card
+   #114, `[policy] auto_reset`, off by default) queues a reset for each idle agent without open
+   work whose fresh context reading is above its threshold in tokens and that had no reset within
+   the cool-down (`state/resets.json`).
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
 7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item it hasn't worked on for
    that long (no report or ask about it, no task sent under it; a new item counts from when it
@@ -455,7 +466,8 @@ harness goes to the human with `xt friction`.
   marks the friction it printed as seen. `xt answer <id> "..."` (a number picks a decision question's
   option), `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
 - `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM] [--at HH:MM]`.
-- `xt reset <name>`: a fresh context for one agent after it saved its notes (`xt checkpoint`).
+- `xt reset <name>`: a fresh context for one agent after it saved its notes (`xt checkpoint`);
+  `--when-idle` queues it for the supervisor, `--cancel` removes the queued one.
 - `xt version`, `xt version check`, `xt version use <tag> [--candidate]`, `xt version rollback` (see Versions above).
 - `xt log [--limit N | --full]`: the newest 20 messages by default.
 - `xt restart <name>…` (stop and start with fresh instructions) and `xt restart --all` (the

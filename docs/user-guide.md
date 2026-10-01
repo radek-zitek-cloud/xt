@@ -476,6 +476,7 @@ xt down && xt version rollback && xt restart --all
 | Restart everything with fresh instructions | `xt restart --all` |
 | Stop / start one agent | `x` / `u` on it in the TUI (`xt stop <name>` / `xt spawn <name>`) |
 | Give one agent a fresh context, safely | `xt reset <name>` (see below) |
+| ... as soon as it's free | `xt reset <name> --when-idle` (`--cancel` removes it) |
 | Give one agent a fresh session right now | `xt restart <name>` |
 
 Stopping keeps an agent in the roster, its notes and its open work; nothing alerts about an agent
@@ -487,10 +488,48 @@ work: it is refused while the agent owns an open goal or task (it names them) or
 xt asks the agent to save what it needs into `members/<name>/notes.md` and confirm with `xt
 checkpoint`, waits up to 5 minutes (`--timeout`), and only then starts a fresh session, whose brief
 points to the notes and the checkpoint line. No checkpoint, or new work arriving meanwhile, means
-nothing is reset. `xt restart <name>` is the emergency route, without a checkpoint. xt never resets
-anyone on its own: when an agent's context reaches 70% of its window, `xt status`, the agent's
-detail in the TUI and the lead's and liaison's briefs show `reset suggested for …`, and only when the
-reading is known, has a window and was observed within the last 2 hours (not in the future, beyond a few minutes of clock difference).
+nothing is reset. `xt restart <name>` is the emergency route, without a checkpoint. When an agent's
+context reaches 70% of its window, `xt status`, the agent's detail in the TUI and the lead's and
+liaison's briefs show `reset suggested for …`, and only when the reading is known, has a window and
+was observed within the last 2 hours (not in the future, beyond a few minutes of clock difference).
+
+**Queueing a reset for when the agent is free.** A busy agent, or one that owns open work, refuses a
+plain reset. `xt reset <name> --when-idle` queues it instead and returns at once: the supervisor
+asks the agent for the same checkpoint the next time it is idle, owns no open goal or task and has
+no messages waiting, then starts the fresh session. While it waits, `xt status` and the agent's
+detail in the TUI show `reset queued (by human at 09:12): waits until it's idle with no open work`
+(then `asked for a checkpoint at …`). Work arriving while it saves keeps the reset queued; no
+checkpoint within 5 minutes drops it (the session is untouched, as with a plain reset). The queue
+survives a restart of the supervisor; one reset per agent can be queued (queueing again shows the
+one there is). `xt reset <name> --cancel` removes it; stopping or retiring the agent drops it too.
+Each step is a line in the message log.
+
+**Resetting automatically (off by default).** With the policy on, the supervisor queues such a reset
+by itself, through the same path, for an agent whose context is above a size in tokens:
+
+```toml
+[policy]
+auto_reset = true                 # off (false) by default: nothing resets on its own
+auto_reset_tokens = 150000        # the threshold in tokens, whatever the agent's window
+auto_reset_cooldown_hours = 6     # at most one reset per agent in this many hours
+
+[[agent]]
+name = "builder"
+# ...
+auto_reset_tokens = 250000        # this agent's own threshold; "off" exempts it
+```
+
+An agent is reset only when all of these hold: it is idle, owns no open goal or task, its context
+reading is known, recent (observed within the last 2 hours, as for the suggestion) and above its
+threshold, and no reset ran for it within the cool-down. A busy agent, one with open work, a stale
+or unknown reading, or one inside the cool-down is left alone. The threshold is an absolute token
+count, not a share of the window: 150,000 tokens is 15% of a 1M window and 58% of a 258k one. The
+ledger says why (`context 160000 tokens, above the threshold of 150000 tokens; policy auto_reset`),
+and `xt status` shows `reset queued (by xt's reset policy …)` while it waits. A cancelled or
+abandoned automatic reset also waits for the cool-down. **The trade-off:** a fresh context costs one
+turn re-reading the first prompt, the brief and the agent's notes, and anything not in the notes is
+gone; keep the threshold well above what an agent needs for one piece of work, and exempt an agent
+in the middle of long, delicate work (`auto_reset_tokens = "off"`).
 
 ### 9. When something goes wrong
 
@@ -740,6 +779,10 @@ by hand. `--keep-supervisor` stops only the agents (same as `X` in the TUI).
 `xt reset <name> [--timeout S]` — a fresh context for one agent, after it saved a checkpoint to its
 notes; refused while it owns open work or is busy (see 8). Human only. Agents answer the request with
 `xt checkpoint --as <name>` (text on stdin: what the next session should read first).
+
+`xt reset <name> --when-idle` queues the same reset and returns at once; the supervisor runs it the
+next time the agent is idle with no open work (see 8). `xt reset <name> --cancel` removes a queued
+reset. Both human only.
 
 ### `xt restart`
 
