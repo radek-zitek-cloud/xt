@@ -11,8 +11,9 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [0.19.0] — not released yet
 
-**0.19.0-rc1** has #167, #169 and #135. No protocol or ledger format change; new state files
-`.xt/state/board_watch.json` (+ `.out`, `.err`), and the agents' start records in
+**0.19.0-rc1** has #167, #169 and #135; **0.19.0-rc2** adds #166. No protocol or ledger format
+change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
+`.xt/state/operators.json` (+ `.xt/operators/`), and the agents' start records in
 `.xt/state/versions.json` may carry `codex_options`.
 
 ### Added
