@@ -327,7 +327,9 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    #165, `src/xt/launch.py`): a running agent with no harness process in the team repo carrying
    its `XT_AGENT` (such as one a restored multiplexer session resumed) raises one alert
    (`launch:<name>`), cleared when xt starts it again or it stops running. `xt status` and `xt up`
-   run the same check. A harness process xt can't inspect makes it "not checked", never a match.
+   run the same check. A harness process xt can't inspect, a nested PID namespace (`NSpid` in
+   `/proc/self/status`: a sandbox) or no visible harness process at all makes it "not checked",
+   never a match, and then no alert is raised or cleared.
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
 7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item it hasn't worked on for
    that long (no report or ask about it, no task sent under it; a new item counts from when it

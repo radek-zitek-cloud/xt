@@ -73,6 +73,20 @@ def watch_pid(ctx: Ctx) -> int | None:
     return pid if pid and pid_alive(pid) else None
 
 
+TICKED_WITHIN = 30  # seconds: a supervisor that saved live state this recently is running
+
+
+def recently_ticked(ctx: Ctx) -> bool:
+    """The supervisor saved Herdr's agent list (state/live.json) in the last few ticks. Its pid can
+    be invisible from a sandboxed shell (a PID namespace) while it runs fine (card #165, rc2)."""
+    try:
+        ts = json.loads((ctx.paths.state / "live.json").read_text())["ts"]
+        age = (ctx.ledger.clock() - dt.datetime.fromisoformat(ts)).total_seconds()
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    return -TICKED_WITHIN <= age <= TICKED_WITHIN
+
+
 def expected(ctx: Ctx) -> set[str]:
     """Agents xt started and hasn't stopped/retired: if one vanishes, something went wrong."""
     f = ctx.paths.state / "expected.json"

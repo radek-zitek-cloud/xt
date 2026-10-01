@@ -368,10 +368,16 @@ def cmd_status(args) -> None:
     print(f"team usage today: {turns.fmt(spend.team_today)}")
     for line in turns.allowance_lines(ctx):
         print(f"allowance: {line}")
-    if not watch_pid(ctx):  # said plainly whenever it's down (card #165), not only with a backlog
-        waiting = " Queued messages and jobs wait for it." if q or jobs else ""
-        print(f"the supervisor isn't running: no messages are delivered, no alerts raised and nobody is "
-              f"woken until it runs.{waiting} `xt up` starts it.")
+    from .watch import recently_ticked
+
+    if not watch_pid(ctx) and not recently_ticked(ctx):  # said plainly whenever it's down (card #165)
+        if launch.isolated():  # its pid is invisible from a sandbox, so its absence proves nothing
+            print("the supervisor: not checked (this shell runs in a PID namespace, a sandbox?, and the "
+                  "supervisor hasn't saved live state in the last 30 s); `xt status` in your own terminal tells")
+        else:
+            waiting = " Queued messages and jobs wait for it." if q or jobs else ""
+            print(f"the supervisor isn't running: no messages are delivered, no alerts raised and nobody is "
+                  f"woken until it runs.{waiting} `xt up` starts it.")
 
 
 def cmd_restart(args) -> None:

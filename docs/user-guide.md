@@ -559,9 +559,13 @@ each running agent's harness process (in the team repo, with `XT_AGENT=<name>` i
 and, when there is none, say `<name> is running without xt's launch settings (restored by the
 multiplexer?) … Run xt restart <name> (or --all)`, raise one `launch:<name>` alert under Needs you,
 and mark the agent with a red `!` in place of its dot in the TUI's Team pane. The alert clears when
-xt starts the agent again. When xt can't read a harness process's environment (another user's, or a
-sandbox without `/proc`), `xt status` shows `launch settings: not checked (…)` for the agent and
-raises nothing: it never counts as a match.
+xt starts the agent again. When xt can't look properly, `xt status` shows `launch settings: not
+checked (…)` for the agent and raises or clears nothing; it never counts as a match. That happens
+when a harness process's environment can't be read (another user's), and from a sandbox: a shell in
+its own PID namespace (as in Codex's sandbox), or one that sees no agent process at all. From such
+a shell `xt status` also says `the supervisor: not checked` rather than "isn't running", unless
+the supervisor saved Herdr's agent list in the last 30 seconds (then it's running). Run `xt status`
+in your own terminal for the real answer.
 
 ### 10. Shrinking the team
 

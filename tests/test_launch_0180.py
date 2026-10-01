@@ -172,7 +172,73 @@ def test_no_proc_at_all_is_not_checked(tmp_path, ctx, monkeypatch, capsys):
     assert _launch_alerts(ctx) == {}
 
 
+def _sandboxed(tmp_path, ctx):
+    """A fake /proc as seen from a sandbox in its own PID namespace (rc2 staging, #2363): a few
+    processes, none of them an agent's, and NSpid with two levels for this process."""
+    proc = _proc(tmp_path, ctx.paths.root, {
+        1: (["/usr/bin/bash"], {}, None), 5: (["/usr/bin/python3", "xt"], {}, None)})
+    (tmp_path / "proc" / "self").mkdir()
+    (tmp_path / "proc" / "self" / "status").write_text("Name:\tpython3\nNSpid:\t48211\t5\n")
+    return proc
+
+
+def test_from_a_sandbox_every_agent_is_not_checked_and_no_alert_changes(tmp_path, ctx, monkeypatch, capsys):
+    _team(ctx)
+    Alerts(ctx).raise_("launch:dave", launch.warning("dave"))  # raised earlier from a real look
+    _use(monkeypatch, _sandboxed(tmp_path, ctx))
+    run = _cli(ctx, monkeypatch, capsys)
+    out = run("status")
+    assert out.count("launch settings: not checked (xt runs in a PID namespace here (a sandbox?)") == 2
+    assert "WARNING" not in out
+    assert list(_launch_alerts(ctx)) == ["launch:dave"]  # neither raised nor cleared
+    Supervisor(ctx, out=lambda _: None).check_launch(ctx.herdr.agents())
+    assert list(_launch_alerts(ctx)) == ["launch:dave"]
+
+
+def test_no_agent_process_visible_at_all_is_not_checked(tmp_path, ctx, monkeypatch, capsys):
+    _team(ctx)
+    # no namespace marker, but /proc shows no harness process in the team repo at all
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {1: (["/usr/bin/bash"], {}, None)}))
+    out = _cli(ctx, monkeypatch, capsys)("status")
+    assert out.count("launch settings: not checked (no agent process is visible from here (a sandbox?))") == 2
+    assert _launch_alerts(ctx) == {}
+
+
+def test_the_restored_case_still_warns_when_only_some_processes_have_xt_agent(tmp_path, ctx, monkeypatch, capsys):
+    _team(ctx)
+    # both restored: their processes are visible, neither has XT_AGENT
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {
+        1: (["/usr/bin/claude", "--resume"], {}, None), 2: (["/usr/bin/claude", "--resume"], {}, None)}))
+    out = _cli(ctx, monkeypatch, capsys)("status")
+    assert "WARNING: carol is running without" in out and "WARNING: dave is running without" in out
+    assert set(_launch_alerts(ctx)) == {"launch:carol", "launch:dave"}
+
+
+def test_the_namespace_marker_is_read_from_nspid(tmp_path):
+    d = tmp_path / "self"
+    d.mkdir(parents=True)
+    (d / "status").write_text("Name:\tx\nNSpid:\t812\n")
+    assert launch.isolated(str(tmp_path)) is False
+    (d / "status").write_text("Name:\tx\nNSpid:\t812\t3\n")
+    assert launch.isolated(str(tmp_path)) is True
+    assert launch.isolated(str(tmp_path / "missing")) is False
+
+
+def test_from_a_sandbox_the_supervisor_is_not_checked_unless_it_saved_live_state(ctx, monkeypatch, capsys):
+    import json
+
+    monkeypatch.setattr(launch, "isolated", lambda proc=None: True)
+    run = _cli(ctx, monkeypatch, capsys)
+    out = run("status")
+    assert "the supervisor: not checked (this shell runs in a PID namespace" in out
+    assert "supervisor isn't running" not in out
+    (ctx.paths.state / "live.json").write_text(json.dumps({"ts": ctx.ledger.clock().isoformat(), "agents": {}}))
+    out = run("status")
+    assert "supervisor" not in out.split("team usage today")[1]  # it ticked seconds ago: running
+
+
 def test_status_says_plainly_when_the_supervisor_is_not_running(ctx, monkeypatch, capsys):
+    monkeypatch.setattr(launch, "isolated", lambda proc=None: False)
     run = _cli(ctx, monkeypatch, capsys)
     assert ("the supervisor isn't running: no messages are delivered, no alerts raised and nobody is "
             "woken until it runs. `xt up` starts it.") in run("status")
