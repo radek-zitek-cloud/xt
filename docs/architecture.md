@@ -317,9 +317,10 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    - goals open but the lead not running (no job starting it, and not stopped by the human).
    **Queued resets** (card #134, `reset.advance`), one step each, never waiting: with live state
    read again after this tick's deliveries, an agent that is idle, owns no open goal or task and
-   has no messages waiting is asked for a checkpoint; once it is confirmed the session is
-   replaced; work arriving first sends the reset back to waiting; no checkpoint within 5 minutes
-   drops it. About once a minute (with usage recording), the **automatic reset policy** (card
+   has no messages waiting is asked for a checkpoint; once it is confirmed and the agent is idle
+   again, the session is replaced; an open item, a waiting message or one delivered since the ask
+   (`asked_id`) sends the reset back to waiting; no checkpoint, or still busy, 5 minutes after
+   the ask drops it. About once a minute (with usage recording), the **automatic reset policy** (card
    #114, `[policy] auto_reset`, off by default) queues a reset for each idle agent without open
    work whose fresh context reading is above its threshold in tokens and that had no reset within
    the cool-down (`state/resets.json`). Also about once a minute, the **launch check** (card

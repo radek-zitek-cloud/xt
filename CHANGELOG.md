@@ -12,16 +12,19 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.18.0] — not released yet
 
 Agent lifecycle: fewer manual resets, and a warning when agents run without xt's launch settings.
-**0.18.0-rc1** has #134 and #114; **0.18.0-rc2** adds #165. No protocol or ledger format change;
+**0.18.0-rc1** has #134 and #114; **0.18.0-rc2** adds #165; **0.18.0-rc3** fixes rc1's queued
+reset (QA) and adds the policy example. No protocol or ledger format change;
 one new state file, `.xt/state/resets.json`.
 
 ### Added
 
 - **Queue a reset until the agent is free (#134).** `xt reset <name> --when-idle` records the reset
   and returns at once; the supervisor runs it, through the same checkpoint as a plain reset, the
-  next time the agent is idle, owns no open goal or task and has no messages waiting. Work arriving
-  while it saves keeps it queued; no checkpoint within 5 minutes drops it, leaving the session as it
-  was. The queue survives a supervisor restart, holds one reset per agent (queueing again shows the
+  next time the agent is idle, owns no open goal or task and has no messages waiting. After the
+  checkpoint it checks again: the session is replaced only once the agent is idle again, and an
+  open item, a message waiting for it or one delivered since it was asked sends the reset back to
+  waiting (it stays queued; a fresh checkpoint is asked for later). No checkpoint, or still busy,
+  5 minutes after asking drops it, leaving the session as it was. The queue survives a supervisor restart, holds one reset per agent (queueing again shows the
   existing one), and shows as `reset queued (by human at HH:MM): …` in `xt status` and the agent's
   detail in the TUI. `xt reset <name> --cancel` removes it; stopping or retiring the agent drops it.
   Each step is a line in the message log. Human only, like `xt reset`. A plain `xt reset` is
@@ -33,7 +36,8 @@ one new state file, `.xt/state/resets.json`.
   `auto_reset_cooldown_hours` (default 6). An agent's own `auto_reset_tokens` overrides the team's;
   `"off"` exempts it. The ledger says why (context and threshold in tokens, the policy). A cancelled
   or abandoned automatic reset also waits for the cool-down. A bad setting is said once in the
-  supervisor's log and resets nobody.
+  supervisor's log and resets nobody. A copyable configuration is in
+  [docs/examples.md](docs/examples.md#6-reset-heavy-agents-automatically).
 - **A warning when an agent runs without xt's launch settings (#165).** After a power cycle the
   terminal multiplexer can resume every agent in its old conversation without the identity,
   model, settings file and connector and tool blocks xt starts it with. The supervisor (about once

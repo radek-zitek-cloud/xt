@@ -223,7 +223,7 @@ twice, so the liaison had to withdraw its first question and ask again with the 
 
 ## Part two: copy and adapt
 
-These two are written for this page, not taken from a run. They follow the setup of xt's own
+These are written for this page, not taken from a run. They follow the setup of xt's own
 product team (from 0.15.0); adjust names, paths and rules to your team.
 
 ## 4. A Claude Code agent with a permissions file
@@ -325,3 +325,53 @@ Answer with the number (`xt answer 230 2`, or in the TUI `s` on it, `2`, ctrl+s)
 words work too. xt refuses a question with fewer than two or more than three options, an option
 without ` :: ` and its consequence, or no single recommendation. See
 [`xt answer`](user-guide.md#xt-answer).
+
+## 6. Reset heavy agents automatically
+
+**Context.** Every turn re-reads an agent's whole context, so a long-running agent gets more
+expensive by the hour. The automatic reset policy (off by default) gives an idle agent without open
+work a fresh context once it's above a size in tokens, through the same checkpoint as `xt reset`.
+
+In `team.toml` (yours to edit; agents never do), turn it on for the team:
+
+```toml
+[policy]
+auto_reset = true                 # default false: nothing resets on its own
+auto_reset_tokens = 150000        # the threshold in tokens, whatever the agent's window
+auto_reset_cooldown_hours = 6     # at most one reset per agent in this many hours
+```
+
+Then give one agent a higher threshold, and exempt another that is in the middle of long, delicate
+work:
+
+```toml
+[[agent]]
+name = "builder"
+role = "builder"
+harness = "claude"
+reports_to = "lead"
+status = "active"
+auto_reset_tokens = 250000        # this agent's own threshold
+
+[[agent]]
+name = "analyst"
+role = "analyst"
+harness = "claude"
+reports_to = "lead"
+status = "active"
+auto_reset_tokens = "off"         # never reset automatically
+```
+
+The supervisor reads `team.toml` on every tick, so no restart is needed. An agent is reset only
+when it's idle, owns no open goal or task, has no messages waiting, its context reading is from the
+last 2 hours and above its threshold, and no reset ran for it in the cool-down. While it waits,
+`xt status` shows `reset queued (by xt's reset policy at 14:02): …`, and the log says why:
+
+```text
+reset of builder queued by xt's reset policy (context 262000 tokens, above the threshold of 250000
+tokens; policy auto_reset): the supervisor runs it when builder is idle with no open work
+```
+
+`xt reset builder --cancel` removes a queued one (the cool-down then applies). The trade-off: a fresh
+context costs a turn re-reading the first prompt, the brief and the agent's notes, and whatever
+isn't in its notes is gone. See the [user guide](user-guide.md#8-pausing-and-resuming-the-team).

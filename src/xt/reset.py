@@ -226,13 +226,23 @@ def _update(ctx: Ctx, name: str, **fields) -> None:
             _save(ctx, data)
 
 
+def _new_input(ctx: Ctx, name: str, entry: dict) -> bool:
+    """A message addressed to the agent since it was asked for the checkpoint."""
+    since = entry.get("asked_id")
+    if since is None:
+        return False
+    return any(m["id"] > since and m["to"] == name for m in ctx.ledger.messages(since_days=1))
+
+
 def advance(ctx: Ctx, live: dict, pending_to: set[str], timeout: float = CHECKPOINT_TIMEOUT) -> list[str]:
     """One supervisor step for each queued reset; never waits. Returns lines for the supervisor log.
 
     Waiting: when the agent is idle (no messages queued for it either) and owns no open goal or task,
-    ask it for a checkpoint. Asked: once the checkpoint is confirmed, replace the session; if work
-    arrived meanwhile, go back to waiting (the reset stays queued); if no checkpoint comes within
-    the timeout, drop the queued reset (the session is untouched, as with a plain reset)."""
+    ask it for a checkpoint. Asked: once the checkpoint is confirmed and the agent is idle again,
+    replace the session; if work arrived meanwhile (an open item, a message waiting for it or one
+    delivered since it was asked), go back to waiting (the reset stays queued); if that doesn't
+    happen within the timeout, drop the queued reset (the session is untouched, as with a plain
+    reset)."""
     from .herdr import DELIVERABLE
 
     out = []
@@ -249,13 +259,24 @@ def advance(ctx: Ctx, live: dict, pending_to: set[str], timeout: float = CHECKPO
         by = "xt's reset policy" if entry.get("by") == POLICY else f"the {entry.get('by', HUMAN)}"
         if entry.get("asked"):
             done = checkpoints(ctx).get(name, {})
-            if open_work(ctx, name):  # first: never reset an agent that owns open work
-                _update(ctx, name, asked=None, before=None)
+            saved = done.get("at") and done.get("at") != entry.get("before")
+            # Never reset an agent with open work, a message waiting for it, or one delivered to it
+            # since it was asked (it's working on that, not on the checkpoint): back to waiting, and a
+            # fresh checkpoint is asked for later (rc1 QA, #2317).
+            if open_work(ctx, name) or name in pending_to or _new_input(ctx, name, entry):
+                _update(ctx, name, asked=None, before=None, asked_id=None)
                 ctx.ledger.append(SYSTEM, HUMAN, "system",
                                   f"queued reset of {name} postponed: new work arrived while it was saving; "
                                   f"it stays queued")
                 out.append(f"queued reset of {name} postponed: new work arrived")
-            elif done.get("at") and done.get("at") != entry.get("before"):
+            elif saved and agent.status not in DELIVERABLE:
+                # still finishing the turn in which it confirmed: replace it only once it's idle,
+                # within the same time limit
+                if (now - dt.datetime.fromisoformat(entry["asked"])).total_seconds() >= timeout:
+                    drop(ctx, name, f"it was still busy {int(timeout)} s after it was asked (its session is "
+                                    f"untouched; queue it again or look at its pane)")
+                    out.append(f"queued reset of {name} dropped: still busy")
+            elif saved:
                 with ctx.ledger.lock():
                     data = _load(ctx)
                     data["queued"].pop(name, None)
@@ -276,7 +297,7 @@ def advance(ctx: Ctx, live: dict, pending_to: set[str], timeout: float = CHECKPO
         except XtError as e:
             out.append(f"queued reset of {name}: couldn't ask it for a checkpoint ({e}); trying again")
             continue
-        _update(ctx, name, asked=_now(ctx), before=before)
+        _update(ctx, name, asked=_now(ctx), before=before, asked_id=ctx.ledger.last_id())
         ctx.ledger.append(SYSTEM, HUMAN, "system", f"queued reset of {name}: it's idle with no open work; "
                                                    f"asked it to save a checkpoint")
         out.append(f"queued reset of {name}: asked it for a checkpoint")

@@ -114,6 +114,66 @@ def test_work_arriving_while_it_saves_keeps_the_reset_queued(ctx, clock):
     assert "queued reset of carol postponed: new work arrived while it was saving; it stays queued" in _system(ctx)
 
 
+def test_after_the_checkpoint_a_working_agent_is_replaced_only_once_idle(ctx, clock):
+    """rc1 QA (#2317): the post-checkpoint path must re-verify idle too."""
+    ws = _running(ctx)
+    reset.queue(ctx, "carol")
+    sup = _sup(ctx)
+    sup.run_resets()
+    _saves(ctx, clock)
+    ctx.herdr.live["carol"].status = "working"  # still finishing the turn in which it confirmed
+    sup.run_resets()
+    assert ctx.herdr.live["carol"].workspace_id == ws and reset.queued(ctx)["carol"]["asked"]
+    ctx.herdr.live["carol"].status = "idle"
+    sup.run_resets()
+    assert ctx.herdr.live["carol"].workspace_id != ws
+
+
+def test_after_the_checkpoint_a_pending_message_postpones_the_reset(ctx, clock):
+    ws = _running(ctx)
+    reset.queue(ctx, "carol")
+    reset.advance(ctx, ctx.herdr.agents(), set())
+    _saves(ctx, clock)
+    reset.advance(ctx, ctx.herdr.agents(), pending_to={"carol"})
+    assert ctx.herdr.live["carol"].workspace_id == ws
+    assert reset.queued(ctx)["carol"]["asked"] is None  # back to waiting; a fresh checkpoint later
+
+
+def test_after_the_checkpoint_a_delivered_message_postpones_the_reset(ctx, clock):
+    ws = _running(ctx)
+    reset.queue(ctx, "carol")
+    sup = _sup(ctx)
+    sup.run_resets()
+    _saves(ctx, clock)
+    send(ctx, "lead", "carol", "report", "fyi: the parser spec changed")  # not open work, but new input
+    ctx.herdr.live["carol"].status = "idle"  # even if it looks idle again by the next tick
+    sup.run_resets()
+    assert ctx.herdr.live["carol"].workspace_id == ws
+    assert reset.queued(ctx)["carol"]["asked"] is None
+    from xt.dispatch import drain
+
+    drain(ctx)  # the supervisor delivers it; the agent works on it, then is idle again
+    ctx.herdr.live["carol"].status = "idle"
+    sup.run_resets()  # asks again, for a checkpoint that includes the new message
+    assert reset.queued(ctx)["carol"]["asked"]
+    _saves(ctx, clock, summary="saved again")
+    sup.run_resets()
+    assert ctx.herdr.live["carol"].workspace_id != ws
+
+
+def test_after_the_checkpoint_a_still_busy_agent_is_dropped_at_the_time_limit(ctx, clock):
+    ws = _running(ctx)
+    reset.queue(ctx, "carol")
+    sup = _sup(ctx)
+    sup.run_resets()
+    _saves(ctx, clock)
+    ctx.herdr.live["carol"].status = "working"
+    clock.advance(seconds=reset.CHECKPOINT_TIMEOUT)
+    sup.run_resets()
+    assert ctx.herdr.live["carol"].workspace_id == ws and reset.queued(ctx) == {}
+    assert _system(ctx)[-1].startswith("queued reset of carol dropped: it was still busy 300 s after it was asked")
+
+
 def test_messages_waiting_for_it_count_as_busy(ctx):
     _running(ctx)
     reset.queue(ctx, "carol")
@@ -366,6 +426,24 @@ def test_bad_settings_are_said_once_and_never_reset_anyone(ctx, clock, monkeypat
     assert reset.queued(ctx) == {}
     said = [line for line in sup.lines if "isn't a token count" in line]
     assert len(said) == 1 and "[policy] auto_reset_tokens = 'lots'" in said[0]
+
+
+def test_the_policy_example_in_the_docs_parses_and_does_what_it_says(tmp_path):
+    """rc1 QA (#2317): the copyable configuration in docs/examples.md, section 6."""
+    import re
+
+    from xt.team import Team
+
+    from .conftest import REPO
+
+    text = (REPO / "docs/examples.md").read_text().split("## 6. Reset heavy agents automatically")[1]
+    blocks = re.findall(r"```toml\n(.*?)```", text, re.S)
+    path = tmp_path / "team.toml"
+    path.write_text('[team]\nname = "t"\nsession = "t"\n\n' + "\n".join(blocks))
+    team = Team.load(path)
+    assert team.policy("auto_reset") is True and team.policy("auto_reset_cooldown_hours") == 6
+    assert reset.threshold(team, team.agent("builder")) == (250_000, None)
+    assert reset.threshold(team, team.agent("analyst")) == (None, None)
 
 
 def test_a_new_team_toml_documents_the_policy_off(paths):

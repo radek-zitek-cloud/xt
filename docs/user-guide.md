@@ -498,8 +498,10 @@ plain reset. `xt reset <name> --when-idle` queues it instead and returns at once
 asks the agent for the same checkpoint the next time it is idle, owns no open goal or task and has
 no messages waiting, then starts the fresh session. While it waits, `xt status` and the agent's
 detail in the TUI show `reset queued (by human at 09:12): waits until it's idle with no open work`
-(then `asked for a checkpoint at …`). Work arriving while it saves keeps the reset queued; no
-checkpoint within 5 minutes drops it (the session is untouched, as with a plain reset). The queue
+(then `asked for a checkpoint at …`). After the checkpoint xt checks again and replaces the session
+only once the agent is idle; an open item, a message waiting for it, or one delivered since it was
+asked keeps the reset queued (a fresh checkpoint is asked for later). No checkpoint, or still busy,
+5 minutes after asking drops it (the session is untouched, as with a plain reset). The queue
 survives a restart of the supervisor; one reset per agent can be queued (queueing again shows the
 one there is). `xt reset <name> --cancel` removes it; stopping or retiring the agent drops it too.
 Each step is a line in the message log.
@@ -529,7 +531,8 @@ and `xt status` shows `reset queued (by xt's reset policy …)` while it waits. 
 abandoned automatic reset also waits for the cool-down. **The trade-off:** a fresh context costs one
 turn re-reading the first prompt, the brief and the agent's notes, and anything not in the notes is
 gone; keep the threshold well above what an agent needs for one piece of work, and exempt an agent
-in the middle of long, delicate work (`auto_reset_tokens = "off"`).
+in the middle of long, delicate work (`auto_reset_tokens = "off"`). A complete example is in
+[Examples](examples.md#6-reset-heavy-agents-automatically).
 
 ### 9. When something goes wrong
 
