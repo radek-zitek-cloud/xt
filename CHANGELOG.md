@@ -13,7 +13,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 Agent lifecycle: fewer manual resets, and a warning when agents run without xt's launch settings.
 **0.18.0-rc1** has #134 and #114; **0.18.0-rc2** adds #165; **0.18.0-rc3** fixes rc1's queued
-reset (QA) and adds the policy example; **0.18.0-rc4** makes #165 say "not checked" from a sandbox. No protocol or ledger format change;
+reset (QA) and adds the policy example; **0.18.0-rc4** makes #165 say "not checked" from a sandbox; **0.18.0-rc5** makes its warning need
+positive evidence. No protocol or ledger format change;
 one new state file, `.xt/state/resets.json`.
 
 ### Added
@@ -42,14 +43,17 @@ one new state file, `.xt/state/resets.json`.
   terminal multiplexer can resume every agent in its old conversation without the identity,
   model, settings file and connector and tool blocks xt starts it with. The supervisor (about once
   a minute), `xt status` and `xt up` now look for each running agent's harness process in the team
-  repo with its `XT_AGENT` in the environment (read from `/proc`); without one, they say `<name> is
+  repo with its `XT_AGENT` in the environment (read from `/proc`). A warning needs evidence: visible
+  harness processes of the agent's kind without `XT_AGENT`, at least as many as the agents of that
+  kind left without a match (rc5); then they say `<name> is
   running without xt's launch settings (restored by the multiplexer?) … Run xt restart <name> (or
   --all)`, raise one `launch:<name>` Inbox alert per agent, and the Team pane shows a red `!` in
   place of the agent's dot. The alert clears when xt starts the agent again. When xt can't look
   properly, the agent is `not checked` in `xt status`, never a match or a warning, and no alert is
-  raised or cleared: a harness process it can't inspect, a shell in its own PID namespace (a
-  sandbox, read from `NSpid`), or no agent process visible at all (rc4, from the rc2 staging: a
-  Codex sandbox reported every agent as restored).
+  raised or cleared for it: a harness process of its kind it can't inspect, its process not
+  visible (a sandbox, which may show only another agent's process), fewer unlaunched processes
+  than unmatched agents, or a shell in its own PID namespace (`NSpid`). (rc4 and rc5, from the rc2
+  and rc4 staging: a Codex sandbox reported every agent as restored.)
 
 ### Changed
 

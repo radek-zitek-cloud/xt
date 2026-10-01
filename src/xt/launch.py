@@ -9,12 +9,17 @@ pi, as for the identity guard) whose working directory is the team repo and whos
 XT_AGENT=<name> means xt started that agent. Herdr's agent list gives no process id, and a restored
 process keeps no id xt recorded, so xt looks for the variable rather than for a known process.
 
-A harness process whose environment can't be read (another user's, or no /proc in a sandbox) could
-be the agent, so then the answer is "not checked", never a match and never a warning.
+A warning needs positive evidence (rc5, from the rc2 and rc4 staging): a visible harness process in
+the team repo without XT_AGENT, of the agent's harness. Herdr-live agents with no matching XT_AGENT
+process are warned about only when there are at least as many such processes of their harness as
+there are such agents (a restore resumes them all); otherwise xt can't tell which process is whose.
+An agent whose process simply isn't visible (a sandbox shows a few processes, possibly another
+agent's with its own XT_AGENT) is "not checked", and so is one when a harness process of its kind
+can't be read: never a match and never a warning, and no alert changes because of it.
 """
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from .alerts import Alerts
 from .context import Ctx
@@ -22,21 +27,23 @@ from .context import Ctx
 PROC = "/proc"
 STARTED, MISSING, UNCHECKED = "started by xt", "without xt's launch settings", "not checked"
 ALERT = "launch:"  # alert key prefix, one per agent
+HARNESSES = ("claude", "codex", "pi")  # the programs the identity guard knows (cli.HARNESS_BINARIES)
 
 
 @dataclass
 class Scan:
     names: set[str]  # XT_AGENT values of the team's harness processes
-    unreadable: str | None = None  # why some harness process couldn't be inspected
-    seen: int = 0  # harness processes in the team repo, with or without XT_AGENT
+    whole: str | None = None  # why nothing could be looked at (a sandbox's PID namespace, no /proc)
+    unlaunched: dict[str, int] = field(default_factory=dict)  # harness -> its processes without XT_AGENT
+    unreadable: dict[str, str] = field(default_factory=dict)  # harness -> why one couldn't be read
 
 
 ISOLATED = "xt runs in a PID namespace here (a sandbox?), so the agents' processes aren't visible"
-NONE_VISIBLE = "no agent process is visible from here (a sandbox?)"
+INVISIBLE = "its process isn't visible from here (a sandbox?)"
 
 
 def isolated(proc: str | None = None) -> bool:
-    """Whether this process sits in a nested PID namespace, as in Codex's sandbox: /proc then shows
+    """Whether this process sits in a nested PID namespace, as in some sandboxes: /proc then shows
     only the namespace's few processes, so an agent's absence there says nothing (rc2 staging)."""
     try:
         with open(f"{proc or PROC}/self/status") as fh:
@@ -54,10 +61,13 @@ def _names(pid_dir: str) -> set[str]:
     return {comm, *(os.path.basename(a.decode(errors="replace")) for a in argv[:2] if a)}
 
 
-def scan_proc(root: str, proc: str | None = None) -> Scan:
-    """XT_AGENT values in the environments of harness processes working in the team repo `root`."""
-    from .cli import harness_in
+def _harness(names: set[str]) -> str | None:
+    return next((h for h in HARNESSES for n in names if n == h or n.startswith(h + "-")), None)
 
+
+def scan_proc(root: str, proc: str | None = None) -> Scan:
+    """What the harness processes working in the team repo `root` carry: their XT_AGENT values, and
+    per harness how many have none or couldn't be read."""
     proc = proc or PROC
     if isolated(proc):
         return Scan(set(), ISOLATED)
@@ -65,35 +75,36 @@ def scan_proc(root: str, proc: str | None = None) -> Scan:
         pids = [p for p in os.listdir(proc) if p.isdigit()]
     except OSError as e:
         return Scan(set(), f"can't list processes ({e.strerror or e})")
-    found: set[str] = set()
-    unreadable = None
-    seen = 0
+    s = Scan(set())
     real_root = os.path.realpath(root)
     for pid in pids:
         d = f"{proc}/{pid}"
         try:
-            if not harness_in([_names(d)]):
-                continue
+            harness = _harness(_names(d))
         except (OSError, ValueError):
             continue  # gone meanwhile, or not a process
+        if harness is None:
+            continue
         try:
             cwd = os.path.realpath(os.readlink(f"{d}/cwd"))
         except OSError:
             cwd = None  # unknown: it may belong to this team
         if cwd is not None and cwd != real_root:
             continue  # another team's or the human's own harness
-        seen += 1
         try:
             env = open(f"{d}/environ", "rb").read()
         except PermissionError:
-            unreadable = f"no permission to read process {pid}'s environment"
+            s.unreadable[harness] = f"no permission to read process {pid}'s environment"
             continue
         except OSError:
             continue
-        for var in env.split(b"\0"):
-            if var.startswith(b"XT_AGENT="):
-                found.add(var[len("XT_AGENT="):].decode(errors="replace"))
-    return Scan(found, unreadable, seen)
+        agent = next((v[len(b"XT_AGENT="):].decode(errors="replace") for v in env.split(b"\0")
+                      if v.startswith(b"XT_AGENT=")), None)
+        if agent is None:
+            s.unlaunched[harness] = s.unlaunched.get(harness, 0) + 1
+        else:
+            s.names.add(agent)  # whoever it is: never evidence against another agent
+    return s
 
 
 scan = scan_proc  # tests replace this (they run no real agents)
@@ -101,22 +112,32 @@ scan = scan_proc  # tests replace this (they run no real agents)
 
 def check(ctx: Ctx, live: dict) -> dict[str, tuple[str, str]]:
     """name -> (STARTED | MISSING | UNCHECKED, detail) for each running agent of the roster."""
-    names = [a.name for a in ctx.team.agents() if a.kind != "human" and a.name in live]
-    if not names:
+    agents = [a for a in ctx.team.agents() if a.kind != "human" and a.name in live]
+    if not agents:
         return {}
     s = scan(str(ctx.paths.root))
-    out = {}
-    for n in names:
-        if n in s.names:
-            out[n] = (STARTED, "")
-        elif s.unreadable:
-            out[n] = (UNCHECKED, s.unreadable)
-        elif not s.seen:
-            # Herdr says it runs, yet no harness process is visible at all: this view of /proc is
-            # partial. A restored agent's process is visible, just without XT_AGENT.
-            out[n] = (UNCHECKED, NONE_VISIBLE)
+    out: dict[str, tuple[str, str]] = {}
+    unmatched: dict[str, list[str]] = {}
+    for a in agents:
+        if a.name in s.names:
+            out[a.name] = (STARTED, "")
+        elif s.whole:
+            out[a.name] = (UNCHECKED, s.whole)
         else:
-            out[n] = (MISSING, "no harness process in the team repo has XT_AGENT=" + n)
+            unmatched.setdefault(a.harness or "?", []).append(a.name)
+    for harness, names in unmatched.items():
+        k = s.unlaunched.get(harness, 0)
+        if harness in s.unreadable:
+            result = (UNCHECKED, s.unreadable[harness])  # the unreadable one may be the agent
+        elif k == 0:
+            result = (UNCHECKED, INVISIBLE)
+        elif k >= len(names):
+            result = (MISSING, f"{k} {harness} process(es) in the team repo run without XT_AGENT")
+        else:
+            result = (UNCHECKED, f"{k} {harness} process(es) in the team repo run without XT_AGENT, "
+                                 f"for {len(names)} agents without one: xt can't tell which is whose")
+        for n in names:
+            out[n] = result
     return out
 
 
@@ -127,16 +148,13 @@ def warning(name: str) -> str:
 
 def alert(ctx: Ctx, results: dict[str, tuple[str, str]], live: dict) -> list[str]:
     """Raise one Inbox alert per agent running without xt's launch settings (once per occurrence);
-    clear it once the agent is started by xt again or not running. Returns the names newly alerted.
-    A look that couldn't check (a sandbox, an unreadable process) changes no alert at all."""
-    if any(state == UNCHECKED for state, _ in results.values()):
-        return []
+    clear it once the agent is started by xt again or no longer running. "Not checked" changes
+    nothing for that agent. Returns the names newly alerted."""
     alerts = Alerts(ctx)
     raised = []
     for name, (state, _) in results.items():
         if state == MISSING and alerts.raise_(f"{ALERT}{name}", warning(name)):
             raised.append(name)
-    # keep: still missing, or not checked this time (no news either way)
     keep = {f"{ALERT}{n}" for n, (state, _) in results.items() if state in (MISSING, UNCHECKED)}
     alerts.resolve_prefix(ALERT, keep)
     return raised

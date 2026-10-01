@@ -324,12 +324,13 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    #114, `[policy] auto_reset`, off by default) queues a reset for each idle agent without open
    work whose fresh context reading is above its threshold in tokens and that had no reset within
    the cool-down (`state/resets.json`). Also about once a minute, the **launch check** (card
-   #165, `src/xt/launch.py`): a running agent with no harness process in the team repo carrying
-   its `XT_AGENT` (such as one a restored multiplexer session resumed) raises one alert
-   (`launch:<name>`), cleared when xt starts it again or it stops running. `xt status` and `xt up`
-   run the same check. A harness process xt can't inspect, a nested PID namespace (`NSpid` in
-   `/proc/self/status`: a sandbox) or no visible harness process at all makes it "not checked",
-   never a match, and then no alert is raised or cleared.
+   #165, `src/xt/launch.py`): harness processes in the team repo are matched to agents by their
+   `XT_AGENT`; running agents left without a match are warned about (one `launch:<name>` alert,
+   cleared when xt starts the agent again or it stops running) only on positive evidence, when at
+   least as many processes of their harness run there without `XT_AGENT` (as after a restored
+   multiplexer session). Otherwise (process not visible, fewer such processes than agents, a
+   harness process that can't be read, or a nested PID namespace from `NSpid`) the agent is "not
+   checked" and its alert is left as it was. `xt status` and `xt up` run the same check.
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
 7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item it hasn't worked on for
    that long (no report or ask about it, no task sent under it; a new item counts from when it

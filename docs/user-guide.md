@@ -554,15 +554,19 @@ supervisor isn't running (then nothing is delivered, no alert is raised and nobo
 **An agent running without xt's launch settings.** xt starts every agent with its identity
 (`XT_AGENT`), its model, its settings file and its connector and browser-tool blocks. A process
 resumed some other way has none of them, so it may run the wrong model without the permissions and
-limits the team relies on. The supervisor (about once a minute), `xt status` and `xt up` look for
-each running agent's harness process (in the team repo, with `XT_AGENT=<name>` in its environment)
-and, when there is none, say `<name> is running without xt's launch settings (restored by the
-multiplexer?) … Run xt restart <name> (or --all)`, raise one `launch:<name>` alert under Needs you,
+limits the team relies on. The supervisor (about once a minute), `xt status` and `xt up` look at
+the harness processes working in the team repo. An agent with one carrying `XT_AGENT=<name>` is
+fine. A warning needs evidence: harness processes of the agent's kind (claude, codex or pi) without
+`XT_AGENT`, at least as many as the running agents of that kind left without a match. Then they
+say `<name> is running without xt's launch settings (restored by the multiplexer?) … Run xt restart
+<name> (or --all)`, raise one `launch:<name>` alert under Needs you,
 and mark the agent with a red `!` in place of its dot in the TUI's Team pane. The alert clears when
 xt starts the agent again. When xt can't look properly, `xt status` shows `launch settings: not
 checked (…)` for the agent and raises or clears nothing; it never counts as a match. That happens
-when a harness process's environment can't be read (another user's), and from a sandbox: a shell in
-its own PID namespace (as in Codex's sandbox), or one that sees no agent process at all. From such
+when a harness process's environment can't be read (another user's), when the agent's process isn't
+visible (from a sandbox, which may show only its own agent's process), when there are fewer such
+processes than agents left without a match (xt can't tell which is whose), and from a shell in its
+own PID namespace. From such
 a shell `xt status` also says `the supervisor: not checked` rather than "isn't running", unless
 the supervisor saved Herdr's agent list in the last 30 seconds (then it's running). Run `xt status`
 in your own terminal for the real answer.

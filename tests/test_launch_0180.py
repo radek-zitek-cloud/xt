@@ -70,7 +70,7 @@ def _launch_alerts(ctx):
 
 def test_the_scan_finds_xt_agent_only_in_this_teams_harness_processes(tmp_path, ctx):
     s = launch.scan_proc(str(ctx.paths.root), _restored(tmp_path, ctx))
-    assert s.names == {"carol"} and s.unreadable is None
+    assert s.names == {"carol"} and s.unreadable == {} and s.unlaunched == {"claude": 1}
 
 
 def test_status_reports_an_agent_started_outside_xt_and_raises_one_alert(tmp_path, ctx, monkeypatch, capsys):
@@ -200,8 +200,67 @@ def test_no_agent_process_visible_at_all_is_not_checked(tmp_path, ctx, monkeypat
     # no namespace marker, but /proc shows no harness process in the team repo at all
     _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {1: (["/usr/bin/bash"], {}, None)}))
     out = _cli(ctx, monkeypatch, capsys)("status")
-    assert out.count("launch settings: not checked (no agent process is visible from here (a sandbox?))") == 2
+    assert out.count("launch settings: not checked (its process isn't visible from here (a sandbox?))") == 2
     assert _launch_alerts(ctx) == {}
+
+
+def test_qa_sandbox_shape_a_foreign_xt_agent_process_is_no_evidence(tmp_path, ctx, monkeypatch, capsys):
+    """rc4 staging (#2384/#2385): from QA's Codex sandbox the one visible harness process was QA's own
+    agent (cwd the staging repo, XT_AGENT=qa); the staging team's liaison and lead weren't visible."""
+    ctx.herdr.add("liaison")
+    ctx.herdr.add("lead")
+    Alerts(ctx).raise_("launch:lead", launch.warning("lead"))  # from an earlier real look
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {
+        7: (["/usr/local/bin/codex", "exec"], {"XT_AGENT": "qa"}, None),
+        8: (["/usr/bin/bash"], {}, None)}))
+    s = launch.scan_proc(str(ctx.paths.root), str(tmp_path / "proc"))
+    assert s.names == {"qa"} and s.unlaunched == {} and s.whole is None
+    run = _cli(ctx, monkeypatch, capsys)
+    out = run("status")
+    assert out.count("launch settings: not checked (its process isn't visible from here (a sandbox?))") == 2
+    assert "WARNING" not in out
+    assert list(_launch_alerts(ctx)) == ["launch:lead"]  # neither raised nor cleared
+    lines = []
+    Supervisor(ctx, out=lines.append).check_launch(ctx.herdr.agents())
+    assert list(_launch_alerts(ctx)) == ["launch:lead"] and lines == []
+    assert not any(line.startswith("WARNING") for line in up(ctx))
+    assert list(_launch_alerts(ctx)) == ["launch:lead"]
+
+
+def test_restored_shape_warns_for_exactly_the_agent_without_a_matching_process(tmp_path, ctx, monkeypatch, capsys):
+    """rc2 staging, the real case: the lead resumed outside xt (codex without XT_AGENT in the repo),
+    the liaison started by xt."""
+    ctx.herdr.add("liaison")
+    ctx.herdr.add("lead")
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {
+        11: (["/usr/local/bin/codex"], {"XT_AGENT": "liaison"}, None),
+        12: (["/usr/local/bin/codex", "resume"], {"HOME": "/h"}, None)}))
+    out = _cli(ctx, monkeypatch, capsys)("status")
+    assert "WARNING: lead is running without xt's launch settings" in out
+    assert "liaison is running without" not in out and "launch settings: not checked" not in out
+    assert list(_launch_alerts(ctx)) == ["launch:lead"]
+
+
+def test_fewer_unlaunched_processes_than_unmatched_agents_is_not_checked(tmp_path, ctx, monkeypatch, capsys):
+    _team(ctx)  # carol and dave on claude, neither matched; one claude without XT_AGENT
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {1: (["/usr/bin/claude", "--resume"], {}, None)}))
+    out = _cli(ctx, monkeypatch, capsys)("status")
+    assert out.count("not checked (1 claude process(es) in the team repo run without XT_AGENT, for 2 agents "
+                     "without one: xt can't tell which is whose)") == 2
+    assert "WARNING" not in out and _launch_alerts(ctx) == {}
+
+
+def test_an_unlaunched_process_counts_only_for_agents_of_its_harness(tmp_path, ctx, monkeypatch, capsys):
+    _team(ctx)  # carol and dave on claude
+    ctx.herdr.add("lead")  # on codex
+    _use(monkeypatch, _proc(tmp_path, ctx.paths.root, {
+        1: (["/usr/bin/claude"], {"XT_AGENT": "carol"}, None),
+        2: (["/usr/bin/claude"], {"XT_AGENT": "dave"}, None),
+        3: (["/usr/local/bin/codex", "resume"], {}, None)}))
+    out = _cli(ctx, monkeypatch, capsys)("status")
+    assert "WARNING: lead is running without" in out
+    assert "carol is running without" not in out and "dave is running without" not in out
+    assert list(_launch_alerts(ctx)) == ["launch:lead"]
 
 
 def test_the_restored_case_still_warns_when_only_some_processes_have_xt_agent(tmp_path, ctx, monkeypatch, capsys):
@@ -235,6 +294,18 @@ def test_from_a_sandbox_the_supervisor_is_not_checked_unless_it_saved_live_state
     (ctx.paths.state / "live.json").write_text(json.dumps({"ts": ctx.ledger.clock().isoformat(), "agents": {}}))
     out = run("status")
     assert "supervisor" not in out.split("team usage today")[1]  # it ticked seconds ago: running
+
+
+def test_an_invisible_supervisor_that_saved_live_state_counts_as_running_without_a_namespace(
+        ctx, monkeypatch, capsys):
+    """QA's Codex sandbox showed no nested NSpid (#2384): the live.json rule alone must hold."""
+    import json
+
+    monkeypatch.setattr(launch, "isolated", lambda proc=None: False)
+    (ctx.paths.state / "watch.pid").write_text("999999")  # a pid this shell can't see
+    (ctx.paths.state / "live.json").write_text(json.dumps({"ts": ctx.ledger.clock().isoformat(), "agents": {}}))
+    out = _cli(ctx, monkeypatch, capsys)("status")
+    assert "supervisor isn't running" not in out and "the supervisor: not checked" not in out
 
 
 def test_status_says_plainly_when_the_supervisor_is_not_running(ctx, monkeypatch, capsys):
