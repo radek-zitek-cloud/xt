@@ -11,7 +11,9 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [0.19.0] — not released yet
 
-**0.19.0-rc1** has #167, #169 and #135; **0.19.0-rc2** adds #166. No protocol or ledger format
+**0.19.0-rc1** has #167, #169 and #135; **0.19.0-rc2** adds #166; **0.19.0-rc3** adds #156 (the
+docs and site caught up) and three findings from the rc1 live run and QA's rc2 check (below). No
+protocol or ledger format
 change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
 `.xt/state/operators.json` (+ `.xt/operators/`), and the agents' start records in
 `.xt/state/versions.json` may carry `codex_options`.
@@ -69,6 +71,24 @@ change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
   `check_prompt_in_log`, set in `harnesses/pi.toml` only: Claude Code and Codex starts are
   unchanged. `xt status` now says `no session log found for <name>: its context and today's usage
   can't be read` under a running agent whose log xt can't find, for any harness.
+- **The board watch's alert shows Fizzy's error (#135, rc3, from the rc1 live run).** A failing
+  command with empty error output now puts the first lines of its standard output in the alert
+  (Fizzy prints its error JSON there); before, the alert gave only the exit code.
+
+### Documentation
+
+- **README, architecture and site caught up (#156, rc3).** The README's "Added since" list covers
+  0.11.0 to 0.19.0 with an entry for each release, its version examples name v0.19.0, and the
+  screenshot's caption says the 0.17.0 picture shows the layout still current. `docs/architecture.md`
+  describes 0.19.0. The site's first screenshot and its TUI section use new 0.19.0 images
+  (`xt tui --demo` at 160×40, with Flow and with Work), with new alt text; the old `screen.jpg` and
+  `tui-v0170.svg` are gone, and `og:image` points to `assets/screen-v0170.png` (the README's PNG,
+  copied into `site/assets/` at publication).
+- **Examples (rc3).** `docs/examples.md` §7 shows QA's suite in a clean clone under Codex with
+  network on (`UV_CACHE_DIR` inside the clone: the default cache is read-only in Codex's sandbox);
+  §8 says to run the board command once by hand, since a wrong column id prints `[]` and exits 0;
+  the new §9 is an operator with a delegation (QA's rc2 check). The user guide says the same about
+  the board command.
 
 ### Upgrading
 

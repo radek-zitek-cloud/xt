@@ -413,7 +413,8 @@ column = "Ready to build"   # optional: the column's name, used in the message
   after the supervisor starts only records the set, so a restart replays nothing.
 - **Failures.** A non-zero exit, a timeout, output that isn't the array above, or a command that
   can't be started raises one Inbox alert (`boardwatch`) naming the cause (`exit code 3`, `timed
-  out after 30s`, `unreadable output`) and the first line of the command's error output. Later
+  out after 30s`, `unreadable output`) and the first line of the command's error output, or, when
+  that's empty, the first lines of its standard output (Fizzy prints its errors there). Later
   failures don't repeat it; the next success clears it. During an outage the supervisor keeps the
   old set, so a card that entered meanwhile is reported after it.
 - **Where it runs.** As your user, outside every agent's sandbox, from the team repo, with no input
@@ -422,6 +423,11 @@ column = "Ready to build"   # optional: the column's name, used in the message
   else and gives agents neither the command nor its credentials; only you edit `team.toml`. A
   Fizzy command reads its token from your keyring: run it once in a pane of the team's Herdr
   session to check that it can.
+- **Check the command by hand first.** A command that runs but lists the wrong thing is a success
+  to xt: Fizzy given a wrong column id prints `[]` with exit code 0, and the watch then reports
+  `0 card(s)` without an alert and never tells the lead anything. Before you rely on it, run the
+  exact command once in your terminal and check that it lists the cards you expect in that column,
+  then compare the count in `xt status`.
 - `xt status` shows `board watch: last success Wed 10:05 (3 card(s) in the column)`, or `board
   watch: FAILING since …` with the cause. One watched column per team. Without the section nothing
   runs. See [examples](examples.md#8-tell-the-lead-when-a-card-is-ready-to-build).

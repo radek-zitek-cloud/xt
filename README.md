@@ -19,11 +19,13 @@ and accepts its releases. Most runs so far used Codex for every agent. **Using i
 
 ![The xt-team in Herdr: the lead's pane on the left, just handed the v0.18.0 proposal to the product manager; the xt 0.17.0 TUI on the right in three bands: Team and Inbox on top, the Flow lane chart in the middle, the answered publish question in Detail at the bottom](docs/screen-v0170.png)
 
-*The xt-team building xt, on 0.17.0. On the left the lead has just passed the v0.18.0 proposal goal
-to the product manager. On the right the TUI in three bands: on top the team grouped by harness
-(Claude and Codex, with each account's usage windows) next to the Inbox of answered questions; in
-the middle the Flow lane chart of messages between the human, xt and the agents, newest on top; at
-the bottom the publish question for v0.17.0 that the human answered.*
+*The xt-team building xt. The picture was taken on 0.17.0, and the layout is still the current one
+in 0.19.0. On the left the lead has just passed the v0.18.0 proposal goal to the product manager.
+On the right the TUI in three bands: on top the Team pane grouped by harness (Claude and Codex, with
+each account's usage windows) next to the Inbox; in the middle Flow, the lane chart of messages
+between the human, xt and the agents, newest on top (Work, the outline of goals and tasks, shares
+that band: `2` and `3` switch); at the bottom the Detail pane with the publish question for v0.17.0
+that the human answered.*
 
 ## What xt can do
 
@@ -55,70 +57,84 @@ each one is in [the story so far](docs/story.md).
 - **Keep agents in bounds.** No desktop or browser control for agents; public output stays free
   of private details.
 
-Added since (0.11.0 to 0.16.0), each checked against its spec by the product team's quality
-analyst before its final release, some on staging teams rather than in daily use yet:
+Added since (0.11.0 to 0.19.0), release by release, each checked against its spec by the product
+team's quality analyst before its final release, some on staging teams rather than in daily use
+yet. The details are in [CHANGELOG.md](CHANGELOG.md).
 
-- **No account connectors by default.** Agents start without your mail, files or calendar
+- **0.11.0: No account connectors by default.** Agents start without your mail, files or calendar
   connectors unless you opt one in, and can't act as you: `--as human` works only from your own
   terminal ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
-
-- **Know which xt is running.** The published, installed and running versions are shown apart,
-  so a half-finished upgrade is visible ([Updating xt](docs/user-guide.md#7-updating-xt)).
-- **Choose a version and roll back.** `xt version use <tag>` merges a release into your team repo
-  after checking the state format and taking a verified snapshot; `xt version rollback` undoes it
-  ([`xt version`](docs/user-guide.md#xt-version)).
-- **Give one agent a fresh context safely.** `xt reset <name>` waits until the agent has saved its
-  notes and has no open work ([`xt reset`](docs/user-guide.md#xt-reset)). `--when-idle` queues it
-  until the agent is free, and an opt-in policy resets idle agents above a context size in tokens
-  ([Resetting automatically](docs/user-guide.md#8-pausing-and-resuming-the-team)).
-- **Know when an agent runs without xt's settings.** An agent resumed outside xt (a multiplexer
-  restoring its session after a power cycle) is flagged in `xt status`, `xt up`, the Inbox and the
-  Team pane, with `xt restart` as the fix ([When something goes wrong](docs/user-guide.md#9-when-something-goes-wrong)).
-- **Decide with options.** A decision question shows numbered options, each with its consequence,
-  and a recommendation; you answer with a number or your own words
-  ([`xt answer`](docs/user-guide.md#xt-answer)).
-- **Per-agent permissions for Claude Code agents.** A settings file per agent (or one for all),
-  checked before every start; `xt spawn --permissions` sets it for a new agent, and the approval
-  warns when a Claude agent would start without one
-  ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery), [`xt spawn`](docs/user-guide.md#xt-spawn)).
-- **See the Claude plan's usage.** The five-hour and weekly windows in `xt status` and the TUI,
-  through a shipped status-line script ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
-- **Hear when a goal is done.** Exactly one notification per goal you dispatched, when it's done
-  (progress on an open goal doesn't notify), and a "Done since you last looked" list in the Inbox ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **Short logs by default.** `xt log` prints the newest 20 messages; `--full` prints all
-  ([`xt log`](docs/user-guide.md#xt-log)).
-- **An Inbox that shows what's new.** Three groups, Needs you, Notifications and Friction, with
-  their counts in the panel title; friction you've seen folds away, in the TUI and in `xt inbox`
-  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **A TUI that reads the same everywhere.** Three bands (Team and Inbox, Work or Flow, the detail
-  pane), numbered titles `[n] - Title - info`, the newest on top in every pane, and a key line with
-  the focused pane's own keys ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **Rows that use the whole panel, with ages.** List rows are cut only at the panel's edge and show
-  how old they are (`now`, `45s`, `14m`, `3h`, `2d`, `8w`); the focused panel's title is reversed
-  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **Goals and their tasks in one outline.** The TUI's Work panel lists open goals first with their
-  tasks under them, so a stuck goal shows its age; done goals fold away under `done (N)`, and `o`
-  shows open work only ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **The whole thread in the detail pane.** Select a task, a question or a report and the detail
-  pane shows its goal's whole conversation in time order, with the selected message marked; the
-  supervisor's log is a pop-up on `v`, and its failed wake-ups, notifications and usage recordings
-  raise Inbox alerts ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **Who talked to whom, at a glance.** The TUI's Flow pane draws the ledger as a lane chart: one
-  lane per agent, one arrow per message with its type's glyph, messages to you dotted, system
-  lines hidden until `t`, and `f` for one agent or one goal's thread
-  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **Hear when a card is ready to build.** A command you name in `team.toml` lists a Board column;
-  the supervisor runs it every few minutes and tells the lead about each card that enters, with one
-  alert if the command fails. xt stays independent of the board tool
-  ([Periodic work](docs/user-guide.md#5-periodic-work-schedules-quiet-hours-standing-rules)).
-- **An operator that acts for you, within limits.** Register an outside process (your own coding
-  agent, say) under its own name: it sends reports to the liaison as itself, and for up to an hour
-  at a time you can delegate `restart`, `reset`, `spawn` and `up` to it, each one logged. Taking
-  the team down, answers and approvals stay yours, and `--as human` stays your terminal's
-  ([An operator acting for you](docs/user-guide.md#13-an-operator-acting-for-you)).
-- **Network for one Codex agent.** `codex_options` gives a single Codex agent the sandbox's network
-  switch (an allowlist of one), shown in its start note, `xt status` and the brief
+- **0.12.0: Know which xt is running.** The published, installed and running versions are shown
+  apart, so a half-finished upgrade is visible ([Updating xt](docs/user-guide.md#7-updating-xt)).
+- **0.12.0: Give one agent a fresh context safely.** `xt reset <name>` waits until the agent has
+  saved its notes and has no open work ([`xt reset`](docs/user-guide.md#xt-reset)).
+- **0.12.1: A first prompt arrives once.** xt no longer resends a long first prompt that had
+  landed, which had cost a double start and thousands of tokens per session.
+- **0.13.0: Per-agent permissions for Claude Code agents.** A settings file per agent (or one for
+  all), checked before every start, and current model prices and context windows
   ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
+- **0.14.0: Choose a version and roll back.** `xt version use <tag>` merges a release into your
+  team repo after checking the state format and taking a verified snapshot; `xt version rollback`
+  undoes it ([`xt version`](docs/user-guide.md#xt-version)).
+- **0.14.0: Decide with options.** A decision question shows numbered options, each with its
+  consequence, and a recommendation; you answer with a number or your own words
+  ([`xt answer`](docs/user-guide.md#xt-answer)).
+- **0.14.1: The identity rule, worded precisely.** Agents never act as you or suggest a way to,
+  while their own work under their own name stays allowed.
+- **0.15.0: See the Claude plan's usage.** The five-hour and weekly windows in `xt status` and the
+  TUI, through a shipped status-line script ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
+- **0.15.0: Hear when a goal is done.** Exactly one notification per goal you dispatched, when it's
+  done (progress on an open goal doesn't notify), and a "Done since you last looked" list in the
+  Inbox ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.15.0: Short logs, and permissions at hire.** `xt log` prints the newest 20 messages (`--full`
+  prints all, [`xt log`](docs/user-guide.md#xt-log)); `xt spawn --permissions` gives a new Claude
+  agent its settings file, and the approval warns when one would start without
+  ([`xt spawn`](docs/user-guide.md#xt-spawn)).
+- **0.16.0: An Inbox that shows what's new.** Three groups, Needs you, Notifications and Friction,
+  with their counts in the panel title; friction you've seen folds away, in the TUI and in `xt inbox`
+  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.16.0: Rows that use the whole panel, with ages.** List rows are cut only at the panel's edge
+  and show how old they are (`now`, `45s`, `14m`, `3h`, `2d`, `8w`); the focused panel's title is
+  reversed ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.16.0: Goals and their tasks in one outline.** The TUI's Work panel lists open goals first
+  with their tasks under them, so a stuck goal shows its age; done goals fold away under `done
+  (N)`, and `o` shows open work only ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.16.0: The whole thread in the detail pane.** Select a task, a question or a report and the
+  detail pane shows its goal's whole conversation in time order, with the selected message marked;
+  the supervisor's log is a pop-up on `v`, and its failed wake-ups, notifications and usage
+  recordings raise Inbox alerts ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.16.0: Who talked to whom, at a glance.** The TUI's Flow pane draws the ledger as a lane
+  chart: one lane per agent, one arrow per message with its type's glyph, messages to you dotted,
+  system lines hidden until `t`, and `f` for one agent or one goal's thread
+  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.16.1: Every pane by key, arrow and mouse.** `0` to `4` focus each pane, the arrows and the
+  wheel move in every list, a click selects, and what you've already seen stays reachable under a
+  fold ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.17.0: A TUI that reads the same everywhere.** Three bands (Team and Inbox, Work or Flow, the
+  detail pane), numbered titles `[n] - Title - info`, the newest on top in every pane, and a key
+  line with the focused pane's own keys; the Team header and harness lines open their detail, and
+  `xt version check` asks for the published version now
+  ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **0.18.0: Resets when the agent is free, or automatically.** `xt reset <name> --when-idle` queues
+  it until the agent is free, and an opt-in policy resets idle agents above a context size in
+  tokens ([Resetting automatically](docs/user-guide.md#8-pausing-and-resuming-the-team)).
+- **0.18.0: Know when an agent runs without xt's settings.** An agent resumed outside xt (a
+  multiplexer restoring its session after a power cycle) is flagged in `xt status`, `xt up`, the
+  Inbox and the Team pane, with `xt restart` as the fix ([When something goes wrong](docs/user-guide.md#9-when-something-goes-wrong)).
+- **0.19.0: Hear when a card is ready to build.** A command you name in `team.toml` lists a Board
+  column; the supervisor runs it every few minutes and tells the lead about each card that enters,
+  with one alert if the command fails. xt stays independent of the board tool
+  ([Periodic work](docs/user-guide.md#5-periodic-work-schedules-quiet-hours-standing-rules)).
+- **0.19.0: An operator that acts for you, within limits.** Register an outside process (your own
+  coding agent, say) under its own name: it sends reports to the liaison as itself, and for up to
+  an hour at a time you can delegate `restart`, `reset`, `spawn` and `up` to it, each one logged.
+  Taking the team down, answers and approvals stay yours, and `--as human` stays your terminal's
+  ([An operator acting for you](docs/user-guide.md#13-an-operator-acting-for-you)).
+- **0.19.0: Network for one Codex agent, and pi's first prompt whole.** `codex_options` gives a
+  single Codex agent the sandbox's network switch (an allowlist of one), shown in its start note,
+  `xt status` and the brief ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)); a
+  pi agent gets its first prompt whole on its first start, and `xt status` says when an agent's
+  session log can't be found.
 
 What it can't do yet is in [Known limits](#known-limits).
 
@@ -346,7 +362,7 @@ To pick a release on purpose and be able to go back (from 0.14.0 on):
 ```sh
 xt down
 git commit -am "team changes"  # xt refuses while tracked files have uncommitted changes
-xt version use v0.15.0         # a candidate needs --candidate
+xt version use v0.19.0         # a candidate needs --candidate
 xt restart --all
 # if it misbehaves: xt down && xt version rollback && xt restart --all
 ```
@@ -382,12 +398,12 @@ fix raises the patch version (0.1.0 → 0.1.1). `1.0.0` comes once `team.toml` a
 stable.
 
 **Following releases instead of `main`:** to stay on a release, switch to its tag instead of
-pulling: `xt version use v0.15.0` (from 0.14.0 on; it merges the tag after its checks, see
+pulling: `xt version use v0.19.0` (from 0.14.0 on; it merges the tag after its checks, see
 [Updating a team](#updating-a-team)). On an older xt, merge the tag by hand:
 
 ```sh
 git fetch upstream --tags
-git merge v0.14.1
+git merge v0.19.0
 ```
 
 ## Releasing

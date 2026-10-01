@@ -399,6 +399,19 @@ Then `xt restart qa`: options apply at the next start. xt passes the option as
 agent's detail show `codex options: sandbox_workspace_write.network_access=true (network on: it can
 reach any host)`.
 
+**Running the suite in the clean clone.** Network alone isn't enough for `uv run`: Codex's sandbox
+keeps uv's default cache under the home directory read-only. Point the cache into the clone:
+
+```sh
+git clone --branch vX.Y.Z-rcN /path/to/the/builders/clone /tmp/qa-check
+cd /tmp/qa-check
+UV_CACHE_DIR=/tmp/qa-check/.uv-cache uv run pytest -q
+```
+
+On the operator's check of 0.19.0-rc1 this passed (532 tests in about 90 s) without an
+escalation; with network on but the default cache, `uv run` failed. xt adds no option for the
+cache path: the network switch is the only one (a decision for this release).
+
 - Codex opens the network wholesale: the agent can reach any host, not just a package index.
   Give it only to an agent whose workspace holds no credentials (here a clean clone). xt doesn't
   check that; it's your rule.
@@ -431,6 +444,16 @@ column = "Ready to build"
 ```
 
 The `--jq` projection makes Fizzy print exactly the contract: a JSON array of `{number, title}`.
+
+**Run it once by hand first** and check it lists the cards you expect in Ready to build:
+
+```sh
+fizzy card list --board BOARD_ID --column COLUMN_ID --all --jq '[.data[] | {number, title}]'
+```
+
+A wrong column id isn't an error to Fizzy: it prints `[]` and exits 0, so the watch would report
+`0 card(s) in the column` without an alert and never tell the lead. After the first run, the count
+in `xt status` (`board watch: last success … (N card(s) in the column)`) should match what you saw.
 The supervisor picks the section up on its next tick. Its first run records the cards already in
 the column; after that, moving card 129 there gives the lead:
 
@@ -441,6 +464,61 @@ Card 129 (Work outline) is now in Ready to build (seen by the board watch)
 - Fizzy reads its token from your keyring. The command runs in the supervisor's environment (the
   pane of the team's Herdr session), so run the `fizzy column list` above in a new pane of that
   session first: if it prints the columns, the watch can reach the keyring too.
-- If the command fails (Fizzy down, the token expired), one `boardwatch` alert says why and clears
-  at the next success; cards that entered meanwhile are reported then.
+- If the command fails (Fizzy down, the token expired), one `boardwatch` alert says why (Fizzy's
+  error JSON from its standard output, when its error output is empty) and clears at the next
+  success; cards that entered meanwhile are reported then.
 - Any other board works the same way: a command, or a small script, that prints the array.
+
+## 9. Let your own coding agent run a staging check
+
+**Context.** You use your own coding-agent session (here Claude Code, in a terminal outside the
+team) to help with a staging check. It should be able to report to the liaison and restart agents
+while you're away from the keyboard, but never act as you, never take the team down and never answer
+or approve anything (from 0.19.0).
+
+In the operator's session, ask it to run:
+
+```sh
+/path/to/team/bin/xt operator pid
+# 48213 (claude): give the human this pid for `xt operator add NAME --pid 48213`
+```
+
+In **your own terminal**, register it under a name and give it a grant:
+
+```sh
+xt operator add helper --pid 48213      # writes .xt/operators/helper.token (readable by you only)
+xt delegate helper --for 45m            # restart, reset, spawn, up; at most 60m, 30m by default
+```
+
+The operator's commands then carry the token and its name. A report to the liaison:
+
+```sh
+XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/helper.token) \
+  /path/to/team/bin/xt send liaison --as helper --type report <<'XT_END'
+Staging check of 0.19.0-rc2: steps 1-9 pass; step 10 waits for a lead restart.
+XT_END
+```
+
+and, under the grant, a restart:
+
+```sh
+XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/helper.token) \
+  /path/to/team/bin/xt restart lead --as helper
+```
+
+The log records it as `helper, delegated by human until 15:30: xt restart lead`, and the report
+arrives at the liaison from `helper`, marked `(sent by helper, an operator, on the human's
+behalf)`. When the check is done:
+
+```sh
+xt delegate --revoke                    # or let it expire
+```
+
+- **Never delegated:** `xt down`, `xt restart --all`, answers, approvals, `xt version use` and
+  `rollback`, `xt operator add` and `xt delegate`. They stay yours, grant or no grant, and `--as
+  human` keeps working only from your own terminal.
+- Both the token and the registered process are needed: the token copied into another shell, or the
+  operator's process without the token, is refused. A new operator session needs a new `xt
+  operator add`.
+- `xt status` and the TUI's Team header show the grant and its end time while it lasts. See the
+  [user guide](user-guide.md#13-an-operator-acting-for-you).

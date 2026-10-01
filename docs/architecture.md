@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.15.0** (2026-09-29), after real runs with a newsroom team and xt's
+What the code does as of **v0.19.0** (2026-10-01), after real runs with a newsroom team and xt's
 own product team, and the fixes they led to. Release-by-release changes are in
 [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the [user guide](user-guide.md).
 
@@ -41,7 +41,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | **`xt` CLI** (`src/xt/`) | Python, run through uv. Commands for the human and for agents; `xt --version` prints the version from `pyproject.toml`. |
 | **Supervisor** (`xt watch`) | A long-running loop in its own Herdr workspace. The only part of xt that calls Herdr on agents' behalf, and the one that notifies the human. |
 | **TUI** (`xt tui`, bare `xt`) | The human's lazygit-style view and controls (Textual). |
-| **Harness adapters** (`harnesses/*.toml`) | Per harness: Herdr kind, start arguments, model flag, startup dialogs to answer, known limits. |
+| **Harness adapters** (`harnesses/*.toml`) | Per harness: Herdr kind, start arguments, model flag, startup dialogs to answer, readiness before the first prompt (pi), session logs, known limits. |
 | **Team repo** | A clone of xt that `xt init` turns into the user's own repo (`origin` renamed `upstream`, so `git pull upstream main` brings xt updates). |
 | **mise** | Puts `bin/` on PATH inside the repo and provides uv. |
 
@@ -54,7 +54,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `bin/xt-statusline` | Claude Code status-line command: records the plan's usage windows (runs `planusage`). |
 | `src/xt/__init__.py` | The package; reads `__version__` from the installed `pyproject.toml` version. |
 | `src/xt/__main__.py` | `python -m xt`: calls `cli.main`. |
-| `src/xt/cli.py` | Every `xt` command: argument parsing, `--as` identity checks (the human's own terminal), and the small commands (`send`, `log`, `status`, `inbox`, `approve`, …). |
+| `src/xt/cli.py` | Every `xt` command: argument parsing, `--as` identity checks (the human's own terminal; a registered operator, card #166), delegated commands, and the small commands (`send`, `log`, `status`, `inbox`, `approve`, `operator`, `delegate`, …). |
 | `src/xt/context.py` | `Ctx`: one command's paths, team, ledger and Herdr client, loaded once. |
 | `src/xt/paths.py` | Where everything lives in a team repo (`.xt/state`, `.xt/log`, …), finding the root (`XT_ROOT`, else the enclosing xt checkout), and `XtError`, the user-facing error. |
 | `src/xt/team.py` | `team.toml`: the roster, policy, notify, log and default settings, schedules and their windows (`next_due`), and the new-team template. |

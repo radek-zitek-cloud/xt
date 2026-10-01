@@ -7,7 +7,7 @@
 <meta name="description" content="xt runs persistent teams of Claude Code, Codex and pi agents. They work on their own; you approve, decide and correct, and every step is on record. Open source, MIT.">
 <meta property="og:title" content="xt: accountable AI agent teams across harnesses">
 <meta property="og:description" content="Persistent, named AI agents in a hierarchy, with approvals, a ledger, schedules, independent QA and cost you can see. Open source, MIT.">
-<meta property="og:image" content="assets/screen.jpg">
+<meta property="og:image" content="assets/screen-v0170.png">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2304070c'/%3E%3Cpath d='M9 9l14 14M23 9L9 23' stroke='%238cc8f5' stroke-width='3.2' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -165,8 +165,8 @@
         </ul>
       </div>
       <div class="frame"><div class="frame-inner" style="padding:10px">
-        <img class="shot" src="assets/screen.jpg" alt="The xt TUI next to a liaison's pane in Herdr: goals, team, tasks, inbox, log and supervisor panels" loading="lazy" width="1600" height="880">
-      </div><div class="caption">The TUI (right) beside the liaison's pane in Herdr</div></div>
+        <img class="shot" src="assets/tui-v0190-flow.svg" alt="The xt 0.19 TUI in three bands: the Team pane by harness and the Inbox side by side on top, the Flow lane chart of messages between the human, xt and the agents in the middle, the detail pane across the bottom" loading="lazy" width="1970" height="1026">
+      </div><div class="caption">The TUI with Flow in the middle: <code class="mono">xt tui --demo</code> at 160×40, made-up data</div></div>
     </div>
   </div>
 </section>
@@ -178,7 +178,7 @@
       <p>The TUI was redesigned in 0.16: what needs you comes first, the team is grouped by harness, and every message is drawn as it flows between agents. Since 0.17 it reads in three bands, Team and the Inbox on top, Work or Flow in the middle, Detail at the bottom, with every pane titled by its key, <code class="mono">[0]</code> Team to <code class="mono">[4]</code> Detail, the newest on top everywhere, and a key line that shows what the focused pane can do.</p>
     </div>
     <div class="frame"><div class="frame-inner" style="padding:10px">
-      <img class="shot" src="assets/tui-v0170.svg" alt="The xt 0.17 TUI in three bands: the Team pane by harness and the Inbox side by side on top, the Work outline full width in the middle with Flow as its second tab, the detail pane across the bottom" loading="lazy" width="1970" height="1026">
+      <img class="shot" src="assets/tui-v0190.svg" alt="The xt 0.19 TUI in three bands: the Team pane by harness and the Inbox side by side on top, the Work outline full width in the middle with Flow as its second tab, the detail pane across the bottom" loading="lazy" width="1970" height="1026">
     </div><div class="caption"><code class="mono">xt tui --demo</code> at 160×40: made-up data, not a live team</div></div>
     <div class="grid">
       <div class="cell"><div class="k">Inbox</div><h4>Three groups</h4><p><b>Needs you</b> (questions, approvals, alerts, until you act), <b>Notifications</b> (done goals and reports since you last looked) and unread <b>Friction</b>. Your answers and what you've seen stay a week, folded: <code class="mono">space</code> opens them.</p></div>
