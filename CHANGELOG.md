@@ -9,16 +9,20 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.19.0] — not released yet
+## [0.19.0] — 2026-10-01
 
-**0.19.0-rc1** has #167, #169 and #135; **0.19.0-rc2** adds #166; **0.19.0-rc3** adds #156 (the
-docs and site caught up) and three findings from the rc1 live run and QA's rc2 check (below);
-**0.19.0-rc4** fixes two #166 findings from the rc3 live run; **0.19.0-rc5** prevents #167's lost
-characters instead of only reporting them (reopened by Radek); **0.19.0-rc6** gives the README and
-the site's `og:image` a new screenshot of the live team (#156, docs only). No protocol or ledger format
-change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
-`.xt/state/operators.json` (+ `.xt/operators/`), and the agents' start records in
-`.xt/state/versions.json` may carry `codex_options`.
+The release: the same code and docs as 0.19.0-rc6 (only the version and this changelog changed).
+Working with the team from outside it: five cards to their approved specs. #135 tells the lead when
+a card enters a Board column; #166 adds a named operator sender and time-bound delegation; #169
+gives one Codex agent network; #167 makes pi's first prompt arrive whole; #156 brings the README,
+architecture, examples and site up to date. **0.19.0-rc1** has #167, #169 and #135;
+**0.19.0-rc2** adds #166; **0.19.0-rc3** adds #156 and three findings from the rc1 live run and
+QA's rc2 check; **0.19.0-rc4** fixes two #166 findings from the rc3 live run; **0.19.0-rc5**
+prevents #167's lost characters instead of only reporting them (reopened by Radek); **0.19.0-rc6**
+gives the README and the site's `og:image` a new screenshot of the live team. No protocol or ledger
+format change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`),
+`.xt/state/operators.json` (+ `.xt/operators/`) and `.xt/state/prompt_resends.json`, and the
+agents' start records in `.xt/state/versions.json` may carry `codex_options`.
 
 ### Added
 
@@ -117,10 +121,12 @@ change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
 
 ### Upgrading
 
-- Nothing is required. `xt restart <name>` for a pi agent picks up the new start. To use the new
-  keys, add `codex_options` to a Codex agent (then `xt restart <name>`) or a `[board_watch]` section
-  (a supervisor running 0.19.0, i.e. after the usual `xt restart --all`, picks it up on its next
-  tick).
+- From 0.18.0: `git pull upstream main` (or `xt version use v0.19.0`), then `xt restart --all` so
+  the supervisor runs the board watch and pi's prompt resend, and pi agents start with the guard
+  line. Nothing changes until you use the new keys: `codex_options` on a Codex agent (then `xt
+  restart <name>`), or a `[board_watch]` section (the supervisor picks it up on its next tick).
+  Operators need `xt operator add` from your own terminal. From 0.19.0-rc6: nothing but the
+  version changes.
 
 ## [0.18.0] — 2026-10-01
 
