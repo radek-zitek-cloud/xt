@@ -130,6 +130,16 @@ def test_each_failure_raises_one_alert_and_success_clears_it(ctx, command, cause
     assert boardwatch.status_line(ctx).startswith("board watch: last success")
 
 
+def test_a_failure_with_empty_stderr_carries_the_first_lines_of_stdout(ctx):
+    # Fizzy prints its error as JSON on standard output and exits non-zero (rc1 live run)
+    out = '{\\n  "ok": false,\\n  "error": "Unauthorized"\\n}\\n'
+    _watch(ctx, [PY, "-c", f"import sys; sys.stdout.write('{out}'); sys.exit(1)"])
+    lines = _run(BoardWatch(ctx), 0.0)
+    text = Alerts(ctx).active()["boardwatch"]["text"]
+    assert 'exit code 1: { "ok": false, "error": "Unauthorized"' in text
+    assert lines and "Unauthorized" in lines[0]
+
+
 def test_a_timeout_raises_the_alert_and_kills_the_command(ctx):
     _watch(ctx, [PY, "-c", "import time; time.sleep(30)"], timeout="1s")
     bw = BoardWatch(ctx)

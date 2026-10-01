@@ -165,12 +165,20 @@ class BoardWatch:
         return self._succeeded(cfg, cards)
 
     def _first_err(self) -> str:
-        try:
-            with open(self.err_path, "rb") as fh:
-                text = fh.read(4096).decode("utf-8", "replace")
-        except OSError:
-            return ""
-        return next((ln.strip() for ln in text.splitlines() if ln.strip()), "")[:200]
+        """The first line of the command's error output; when that is empty, its first lines of
+        standard output (Fizzy prints its error JSON there; rc1 live run)."""
+        def lines(path):
+            try:
+                with open(path, "rb") as fh:
+                    text = fh.read(4096).decode("utf-8", "replace")
+            except OSError:
+                return []
+            return [ln.strip() for ln in text.splitlines() if ln.strip()]
+
+        err = lines(self.err_path)
+        if err:
+            return err[0][:200]
+        return " ".join(lines(self.out_path)[:3])[:200]
 
     def _clock(self) -> str:
         return self.ctx.ledger.clock().isoformat(timespec="seconds")
