@@ -544,6 +544,7 @@ xt alerts, it never repairs. Alerts appear in the Inbox (red `⚠`) and as notif
 | `missing:<name>` | An agent xt started isn't running any more (crashed, or its workspace was closed outside xt) | Find out why (its pane, `xt log --member <name>`), then `u` / `xt spawn <name>` |
 | `missing:lead` with goals open | The lead isn't running though there's work | `xt up` |
 | `noprompt:<name>` | An agent started but its first prompt never showed up on its screen, so it doesn't know who it is | Stop and start it again (`xt restart <name>`) |
+| `partprompt:<name>` | (from 0.19.0, pi) The agent's first prompt reached it without its opening: the harness wasn't ready for input yet. It has its identity and protocol, but xt can't link its session log, so its context and today's usage stay empty | Stop and start it again (`xt restart <name>`); clears at its next start |
 | `silent:<id>` | The owner of an open item ignored two nudges | Look at its pane; ask the liaison or restart the agent |
 | `volume:<date>` | Today's message log is unusually big: probably two agents in a loop | `xt log` to see who; stop them |
 | `launch:<name>` | The agent runs without xt's launch settings: something other than xt started it, typically the terminal multiplexer restoring its session after a reboot or power cycle and resuming the agent's old conversation | `xt restart <name>`, or `xt restart --all` for the whole team; clears by itself |
@@ -708,7 +709,12 @@ agent to its log by its first prompt, so a restarted agent starts again from its
 `~` means approximate (Codex reports the latest turn's usage, not a live figure); tokens with no
 bar and no share mean the window isn't known for that model (`?` in the detail); `—` means nothing
 is recorded yet, or the agent isn't running
-(its detail then shows the last session's figure, labelled as such). Supported: Codex, Claude
+(its detail then shows the last session's figure, labelled as such). When a running agent has no
+session log xt can link, `xt status` says so under its row (`no session log found for <name>: its
+context and today's usage can't be read`; from 0.19.0). pi takes input a moment after it appears
+to have started, so for pi xt waits until its screen has stopped changing before it types the first
+prompt, then checks the session log for the prompt's opening; an incomplete prompt raises
+`partprompt:<name>`. Supported: Codex, Claude
 Code, pi. The window comes from where it's reliable: Codex writes the usable window of the session
 into its log (258,400 tokens for the current models, well below an API model's published maximum,
 such as gpt-6-astra's 1.05M); Claude Code doesn't, so xt uses the table in

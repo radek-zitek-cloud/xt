@@ -157,14 +157,19 @@ supervisor, never inside an agent's shell.
    - claude "Is this a project you created or one you trust?": `down`, `enter` ("No, exit" is
      preselected). Herdr refuses `agent start` with `agent_not_ready` while it's up; xt answers
      it and waits for the agent to become idle instead of giving up.
-   - pi: started with `-a`, so no dialog (and repo skills load).
+   - pi: started with `-a`, so no dialog (and repo skills load). pi takes input a moment after
+     Herdr reports it started, so its adapter sets `ready_settle = 3`: xt waits until the pane's
+     screen has stayed unchanged for three checks a second apart (at most 30) before step 3
+     (card #167).
 3. **First prompt.** Identity ("You are **name**, an agent in the xt team …"), a precedence
    statement (for team coordination the xt protocol wins over any other instructions the agent
    has), `protocol.md`, the role brief, the skills index, and `xt brief` for that agent.
 4. **Landed check.** The prompt counts as delivered only if Herdr sees the agent start working
    *and* the prompt's text appears on the agent's screen. Otherwise xt retries once, then raises a
    `noprompt:<name>` alert. (Without this, a codex liaison twice ran with no identity and acted as
-   a plain assistant.)
+   a plain assistant.) With `check_prompt_in_log` (pi), xt then reads the harness's session log: a
+   log with the prompt's later parts but not its opening raises `partprompt:<name>` (the prompt
+   lost its first characters, so `usage.find_session` can't link the log).
 5. The agent is added to the "expected" set, so the supervisor can tell a crash from a stop.
 
 **What goes into the start command.** Before step 1, `permissions.effective` picks the agent's

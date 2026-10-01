@@ -38,6 +38,11 @@ class Adapter:
     connector_style: str | None = None  # "claude-mcp" (named opt-in possible) or None (no opt-in)
     # The flag that passes a settings file (per-agent permissions, card #117); None = not supported.
     settings_flag: str | None = None
+    # Readiness before the first prompt (card #167): Herdr can report the harness started before it
+    # takes input. With `ready_settle = N`, xt waits until the screen stays unchanged for N checks a
+    # second apart; with `check_prompt_in_log`, it checks the session log for the prompt's opening.
+    ready_settle: int = 0
+    check_prompt_in_log: bool = False
 
     @property
     def installed(self) -> bool:
@@ -125,6 +130,8 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
             connector_block_args=list(d.get("connector_block_args", [])),
             connector_style=d.get("connector_style"),
             settings_flag=d.get("settings_flag"),
+            ready_settle=int(d.get("ready_settle", 0)),
+            check_prompt_in_log=bool(d.get("check_prompt_in_log", False)),
         )
     return out
 

@@ -18,3 +18,10 @@ limits = [
 # (cached by xt for a day), or this table ("provider/model" = tokens) to override.
 sessions = "~/.pi/agent/sessions/*/*.jsonl"
 session_format = "pi"
+
+# pi takes input a moment after Herdr reports it started: a first prompt typed at once lost its
+# first five characters on a first start (card #167). xt waits until pi's screen has stayed
+# unchanged for this many checks (a second apart), then checks the session log for the prompt's
+# opening and alerts when it arrived incomplete.
+ready_settle = 3
+check_prompt_in_log = true

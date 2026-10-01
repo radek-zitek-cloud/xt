@@ -71,6 +71,7 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     # Before the harness starts, so it and every shell it opens inherit it (card #103).
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
     answered: list[str] = []
+    began = time.time()
     try:
         ctx.herdr.start_agent(name, adapter.herdr_kind, pane, args)
     except HerdrError as e:
@@ -85,11 +86,15 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     set_expected(ctx, name, True)
     set_stopped(ctx, name, False)
     Alerts(ctx).resolve(f"launch:{name}")  # xt started it, with its settings (card #165)
+    Alerts(ctx).resolve(f"partprompt:{name}")  # a new start sends a new first prompt (card #167)
     answered += answer_startup_dialogs(ctx, adapter, pane)
     for dialog in answered:
         ctx.ledger.append(SYSTEM, HUMAN, "system", f"answered {a.harness}'s '{dialog}' dialog for {name}")
+    settled = wait_settled(ctx, adapter, pane)
     landed = send_first_prompt(ctx, name, pane, adapter, first_prompt(ctx, name))
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
+    if landed and adapter.check_prompt_in_log:
+        note = check_prompt_in_log(ctx, name, adapter, began, settled)
     from . import __version__, versions
 
     versions.record_agent_start(ctx, name, ctx.ledger.clock())
@@ -174,6 +179,53 @@ def _landed(ctx: Ctx, pane: str) -> bool:
         if time.monotonic() >= deadline:
             return False
         time.sleep(POLL)
+
+
+SETTLE_CHECKS = 30  # most POLL-spaced checks wait_settled waits for a still screen
+
+
+def wait_settled(ctx: Ctx, adapter, pane: str) -> bool:
+    """Wait until the harness's screen has stayed the same for `adapter.ready_settle` checks: a
+    harness still drawing its start-up screen doesn't take input yet, and a prompt typed then loses
+    its first characters (pi, card #167). True when it settled (or nothing to wait for), False when
+    it kept changing: xt types the prompt anyway and the log check reports what arrived."""
+    if not adapter.ready_settle:
+        return True
+    last, still = None, 0
+    for _ in range(SETTLE_CHECKS):
+        screen = ctx.herdr.read_pane(pane, lines=60)
+        still = still + 1 if screen == last and screen.strip() else 0
+        if still >= adapter.ready_settle:
+            return True
+        last = screen
+        time.sleep(POLL)
+    return False
+
+
+def check_prompt_in_log(ctx: Ctx, name: str, adapter, since: float, settled: bool) -> str:
+    """Whether the first prompt reached the harness whole, from its session log (card #167): an
+    incomplete one raises an alert, since status can't read the agent's context or usage then. The
+    result is a note for the start record."""
+    from . import usage
+
+    deadline = time.monotonic() + LANDED_WAIT
+    while True:
+        found = usage.prompt_in_log(ctx, adapter, name, since)
+        if found or time.monotonic() >= deadline:
+            break
+        time.sleep(POLL)
+    if found == usage.WHOLE:
+        return ""
+    if found == usage.INCOMPLETE:
+        Alerts(ctx).raise_(
+            f"partprompt:{name}",
+            f"{name}'s first prompt reached {adapter.name} without its opening (the harness wasn't ready "
+            f"for input{'' if settled else '; its screen never settled'}). It has its identity and "
+            f"protocol, but xt can't find its session log, so `xt status` can't show its context or "
+            f"today's usage. `xt stop {name}` and `xt spawn {name}` start it again.",
+        )
+        return " — FIRST PROMPT ARRIVED INCOMPLETE, see alert"
+    return " — first prompt not checked: no session log showed it yet"
 
 
 def send_first_prompt(ctx: Ctx, name: str, pane: str, adapter, text: str) -> bool:

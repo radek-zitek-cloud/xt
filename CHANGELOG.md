@@ -9,6 +9,26 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.19.0] — not released yet
+
+### Fixed
+
+- **pi gets its first prompt whole (#167).** On a first start pi takes input a moment after Herdr
+  reports it started, and the first prompt lost its first five characters; xt then couldn't link
+  the agent's session log, so `xt status` showed its context and today's usage empty, with no
+  reason. For pi, xt now waits until the screen has stayed unchanged for three checks a second
+  apart (at most 30) before it types the prompt, then checks pi's session log for the prompt's
+  opening. A prompt that still arrives without it raises a `partprompt:<name>` alert (cleared at the
+  agent's next start) and the start record says so; when no log shows the prompt yet, the start
+  record says it wasn't checked. Two new adapter keys carry this, `ready_settle` and
+  `check_prompt_in_log`, set in `harnesses/pi.toml` only: Claude Code and Codex starts are
+  unchanged. `xt status` now says `no session log found for <name>: its context and today's usage
+  can't be read` under a running agent whose log xt can't find, for any harness.
+
+### Upgrading
+
+- Nothing to do: `xt restart <name>` for a pi agent picks up the new start.
+
 ## [0.18.0] — 2026-10-01
 
 The release: the same code and docs as 0.18.0-rc6 (only the version and this changelog changed).

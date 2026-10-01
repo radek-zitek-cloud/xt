@@ -340,6 +340,9 @@ def cmd_status(args) -> None:
         today_txt += f"  next wake {dt.datetime.fromtimestamp(nxt):%a %H:%M}" if nxt else ""
         print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} "
               f"open:{mine:<3} context:{ctx_txt:<12} today:{today_txt}")
+        if a.name in live and a.name in contexts and contexts[a.name].reason == usage.NOT_FOUND:
+            # blanks with no reason looked like nothing to read (card #167)
+            print(f"  {'':<12} no session log found for {a.name}: its context and today's usage can't be read")
         settings_path = permissions.shown(ctx.team, a, adapters.get(a.harness))
         if settings_path:
             print(f"  {'':<12} settings: {settings_path}")

@@ -22,6 +22,7 @@ from .adapters import Adapter, load_adapters
 from .context import Ctx
 from .team import HUMAN, SYSTEM
 
+NOT_FOUND = "session not found since the agent started"
 HEAD_BYTES = 256 * 1024  # where the first prompt is (session header + first user message)
 TAIL_BYTES = 512 * 1024  # where the latest usage record is
 MODEL_WINDOWS_TTL = 24 * 3600
@@ -118,11 +119,15 @@ def _marker_re(name: str, team: str) -> re.Pattern:
     return re.compile(re.escape(f"You are **{name}**, an agent in the xt team ") + r'\\?"' + re.escape(team))
 
 
-def find_session(ctx: Ctx, adapter: Adapter, name: str, since: float | None) -> str | None:
-    """The newest main session log whose first prompt is this agent's, written since it started."""
-    if not adapter.sessions:
-        return None
-    marker = _marker_re(name, ctx.team.name)
+def _later_markers(ctx: Ctx, name: str) -> list[str]:
+    """Two pieces of the first prompt's first paragraph after its opening: they survive when the
+    harness loses the opening characters (card #167)."""
+    return [f"The team's repo (your home, not your workspace) is {ctx.paths.root}.",
+            f"Always pass `--as {name}` when you use xt."]
+
+
+def _recent_logs(adapter: Adapter, since: float | None) -> list[str]:
+    """The adapter's session logs written since `since` (two minutes' slack), newest first."""
     floor = (since or time.time() - 3 * 86400) - 120
     candidates = []
     for path in glob.glob(os.path.expanduser(adapter.sessions)):
@@ -131,13 +136,45 @@ def find_session(ctx: Ctx, adapter: Adapter, name: str, since: float | None) -> 
                 candidates.append(path)
         except OSError:
             continue
-    for path in sorted(candidates, key=os.path.getmtime, reverse=True):
+    return sorted(candidates, key=os.path.getmtime, reverse=True)
+
+
+def find_session(ctx: Ctx, adapter: Adapter, name: str, since: float | None) -> str | None:
+    """The newest main session log whose first prompt is this agent's, written since it started."""
+    if not adapter.sessions:
+        return None
+    marker = _marker_re(name, ctx.team.name)
+    for path in _recent_logs(adapter, since):
         try:
             head = _head(path)
         except OSError:
             continue
         if marker.search(head) and _is_main_session(adapter.session_format, head):
             return path
+    return None
+
+
+WHOLE, INCOMPLETE = "whole", "incomplete"
+
+
+def prompt_in_log(ctx: Ctx, adapter: Adapter, name: str, since: float) -> str | None:
+    """How the agent's first prompt arrived, read from its session log (card #167): WHOLE when its
+    opening is there, INCOMPLETE when only its later parts are, None when no log has it yet."""
+    if not adapter.sessions:
+        return None
+    marker = _marker_re(name, ctx.team.name)
+    later = _later_markers(ctx, name)
+    for path in _recent_logs(adapter, since):
+        try:
+            head = _head(path)
+        except OSError:
+            continue
+        if not _is_main_session(adapter.session_format, head):
+            continue
+        if marker.search(head):
+            return WHOLE
+        if all(m in head for m in later):
+            return INCOMPLETE
     return None
 
 
@@ -284,7 +321,7 @@ def reading(ctx: Ctx, name: str, adapters: dict[str, Adapter] | None = None,
         return Reading(reason=f"xt can't read {a.harness if a else '?'} sessions yet")
     path = session_for(ctx, adapter, name, starts.get(name))
     if not path:
-        return Reading(source=f"{adapter.name} session log", reason="session not found since the agent started")
+        return Reading(source=f"{adapter.name} session log", reason=NOT_FOUND)
     try:
         lines = _tail_lines(path)
     except OSError as e:
