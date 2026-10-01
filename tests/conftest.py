@@ -190,6 +190,20 @@ def add_member(ctx: Ctx, name: str, role: str = "worker", reports_to: str = "lea
     ctx.reload_team()
 
 
+class _Everyone(set):
+    def __contains__(self, name):
+        return True
+
+
+@pytest.fixture(autouse=True)
+def agents_started_by_xt(monkeypatch):
+    """Card #165 reads /proc for each agent's XT_AGENT: the fake agents have no process, so every
+    one counts as started by xt unless a test says otherwise (tests/test_launch_0180.py)."""
+    from xt import launch
+
+    monkeypatch.setattr(launch, "scan", lambda root, proc=None: launch.Scan(_Everyone()))
+
+
 @pytest.fixture(autouse=True)
 def no_controlling_terminal(monkeypatch):
     """Tests decide the human terminal through a fake stdin (a terminal on stdin stands for the

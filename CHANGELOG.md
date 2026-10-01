@@ -11,8 +11,9 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [0.18.0] — not released yet
 
-Agent lifecycle: fewer manual resets. **0.18.0-rc1** has #134 and #114. No protocol or ledger
-format change; one new state file, `.xt/state/resets.json`.
+Agent lifecycle: fewer manual resets, and a warning when agents run without xt's launch settings.
+**0.18.0-rc1** has #134 and #114; **0.18.0-rc2** adds #165. No protocol or ledger format change;
+one new state file, `.xt/state/resets.json`.
 
 ### Added
 
@@ -33,6 +34,20 @@ format change; one new state file, `.xt/state/resets.json`.
   `"off"` exempts it. The ledger says why (context and threshold in tokens, the policy). A cancelled
   or abandoned automatic reset also waits for the cool-down. A bad setting is said once in the
   supervisor's log and resets nobody.
+- **A warning when an agent runs without xt's launch settings (#165).** After a power cycle the
+  terminal multiplexer can resume every agent in its old conversation without the identity,
+  model, settings file and connector and tool blocks xt starts it with. The supervisor (about once
+  a minute), `xt status` and `xt up` now look for each running agent's harness process in the team
+  repo with its `XT_AGENT` in the environment (read from `/proc`); without one, they say `<name> is
+  running without xt's launch settings (restored by the multiplexer?) … Run xt restart <name> (or
+  --all)`, raise one `launch:<name>` Inbox alert per agent, and the Team pane shows a red `!` in
+  place of the agent's dot. The alert clears when xt starts the agent again. A harness process xt
+  can't inspect makes the agent `not checked` in `xt status`, never a match.
+
+### Changed
+
+- **`xt status` says whenever the supervisor isn't running (#165),** not only when messages or jobs
+  are waiting for it.
 
 ### Upgrading
 

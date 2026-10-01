@@ -323,6 +323,10 @@ def cmd_status(args) -> None:
     from .reset import queued, queued_text
 
     resets = queued(ctx)
+    from . import launch
+
+    launched = launch.check(ctx, live)  # card #165
+    launch.alert(ctx, launched, live)
     for a in ctx.team.agents():
         if a.kind == HUMAN:
             continue
@@ -341,6 +345,11 @@ def cmd_status(args) -> None:
             print(f"  {'':<12} settings: {settings_path}")
         if a.name in resets:
             print(f"  {'':<12} {queued_text(resets[a.name])}")
+        state_launch, why = launched.get(a.name, (None, ""))
+        if state_launch == launch.MISSING:
+            print(f"  {'':<12} WARNING: {launch.warning(a.name)}")
+        elif state_launch == launch.UNCHECKED:
+            print(f"  {'':<12} launch settings: not checked ({why})")
     from .jobs import Jobs
     from .reset import suggestion
     from .watch import watch_pid
@@ -359,8 +368,10 @@ def cmd_status(args) -> None:
     print(f"team usage today: {turns.fmt(spend.team_today)}")
     for line in turns.allowance_lines(ctx):
         print(f"allowance: {line}")
-    if (q or jobs) and not watch_pid(ctx):
-        print("the supervisor isn't running: queued messages and jobs wait for it (`xt up`)")
+    if not watch_pid(ctx):  # said plainly whenever it's down (card #165), not only with a backlog
+        waiting = " Queued messages and jobs wait for it." if q or jobs else ""
+        print(f"the supervisor isn't running: no messages are delivered, no alerts raised and nobody is "
+              f"woken until it runs.{waiting} `xt up` starts it.")
 
 
 def cmd_restart(args) -> None:

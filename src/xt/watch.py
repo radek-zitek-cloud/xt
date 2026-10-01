@@ -159,6 +159,7 @@ class Supervisor:
             self.last_usage = now
             self.record_usage()
             self.auto_reset()
+            self.check_launch(live)
         self.check_published()
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
@@ -219,6 +220,14 @@ class Supervisor:
         pending_to = {i["to"] for i in Queue(self.ctx).pending()}
         for line in reset.advance(self.ctx, self.ctx.herdr.agents(), pending_to):
             self.say(line)
+
+    def check_launch(self, live: dict) -> None:
+        """Agents running without xt's launch settings, e.g. resumed by a restored multiplexer
+        session (card #165): one alert each, cleared when xt starts the agent again."""
+        from . import launch
+
+        for name in launch.alert(self.ctx, launch.check(self.ctx, live), live):
+            self.say(f"alert: {name} runs without xt's launch settings")
 
     def auto_reset(self) -> None:
         """The automatic reset policy (card #114, off by default): queues resets that run_resets

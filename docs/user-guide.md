@@ -543,9 +543,22 @@ xt alerts, it never repairs. Alerts appear in the Inbox (red `⚠`) and as notif
 | `noprompt:<name>` | An agent started but its first prompt never showed up on its screen, so it doesn't know who it is | Stop and start it again (`xt restart <name>`) |
 | `silent:<id>` | The owner of an open item ignored two nudges | Look at its pane; ask the liaison or restart the agent |
 | `volume:<date>` | Today's message log is unusually big: probably two agents in a loop | `xt log` to see who; stop them |
+| `launch:<name>` | The agent runs without xt's launch settings: something other than xt started it, typically the terminal multiplexer restoring its session after a reboot or power cycle and resuming the agent's old conversation | `xt restart <name>`, or `xt restart --all` for the whole team; clears by itself |
 
-`c` (or `xt clear <key>`) dismisses an alert once dealt with. `xt status` also warns when the
-supervisor isn't running (then nothing is delivered: `xt up`).
+`c` (or `xt clear <key>`) dismisses an alert once dealt with. `xt status` also says whenever the
+supervisor isn't running (then nothing is delivered, no alert is raised and nobody is woken: `xt up`).
+
+**An agent running without xt's launch settings.** xt starts every agent with its identity
+(`XT_AGENT`), its model, its settings file and its connector and browser-tool blocks. A process
+resumed some other way has none of them, so it may run the wrong model without the permissions and
+limits the team relies on. The supervisor (about once a minute), `xt status` and `xt up` look for
+each running agent's harness process (in the team repo, with `XT_AGENT=<name>` in its environment)
+and, when there is none, say `<name> is running without xt's launch settings (restored by the
+multiplexer?) … Run xt restart <name> (or --all)`, raise one `launch:<name>` alert under Needs you,
+and mark the agent with a red `!` in place of its dot in the TUI's Team pane. The alert clears when
+xt starts the agent again. When xt can't read a harness process's environment (another user's, or a
+sandbox without `/proc`), `xt status` shows `launch settings: not checked (…)` for the agent and
+raises nothing: it never counts as a match.
 
 ### 10. Shrinking the team
 

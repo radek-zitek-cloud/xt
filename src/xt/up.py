@@ -50,7 +50,18 @@ def up(ctx: Ctx) -> list[str]:
         else:
             note = " — was running before; find out why it stopped" if a.name in exp else ""
             out.append(f"member: {a.name} not running{note}; `xt spawn {a.name}` starts it again")
+    out += launch_warnings(ctx)
     return out
+
+
+def launch_warnings(ctx: Ctx) -> list[str]:
+    """Agents running without xt's launch settings (card #165), with their Inbox alerts."""
+    from . import launch
+
+    live = ctx.herdr.agents()
+    results = launch.check(ctx, live)
+    launch.alert(ctx, results, live)
+    return [f"WARNING: {launch.warning(n)}" for n, (state, _) in results.items() if state == launch.MISSING]
 
 
 def down(ctx: Ctx, keep_supervisor: bool = False) -> list[str]:

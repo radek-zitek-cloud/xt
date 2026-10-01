@@ -249,6 +249,9 @@ def build(ctx: Ctx) -> Snapshot:
 
     spend = turns.today(ctx)
     contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
+    from .. import launch
+
+    unlaunched = launch.flagged(ctx)  # the supervisor's, status's or up's alert (card #165)
     team_rows = []
     for a in ctx.team.agents():
         if a.kind == HUMAN:
@@ -265,6 +268,8 @@ def build(ctx: Ctx) -> Snapshot:
             wakes = f" · woken {schedule_text(a)}" if a.wake_every else ""
             out.append(f" · {a.role} · {harness_model(a.harness, a.model)} · reports to {a.reports_to}{wakes} · ")
             out.append(state + "\n", style=STATUS_STYLE.get(state, "bright_black"))
+            if la and a.name in unlaunched:
+                out.append(launch.warning(a.name) + "\n", style="bold red")
             if la:
                 out.append(f"workspace {la.workspace_id} · pane {la.pane_id}  (f: jump there)\n", style="bright_black")
             if ctxr is not None and la:
@@ -318,6 +323,7 @@ def build(ctx: Ctx) -> Snapshot:
                 "model": shown_model(a.model, ctxr.model if ctxr else None),
                 "state": la.status if la else ("retired" if not a.active else "stopped"),
                 "dot": "●" if la else "○",  # its colour follows the state (teampane.dot_style)
+                "unlaunched": la is not None and a.name in unlaunched,  # card #165: a red ! instead
                 "used": now_ctx.used if now_ctx else None, "window": now_ctx.window if now_ctx else None,
                 "approximate": now_ctx.approximate if now_ctx else False}
         team_rows.append(Row(f"agent:{a.name}", teampane.cell(data, teampane.widths([data]), teampane.BAR_MAX),

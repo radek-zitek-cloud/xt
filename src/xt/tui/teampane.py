@@ -130,7 +130,10 @@ def cell(d: dict, w: Widths, bar: int, selected: bool = False) -> Text:
     """One agent: dot, name, short model, state, context tokens, a bar and the share of the window.
     The whole cell carries the agent's name as meta, so a click on it selects the agent (card #157)."""
     out = Text(no_wrap=True)
-    out.append(d.get("dot", "○"), style=dot_style(d))
+    if d.get("unlaunched"):  # running without xt's launch settings (card #165)
+        out.append("!", style="bold red")
+    else:
+        out.append(d.get("dot", "○"), style=dot_style(d))
     out.append(f" {d['name']:<{w.name}} ", style="bold" if d.get("running") else "")
     out.append(f"{d['model']:<{w.model}} ", style="bright_black")
     out.append(f"{d['state']:<{w.state}} ", style=STATE_STYLE.get(d["state"], "bright_black"))

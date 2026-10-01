@@ -84,6 +84,7 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         raise
     set_expected(ctx, name, True)
     set_stopped(ctx, name, False)
+    Alerts(ctx).resolve(f"launch:{name}")  # xt started it, with its settings (card #165)
     answered += answer_startup_dialogs(ctx, adapter, pane)
     for dialog in answered:
         ctx.ledger.append(SYSTEM, HUMAN, "system", f"answered {a.harness}'s '{dialog}' dialog for {name}")

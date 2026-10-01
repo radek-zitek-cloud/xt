@@ -75,6 +75,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/alerts.py` | Alerts for the human, raised and cleared by key. |
 | `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
+| `src/xt/launch.py` | Card #165: whether each running agent is the process xt started, by its `XT_AGENT` in `/proc` (a harness process working in the team repo); the warning and one Inbox alert per agent running without xt's launch settings. |
 | `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. The queued reset (`--when-idle`, `state/resets.json`), the supervisor's non-blocking step that runs it, and the opt-in automatic policy that queues one above a token threshold. |
 | `src/xt/usage.py` | Live context per agent, from its harness's session log. |
 | `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines and windows. |
@@ -321,7 +322,11 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    drops it. About once a minute (with usage recording), the **automatic reset policy** (card
    #114, `[policy] auto_reset`, off by default) queues a reset for each idle agent without open
    work whose fresh context reading is above its threshold in tokens and that had no reset within
-   the cool-down (`state/resets.json`).
+   the cool-down (`state/resets.json`). Also about once a minute, the **launch check** (card
+   #165, `src/xt/launch.py`): a running agent with no harness process in the team repo carrying
+   its `XT_AGENT` (such as one a restored multiplexer session resumed) raises one alert
+   (`launch:<name>`), cleared when xt starts it again or it stops running. `xt status` and `xt up`
+   run the same check. A harness process xt can't inspect makes it "not checked", never a match.
 6. **Volume**: alert if today's log passes the limit (a likely message loop).
 7. **Heartbeat** (every `heartbeat_minutes`): an idle owner of an open item it hasn't worked on for
    that long (no report or ask about it, no task sent under it; a new item counts from when it
@@ -460,8 +465,8 @@ harness goes to the human with `xt friction`.
   one-line toast that goes after about ten seconds; the bottom line is key hints; `h` lists every
   key (the README has the table). Slow actions (starting agents) run in the background.
   `xt tui --demo` shows sample data.
-- `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; warns if
-  the supervisor isn't running.
+- `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; agents
+  running without xt's launch settings (card #165); says whenever the supervisor isn't running.
 - `xt inbox`: the Inbox's three groups as in the TUI; in the human's terminal it clears New and
   marks the friction it printed as seen. `xt answer <id> "..."` (a number picks a decision question's
   option), `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.

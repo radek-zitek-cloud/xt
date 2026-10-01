@@ -69,6 +69,9 @@ analyst before its final release, some on staging teams rather than in daily use
   notes and has no open work ([`xt reset`](docs/user-guide.md#xt-reset)). `--when-idle` queues it
   until the agent is free, and an opt-in policy resets idle agents above a context size in tokens
   ([Resetting automatically](docs/user-guide.md#8-pausing-and-resuming-the-team)).
+- **Know when an agent runs without xt's settings.** An agent resumed outside xt (a multiplexer
+  restoring its session after a power cycle) is flagged in `xt status`, `xt up`, the Inbox and the
+  Team pane, with `xt restart` as the fix ([When something goes wrong](docs/user-guide.md#9-when-something-goes-wrong)).
 - **Decide with options.** A decision question shows numbered options, each with its consequence,
   and a recommendation; you answer with a number or your own words
   ([`xt answer`](docs/user-guide.md#xt-answer)).
