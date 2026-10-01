@@ -17,11 +17,13 @@ and accepts its releases. Most runs so far used Codex for every agent. **Using i
 [docs/user-guide.md](docs/user-guide.md)** (lifecycles and every command); how it works inside:
 [docs/architecture.md](docs/architecture.md).
 
-![The newsroom pilot team in Herdr: the liaison's pane on the left, asking which story to write next; the xt TUI on the right with goals, team, tasks, inbox, log and a goal brief in the detail pane](docs/screen.png)
+![The xt-team in Herdr: the lead's pane on the left, just handed the v0.18.0 proposal to the product manager; the xt 0.17.0 TUI on the right in three bands: Team and Inbox on top, the Flow lane chart in the middle, the answered publish question in Detail at the bottom](docs/screen.png)
 
-*The newsroom pilot in Herdr: on the left the liaison asks which of the scout's stories to write
-next; on the right the xt TUI shows the goals, the team (all on Codex), tasks, inbox and log, with
-the scout goal's brief in the detail pane.*
+*The xt-team building xt, on 0.17.0. On the left the lead has just passed the v0.18.0 proposal goal
+to the product manager. On the right the TUI in three bands: on top the team grouped by harness
+(Claude and Codex, with each account's usage windows) next to the Inbox of answered questions; in
+the middle the Flow lane chart of messages between the human, xt and the agents, newest on top; at
+the bottom the publish question for v0.17.0 that the human answered.*
 
 ## What xt can do
 
