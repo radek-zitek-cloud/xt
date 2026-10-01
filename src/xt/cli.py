@@ -374,6 +374,11 @@ def cmd_status(args) -> None:
     print(f"team usage today: {turns.fmt(spend.team_today)}")
     for line in turns.allowance_lines(ctx):
         print(f"allowance: {line}")
+    from .boardwatch import status_line
+
+    board = status_line(ctx)  # card #135
+    if board:
+        print(board)
     from .watch import recently_ticked
 
     if not watch_pid(ctx) and not recently_ticked(ctx):  # said plainly whenever it's down (card #165)
@@ -549,7 +554,7 @@ def cmd_harnesses(args) -> None:
               + (f" ({a.connectors_note})" if a.connectors_note else ""))
         print(f"   per-agent settings file (`permissions` in team.toml): "
               + (f"yes, passed with {a.settings_flag}" if a.settings_flag else "not supported"))
-        print(f"   per-agent options (`codex_options` in team.toml, Codex only): "
+        print("   per-agent options (`codex_options` in team.toml, Codex only): "
               + (f"yes, passed with -c; allowed: {allowed_codex_options()}" if a.name == CODEX else "not supported"))
 
 

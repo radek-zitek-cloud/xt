@@ -68,11 +68,12 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
 | `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, first prompt, landed check), spawn requests and their approvals, stop and retire. |
 | `src/xt/permissions.py` | Claude Code settings files: which file applies (`effective`), the preflight check, the start note. |
-| `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (settings file, connector block or opt-in, model flag), dialogs, limits. |
+| `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`), limits. |
 | `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |
 | `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor. |
 | `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. |
 | `src/xt/alerts.py` | Alerts for the human, raised and cleared by key. |
+| `src/xt/boardwatch.py` | Card #135: the board watch. Runs the `[board_watch]` command from `team.toml` in the background (no shell, no input, a timeout, at most 64 KB of output), reads its JSON array of cards, tells the lead about each number new since the last success (the first success after a supervisor start is only the baseline), one `boardwatch` alert per outage, and the status line (`state/board_watch.json`). |
 | `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
 | `src/xt/launch.py` | Card #165: whether each running agent is the process xt started, by its `XT_AGENT` in `/proc` (a harness process working in the team repo); the warning and one Inbox alert per agent running without xt's launch settings. |
@@ -107,6 +108,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | | `usage/YYYY-MM-DD.jsonl`: per-turn usage records; `state/usage_offsets.json`, `state/allowance.json`, `state/claude_plan.json` (Claude plan windows from the status line) |
 | | `state/alerts.json`, `expected.json`, `stopped.json`, `nudges.json`, `wakes.json`, `notified.json`, `goal_notices.json`, `inbox_seen.json`, `watch.pid`, `lock` |
 | | `state/resets.json`: queued resets and each agent's last reset, for the automatic policy's cool-down |
+| | `state/board_watch.json` (+ `.out`, `.err` of the last run): the board watch's last success or current failure, for status |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
 `roles/liaison.md`, `prices.toml`, `pyproject.toml`, `uv.lock`, `mise.toml`, `CHANGELOG.md`, `LICENSE`) come from
@@ -121,10 +123,12 @@ upstream and aren't edited by the team, so upstream merges rarely conflict.
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [notify]    enabled, command (e.g. "notify-send --app-name=xt {title} {body}"), quiet (e.g. "21:00-07:00")
 [defaults]  liaison / lead harness (and optional model); permissions? (settings file for every Claude agent)
+[board_watch]  command (argument list), interval? ("5m"), timeout? ("30s"), column? (its name, for the message)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
             wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"), wake_at? (e.g. "09:30"; set with `xt schedule`),
             permissions? (e.g. "settings/carol.json"; Claude Code only), connectors? (account connectors opted in),
-            auto_reset_tokens? (this agent's threshold, or "off")
+            auto_reset_tokens? (this agent's threshold, or "off"),
+            codex_options? (e.g. ["sandbox_workspace_write.network_access=true"]; Codex only, allowlisted)
 ```
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
@@ -374,7 +378,15 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    leaves the Inbox panel, `xt inbox` in the human's terminal after printing), and friction's read
    marker (`friction_upto` and the ids seen one by one above it, `friction_seen`; see
    `src/xt/inbox.py`). The supervisor's first run starts both at the end of the log.
-10. **Rotation**, hourly.
+10. **Board watch** (card #135, `src/xt/boardwatch.py`), only with a `[board_watch]` section:
+    every `interval` (default 5m) it starts the team's command in the background (an argument list,
+    no shell, no input, the supervisor's environment, its own process group) and reads the result on
+    a later tick, so a slow command never holds up the tick; past `timeout` (default 30s) or 64 KB
+    of output it is killed. The output must be a JSON array of `{number, title?}`. The first
+    success after the supervisor starts is the baseline; each later number not in the set is one
+    `system` message to the lead. The first failure of an outage raises the `boardwatch` alert; the
+    next success clears it and compares against the set kept from before the outage.
+11. **Rotation**, hourly.
 
 Every event the supervisor prints in its pane is also appended to `state/watch.log`, which the
 TUI's supervisor pop-up (`v`) and `xt log --watch` show. A failed wake-up, notification or usage

@@ -129,6 +129,9 @@ class Supervisor:
         self.notify_error: str | None = None
         self.quiet_ids: set[int] = set()  # alerts about a failed notification: never notified
         self.policy_problems: set[str] = set()  # bad auto-reset settings already said (card #114)
+        from .boardwatch import BoardWatch
+
+        self.board = BoardWatch(ctx)  # card #135
 
     def failed(self, kind: str, error: str) -> None:
         """A failed wake-up, notification or usage recording raises an Inbox alert (card #131); a
@@ -175,6 +178,7 @@ class Supervisor:
             self.auto_reset()
             self.check_launch(live)
         self.check_published()
+        self.watch_board(now)
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
             for line in self.ctx.ledger.rotate(
@@ -193,6 +197,15 @@ class Supervisor:
         if not self.published_checked or versions.published_due(self.ctx, now):
             self.published_checked = True
             self.say(versions.refresh_published(self.ctx, now))
+
+    def watch_board(self, now: float) -> None:
+        """The team's board command, if it has one (card #135). Its own failures become its alert;
+        a bug here must never stop the supervisor."""
+        try:
+            for line in self.board.tick(now):
+                self.say(line)
+        except Exception as e:  # noqa: BLE001
+            self.say(f"board watch error: {type(e).__name__}: {e}")
 
     def check_agents(self, live: dict) -> None:
         team = self.ctx.team
@@ -457,5 +470,6 @@ def run(ctx: Ctx) -> None:
     except KeyboardInterrupt:
         sup.say("stopped")
     finally:
+        sup.board._stop()  # no board command outlives the supervisor
         if pidfile.exists() and pidfile.read_text().strip() == str(os.getpid()):
             pidfile.unlink()

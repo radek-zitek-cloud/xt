@@ -21,6 +21,19 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
   options (with "network on: it can reach any host"), and say when the running start has other
   options than `team.toml`; `xt harnesses` says the key is for Codex only. The options are kept
   with the agent's start record (`.xt/state/versions.json`). Without the line nothing changes.
+- **Tell the lead when a card enters a Board column (#135).** An optional `[board_watch]` section in
+  `team.toml` names a command (an argument list, run without a shell, with no input and the
+  supervisor's environment), an `interval` (default 5m), a `timeout` (default 30s) and optionally
+  the `column`'s name. The supervisor runs it in the background and reads, on exit code 0, one JSON
+  array of the cards in the column (`[{"number": 129, "title": "…"}]`, at most 64 KB). Its first
+  success after a supervisor start records the set; each later card number not in it reaches the
+  lead as one system message ("Card 129 (…) is now in Ready to build (seen by the board watch)").
+  A card leaving causes nothing. A non-zero exit, a timeout, unreadable output or a command that
+  can't start raises one `boardwatch` alert per outage with the cause and the first line of the
+  command's error output; the next success clears it and reports the cards that entered meanwhile.
+  `xt status` shows the last success or the failure. xt contains no board code: Fizzy is an
+  example (`docs/examples.md` §8). New state: `.xt/state/board_watch.json` and the last run's
+  `.out`/`.err`.
 
 ### Fixed
 
@@ -38,7 +51,10 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ### Upgrading
 
-- Nothing to do: `xt restart <name>` for a pi agent picks up the new start.
+- Nothing is required. `xt restart <name>` for a pi agent picks up the new start. To use the new
+  keys, add `codex_options` to a Codex agent (then `xt restart <name>`) or a `[board_watch]` section
+  (a supervisor running 0.19.0, i.e. after the usual `xt restart --all`, picks it up on its next
+  tick).
 
 ## [0.18.0] — 2026-10-01
 

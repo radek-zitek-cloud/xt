@@ -388,6 +388,43 @@ passed and it's idle.
   asking you (naming the rule) and tells you afterwards.
 - A decision like "pass" (none of these) is a decision: a standing auto-pick won't override it.
 
+**The board watch** (from 0.19.0). When you move a card into a Board column that means "go" (Ready
+to build, say), the team can learn it without a message from you. xt knows no board tool: you name
+a command in `team.toml` that lists the cards in that column, and the supervisor runs it on a
+schedule.
+
+```toml
+[board_watch]
+command = ["fizzy", "card", "list", "--board", "BOARD_ID", "--column", "COLUMN_ID", "--all", "--jq", "[.data[] | {number, title}]"]
+interval = "5m"             # how often; default 5m
+timeout = "30s"             # a run taking longer is a failure; default 30s
+column = "Ready to build"   # optional: the column's name, used in the message
+```
+
+- **The command's output (the contract).** Exit code 0 and, on standard output, one JSON array of
+  the cards now in the column, each an object with a `number` (integer or string) and an optional
+  `title`: `[{"number": 129, "title": "Work outline"}]`. An empty array is fine. Anything else is a
+  failure, and so is output over 64 KB.
+- **What the lead gets.** The supervisor keeps the set of numbers from its last successful run.
+  A number that wasn't there before reaches the lead as one system message: `Card 129 (Work
+  outline) is now in Ready to build (seen by the board watch)`. xt doesn't say who moved it (the
+  output doesn't tell). A card that leaves the column causes nothing. The first successful run
+  after the supervisor starts only records the set, so a restart replays nothing.
+- **Failures.** A non-zero exit, a timeout, output that isn't the array above, or a command that
+  can't be started raises one Inbox alert (`boardwatch`) naming the cause (`exit code 3`, `timed
+  out after 30s`, `unreadable output`) and the first line of the command's error output. Later
+  failures don't repeat it; the next success clears it. During an outage the supervisor keeps the
+  old set, so a card that entered meanwhile is reported after it.
+- **Where it runs.** As your user, outside every agent's sandbox, from the team repo, with no input
+  and the supervisor's environment (the shell of the Herdr pane it runs in). It's run directly,
+  never through a shell, so `;`, `$(…)` and quotes in the list are plain text. xt passes it nothing
+  else and gives agents neither the command nor its credentials; only you edit `team.toml`. A
+  Fizzy command reads its token from your keyring: run it once in a pane of the team's Herdr
+  session to check that it can.
+- `xt status` shows `board watch: last success Wed 10:05 (3 card(s) in the column)`, or `board
+  watch: FAILING since …` with the cause. One watched column per team. Without the section nothing
+  runs. See [examples](examples.md#8-tell-the-lead-when-a-card-is-ready-to-build).
+
 ### 6. Changing or stopping a goal
 
 - **Change it:** tell the liaison; it sends the lead the change with a reference to the goal.

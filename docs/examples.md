@@ -406,3 +406,41 @@ reach any host)`.
   agent's start and names what is allowed, because Codex may silently accept a key it doesn't know.
 - An agent without the line runs as before, with no network. See the
   [user guide](user-guide.md#11-memory-and-recovery).
+
+## 8. Tell the lead when a card is Ready to build
+
+**Context.** You approve work by moving its card on the Board into Ready to build, and the lead
+should start on it without a message from you. The board watch runs a command you name and tells
+the lead about each card that enters the column (from 0.19.0). Here the Board is Fizzy, with its
+command-line client `fizzy`.
+
+Find the board's and the column's IDs once, in your own terminal:
+
+```sh
+fizzy column list --board BOARD_ID --jq '[.data[] | {id,name}]'
+```
+
+Then in `team.toml` (yours to edit; agents never do):
+
+```toml
+[board_watch]
+command = ["fizzy", "card", "list", "--board", "BOARD_ID", "--column", "COLUMN_ID", "--all", "--jq", "[.data[] | {number, title}]"]
+interval = "5m"
+timeout = "30s"
+column = "Ready to build"
+```
+
+The `--jq` projection makes Fizzy print exactly the contract: a JSON array of `{number, title}`.
+The supervisor picks the section up on its next tick. Its first run records the cards already in
+the column; after that, moving card 129 there gives the lead:
+
+```text
+Card 129 (Work outline) is now in Ready to build (seen by the board watch)
+```
+
+- Fizzy reads its token from your keyring. The command runs in the supervisor's environment (the
+  pane of the team's Herdr session), so run the `fizzy column list` above in a new pane of that
+  session first: if it prints the columns, the watch can reach the keyring too.
+- If the command fails (Fizzy down, the token expired), one `boardwatch` alert says why and clears
+  at the next success; cards that entered meanwhile are reported then.
+- Any other board works the same way: a command, or a small script, that prints the array.

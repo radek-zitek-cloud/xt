@@ -107,6 +107,13 @@ analyst before its final release, some on staging teams rather than in daily use
   lane per agent, one arrow per message with its type's glyph, messages to you dotted, system
   lines hidden until `t`, and `f` for one agent or one goal's thread
   ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
+- **Hear when a card is ready to build.** A command you name in `team.toml` lists a Board column;
+  the supervisor runs it every few minutes and tells the lead about each card that enters, with one
+  alert if the command fails. xt stays independent of the board tool
+  ([Periodic work](docs/user-guide.md#5-periodic-work-schedules-quiet-hours-standing-rules)).
+- **Network for one Codex agent.** `codex_options` gives a single Codex agent the sandbox's network
+  switch (an allowlist of one), shown in its start note, `xt status` and the brief
+  ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
 
 What it can't do yet is in [Known limits](#known-limits).
 
@@ -297,8 +304,11 @@ Each `[[agent]]` has `name`, `role`, `harness`, optional `model`, `reports_to`, 
 optional schedule (`wake_every`, `wake_message`, `wake_between`, `wake_at`), optional
 `connectors` (account connectors opted in for that agent; none by default) and, for a Claude Code
 agent, optional `permissions` (its settings file, e.g. `"settings/carol.json"`; `[defaults]
-permissions` sets one for every Claude agent). Runtime facts such as pane ids never go in
-`team.toml`. A copyable settings file is in [docs/examples.md](docs/examples.md).
+permissions` sets one for every Claude agent), and for a Codex agent optional `codex_options`
+(only `["sandbox_workspace_write.network_access=true"]`: network for that agent). An optional
+`[board_watch]` names a command that lists a Board column's cards, so the lead hears when one
+enters it. Runtime facts such as pane ids never go in `team.toml`. Copyable examples of each are in
+[docs/examples.md](docs/examples.md).
 
 ## Layout
 
