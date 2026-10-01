@@ -17,15 +17,16 @@ and accepts its releases. Most runs so far used Codex for every agent. **Using i
 [docs/user-guide.md](docs/user-guide.md)** (lifecycles and every command); how it works inside:
 [docs/architecture.md](docs/architecture.md).
 
-![The xt-team in Herdr: the lead's pane on the left, just handed the v0.18.0 proposal to the product manager; the xt 0.17.0 TUI on the right in three bands: Team and Inbox on top, the Flow lane chart in the middle, the answered publish question in Detail at the bottom](docs/screen-v0170.png)
+![The xt-team in Herdr on xt 0.18.0: on the left the liaison's pane, telling the human what the v0.19.0-rc5 release candidate needs next; on the right the xt TUI in three bands: the Team pane grouped by harness and the Inbox's notifications on top, the Flow lane chart of messages between the human, xt and five agents in the middle, and the liaison's report in Detail at the bottom](docs/screen-v0180.png)
 
-*The xt-team building xt. The picture was taken on 0.17.0, and the layout is still the current one
-in 0.19.0. On the left the lead has just passed the v0.18.0 proposal goal to the product manager.
-On the right the TUI in three bands: on top the Team pane grouped by harness (Claude and Codex, with
-each account's usage windows) next to the Inbox; in the middle Flow, the lane chart of messages
-between the human, xt and the agents, newest on top (Work, the outline of goals and tasks, shares
-that band: `2` and `3` switch); at the bottom the Detail pane with the publish question for v0.17.0
-that the human answered.*
+*The xt-team building xt, live on 0.18.0. On the left the liaison's pane: it has just forwarded the
+lead's status on the v0.19.0 goal and lists, in plain words, the checks only the human can run
+next. On the right the TUI in three bands. On top, the Team pane grouped by harness (Claude with
+its five-hour and weekly windows for the liaison, lead, product manager and builder; Codex for the
+quality analyst; a retired pi agent) next to the Inbox's notifications, newest first. In the
+middle, Flow: one lane each for the human, xt and the agents, one arrow per message, the newest on
+top (Work, the outline of goals and tasks, shares that band: `2` and `3` switch). At the bottom,
+the Detail pane with the selected notification, the liaison's report on the rc5 candidate.*
 
 ## What xt can do
 

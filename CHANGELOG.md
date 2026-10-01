@@ -14,7 +14,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 **0.19.0-rc1** has #167, #169 and #135; **0.19.0-rc2** adds #166; **0.19.0-rc3** adds #156 (the
 docs and site caught up) and three findings from the rc1 live run and QA's rc2 check (below);
 **0.19.0-rc4** fixes two #166 findings from the rc3 live run; **0.19.0-rc5** prevents #167's lost
-characters instead of only reporting them (reopened by Radek). No protocol or ledger format
+characters instead of only reporting them (reopened by Radek); **0.19.0-rc6** gives the README and
+the site's `og:image` a new screenshot of the live team (#156, docs only). No protocol or ledger format
 change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
 `.xt/state/operators.json` (+ `.xt/operators/`), and the agents' start records in
 `.xt/state/versions.json` may carry `codex_options`.
@@ -101,12 +102,13 @@ change; new state files `.xt/state/board_watch.json` (+ `.out`, `.err`) and
 ### Documentation
 
 - **README, architecture and site caught up (#156, rc3).** The README's "Added since" list covers
-  0.11.0 to 0.19.0 with an entry for each release, its version examples name v0.19.0, and the
-  screenshot's caption says the 0.17.0 picture shows the layout still current. `docs/architecture.md`
-  describes 0.19.0. The site's first screenshot and its TUI section use new 0.19.0 images
-  (`xt tui --demo` at 160×40, with Flow and with Work), with new alt text; the old `screen.jpg` and
-  `tui-v0170.svg` are gone, and `og:image` points to `assets/screen-v0170.png` (the README's PNG,
-  copied into `site/assets/` at publication).
+  0.11.0 to 0.19.0 with an entry for each release, and its version examples name v0.19.0.
+  `docs/architecture.md` describes 0.19.0. The site's first screenshot and its TUI section use new
+  0.19.0 images (`xt tui --demo` at 160×40, with Flow and with Work), with new alt text; the old
+  `screen.jpg` and `tui-v0170.svg` are gone. From rc6 the README's picture is a new screenshot of
+  the live xt-team on 0.18.0 (`docs/screen-v0180.png`: the liaison's pane beside the TUI's Team,
+  Inbox, Flow and Detail), with new alt text and caption, and the site's `og:image` is the same
+  picture (`site/assets/screen-v0180.png`).
 - **Examples (rc3).** `docs/examples.md` §7 shows QA's suite in a clean clone under Codex with
   network on (`UV_CACHE_DIR` inside the clone: the default cache is read-only in Codex's sandbox);
   §8 says to run the board command once by hand, since a wrong column id prints `[]` and exits 0;
