@@ -1,6 +1,6 @@
 [project]
 name = "xt"
-version = "0.19.0"
+version = "0.20.0rc1"
 description = "Harness-agnostic hierarchical agent teams on top of Herdr"
 readme = "README.md"
 license = "MIT"
