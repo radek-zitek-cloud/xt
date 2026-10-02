@@ -191,7 +191,8 @@ supervisor, never inside an agent's shell.
 settings file (its own `permissions` line, else `[defaults] permissions` when the harness takes one;
 a Codex or pi agent with its own line is refused), `permissions.preflight` checks it (inside the
 repo, JSON, known `defaultMode`, well-formed rules; a bad file refuses the start) and
-`Adapter.start_args` builds the arguments: the adapter's own `args`, then a Codex agent's
+`Adapter.start_args` builds the arguments: the adapter's own `args` (for Claude Code, Claude in
+Chrome refused and `--disable-slash-commands`, card #188), then a Codex agent's
 `codex_options` as `-c key=value` (checked by `adapters.codex_option_args` against the allowlist
 `CODEX_OPTIONS`, which is the sandbox network switch alone; anything else, or the line on another
 harness, refuses the start; card #169), then `--settings <file>` (the

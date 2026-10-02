@@ -3,7 +3,9 @@ herdr_kind = "claude"
 binary = "claude"
 # Agents get no browser control (card #89): Claude in Chrome's tools are refused for xt's sessions.
 # Other desktop skills weren't available to verify, so this is reported as partial.
-args = ["--disallowedTools", "mcp__claude-in-chrome"]
+# No slash skills (card #188): the operator's personal and plugin skill listing cost about 9k
+# tokens at every start (measured 2026-10-02); team skills are files under skills/ and still work.
+args = ["--disallowedTools", "mcp__claude-in-chrome", "--disable-slash-commands"]
 desktop_tools = "partial"
 desktop_tools_note = "Claude in Chrome tools refused for this session; other desktop or computer-use skills not verified"
 # The operator's account connectors (card #101): claude.ai connectors (mail, drive, calendar…)

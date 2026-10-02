@@ -673,6 +673,11 @@ switched off and Claude Code agents with Claude in Chrome refused (their own set
 sessions stay as they are); `xt harnesses` shows what each harness blocks, and a start note says
 when a harness can't block everything. Agents are told to ask you for anything only a UI can do.
 
+**No personal skills.** Claude Code agents start with `--disable-slash-commands` (in
+`harnesses/claude.toml`'s `args`), so your own and your plugins' skills aren't listed in their
+sessions: that listing cost about 9k tokens at every start. The team's skills are files under
+`skills/` that the protocol points to, so they keep working. Your own sessions keep your skills.
+
 **No account connectors.** Harnesses can reach your accounts through connectors: Claude Code's
 claude.ai connectors (Gmail, Drive, Calendar…) and MCP servers, Codex's apps. xt starts agents
 without them: Claude Code with `--strict-mcp-config` (no MCP server loads), Codex with its apps

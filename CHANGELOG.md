@@ -9,6 +9,25 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.21.1] — not released yet
+
+A patch release with one card (#188). No command, protocol, ledger or state-file change.
+**0.21.1-rc1** (2026-10-02) has it.
+
+### Changed
+
+- **Claude Code agents start without slash skills (#188).** xt starts every Claude Code agent with
+  `--disable-slash-commands` (a default start argument in `harnesses/claude.toml`), so the
+  operator's personal and plugin skills are no longer listed in the agents' sessions. That listing
+  was about 9k input tokens at every start (measured 2026-10-02). The team's skills are files under
+  `skills/` that the protocol points to, so they keep working; your own Claude Code sessions keep
+  your skills.
+
+### Upgrading
+
+- From 0.21.0: `git pull upstream main` (or `xt version use v0.21.1`), then `xt restart --all` so
+  Claude Code agents start with the new argument. Nothing to migrate.
+
 ## [0.21.0] — 2026-10-02
 
 The release: the same code and docs as 0.21.0-rc2 (only the version, this changelog and the site's
