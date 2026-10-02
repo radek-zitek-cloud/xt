@@ -401,12 +401,15 @@ class Approvals:
                     + (f" ({req['model']})" if req.get("model") else "")
                     + f", reporting to {req['reports_to']}."
                     + (f" {req['settings_note']}" if req.get("settings_note") else ""))
+        # a closed question with the request as its narrative (card #183): yes approves, no denies
         msg = self.ctx.ledger.append(
             SYSTEM,
             HUMAN,
             "approval",
-            what + " Approve: xt approve {id}; deny: xt deny {id} (or a / d on it in the TUI's Inbox)",
+            what + "\n\nAnswer yes or no: xt answer {id} yes|no (or s, then y / n on it in the TUI's Inbox). "
+                   "xt approve {id} and xt deny {id} (a / d) still work.",
             fill_id=True,
+            data={"question": {"kind": "closed"}},
         )
         with self.ctx.ledger.lock():
             d = self._load()
@@ -420,8 +423,18 @@ class Approvals:
             req = d.pop(str(req_id), None)
             self._save(d)
         if req is None:
+            asked = self.ctx.ledger.message(req_id)
+            if asked and asked["type"] == "approval":  # answered before, through any route (card #183)
+                raise XtError(f"approval #{req_id} was already answered; nothing changed (xt log --id {req_id})")
             raise XtError(f"no pending approval #{req_id}")
         return req
+
+    def is_approval(self, req_id: int) -> bool:
+        """Whether this id is an approval request, pending or answered."""
+        if str(req_id) in self.pending():
+            return True
+        asked = self.ctx.ledger.message(req_id)
+        return bool(asked and asked["type"] == "approval")
 
 
 def spawn_settings(ctx: Ctx, name: str, harness: str, own: str | None) -> str:

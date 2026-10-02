@@ -57,7 +57,10 @@ set `[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notificati
 1. Switch to the liaison's workspace (in the TUI: select it in Team, press `f`) and say what you
    want: the outcome, constraints, what "done" looks like.
 2. The liaison drafts the goal in `goals/drafts/<slug>.md` as you talk (the TUI's Work panel
-   shows it as `✎ … draft`), reads it back, and dispatches it when you say so.
+   shows it as `✎ … draft`), reads it back, and dispatches it when you say so. From 0.21.0 the
+   read-back is a yes/no question in your Inbox (`⚑ … yes/no`): answer `yes` and the liaison
+   dispatches the goal, `no` and it asks what to change. Your yes doesn't dispatch the goal by
+   itself: dispatching stays the liaison's step (a deliberate limit of 0.21.0).
 3. The supervisor starts the lead, with the goal in its first prompt. From here the Work panel
    shows the goal with its tasks under it, and the Flow pane every message as a lane chart.
 
@@ -76,11 +79,19 @@ that (from 0.17.0, among the Inbox's keys, before `S message liaison`).
 ### 3. Hiring (approvals)
 
 The lead writes a role (`roles/<role>.md`) and asks to hire someone for it. The request waits for
-you: the TUI's Inbox shows `⚑ #12 spawn carol (researcher, codex/default)`, the detail pane shows
-the role the lead wrote, and you get a desktop notification.
+you as a yes/no question (from 0.21.0): the TUI's Inbox shows `⚑ #12 spawn carol (researcher,
+codex/default)  yes/no`, the detail pane shows the role the lead wrote, and you get a desktop
+notification. A schedule the lead asks for (`⚑ #13 wake scout every 30m  yes/no`) waits the same way.
 
-- Approve with `a` (or `xt approve 12`), deny with `d` (`xt deny 12`). Several at once:
-  `xt approve 12 13 14`; `xt approve` alone lists what's waiting.
+- Answer yes to approve, no to deny: `xt answer 12 yes` (or `no`), or in the TUI `s` on it and
+  then `y` or `n`. `a` and `d` still approve and deny.
+- `xt approve 12` and `xt deny 12` still work too, as aliases of the yes and no answer (several
+  at once: `xt approve 12 13 14`; `xt approve` alone lists what's waiting). From 0.21.0 they print
+  a one-line note that `xt answer` is the one way to answer; whether they're removed is decided in
+  0.23.0.
+- Each request is answered once, whichever way: a second answer, through any route, is refused
+  with `approval #12 was already answered; nothing changed`. Only you, in your own terminal,
+  answer them; an agent can't.
 - On approval the supervisor starts the agent in its own workspace and tells the lead.
 - `max_agents` in `team.toml` caps the team; beyond it the lead has to ask you first.
 
@@ -1063,7 +1074,9 @@ takes. The type is stored with the question in the ledger, and your answer is ch
 | **options** | two to four numbered options, each with what it leads to, and one `Recommended:` | the option's number; your own words only when the question offers **Other** |
 | **open** | (nothing extra) | your own words |
 
-A message with no question at all (a report) needs no answer and never waits in Needs you.
+A message with no question at all (a report) needs no answer and never waits in Needs you. Hire
+and schedule approvals are closed questions too: `xt answer 12 yes` approves, `no` denies (see
+[`xt approve`](#xt-approve-xt-deny)).
 
 ```text
 When do we ship 0.14.0?
@@ -1101,7 +1114,11 @@ lost.
 `xt approve [<id>…]`, `xt deny <id>…` — decide hires and schedules the lead asked for. Without ids,
 `xt approve` lists what's waiting and the command to approve them all. **Use it** when a
 notification says something waits for you; in the TUI, `a` / `d` on the Inbox row (the detail
-shows the role or schedule first).
+shows the role or schedule first). From 0.21.0 every hire and schedule request is a yes/no
+question, and `xt answer <id> yes` (or `no`) and `s`, then `y` / `n`, in the TUI do the same with
+the same result; `xt approve` and `xt deny` stay as aliases and print a one-line note saying so
+(on standard error; their removal is decided in 0.23.0). A request already answered, through any
+route, is refused with a clear message.
 
 ### `xt clear`
 

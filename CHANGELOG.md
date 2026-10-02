@@ -33,6 +33,22 @@ read unchanged and older xt versions ignore the fields.
   columns, and `1` to `4` fill one in; the Inbox row and `xt inbox` say `yes/no`, `3 options` or
   `4 options, Other`. Asks written before 0.21.0 still read and answer as they did: 0.14.0's options
   take a number or own words, any other ask is an open question.
+- **Approvals are closed questions (#183).** Every hire and schedule request is a yes/no question
+  with the request as its narrative (`Answer yes or no: xt answer 12 yes|no`, stored as a closed
+  question on the approval). `xt answer 12 yes` approves and `no` denies, with the same effect and
+  ledger result as `xt approve` and `xt deny`; in the TUI, `s` on an approval asks `y` or `n`, and
+  `a` and `d` work as before. The Inbox row, `xt inbox` and the brief say `yes/no`. A request is
+  answered once: a second answer through any route is refused with `approval #12 was already
+  answered; nothing changed`. Only the human's own terminal answers, as before. The liaison's
+  read-back before a goal dispatch is a closed question (`--closed`); the human's yes doesn't
+  dispatch the goal by itself, dispatching stays the liaison's step (a deliberate limit: a linked
+  dispatch would be a later card).
+
+### Deprecated
+
+- **`xt approve` and `xt deny` (#183)** stay as aliases of `xt answer <id> yes|no` and print a
+  one-line note on standard error saying so; their output is unchanged. Whether they're removed is
+  decided in 0.23.0.
 
 ### Changed
 

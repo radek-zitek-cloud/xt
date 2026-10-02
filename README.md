@@ -66,9 +66,10 @@ in [CHANGELOG.md](CHANGELOG.md).
   agent's context, an Inbox of what needs you, goals with their tasks, every message as a lane
   chart, and the whole thread of what you select; `xt tui --demo` tries it on made-up data
   ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
-- **Decisions with options, and word when a goal is done (0.14, 0.15).** A question shows numbered
-  options with their consequences and a recommendation, and you answer with a number; each goal
-  you gave sends exactly one notification when it's done ([`xt answer`](docs/user-guide.md#xt-answer)).
+- **Questions that say what answer they take, and word when a goal is done (0.14, 0.15, 0.21).** A
+  question is yes/no, two to four numbered options with their consequences and a recommendation, or
+  open, and xt checks your answer against it; hires and schedules are yes/no questions too. Each
+  goal you gave sends exactly one notification when it's done ([`xt answer`](docs/user-guide.md#xt-answer)).
 - **Upgrades you can see and undo (0.12, 0.14).** The published, installed and running versions
   are shown apart; `xt version use <tag>` switches after checks and a verified snapshot, and `xt
   version rollback` goes back ([Updating xt](docs/user-guide.md#7-updating-xt)).
@@ -199,7 +200,7 @@ width and end with their age.
 | `g` / `G`, page keys (Flow) | The newest (top) / oldest message, a page up or down; with the newest selected, Flow follows new messages |
 | `space` / `o` | Fold or unfold the selected goal, `done (N)` or `no goal` row / show open work only (Work) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
-| `s` | Answer the selected question (Inbox); anywhere else, message the liaison. The key line at the bottom says `s answer #288` while it answers. In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
+| `s` | Answer the selected question or approval (Inbox; a yes/no one takes `y` or `n`); anywhere else, message the liaison. The key line at the bottom says `s answer #288` while it answers. In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
 | `S` | Always message the liaison, even with a question selected |
 | `c` | Clear the selected alert, or mark the selected friction seen (Inbox) |
 | `enter` or `space` on `(N older, seen) ▸` | Show or hide the friction you've already seen (Inbox) |
@@ -226,8 +227,8 @@ equivalent and when you'd use it.
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, context and today's usage per agent, team usage and allowance (Codex, and Claude's five-hour and weekly windows through `bin/xt-statusline`), open work, questions, queue, approvals, alerts |
 | `xt inbox` | The Inbox as in the TUI: what needs you (questions, approvals, alerts), what's new since you last looked (goals done, reports), unread friction (`--seen`: also what the TUI folds: questions you answered and notifications you've seen in the last 7 days, and the friction you've seen) |
-| `xt answer <id> "..."` | Answer a question the liaison asked you (a number picks one of its options) |
-| `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |
+| `xt answer <id> "..."` | Answer a question the liaison asked you (yes or no, a number that picks one of its options, or your words where it takes them), or a hire or schedule request (yes or no) |
+| `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting); aliases of `xt answer <id> yes\|no` from 0.21.0 |
 | `xt clear <alert>` | Dismiss an alert |
 | `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00] [--at 09:30]` | Wake an agent periodically when idle, optionally only within local hours or at a set time |
 | `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent (`xt spawn … --permissions FILE`: a Claude agent's settings file) |

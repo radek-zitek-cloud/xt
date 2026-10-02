@@ -286,6 +286,14 @@ def cmd_done(args) -> None:
 def cmd_answer(args) -> None:
     ctx = Ctx.load()
     who = _who(args)
+    if Approvals(ctx).is_approval(args.id):  # a hire or schedule is a closed question (card #183)
+        if who != HUMAN:
+            raise XtError("only the human approves spawns")
+        from .choices import resolve_answer
+
+        word, _ = resolve_answer({"kind": "closed"}, _body(args))
+        print(f"#{args.id}: {decide(ctx, args.id, word == 'yes')}")
+        return
     item = ctx.ledger.item(args.id)
     if item is None or item["type"] != "ask":
         raise XtError(f"#{args.id} is not an open question (see `xt inbox`)")
@@ -552,7 +560,7 @@ def cmd_inbox(args) -> None:
             print(f"  ⚑ #{q['id']} {q['opened'][5:16]} from {q['opener']}: {q['title']}"
                   f"{f'  {kind}' if kind else ''}  (xt answer {q['id']} \"...\")")
         for rid, r in box.approvals:
-            print(f"  ⚑ #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
+            print(f"  ⚑ #{rid} {r['requester']} → {approval_what(r)}  yes/no  (xt answer {rid} yes|no)")
         for k, a in box.alerts:
             print(f"  ⚠ #{a['id']} {a['ts'][5:16]} {a['text']}{repeats(a)}  (clear: xt clear {k})")
         if answered:
@@ -600,10 +608,15 @@ def cmd_clear(args) -> None:
     print("cleared" if Alerts(ctx).resolve(args.key) else f"no alert {args.key!r}")
 
 
+DEPRECATED_APPROVE = ("note: approvals are yes/no questions from 0.21.0: `xt answer <id> yes|no` answers them; "
+                      "`xt approve` and `xt deny` stay as aliases for now (their removal is decided in 0.23.0)")
+
+
 def cmd_approve(args, approve: bool = True) -> None:
     if _who(args) != HUMAN:
         raise XtError("only the human approves spawns")
     ctx = Ctx.load()
+    print(DEPRECATED_APPROVE, file=sys.stderr)  # card #183, Q3: one line, nothing removed
     if not args.ids:  # no ids: show what's waiting, with the commands
         pending = Approvals(ctx).pending()
         if not pending:
@@ -798,7 +811,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("id", type=int)
     sp.add_argument("body", nargs="*")
 
-    sp = add("answer", cmd_answer, "answer a question the liaison asked you (see `xt inbox`)")
+    sp = add("answer", cmd_answer, "answer a question the liaison asked you, or a hire or schedule request "
+                                   "with yes or no (see `xt inbox`)")
     sp.add_argument("id", type=int)
     sp.add_argument("body", nargs="*", help="your answer (or stdin)")
 

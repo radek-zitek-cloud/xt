@@ -137,11 +137,11 @@ def waiting_on_human(ctx: Ctx) -> list[str]:
                    "answers some other way, or the question is no longer needed, the asker closes it: "
                    "`xt done <id> --as <asker> \"why\"`. Work that waits on an open question is not nudged.")
     for rid, r in sorted(approvals.items(), key=lambda kv: int(kv[0])):
-        out.append(f"- approval #{rid}: {r['requester']} asks to {approval_what(r)}")
+        out.append(f"- approval #{rid} (yes/no): {r['requester']} asks to {approval_what(r)}")
     if approvals:
         ids = " ".join(sorted(approvals, key=int))
-        out.append(f"  → the human approves with `xt approve {ids}` (or `a` on each in the TUI's Inbox), "
-                   f"or denies with `xt deny <id>`")
+        out.append(f"  → the human answers each with `xt answer <id> yes|no` (or `s`, then y / n, on it in the "
+                   f"TUI's Inbox); all at once: `xt approve {ids}`")
     for key, a in sorted(alerts.items(), key=lambda kv: kv[1].get("id", 0)):
         out.append(f"- alert: {a['text']}{repeats(a)}  (clear: `xt clear {key}`, or `c` in the TUI's Inbox)")
     if not approvals and not alerts and not questions:

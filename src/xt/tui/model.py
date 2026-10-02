@@ -214,6 +214,14 @@ def _heading(s: str) -> Text:
     return Text(f"\n── {s} ──\n", style="bold")
 
 
+def approval_data(rid: str, r: dict, ts: str | None) -> dict:
+    """An approval row's data: a closed question with the request as its narrative (card #183)."""
+    from ..spawn import approval_what
+
+    return {"id": int(rid), "ts": ts, "question": {"kind": "closed"},
+            "text": f"{r['requester']} asks to {approval_what(r)}.\n\nAnswer yes (approve) or no (deny)."}
+
+
 def build(ctx: Ctx) -> Snapshot:
     ctx.reload_team()
     now = ctx.ledger.clock()
@@ -370,7 +378,8 @@ def build(ctx: Ctx) -> Snapshot:
                 out.append(f" every {r['every']} when idle\n")
                 if r.get("message"):
                     out.append(f"on each wake-up: {r['message']}\n")
-                out.append("each wake-up is a billed agent turn · a approve · d deny\n", style="bright_black")
+                out.append("each wake-up is a billed agent turn · s: answer yes or no · a approve · d deny\n",
+                           style="bright_black")
                 agent = ctx.team.agent(r["name"])
                 if agent and agent.role:
                     out.append(_heading(f"its role: roles/{agent.role}.md"))
@@ -378,8 +387,8 @@ def build(ctx: Ctx) -> Snapshot:
                 return out
 
             needs.append(Row(f"approval:{rid}", _t(("⚑ ", "yellow"), f"#{rid} wake {r['name']} ",
-                                                   (f"every {r['every']}", "bright_black")),
-                             sdetail, "approval", {"id": int(rid), "ts": ts}, row_age(ts, now)))
+                                                   (f"every {r['every']}", "bright_black"), ("  yes/no", "yellow")),
+                             sdetail, "approval", approval_data(rid, r, ts), row_age(ts, now)))
             continue
 
         def detail(rid=rid, r=r):
@@ -391,15 +400,15 @@ def build(ctx: Ctx) -> Snapshot:
             if r.get("settings_note"):
                 out.append(r["settings_note"] + "\n",
                            style="bold red" if r["settings_note"].startswith("WARNING") else "")
-            out.append("a approve · d deny\n", style="bright_black")
+            out.append("s: answer yes or no · a approve · d deny\n", style="bright_black")
             out.append(_heading(f"role brief: roles/{r['role']}.md"))
             out.append_text(_file_text(ctx, f"roles/{r['role']}.md"))
             return out
 
         needs.append(Row(f"approval:{rid}", _t(("⚑ ", "yellow"), f"#{rid} spawn {r['name']} ",
                                                (f"({r['role']}, {harness_model(r['harness'], r.get('model'))})",
-                                                "bright_black")),
-                         detail, "approval", {"id": int(rid), "ts": ts}, row_age(ts, now)))
+                                                "bright_black"), ("  yes/no", "yellow")),
+                         detail, "approval", approval_data(rid, r, ts), row_age(ts, now)))
     for key, al in box.alerts:
         def detail(key=key, al=al):
             out = Text()

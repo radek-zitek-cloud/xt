@@ -54,7 +54,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `bin/xt-statusline` | Claude Code status-line command: records the plan's usage windows (runs `planusage`). |
 | `src/xt/__init__.py` | The package; reads `__version__` from the installed `pyproject.toml` version. |
 | `src/xt/__main__.py` | `python -m xt`: calls `cli.main`. |
-| `src/xt/cli.py` | Every `xt` command: argument parsing, `--as` identity checks (the human's own terminal; a registered operator, card #166), delegated commands, and the small commands (`send`, `log`, `status`, `inbox`, `approve`, `operator`, `delegate`, …). |
+| `src/xt/cli.py` | Every `xt` command: argument parsing, `--as` identity checks (the human's own terminal; a registered operator, card #166), delegated commands, the one answer path (`answer_question`, used by `xt answer` and the TUI), and the small commands (`send`, `log`, `status`, `inbox`, `approve`, `operator`, `delegate`, …). |
 | `src/xt/context.py` | `Ctx`: one command's paths, team, ledger and Herdr client, loaded once. |
 | `src/xt/paths.py` | Where everything lives in a team repo (`.xt/state`, `.xt/log`, …), finding the root (`XT_ROOT`, else the enclosing xt checkout), and `XtError`, the user-facing error. |
 | `src/xt/team.py` | `team.toml`: the roster, policy, notify, log and default settings, schedules and their windows (`next_due`), and the new-team template. |
@@ -66,7 +66,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/choices.py` | Questions with a declared answer type (closed, options, open; from 0.21.0): validation, rendering, the `question` data stored on an ask (read from the text for older asks), and checking an answer against it, a numeric answer recorded as the option's text. |
 | `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
-| `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and their approvals, stop and retire. |
+| `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and their approvals (each a closed question in the ledger, answered once by `xt answer`, `approve`/`deny` or the TUI), stop and retire. |
 | `src/xt/permissions.py` | Claude Code settings files: which file applies (`effective`), the preflight check, the start note. |
 | `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`, `first_prompt_prefix`), `first_prompt_note`, limits. |
 | `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |

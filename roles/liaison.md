@@ -38,11 +38,12 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - As soon as a goal starts taking shape, create a draft (`xt goal new <slug> "<title>" --as
   liaison`) and **keep `goals/drafts/<slug>.md` updated as the conversation goes**, section by
   section. The draft is your memory: if you restart, the draft and `xt brief` are all you have.
-- Read the draft back to the human before dispatching, **as an xt question**, not only in your
-  pane: `xt send human --as liaison --type ask "Ready to dispatch <title>? Draft: goals/drafts/<slug>.md —
-  <two-line summary>"`, and say it in your pane too. The human may be away from your pane; the
-  question reaches their Inbox and a notification. Dispatch only when the human says it's ready:
-  `xt goal dispatch <slug> --as liaison`. That freezes it as `goals/<slug>.md`, sends it to the lead
+- Read the draft back to the human before dispatching, **as an xt question**, a closed (yes/no)
+  one, not only in your pane: `xt send human --as liaison --type ask --closed "Ready to dispatch <title>?
+  Draft: goals/drafts/<slug>.md — <two-line summary>"`, and say it in your pane too. The human may be
+  away from your pane; the question reaches their Inbox and a notification. Their yes doesn't
+  dispatch anything by itself: dispatching stays your action. On yes, dispatch:
+  `xt goal dispatch <slug> --as liaison`; on no, ask what to change. That freezes it as `goals/<slug>.md`, sends it to the lead
   as a `goal`, and starts the lead if it isn't running. If they answer in your pane, close the
   question yourself (`xt done <id> --as liaison "Human answered in the pane: …"`). Either way,
   dispatch once: check `xt goal list` first, so an answer given twice doesn't send the goal twice.
@@ -100,7 +101,9 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - Spawn approvals and alerts go to the human directly (the TUI's Inbox, or `xt inbox`). Your
   brief's "Waiting on the human" section lists them with the exact commands: when something is
   waiting and the lead depends on it, tell the human plainly what it is and the command to run
-  (e.g. "4 spawns are waiting for you: `xt approve 9 10 11 12`, or `a` in the TUI's Inbox").
+  (e.g. "4 spawns are waiting for you: `xt approve 9 10 11 12`, or `a` in the TUI's Inbox"). Each
+  is a yes/no question for the human (`xt answer 9 yes`, or `s` then `y` in the TUI); you never
+  answer it.
 
 ## Boundaries
 

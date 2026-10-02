@@ -965,7 +965,7 @@ class Help(ModalScreen[None]):
         ("mouse", "a click selects a row and keeps focus in its pane; the wheel scrolls Flow and the detail pane"),
         ("v", "the supervisor's log, newest first, in a pop-up (esc closes it)"),
         (f"Inbox ({INBOX})", ""),
-        ("a / d", "approve / deny the selected spawn (asks y/n)"),
+        ("a / d", "approve / deny the selected spawn or schedule (asks y/n); the same as s, then y / n"),
         ("c", "clear the selected alert; on unread friction: mark it seen"),
         ("enter/space", "on (N older, seen): show or hide the friction you've seen; on (N earlier, seen): "
                         "the notifications you've seen in the last 7 days; on (N answered, last 7 days): "
@@ -995,7 +995,8 @@ class Help(ModalScreen[None]):
         ("R", "retire the selected agent: it leaves the roster (asks y/n; not the liaison or lead)"),
         ("f", "switch Herdr to the selected agent's workspace"),
         ("Anywhere", ""),
-        ("s", "answer the question selected in Inbox; anywhere else: send a message to the liaison "
+        ("s", "answer the question or approval selected in Inbox (a yes/no one, approvals included: y / n; "
+              "options: 1-4 fill one in); anywhere else: send a message to the liaison "
               "(in the Inbox the key line says which; enter: new line, ctrl+s: send)"),
         ("S", "always send a message to the liaison, even with a question selected"),
         ("r", "refresh now (it also refreshes every 2 s)"),
@@ -1231,7 +1232,7 @@ class XtTui(App):
     def send_hint(self) -> tuple[str, str] | None:
         """`s answer #N` while a question is selected in the Inbox, else None (s messages the liaison)."""
         try:
-            row = self._selected("question")
+            row = self._selected("question") or self._selected("approval")  # an approval is yes/no (#183)
         except Exception:  # before the panels exist
             row = None
         return ("s", f"answer #{row.data['id']}") if row else None
@@ -1493,7 +1494,21 @@ class XtTui(App):
             self.refresh_data()
 
     def action_send(self) -> None:
-        """s: answer the question selected in the Inbox, otherwise send a message to the liaison."""
+        """s: answer the question (or approval: a yes/no question, card #183) selected in the Inbox,
+        otherwise send a message to the liaison."""
+        approval = self._selected("approval")
+        if approval is not None:
+            if not self._need_live():
+                return
+            rid = approval.data["id"]
+
+            def go(word: str | None) -> None:
+                if word:
+                    self.set_status(f"answering #{rid} {word}… (starting an agent takes a few seconds)")
+                    self.run_worker(lambda: self._decide(rid, word == "yes"), thread=True, exclusive=False)
+
+            self.push_screen(YesNo(f"Answer approval #{rid}", approval.data["text"]), go)
+            return
         row = self._selected("question")
         self._compose(row.data if row else None)
 
