@@ -9,10 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.20.0] — not released yet
+## [0.20.0] — 2026-10-02
 
-Polish from a fresh-eyes usability review of 0.19.0: seven small cards to their approved spec, no
-new feature. **0.20.0-rc1** has #174, #177 and #178; **0.20.0-rc2** adds #176, #179 and #180; **0.20.0-rc3** adds #175. No protocol or ledger format change; new state
+The release: the same code and docs as 0.20.0-rc3 (only the version, this changelog and the site's
+badge and Flow line changed). Polish from a fresh-eyes usability review of 0.19.0: seven small
+cards to their approved spec, no new feature. **0.20.0-rc1** has #174, #177 and #178; **0.20.0-rc2** adds #176, #179 and #180; **0.20.0-rc3** adds #175. No protocol or ledger format change; new state
 file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `starting`.
 
 ### Fixed
@@ -30,8 +31,8 @@ file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `s
   usage yet is expected and says nothing. After them, the supervisor raises one `context:<name>`
   alert per start, cleared when the context becomes readable or the agent stops. The `partprompt`
   alert no longer says xt can't find the log. The user guide says when an unreadable context is
-  expected. The cause seen in the review is not confirmed yet: it needs a real pi member on a
-  non-Anthropic provider (staging).
+  expected. The cause seen in the review was not reproduced on staging; status now names the cause
+  class.
 
 ### Changed
 
@@ -75,7 +76,7 @@ file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `s
 
 ### Documentation
 
-- **README highlights and a quick start on the site (#175).** The README's 24 "Added since"
+- **README highlights and a quick start on the site (#175).** The README's 23 "Added since"
   entries (0.11.0 to 0.19.0), which sat between the pitch and the Quick start, are replaced by five
   highlights and a link to this changelog, where every one of them is; a "Want to try it?" link at
   the top goes to the Quick start. The site shows the README's Quick start command (`curl -fsSLO
@@ -85,7 +86,8 @@ file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `s
 ### Upgrading
 
 - From 0.19.0: `git pull upstream main` (or `xt version use v0.20.0`), then `xt restart --all` so
-  the supervisor runs the context check. Scripts using `xt log --watch` keep working.
+  the supervisor runs the context check. Scripts using `xt log --watch` keep working. From
+  0.20.0-rc3: nothing but the version changes.
 
 ## [0.19.0] — 2026-10-01
 
