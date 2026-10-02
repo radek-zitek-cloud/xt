@@ -9,11 +9,10 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.21.1] — not released yet
+## [0.21.1] — 2026-10-02
 
+The release: the same code and docs as 0.21.1-rc2 (only the version and this changelog changed).
 A patch release with one card (#188). No command, protocol, ledger or state-file change.
-**0.21.1-rc1** (2026-10-02) has it. **0.21.1-rc2** (2026-10-02) adds only a docs sentence: the
-flag also turns off built-in slash commands.
 
 ### Changed
 
