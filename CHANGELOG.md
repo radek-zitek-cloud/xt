@@ -12,7 +12,7 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.20.0] — not released yet
 
 Polish from a fresh-eyes usability review of 0.19.0: seven small cards to their approved spec, no
-new feature. **0.20.0-rc1** has #174, #177 and #178. No protocol or ledger format change; new state
+new feature. **0.20.0-rc1** has #174, #177 and #178; **0.20.0-rc2** adds #176. No protocol or ledger format change; new state
 file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `starting`.
 
 ### Fixed
@@ -49,6 +49,15 @@ file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `s
   user guide say it doesn't follow. `xt init` without a terminal (a script or a pipe) still uses the
   defaults for every question not given as an option, and now says so in one line naming `--yes`
   and `xt init --help`; the written `team.toml` and the exit code are unchanged.
+- **TUI help, detail cue and Flow key names (#176).** The Keys pop-up (`h`) is never wider than the
+  terminal: at 80 columns and less it takes the whole width, every entry wraps under itself, and
+  its `j/k scroll · esc close` hint stays visible; it scrolls with `j`/`k` and the page keys (it is
+  taller than the screen at every size checked, 120x40 included, and its last lines were cut off
+  before). When the detail pane's text is longer than the pane, its bottom edge says `▾ N more
+  (j/k)` (at the end, `▴ N above (k)`), and the key line in the detail pane starts with `j/k
+  scroll`. Flow's `f` is called focus (key line `f focus`, the picker `Focus Flow on`, `Flow: focus
+  cleared`) and `/` filter, in the key lines, the help and the user guide. Checked with Textual's
+  headless Pilot at 120x40, 100x30, 80x24 and 60x20.
 
 ### Upgrading
 

@@ -726,7 +726,7 @@ def test_the_key_line_lists_t_f_and_g_G_while_flow_has_focus(ctx, clock):
             await pilot.press(str(FLOW))
             await pilot.pause()
             line = str(app.query_one("#hints").render())
-            assert line.startswith("t system · f filter · g/G newest/oldest")
+            assert line.startswith("t system · f focus · g/G newest/oldest")  # v0.20.0 #176: f is focus
             await pilot.press(str(INBOX))
             await pilot.pause()
             line = str(app.query_one("#hints").render())

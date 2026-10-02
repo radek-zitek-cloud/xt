@@ -244,10 +244,11 @@ alone with its replies.
   colour. Flow rows show a time, not an age.
 - **System lines** (xt's starts, stops and settings lines, wake-ups and nudges) are hidden; `t`
   shows or hides them (the title says which). Approval requests and alerts are always shown.
-- `f` picks **one agent** (every message it sent or received) or **one goal** (the goal and every
-  message whose `--ref` chain leads to it); the team's lanes stay, only rows are filtered, and the title
-  names the filter. The same pick again, `esc` in the picker, or `esc` in Flow clears it. `/`
-  filters by the message text.
+- `f`, the **focus** (named so from 0.20.0; before, the key line called it a filter too), picks
+  **one agent** (every message it sent or received) or **one goal** (the goal and every message
+  whose `--ref` chain leads to it); the team's lanes stay, only rows are left out, and the title
+  names the focus with `(f)`. The same pick again, `esc` in the picker, or `esc` in Flow clears it.
+  `/`, the **filter**, keeps the messages with that text; both can be on at once.
 - `j`/`k` or the arrows select a row, the page keys scroll, `g`/`G` (or `Home`/`End`) go to the
   newest (top) or oldest (bottom); a click selects a row and the wheel scrolls (from 0.16.1).
   While the newest row (the top one) is selected, Flow follows new messages; move down and it
@@ -352,14 +353,21 @@ detail pane, and `v` opens the supervisor's log; the TUI starts in the Inbox, an
 the panes. `esc` in the detail pane goes back to the pane you came from. In the Team pane `j`/`k`
 or the arrows select the header, a harness line or an agent (`Home`/`End` or `PgUp`/`PgDn`: the
 first and last row in view), the detail pane shows it, and on an agent `u`, `x`, `R` and `f` act
-on it (`f` in Flow is its filter).
+on it (`f` in Flow is its focus).
 
 **The key line** (from 0.17.0) shows the focused pane's own keys first, then `S`, `/` and `v`,
 which work everywhere; a narrow terminal keeps the keys and drops their words. Inbox: `a/d`,
 `s answer #N` (only while a question is selected: otherwise `s`, like `S`, messages the liaison),
-`c`, `space`. Team: `u/U`, `x/X`, `R`, `f`. Work: `space`, `o`. Flow: `t`, `f`, `g/G`. The detail
-pane: only the keys that work everywhere. Keys for moving around (`0`-`4`, `j/k`, `tab`, `enter`,
-`esc`), `h` and `q` are left to the help screen (`h`), which lists every key.
+`c`, `space`. Team: `u/U`, `x/X`, `R`, `f jump`. Work: `space`, `o`. Flow: `t`, `f focus`, `g/G`;
+`/ filter` is among the keys that work everywhere. The detail pane: `j/k scroll` (from 0.20.0),
+then the keys that work everywhere. Other keys for moving around (`0`-`4`, `j/k` elsewhere, `tab`,
+`enter`, `esc`), `h` and `q` are left to the help screen (`h`), which lists every key. From 0.20.0
+the help fits the terminal's width (each entry wraps under itself; at 80 columns or less it takes
+the whole width) and scrolls with `j`/`k` or the page keys; its bottom edge says so.
+
+**What the detail pane hides** (from 0.20.0): when its text is longer than the pane, the bottom
+edge counts the lines below, `▾ 5 more (j/k)`; at the end it says `▴ 5 above (k)`. A thread's own
+hidden rows show inside the pane as before (`↓ 3 later rows hidden`).
 
 **The mouse** (from 0.16.1): a click selects a row in any pane (an agent in Team, a row in the
 Inbox, Work or Flow) and focuses that pane; the detail pane shows it but doesn't take focus, so the

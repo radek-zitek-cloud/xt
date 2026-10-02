@@ -307,3 +307,109 @@ def test_178_init_without_a_terminal_writes_what_yes_writes(tmp_path, no_termina
     no_terminal.init(piped, "t", None, None, None, None, yes=False, commit=False)
     no_terminal.init(yes, "t", None, None, None, None, yes=True, commit=False)
     assert piped.team_toml.read_text() == yes.team_toml.read_text()
+
+
+# --- #176: TUI help, detail cue and Flow key names (Pilot at four sizes) ------------------------------
+
+SIZES = [(120, 40), (100, 30), (80, 24), (60, 20)]
+
+
+def _lines(widget):
+    from textual.geometry import Region
+
+    return [s.text for s in widget.render_lines(Region(0, 0, widget.size.width, widget.size.height))]
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_176_every_keys_line_is_whole_and_the_close_hint_shows(size):
+    from xt.tui.app import Help, XtTui, demo_snapshot
+
+    from .test_tui_0170 import _run
+
+    async def run():
+        app = XtTui(demo_snapshot)
+        async with app.run_test(size=size) as pilot:
+            await pilot.press("h")
+            await pilot.pause()
+            box = app.screen.query_one("#help")
+            assert 0 <= box.region.x and box.region.right <= size[0] and box.region.bottom <= size[1]
+            assert box.border_subtitle == Help.HINT and box.region.width - 4 >= len(Help.HINT)
+            body = app.screen.query_one("#help-body")
+            assert body.size.width <= box.content_region.width
+            lines = _lines(body)
+            assert all(len(line.rstrip()) <= body.size.width for line in lines)
+            text = " ".join(" ".join(lines).split())
+            for key, what in Help.KEYS:  # each entry whole, its words in order across its wrapped lines
+                assert " ".join(f"{key} {what}".split()) in text, (size, key)
+            for _ in range(len(lines)):  # j reaches the last line
+                await pilot.press("j")
+            await pilot.pause()
+            assert box.scroll_y == box.max_scroll_y  # taller than 80% of every size here: before, cut off
+            await pilot.press("escape")
+            await pilot.pause()
+            assert not app.screen.query("#help")
+
+    _run(run())
+
+
+@pytest.mark.parametrize("size", SIZES)
+def test_176_hidden_detail_lines_get_a_cue_and_the_key_line_lists_j_k(ctx, fake_home, clock, size):
+    from xt.tui.app import DETAIL, GLOBAL_KEYS, TEAM
+
+    from .test_tui_0170 import _acceptance, _app, _run
+
+    _acceptance(ctx, fake_home, clock)
+
+    async def run():
+        app = _app(ctx)
+        async with app.run_test(size=size) as pilot:
+            await pilot.press(str(TEAM))
+            for _ in range(12):
+                await pilot.press("k")  # up to the Team header: versions and today's usage, long
+            await pilot.press(str(DETAIL))
+            await pilot.pause()
+            await pilot.pause()
+            pane = app.query_one("#detail")
+            hints = str(app.query_one("#hints").render()).strip()
+            assert hints.startswith("j/k scroll · " + " · ".join(f"{k} {w}" for k, w in GLOBAL_KEYS)[:20]), hints
+            below = round(pane.max_scroll_y - pane.scroll_y)
+            if below:
+                assert pane.border_subtitle == f"▾ {below} more (j/k)"
+                for _ in range(below):
+                    await pilot.press("j")
+                await pilot.pause()
+                assert pane.scroll_y == pane.max_scroll_y
+                assert pane.border_subtitle == f"▴ {round(pane.scroll_y)} above (k)"
+            else:
+                assert pane.border_subtitle == ""
+            return below
+
+    hidden = _run(run())
+    assert hidden or size == (120, 40), size  # the smaller sizes hide lines of the Team header's detail
+
+
+def test_176_flow_names_f_focus_and_slash_filter(ctx, fake_home, clock):
+    from xt.tui.app import FLOW, GLOBAL_KEYS, PANE_KEYS, FlowPick, Help
+
+    from .test_tui_0170 import _acceptance, _app, _run
+
+    _acceptance(ctx, fake_home, clock)
+    assert ("f", "focus") in PANE_KEYS[FLOW] and ("/", "filter") in GLOBAL_KEYS
+    keys = [k for k, _ in Help.KEYS]
+    flow = dict(Help.KEYS[keys.index(f"Flow ({FLOW})"):keys.index("Team (0)")])  # Flow's own section
+    assert flow["f"].startswith("focus: only one agent's messages or one goal's thread")
+    assert flow["/"] == "filter: only messages with this text"
+    assert dict(Help.KEYS[:keys.index("Inbox (1)")])["/"].startswith("filter the focused pane")
+
+    async def run():
+        app = _app(ctx)
+        async with app.run_test(size=(120, 40)) as pilot:
+            await pilot.press(str(FLOW))
+            await pilot.pause()
+            line = str(app.query_one("#hints").render())
+            assert line.startswith("t system · f focus · g/G newest/oldest") and "/ filter" in line
+            await pilot.press("f")
+            await pilot.pause()
+            assert isinstance(app.screen, FlowPick) and app.screen.query_one(".pick").border_title == "Focus Flow on"
+
+    _run(run())

@@ -24,14 +24,15 @@ TEAM = 0  # the Team pane's key (card #157); last_panel is 0 while it has focus
 DETAIL = len(PANELS) + 1  # Detail's key, 4 (card #157)
 PICK_AGENT = "select an agent in Team first (0, then j/k)"
 # The key line (card #162): the focused pane's own keys first, then the keys that work everywhere.
-# Moving around (0-4, j/k, tab, enter, esc) and h and q are left to the help screen. In the Inbox, s
-# shows while a question is selected, as `s answer #N` (card #102).
+# Moving around (0-4, j/k, tab, enter, esc) and h and q are left to the help screen, except j/k in
+# Detail, which reveal what it hides (card #176). In the Inbox, s shows while a question is
+# selected, as `s answer #N` (card #102). Flow's `f` focuses on one agent or goal; `/` filters text.
 PANE_KEYS = {
     TEAM: [("u/U", "start"), ("x/X", "stop"), ("R", "retire"), ("f", "jump")],
     INBOX: [("a/d", "approve/deny"), ("s", "answer"), ("c", "clear"), ("space", "fold")],
     WORK: [("space", "fold"), ("o", "open only")],
-    FLOW: [("t", "system"), ("f", "filter"), ("g/G", "newest/oldest")],
-    DETAIL: [],
+    FLOW: [("t", "system"), ("f", "focus"), ("g/G", "newest/oldest")],
+    DETAIL: [("j/k", "scroll")],
 }
 GLOBAL_KEYS = [("S", "message liaison"), ("/", "filter"), ("v", "supervisor")]
 # The three bands (card #162), in outer rows: Detail about a fifth of the height (4 to 8 content rows),
@@ -647,14 +648,14 @@ class FlowPane(Widget):
             lines.append(line)
         if not self.items:
             filtered = self.pick or self.filter
-            lines.append(Text("(no messages match the filter)" if filtered else "(no messages yet)",
+            lines.append(Text("(no messages match the focus or filter)" if filtered else "(no messages yet)",
                               style="bright_black"))
         return Text("\n").join(lines)
 
 
 class FlowPick(ModalScreen[object]):
-    """`f` in Flow: one agent's messages or one goal's thread. Picking the active filter again, or
-    esc, clears it."""
+    """`f` in Flow: focus on one agent's messages or one goal's thread (card #176: `/` is the text
+    filter). Picking the active focus again, or esc, clears it."""
 
     BINDINGS = [Binding("escape", "cancel", show=False), Binding("j", "move('down')", show=False),
                 Binding("k", "move('up')", show=False)]
@@ -666,7 +667,7 @@ class FlowPick(ModalScreen[object]):
 
     def compose(self) -> ComposeResult:
         box = Vertical(classes="popup pick")
-        box.border_title = "Filter Flow"
+        box.border_title = "Focus Flow on"
         box.border_subtitle = ("enter pick · the active one again or esc clears it" if self.active
                                else "enter pick · esc cancel")
         with box:
@@ -695,7 +696,21 @@ PANES = (Panel, TeamPane, FlowPane)  # what focus moves between (Detail is reach
 
 class DetailPane(VerticalScroll):
     """The detail pane's frame, full width at the bottom (card #162). The wheel moves a thread like
-    j/k: its hidden rows first, then the scroll (card #157)."""
+    j/k: its hidden rows first, then the scroll (card #157). Lines out of view are counted in the
+    bottom border, `▾ N more (j/k)` (card #176): there, the cue takes none of Detail's few rows."""
+
+    def watch_scroll_y(self, old_value: float, new_value: float) -> None:
+        super().watch_scroll_y(old_value, new_value)
+        self.update_more()
+
+    def on_resize(self) -> None:
+        self.call_after_refresh(self.update_more)
+
+    def update_more(self) -> None:
+        below = max(0, round(self.max_scroll_y - self.scroll_y))
+        above = max(0, round(self.scroll_y))
+        self.border_subtitle = (f"▾ {below} more (j/k)" if below
+                                else f"▴ {above} above (k)" if above else "")
 
     def on_mouse_scroll_down(self, event) -> None:
         event.prevent_default()
@@ -899,7 +914,15 @@ class SupervisorPopup(ModalScreen[None]):
 
 
 class Help(ModalScreen[None]):
-    BINDINGS = [Binding("escape,q,h,question_mark", "close", show=False)]
+    """`h` or `?`: every key. It takes the terminal's width when that's narrower than its own, wraps
+    each entry under itself, and scrolls when it's taller than the screen (card #176: at 80x24 it
+    lost its right edge, `esc to clos`, and its last lines)."""
+
+    BINDINGS = [Binding("escape,q,h,question_mark", "close", show=False),
+                Binding("j,down", "scroll(1)", show=False), Binding("k,up", "scroll(-1)", show=False),
+                Binding("pagedown,space", "page(1)", show=False), Binding("pageup", "page(-1)", show=False)]
+    HINT = "j/k scroll · esc close"
+    KEY_WIDTH = 14  # the indent, the longest key ("enter/space") and a space
 
     KEYS = [
         ("Move", ""),
@@ -908,7 +931,8 @@ class Help(ModalScreen[None]):
                              "its selection"),
         ("tab / l", "next pane"),
         ("shift+tab", "previous pane"),
-        ("j / k", "down / up; the arrows too (in the detail pane: the thread's hidden rows first, then scroll)"),
+        ("j / k", "down / up; the arrows too (in the detail pane: the thread's hidden rows first, then "
+                  "scroll; its bottom edge counts the lines below, ▾ N more)"),
         ("enter", "read the detail pane: the selected item and its thread"),
         ("/", "filter the focused pane (empty clears it)"),
         ("esc", "back from the detail pane to the pane you came from"),
@@ -930,9 +954,9 @@ class Help(ModalScreen[None]):
         ("g / G", "the newest (top) / the oldest (bottom) message (home / end too)"),
         ("enter", "show the selected message and its thread in the detail pane"),
         ("t", "show or hide system lines (starts, stops, settings, wake-ups, nudges); from any pane"),
-        ("f", "filter to one agent's messages or one goal's thread; the same pick again, esc in the "
+        ("f", "focus: only one agent's messages or one goal's thread; the same pick again, esc in the "
               "picker, or esc in Flow clears it"),
-        ("/", "filter by the message's text"),
+        ("/", "filter: only messages with this text"),
         (f"Team ({TEAM})", ""),
         ("j / k", "select the header (xt and the team: versions, today's usage), a harness line (its "
                   "windows and why one is unknown; ? marks one) or an agent; the detail pane shows it. "
@@ -954,18 +978,34 @@ class Help(ModalScreen[None]):
     ]
 
     def compose(self) -> ComposeResult:
-        box = Vertical(classes="popup help")
+        from rich.table import Table
+
+        box = VerticalScroll(id="help", classes="popup help")
         box.border_title = "Keys"
-        box.border_subtitle = "esc to close"
-        text = Text()
-        for key, what in self.KEYS:
+        box.border_subtitle = self.HINT
+        grid = Table.grid(padding=0)
+        grid.add_column(width=self.KEY_WIDTH, no_wrap=True)
+        grid.add_column(ratio=1)  # wraps at words, under itself
+        for i, (key, what) in enumerate(self.KEYS):
             if not what:
-                text.append(f"\n{key}\n" if text else f"{key}\n", style="bold")
+                if i:
+                    grid.add_row("", "")
+                grid.add_row(Text(key, style="bold"), "")
             else:
-                text.append(f"  {key:<11}", style="green")
-                text.append(what + "\n")
+                grid.add_row(Text(f"  {key}", style="green"), Text(what))
         with box:
-            yield Static(text)
+            yield Static(grid, id="help-body")
+
+    def on_mount(self) -> None:
+        self.query_one("#help", VerticalScroll).focus()
+
+    def action_scroll(self, step: int) -> None:  # the app's j/k don't reach a pop-up
+        box = self.query_one("#help", VerticalScroll)
+        (box.scroll_down if step > 0 else box.scroll_up)(animate=False)
+
+    def action_page(self, step: int) -> None:
+        box = self.query_one("#help", VerticalScroll)
+        (box.scroll_page_down if step > 0 else box.scroll_page_up)(animate=False)
 
     def action_close(self) -> None:
         self.dismiss(None)
@@ -1138,6 +1178,7 @@ class XtTui(App):
         self.detail_view, self.detail_key = view, key
         body.update(view)
         pane.border_title = pane_title(DETAIL, "Detail", panel.title)
+        pane.call_after_refresh(pane.update_more)  # the new content's height is known only then
 
     def set_status(self, text: str) -> None:
         """The last action's result goes to the toast, never into the Team pane (card #128)."""
@@ -1265,7 +1306,8 @@ class XtTui(App):
             in_view = top <= view.rows_at and view.rows_at + view.rows_n <= top + h
             at_edge = (w.scroll_y >= w.max_scroll_y) if down else (w.scroll_y <= 0)
             if (in_view or at_edge) and view.scroll(1 if down else -1):
-                return self.query_one("#detail-body", Static).update(view)
+                self.query_one("#detail-body", Static).update(view)
+                return w.call_after_refresh(w.update_more)
         (w.scroll_down if down else w.scroll_up)(animate=False)
 
     def action_detail(self) -> None:
@@ -1280,7 +1322,7 @@ class XtTui(App):
             self.query_one("#detail", VerticalScroll).focus()
 
     def action_back(self) -> None:
-        """esc: from Detail back to the panes; in Flow, clear its agent or goal filter."""
+        """esc: from Detail back to the panes; in Flow, clear its agent or goal focus."""
         if isinstance(self.focused, FlowPane) and self.focused.pick:
             self.set_flow_pick(None)
         elif not isinstance(self.focused, PANES):
@@ -1297,7 +1339,7 @@ class XtTui(App):
     def set_flow_pick(self, pick) -> None:
         pane = self.panel(FLOW)
         pane.set_pick(pick)
-        self.set_status(f"Flow: only {pane.pick_text()}" if pick else "Flow: filter cleared")
+        self.set_status(f"Flow: only {pane.pick_text()}" if pick else "Flow: focus cleared")
         if self.focused is pane:
             self.show_detail(pane)
 
@@ -1560,7 +1602,7 @@ class XtTui(App):
                                                    f"takes a new spawn."), go)
 
     def action_jump(self) -> None:
-        """f: in Flow, its filter (card #130); on an agent in Team, switch Herdr to it."""
+        """f: in Flow, its focus (card #130, named so in #176); on an agent in Team, switch Herdr to it."""
         if isinstance(self.focused, FlowPane):
             return self.flow_filter()
         row = self._selected("agent")

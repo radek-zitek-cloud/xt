@@ -114,8 +114,11 @@ ModalScreen {
     padding: 0 1;
 }
 
+/* the keys on `h` (card #176): never wider than the terminal, scrolls with j/k */
 .popup.help {
     width: 84;
+    max-width: 100%;
+    scrollbar-size-vertical: 1;
 }
 
 /* the supervisor's log on `v` (card #131): most of the screen, scrolls with j/k */

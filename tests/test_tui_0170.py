@@ -292,10 +292,10 @@ def test_the_key_line_follows_the_focused_pane_and_the_help_has_every_key(ctx, f
     assert lines["inbox"] == f"a/d approve/deny · s answer #{ids['q']} · c clear · space fold · {ends}"
     assert lines["team"] == f"u/U start · x/X stop · R retire · f jump · {ends}"
     assert lines["work"] == f"space fold · o open only · {ends}"
-    assert lines["flow"] == f"t system · f filter · g/G newest/oldest · {ends}"
-    assert lines["detail"] == ends
-    for line in lines.values():
-        assert not any(nav in line + " " for nav in NAVIGATION), line
+    assert lines["flow"] == f"t system · f focus · g/G newest/oldest · {ends}"  # v0.20.0 #176: f is focus
+    assert lines["detail"] == f"j/k scroll · {ends}"  # v0.20.0 #176: Detail lists j/k
+    for name, line in lines.items():
+        assert not any(nav in line + " " for nav in NAVIGATION if not (name == "detail" and nav == "j/k")), line
     helped = " ".join(k for k, _ in Help.KEYS)
     for key in ("0-4", "tab", "shift+tab", "j / k", "enter", "esc", "h / ?", "q", "a / d", "c", "s", "S", "/",
                 "v", "space", "o", "g / G", "t", "f", "u", "U", "x", "X", "R", "r", "pgup/pgdn", "2 / 3"):

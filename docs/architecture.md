@@ -494,7 +494,7 @@ harness goes to the human with `xt friction`.
   from sender to receiver with the type's glyph and label, dotted into the human's lane, `#id` and
   the first line in the margin and a clock time on the left; lanes that don't fit collapse into a
   `+N` lane, and a narrow pane lists one line per message. `app.FlowPane` keeps the filters, `t`
-  system lines, `f` one agent or one goal's thread, `/` the text, the selection, lists the newest
+  system lines, `f` the focus on one agent or one goal's thread, `/` the text filter, the selection, lists the newest
   on top and follows new messages while the newest is selected; it draws only the rows in view).
   The detail pane at the bottom (card #131, `tui/thread.py`) shows the
   selected item with its thread: for a message under a goal (the root of its `ref` chain) the whole

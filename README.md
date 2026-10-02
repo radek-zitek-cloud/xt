@@ -245,13 +245,13 @@ width and end with their age.
 
 | Key | What it does |
 |---|---|
-| `0`–`4`, `tab`, `j`/`k`, `enter`, `esc` | Switch panes: 0 Team, 1 Inbox, 2 Work, 3 Flow (2 and 3 swap the middle pane), 4 the detail pane (`tab` goes round them); move (the arrows too); read the detail (`j`/`k` there bring a long thread's hidden rows in); `esc` from the detail pane back to the pane you came from |
+| `0`–`4`, `tab`, `j`/`k`, `enter`, `esc` | Switch panes: 0 Team, 1 Inbox, 2 Work, 3 Flow (2 and 3 swap the middle pane), 4 the detail pane (`tab` goes round them); move (the arrows too); read the detail (`j`/`k` there bring a long thread's hidden rows in, then scroll; its bottom edge says `▾ N more (j/k)` while lines are below); `esc` from the detail pane back to the pane you came from |
 | Mouse | A click selects a row in any pane and focuses that pane (the detail pane follows without taking focus); the wheel scrolls Flow and the detail pane |
 | `Home` / `End`, page keys (Team) | The first / last agent in view |
 | `v` | The supervisor's log, newest first, in a pop-up (`esc` closes it) |
 | `/` | Filter the focused pane by text (empty clears it) |
 | `t` | Show or hide system lines (starts, stops, settings, wake-ups, nudges) in Flow |
-| `f` (Flow) | Show one agent's messages or one goal's thread; the same pick again, or `esc`, clears it |
+| `f` (Flow) | Focus: show only one agent's messages or one goal's thread (`/` is the text filter); the same pick again, or `esc`, clears it |
 | `g` / `G`, page keys (Flow) | The newest (top) / oldest message, a page up or down; with the newest selected, Flow follows new messages |
 | `space` / `o` | Fold or unfold the selected goal, `done (N)` or `no goal` row / show open work only (Work) |
 | `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
@@ -265,7 +265,7 @@ width and end with their age.
 | `u` / `U` | Start the selected stopped agent / every stopped agent |
 | `x` / `X` | Stop the selected agent / every agent (they stay in the roster) |
 | `R` | Retire the selected member (not the liaison or lead) |
-| `h` or `?`, `q` | All keys, quit |
+| `h` or `?`, `q` | All keys (a pop-up that fits the terminal's width; `j`/`k` scroll it), quit |
 
 `xt tui --demo` shows sample data.
 
