@@ -209,6 +209,54 @@ footer .wrap { display: flex; gap: 20px; flex-wrap: wrap; justify-content: space
 footer a { color: var(--muted); text-decoration: none; margin-right: 18px; }
 footer a:hover { color: var(--text); }
 
+/* --- say hello: the pill under the quick start and the band before the closing ------------- */
+
+.hello-pill {
+  display: inline-flex; align-items: center; gap: 10px; margin-top: 22px;
+  padding: 8px 14px 8px 12px; border: 1px solid var(--line-2); border-radius: 999px;
+  background: rgba(127, 212, 168, .06); color: var(--text); text-decoration: none;
+  font: 400 13px var(--mono); transition: border-color .15s, background .15s;
+}
+.hello-pill:hover { border-color: var(--ok); background: rgba(127, 212, 168, .12); }
+.hello-pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 4px rgba(127, 212, 168, .15); }
+.hello-pill .go { color: var(--ok); }
+.quickstart .hello-pill { color: var(--text); }
+
+.hello-band { padding: 40px 0 0; }
+.hello {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 40px; align-items: center;
+  padding: 40px 44px; border: 1px solid var(--line-2); border-radius: 18px;
+  background: radial-gradient(120% 140% at 0% 0%, rgba(127, 212, 168, .10), transparent 55%), linear-gradient(180deg, var(--bg-2), var(--bg));
+}
+.hello .k { font: 400 12px var(--mono); color: var(--ok); }
+.hello h3 { margin: 10px 0 12px; font-size: clamp(24px, 2.6vw, 32px); }
+.hello p { margin: 0; color: var(--muted); max-width: 640px; font-size: 15px; }
+.hello-cta { display: flex; flex-direction: column; gap: 10px; }
+.hello-cta .btn { justify-content: center; }
+
+/* --- the chat illustration ------------------------------------------------------------------ */
+
+.term { padding: 0; }
+.term-bar { display: flex; align-items: center; gap: 7px; padding: 10px 14px; border-bottom: 1px solid var(--line); font: 400 12px var(--mono); color: var(--dim); }
+.term-bar i { width: 9px; height: 9px; border-radius: 50%; background: var(--line-2); }
+.term-bar span { margin-left: 8px; }
+.chat { padding: 16px 18px 6px; font: 400 12.5px/1.65 var(--mono); color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; }
+.chat .m { margin-bottom: 14px; }
+.chat .t { color: var(--dim); }
+.chat b { font-weight: 600; }
+.chat b.you { color: var(--accent); }
+.chat .q { color: var(--warn); }
+.chat .ok { color: var(--ok); }
+.chat .opt { color: var(--muted); }
+.term-line { border-top: 1px solid var(--line); padding: 10px 18px; font: 400 12.5px var(--mono); }
+.term-line .target { color: var(--accent); font-weight: 600; margin-right: 1ch; }
+.caret { display: inline-block; width: .6em; height: 1.1em; margin-left: 2px; vertical-align: -.2em; background: var(--accent); animation: blink 1.1s steps(1) infinite; }
+@keyframes blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+
+.team .tag.past { color: var(--dim); }
+#chat { padding-top: 0; }
+
 /* --- small screens ----------------------------------------------------------------------- */
 
 @media (max-width: 900px) {
@@ -219,13 +267,16 @@ footer a:hover { color: var(--text); }
   .teams { grid-template-columns: minmax(0, 1fr); }
   .nav-links { display: none; }
   .nav .btn { margin-left: auto; }
+  .hello { grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 30px 26px; }
+  .hello-cta { flex-direction: row; flex-wrap: wrap; }
 }
 @media (max-width: 560px) {
   .grid, .grid.four { grid-template-columns: minmax(0, 1fr); }
   .limits { grid-template-columns: minmax(0, 1fr); }
   .stats .n { font-size: 24px; }
   .install span { display: none; }
-  .log { font-size: 11.5px; }
+  .log, .chat { font-size: 11.5px; }
+  .hello-pill { font-size: 12px; }
   section { padding: 64px 0; }
   .hero { padding: 80px 0 50px; }
 }

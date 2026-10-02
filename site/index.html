@@ -20,9 +20,10 @@
   </a>
   <div class="nav-links">
     <a href="#how">How it works</a>
+    <a href="#chat">Chat</a>
     <a href="#tui">TUI</a>
     <a href="#can">Capabilities</a>
-    <a href="#teams">Live teams</a>
+    <a href="#teams">In practice</a>
     <a href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/story.md">Story</a>
     <a href="https://sb.zvikov.zitek.cloud/xt-space">Backlog</a>
   </div>
@@ -34,7 +35,7 @@
   <div class="wrap">
     <div class="eyebrow">open source · MIT · v0.21.0</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
-    <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You approve, decide and correct, and every step is on record.</p>
+    <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You talk to one of them in a chat: approve, decide and correct, and every step is on record.</p>
     <div class="cta">
       <a class="btn primary" href="#start">Get started</a>
       <a class="btn" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/story.md">Read how it was built</a>
@@ -43,7 +44,7 @@
       <div class="install"><pre><b>$</b> curl -fsSLO https://raw.githubusercontent.com/radek-zitek-cloud/xt/main/bin/xt-clone.sh
 <b>$</b> sh xt-clone.sh my-team</pre></div>
       <p>Clones xt into <code class="mono">./my-team</code>, asks which harness runs the liaison and the lead, starts the team in its own Herdr session and attaches you to it. Needs Linux with <a href="https://herdr.dev">Herdr</a>, <a href="https://mise.jdx.dev">mise</a> and one of <code class="mono">codex</code>, <code class="mono">claude</code> or <code class="mono">pi</code>. By hand, step by step: <a href="https://github.com/radek-zitek-cloud/xt#quick-start">the README's quick start</a>.</p>
-      <p>Tried it? <a href="https://github.com/radek-zitek-cloud/xt/discussions/1">Say hello on GitHub Discussions</a>: xt is made by one person with an AI team, and every note on how it went, even after five minutes, helps.</p>
+      <a class="hello-pill" href="https://github.com/radek-zitek-cloud/xt/discussions/1"><span class="dot"></span>Tried it? Say hello on GitHub Discussions<span class="go">→</span></a>
     </div>
   </div>
 </header>
@@ -176,11 +177,44 @@
   </div>
 </section>
 
+<section id="chat">
+  <div class="wrap">
+    <div class="row">
+      <div class="copy">
+        <h3>Chat with the team</h3>
+        <p class="sub">The everyday way to work with xt: one conversation with the liaison, in your terminal.</p>
+        <ul>
+          <li><b>Narrative first:</b> the liaison tells you what happened in plain words; when it needs you, the message ends in a question.</li>
+          <li><b>Every question says what answer it takes:</b> yes or no; two to four options, each with its consequence and one recommended, sometimes with room for your own words; or open.</li>
+          <li><b>Approvals are questions too:</b> a hire, a schedule or a goal ready to dispatch is a yes/no question, answered in the same place.</li>
+          <li><b>Answered once, by you:</b> <code class="mono">tab</code> picks the waiting question; xt checks the answer against its type and accepts it only from your own terminal.</li>
+        </ul>
+        <div class="pills">
+          <a class="pill arrow" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/user-guide.md">User guide</a>
+        </div>
+      </div>
+      <div class="frame"><div class="frame-inner term">
+        <div class="term-bar"><i></i><i></i><i></i><span>xt chat with liaison</span></div>
+        <div class="chat"><div class="m"><span class="t">09:12</span> <b class="you">you</b> <span class="t">#412</span>
+Every morning, summarise yesterday's merged pull requests for the team channel.</div><div class="m"><span class="t">09:13</span> <b>liaison</b> <span class="t">#413</span>  <span class="q">⚑ yes/no</span>
+Read back: a daily digest of yesterday's merged PRs, posted at 08:00, one paragraph per repository. Shall I give it to the lead?
+<span class="ok">✓ answered #414: yes</span></div><div class="m"><span class="t">09:41</span> <b>liaison</b> <span class="t">#421</span>  <span class="q">⚑ 3 options, Other</span>
+The lead wants to hire a writer for the digest. Which model should it run on?
+<span class="opt">  1  a small model: cheapest, fine for summaries  (recommended)</span>
+<span class="opt">  2  the lead's model: better prose, about four times the cost</span>
+<span class="opt">  3  no hire: the lead writes it, slower on busy days</span>
+<span class="q">⚑ waits for your answer: tab picks it</span></div></div>
+        <div class="term-line"><span class="target">answer #421 ›</span> 1<span class="caret"></span></div>
+      </div><div class="caption">An illustration of <code class="mono">xt chat</code>: made-up messages in its real layout</div></div>
+    </div>
+  </div>
+</section>
+
 <section id="tui">
   <div class="wrap">
     <div class="section-title">
       <h2>The whole team on one screen</h2>
-      <p>The TUI was redesigned in 0.16: what needs you comes first, the team is grouped by harness, and every message is drawn as it flows between agents. Since 0.17 it reads in three bands, Team and the Inbox on top, Work or Flow in the middle, Detail at the bottom, with every pane titled by its key, <code class="mono">[0]</code> Team to <code class="mono">[4]</code> Detail, the newest on top everywhere, and a key line that shows what the focused pane can do.</p>
+      <p>When you want to see how the work flows, or why it stopped: <code class="mono">xt tui</code>. Three bands: Team and the Inbox on top, Work or Flow in the middle, Detail at the bottom. What needs you comes first, every pane is titled by its key, the newest is on top everywhere, and a key line shows what the focused pane can do.</p>
     </div>
     <div class="frame"><div class="frame-inner" style="padding:10px">
       <img class="shot" src="assets/tui-v0190.svg" alt="The xt 0.19 TUI in three bands: the Team pane by harness and the Inbox side by side on top, the Work outline full width in the middle with Flow as its second tab, the detail pane across the bottom" loading="lazy" width="1970" height="1026">
@@ -200,43 +234,27 @@
   <div class="wrap">
     <div class="section-title">
       <h2>What xt can do</h2>
-      <p>Each of these has been shown in real runs, not only in tests.</p>
+      <p>Each one shown in real runs or accepted against its spec by the team's quality analyst, not only in unit tests.</p>
     </div>
     <div class="grid">
-      <div class="cell"><div class="k">01</div><h4>Persistent, named agents</h4><p>A liaison, a lead and members, each in its own workspace, working while you're away.</p></div>
-      <div class="cell"><div class="k">02</div><h4>You decide, they deliver</h4><p>Questions wait in one Inbox with a notification. You never have to watch a pane.</p></div>
-      <div class="cell"><div class="k">03</div><h4>A supervisor and a ledger</h4><p>Every message is delivered and logged. Nothing gets lost, and every step can be audited.</p></div>
-      <div class="cell"><div class="k">04</div><h4>Goals, read back first</h4><p>The liaison reads a goal back to you, lets you revise it, and dispatches it exactly once.</p></div>
-      <div class="cell"><div class="k">05</div><h4>Schedules</h4><p>Daily wakes at a set local time, hourly scouts, quiet hours that hold to the second.</p></div>
-      <div class="cell"><div class="k">06</div><h4>Autonomy within rules</h4><p>A newsroom picked and published stories when you didn't answer, and stopped at its daily limit.</p></div>
-      <div class="cell"><div class="k">07</div><h4>Corrections become rules</h4><p>Recorded lessons and a regular rules review keep the team's rules consistent and short.</p></div>
-      <div class="cell"><div class="k">08</div><h4>A product team for xt itself</h4><p>A PM and a quality analyst run xt's backlog, specs and releases in public. Only you pass the gates.</p></div>
-      <div class="cell"><div class="k">09</div><h4>Independent acceptance</h4><p>Every card is checked against its spec. A final PASS closes it; anything else waits for you.</p></div>
-      <div class="cell"><div class="k">10</div><h4>Context and cost you can see</h4><p>Per agent, per turn, per goal, and the week's subscription allowance.</p></div>
-      <div class="cell"><div class="k">11</div><h4>Restarts without loss</h4><p>The team that was running comes back, and each agent picks up from its brief.</p></div>
-      <div class="cell"><div class="k">12</div><h4>Agents in bounds</h4><p>No desktop, browser or account connectors by default, and no posing as the human.</p></div>
-    </div>
-    <div class="section-title">
-      <h2>Added since 0.12</h2>
-      <p>Each checked against its spec by the product team's quality analyst before its final release; some on staging teams rather than in daily use yet.</p>
-    </div>
-    <div class="grid four">
-      <div class="cell"><div class="k">13</div><h4>Which xt is running</h4><p>Published, installed and running versions shown apart, so a half-finished upgrade is visible.</p></div>
-      <div class="cell"><div class="k">14</div><h4>Choose a version, roll back</h4><p><code class="mono">xt version use</code> checks the state format and takes a verified snapshot; <code class="mono">rollback</code> undoes it.</p></div>
-      <div class="cell"><div class="k">15</div><h4>A fresh context, safely</h4><p><code class="mono">xt reset</code> waits until the agent has saved its notes and has no open work; <code class="mono">--when-idle</code> queues it until the agent is free, and an opt-in policy resets idle agents above a token threshold.</p></div>
-      <div class="cell"><div class="k">16</div><h4>Decisions with options</h4><p>Numbered options, each with its consequence, and a recommendation; answer with a number.</p></div>
-      <div class="cell"><div class="k">17</div><h4>Per-agent permissions</h4><p>A checked settings file for each Claude Code agent; a hire's approval warns when one is missing.</p></div>
-      <div class="cell"><div class="k">18</div><h4>Claude plan usage</h4><p>The five-hour and weekly windows in status, through a shipped status-line script.</p></div>
-      <div class="cell"><div class="k">19</div><h4>Told when it's done</h4><p>Exactly one notification per goal you gave, when it's done, and a "done since you last looked" list in the Inbox.</p></div>
-      <div class="cell"><div class="k">20</div><h4>Short logs by default</h4><p><code class="mono">xt log</code> shows the newest 20 messages; <code class="mono">--full</code> shows everything.</p></div>
-      <div class="cell"><div class="k">21</div><h4>Hears when a card is ready</h4><p>A command you name lists a Board column; the lead is told about each card that enters it. xt stays independent of the board tool.</p></div>
-      <div class="cell"><div class="k">22</div><h4>An operator, within limits</h4><p>Your own coding agent reports to the liaison under its own name, and runs restart, reset, spawn and up for up to an hour when you delegate them. Logged; never the team's stop, answers or approvals.</p></div>
-      <div class="cell"><div class="k">23</div><h4>Network for one agent</h4><p>One Codex agent, say the quality analyst in a clean clone, gets the sandbox's network switch; nothing else is allowed.</p></div>
-      <div class="cell"><div class="k">24</div><h4>pi starts whole</h4><p>A guard line and one resend make sure a pi agent's first prompt arrives whole, so its context and usage show from the first start.</p></div>
-      <div class="cell"><div class="k">25</div><h4>A chat with the team</h4><p><code class="mono">xt chat</code>: one conversation with the liaison in your terminal, the last 30 messages, new ones as they arrive, questions answered in place. A view over the same ledger the TUI shows.</p></div>
-      <div class="cell"><div class="k">26</div><h4>Questions with an answer type</h4><p>Yes/no, two to four options with a recommendation and an optional Other, or open; stored as data, and every answer checked against it.</p></div>
-      <div class="cell"><div class="k">27</div><h4>Approvals as questions</h4><p>Hires and schedules are yes/no questions: <code class="mono">xt answer 12 yes</code>, or <code class="mono">s</code> then <code class="mono">y</code> in the TUI; <code class="mono">xt approve</code> stays as an alias.</p></div>
-      <div class="cell"><div class="k">28</div><h4>Answered once, by you</h4><p>Every question and approval takes one answer, from chat, the TUI or <code class="mono">xt answer</code>, and only from your own terminal; a second one is refused.</p></div>
+      <div class="cell"><div class="k">team</div><h4>Persistent, named agents</h4><p>A liaison, a lead and the members the lead hires, each in its own terminal, working while you're away.</p></div>
+      <div class="cell"><div class="k">team</div><h4>Any harness, mixed</h4><p>Claude Code, Codex and pi agents in one team, each on its own model; xt speaks to all of them the same way.</p></div>
+      <div class="cell"><div class="k">team</div><h4>A supervisor and a ledger</h4><p>Every message is delivered and logged. Nothing gets lost, and every step can be audited.</p></div>
+      <div class="cell"><div class="k">decisions</div><h4>Goals, read back first</h4><p>The liaison reads a goal back to you, lets you revise it, and dispatches it exactly once.</p></div>
+      <div class="cell"><div class="k">decisions</div><h4>Questions with an answer type</h4><p>Yes/no, options with a recommendation, or open; stored as data, and every answer checked against it.</p></div>
+      <div class="cell"><div class="k">decisions</div><h4>Told when it's done</h4><p>Exactly one notification for each goal you gave, and a "done since you last looked" list in the Inbox.</p></div>
+      <div class="cell"><div class="k">autonomy</div><h4>Schedules</h4><p>Daily wakes at a set local time, hourly scouts, quiet hours that hold to the second.</p></div>
+      <div class="cell"><div class="k">autonomy</div><h4>Within your rules</h4><p>A newsroom picked and published stories when you didn't answer, and stopped at its daily limit.</p></div>
+      <div class="cell"><div class="k">autonomy</div><h4>Corrections become rules</h4><p>Recorded lessons and a regular rules review keep the team's rules consistent and short.</p></div>
+      <div class="cell"><div class="k">operations</div><h4>Upgrades you can undo</h4><p><code class="mono">xt version use</code> checks, snapshots and switches; <code class="mono">rollback</code> goes back. Published, installed and running versions are shown apart.</p></div>
+      <div class="cell"><div class="k">operations</div><h4>Restarts without loss</h4><p>The team that was running comes back, and each agent picks up from its brief, not from memory.</p></div>
+      <div class="cell"><div class="k">operations</div><h4>A fresh context, safely</h4><p><code class="mono">xt reset</code> waits until the agent has saved its notes and has no open work, or queues until it's idle.</p></div>
+      <div class="cell"><div class="k">visibility</div><h4>Context and cost you can see</h4><p>Per agent, per turn and per goal, with Codex's week and Claude's five-hour and weekly windows.</p></div>
+      <div class="cell"><div class="k">bounds</div><h4>Agents in bounds</h4><p>No desktop, browser or account connectors by default, a checked permissions file per Claude agent, and no posing as the human.</p></div>
+      <div class="cell"><div class="k">bounds</div><h4>Your own agent as operator</h4><p>A coding agent of yours can report to the liaison under its own name and, for a time you set, run restarts and resets. Logged.</p></div>
+      <div class="cell"><div class="k">product</div><h4>Independent acceptance</h4><p>A quality analyst checks every card against its spec in a clean copy. A final PASS closes it; anything else waits for you.</p></div>
+      <div class="cell"><div class="k">product</div><h4>Release candidates first</h4><p>A release starts as <code class="mono">-rc1</code>; the team stays on the accepted version until every card passes.</p></div>
+      <div class="cell"><div class="k">product</div><h4>Hears when a card is ready</h4><p>A command you name lists a board column; the lead is told about each card that enters it. Any board tool works.</p></div>
     </div>
   </div>
 </section>
@@ -244,28 +262,28 @@
 <section id="teams">
   <div class="wrap">
     <div class="section-title">
-      <h2>Two teams run on it every day</h2>
-      <p>Not demos: both work from the same ledger and rules you'd use.</p>
+      <h2>Built by the team it describes</h2>
+      <p>Not demos: both teams worked from the same ledger and rules you'd use.</p>
     </div>
     <div class="teams">
       <div class="team">
-        <div class="tag">● newsroom</div>
-        <h4>Finds, checks and publishes news</h4>
-        <p>A scout reads nine news feeds every hour and proposes stories; a researcher, an author, an editor and a publisher take the chosen one to a published article, every claim sourced.</p>
+        <div class="tag">● xt-team · running</div>
+        <h4>Develops xt itself</h4>
+        <p>A liaison, a lead, a product manager, a builder, a quality analyst and a UX researcher. They plan from the backlog, build release candidates, accept or reject each card, and walk every candidate as a new user would; the human owns the approvals and every publication.</p>
+        <div class="stats">
+          <div class="stat"><div class="n">26</div><div class="l">releases from 26 Sep to 2 Oct</div></div>
+          <div class="stat"><div class="n">3</div><div class="l">harnesses: Claude Code, Codex, pi</div></div>
+          <div class="stat"><div class="n">2</div><div class="l">real bugs caught in its first candidate</div></div>
+        </div>
+      </div>
+      <div class="team">
+        <div class="tag past">● newsroom · ran in September</div>
+        <h4>Found, checked and published news</h4>
+        <p>A scout read nine news feeds every hour and proposed stories; a researcher, an author, an editor and a publisher took the chosen one to a published article, every claim sourced.</p>
         <div class="stats">
           <div class="stat"><div class="n">19 min</div><div class="l">first brief to published article</div></div>
           <div class="stat"><div class="n">8</div><div class="l">articles on 28 Sep, 6 picked by the team</div></div>
           <div class="stat"><div class="n">6/6</div><div class="l">daily auto-pick limit, held</div></div>
-        </div>
-      </div>
-      <div class="team">
-        <div class="tag">● product team</div>
-        <h4>Runs the development of xt itself</h4>
-        <p>A product manager specifies and plans; a builder agent implements approved cards and prepares release candidates; a quality analyst accepts or rejects each delivery; the human owns the approval points and every publication.</p>
-        <div class="stats">
-          <div class="stat"><div class="n">13</div><div class="l">cards specified, built and accepted in a day</div></div>
-          <div class="stat"><div class="n">2</div><div class="l">real bugs caught in a release candidate</div></div>
-          <div class="stat"><div class="n">~$37</div><div class="l">its busiest day, at API list prices</div></div>
         </div>
       </div>
     </div>
@@ -276,14 +294,30 @@
   <div class="wrap">
     <div class="section-title">
       <h2 class="plain" style="color:var(--text)">Honest limits</h2>
-      <p>xt is 0.x and a few days old. This is what it doesn't do yet.</p>
+      <p>xt is 0.x and about a week old. This is what it doesn't do yet.</p>
     </div>
     <ul class="limits">
-      <li>Tested on Linux only, with Herdr. Most runs used Codex for every agent; the Claude Code and pi adapters have seen little real use.</li>
+      <li>Tested on Linux only, with Herdr. Daily use so far is one team, mostly on Claude Code, with one Codex and one pi agent; other setups have seen little real use.</li>
       <li>The hierarchy is enforced by xt, not by a sandbox. A determined agent could still reach around it through its shell.</li>
       <li>Costs are estimates from public list prices, not bills. No budgets yet.</li>
       <li>Command-line tools that hold your credentials are ordinary programs to a harness; xt can't switch them off. A Claude agent's permissions file can refuse them; a Codex agent is bounded only by its sandbox's review.</li>
     </ul>
+  </div>
+</section>
+
+<section id="hello" class="hello-band">
+  <div class="wrap">
+    <div class="hello">
+      <div>
+        <div class="k">say hello</div>
+        <h3>Tried it? I'd love to hear how it went.</h3>
+        <p>xt is made by one person, Radek, mostly by the AI team it describes. If you tried it, even for five minutes, tell me what you used it for, or where it stopped you. Every note shapes what gets built next.</p>
+      </div>
+      <div class="hello-cta">
+        <a class="btn primary" href="https://github.com/radek-zitek-cloud/xt/discussions/1">Say hello</a>
+        <a class="btn" href="https://github.com/radek-zitek-cloud/xt/issues/new">Report a problem</a>
+      </div>
+    </div>
   </div>
 </section>
 
