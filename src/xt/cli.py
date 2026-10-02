@@ -317,19 +317,21 @@ def cmd_brief(args) -> None:
 
 
 LOG_LIMIT = 20  # plain `xt log`: the newest messages only (card #113)
-WATCH_LIMIT = 50  # `xt log --watch`: the newest supervisor events
+WATCH_LIMIT = 50  # `xt log --events`: the newest supervisor events
 
 
 def cmd_log(args) -> None:
     if args.limit is not None and args.limit < 1:
         raise XtError("--limit needs a number of 1 or more (`--full` prints everything)")
     ctx = Ctx.load()
-    if args.watch:
+    if args.events:  # `--watch` before 0.20.0: it never followed, so it's named for what it does (#178)
         from .watch import watch_log
 
         lines = watch_log(ctx, args.limit or WATCH_LIMIT)
         print("\n".join(lines) if lines else "(no supervisor events yet)")
         return
+    if args.id is not None and ctx.ledger.message(args.id) is None:
+        raise XtError(f"no such message: #{args.id}")  # "(no messages)" is for an existing one (#177)
     shown = [m for m in ctx.ledger.messages(since_days=args.since)
              if not (args.member and args.member not in (m["from"], m["to"]))
              and not (args.id and args.id not in (m["id"], m.get("ref")))
@@ -578,7 +580,7 @@ def cmd_approve(args, approve: bool = True) -> None:
         try:
             print(f"#{rid}: {decide(ctx, rid, approve)}")
         except XtError as e:
-            print(f"#{rid}: {e}")
+            print(str(e) if f"#{rid}" in str(e) else f"#{rid}: {e}")  # the id once (card #177)
 
 
 def cmd_spawn(args) -> None:
@@ -713,7 +715,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--liaison", metavar="HARNESS[:MODEL]")
     sp.add_argument("--lead", metavar="HARNESS[:MODEL]")
     sp.add_argument("--approval", choices=["on", "off"])
-    sp.add_argument("--yes", action="store_true", help="accept recommended defaults, no questions")
+    sp.add_argument("--yes", action="store_true",
+                    help="accept recommended defaults, no questions (without a terminal xt uses them too, "
+                         "and says so)")
     sp.add_argument("--no-commit", action="store_true")
 
     add("up", cmd_up, "start the supervisor and liaison (and the lead if goals are open)")
@@ -773,9 +777,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--id", type=int)
     sp.add_argument("--type")
     sp.add_argument("--since", type=int, metavar="DAYS")
-    sp.add_argument("--watch", action="store_true", help="the supervisor's events instead of messages")
+    sp.add_argument("--events", "--watch", dest="events", action="store_true",
+                    help="the supervisor's newest events instead of messages, printed once (it doesn't follow; "
+                         "--watch is the old name)")
     sp.add_argument("--limit", type=int, metavar="N",
-                    help=f"the newest N messages (default {LOG_LIMIT}), or with --watch events (default {WATCH_LIMIT})")
+                    help=f"the newest N messages (default {LOG_LIMIT}), or with --events events (default {WATCH_LIMIT})")
     sp.add_argument("--full", action="store_true", help="the whole message history")
 
     add("status", cmd_status, "one-shot team status")
@@ -861,7 +867,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     add("watch", cmd_watch, "run the supervisor (xt up starts it in its own pane)")
     sp = add("tui", cmd_tui, "the lazygit-style overview of the team (--demo: static sample data)")
-    sp.add_argument("--demo", action="store_true", help="show the look-and-feel spike with demo data")
+    sp.add_argument("--demo", action="store_true",
+                    help="try the TUI on made-up example data: no team needed, nothing is changed")
     return p
 
 

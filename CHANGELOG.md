@@ -13,7 +13,7 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 Polish from a fresh-eyes usability review of 0.19.0: seven small cards to their approved spec, no
 new feature. **0.20.0-rc1** has #174, #177 and #178. No protocol or ledger format change; new state
-file `.xt/state/context_alerts.json`.
+file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `starting`.
 
 ### Fixed
 
@@ -32,6 +32,28 @@ file `.xt/state/context_alerts.json`.
   alert no longer says xt can't find the log. The user guide says when an unreadable context is
   expected. The cause seen in the review is not confirmed yet: it needs a real pi member on a
   non-Anthropic provider (staging).
+
+### Changed
+
+- **Plainer wording (#177).** The demo TUI's Inbox shows the real TUI's group labels (`NEEDS YOU`,
+  `NOTIFICATIONS`, `FRICTION`; it said `NEW`), from one shared list. An agent whose start is under
+  way, as in its own first brief, shows `not recorded yet (first turn running)` instead of `unknown
+  (started before xt recorded versions)`, which stays for processes that really predate version
+  recording (xt marks the start in `.xt/state/versions.json` before the first prompt). `xt log --id`
+  of a message that doesn't exist says `no such message: #ID` and exits with an error; an existing
+  message filtered away still prints `(no messages)`. `xt tui --help` describes `--demo` as made-up
+  example data rather than a "look-and-feel spike". `xt approve` of a missing id says `no pending
+  approval #ID` with the id once.
+- **`xt log --events`, and `xt init` without a terminal (#178).** `xt log --events` prints the
+  supervisor's newest events once, as `--watch` did; `--watch` stays as its alias, and the help and
+  user guide say it doesn't follow. `xt init` without a terminal (a script or a pipe) still uses the
+  defaults for every question not given as an option, and now says so in one line naming `--yes`
+  and `xt init --help`; the written `team.toml` and the exit code are unchanged.
+
+### Upgrading
+
+- From 0.19.0: `git pull upstream main` (or `xt version use v0.20.0`), then `xt restart --all` so
+  the supervisor runs the context check. Scripts using `xt log --watch` keep working.
 
 ## [0.19.0] — 2026-10-01
 

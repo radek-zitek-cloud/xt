@@ -473,7 +473,9 @@ status` and every agent's brief:
 After `git pull` the team is *installed* on the new version but still *running* the old one until
 `xt restart --all`; the status line says which processes haven't picked it up yet. A newer
 *published* release only produces a notice: nothing upgrades on its own. Processes started by xt
-older than 0.12.0 show as `unknown` until their next restart. To verify an upgrade finished: all
+older than 0.12.0 show as `unknown` until their next restart. An agent whose start is still under
+way (its own first brief is written before xt records the start) shows `not recorded yet (first
+turn running)` instead, from 0.20.0. To verify an upgrade finished: all
 three read the same version and no note follows the line. (Teams on xt
 0.6.0 or older don't have `restart` yet: `xt down`, pull, `xt`, then `U` in the TUI.)
 
@@ -940,7 +942,11 @@ the TUI. **Use it** as the one command to start working with a team, any time.
 prerequisites, asks for the team name, the Herdr session, the liaison's and lead's harness and model
 and whether hires need approval, renames `origin` to `upstream`, writes `team.toml` and the team
 folders, and commits. **Use it** once per team; `xt-clone.sh` and bare `xt` run it for you.
-`--yes` takes the recommended defaults without questions (e.g. for scripts).
+`--yes` takes the recommended defaults without questions (e.g. for scripts). Without a terminal
+(in a script or a pipe) it can't ask either, so it uses the same defaults for every question not
+given as an option and, from 0.20.0, says so in one line: ``no terminal: used the defaults for the
+questions not given as options (`--yes` does the same on purpose; `xt init --help` lists the
+options)``. The written `team.toml` and the exit code are the same as before.
 
 ### `xt up`
 
@@ -1161,8 +1167,11 @@ what it knows (`xt brief lead`).
 message history, filtered. By default it prints the newest 20 messages that match the filters, oldest
 of them first, and a first line saying how many older ones were left out; `--limit N` prints the
 newest N, `--full` all of them. `--id` alone still prints the whole thread (from 0.15.0; before, `xt
-log` always printed everything). `xt log --watch [--limit N]` shows the supervisor's newest events
-instead (50 by default). **Use it** to trace a goal (`--id 234` shows the goal and every message
+log` always printed everything); an id that no message has says `no such message: #ID` and exits
+with an error, while an existing message filtered away still prints `(no messages)` (from 0.20.0).
+`xt log --events [--limit N]` prints the supervisor's newest events instead (50 by default), once:
+it doesn't follow new ones (run it again, or watch the TUI's supervisor pop-up). `--watch` was its
+name before 0.20.0 and still works. **Use it** to trace a goal (`--id 234` shows the goal and every message
 that refers to it directly) or an agent (`--member carol`); the TUI's Flow pane (`3`) and the
 supervisor's pop-up (`v`) show the recent part.
 
@@ -1174,10 +1183,10 @@ limits. **Use it** before choosing a harness for the liaison, lead or a new agen
 ### `xt watch`
 
 `xt watch` — the supervisor loop. `xt up` starts it in its own workspace; you don't run it by hand.
-Its events show in the TUI's supervisor pop-up (`v`) and `xt log --watch`; a failed wake-up,
+Its events show in the TUI's supervisor pop-up (`v`) and `xt log --events`; a failed wake-up,
 notification or usage recording also raises an Inbox alert.
 
 ### `xt tui`
 
-`xt tui [--demo]` — the TUI without the `xt up` step; `--demo` shows it with sample data (no team
-needed). Keys: `h` lists them all; the [README](../README.md#the-tui) has the table.
+`xt tui [--demo]` — the TUI without the `xt up` step; `--demo` shows it with made-up example data
+(no team needed, nothing is changed, the same panes and labels as the real TUI). Keys: `h` lists them all; the [README](../README.md#the-tui) has the table.

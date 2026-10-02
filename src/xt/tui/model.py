@@ -31,6 +31,7 @@ from .thread import ThreadDetail, thread_of
 PANELS = ("Inbox", "Work", "Flow")
 # the Inbox's folds (cards #127, #157): their rows carry the fold's key in `under`
 FRICTION_FOLD, EARLIER_FOLD, ANSWERED_FOLD = "fold:friction", "fold:earlier", "fold:answered"
+INBOX_HEADINGS = ("NEEDS YOU", "NOTIFICATIONS", "FRICTION")  # the demo uses them too (card #177)
 OPTION_ANSWER = re.compile(r"^Option (\d+): (.+?)(?: — .*)?$", re.S)
 
 
@@ -502,7 +503,7 @@ def build(ctx: Ctx) -> Snapshot:
                                      {"id": m["id"], "seen": True, "folded": True, "under": FRICTION_FOLD},
                                      row_age(m["ts"], now)))
     inbox_rows = []
-    for heading, rows in (("NEEDS YOU", needs), ("NOTIFICATIONS", new_rows), ("FRICTION", friction_rows)):
+    for heading, rows in zip(INBOX_HEADINGS, (needs, new_rows, friction_rows)):
         if rows:
             inbox_rows.append(Row(f"heading:{heading}", Text(heading, style="bold"), lambda: Text(""), "heading"))
             inbox_rows += rows

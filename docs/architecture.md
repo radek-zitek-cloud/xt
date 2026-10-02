@@ -410,7 +410,7 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
 11. **Rotation**, hourly.
 
 Every event the supervisor prints in its pane is also appended to `state/watch.log`, which the
-TUI's supervisor pop-up (`v`) and `xt log --watch` show. A failed wake-up, notification or usage
+TUI's supervisor pop-up (`v`) and `xt log --events` (once; `--watch` is its old name) show. A failed wake-up, notification or usage
 recording also raises an alert (card #131, `Alerts.raise_or_count`): one per kind (`failed:wake-up`,
 `failed:notification`, `failed:usage-recording`), whose count and last time go up while it is
 open, so a failure every minute stays one Inbox row; a cleared one is raised anew by the next

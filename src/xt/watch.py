@@ -143,7 +143,7 @@ class Supervisor:
 
     def say(self, text: str) -> None:
         """Print an event in the supervisor's pane and keep it in .xt/state/watch.log (the TUI's
-        Supervisor panel and `xt log --watch` read it)."""
+        Supervisor panel and `xt log --events` read it)."""
         now = dt.datetime.now()
         self.out(f"{now:%H:%M:%S} {text}")
         path = self.ctx.paths.state / "watch.log"

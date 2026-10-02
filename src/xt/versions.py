@@ -23,6 +23,9 @@ from .context import Ctx
 PUBLISHED_EVERY = 6 * 3600  # seconds between the supervisor's checks of the upstream tags
 STALE_RETRY = 15 * 60  # sooner while the cache is older than the installed final (card #133)
 PENDING = "published ≥ installed, check pending"
+UNKNOWN = "unknown (started before xt recorded versions)"
+NOT_YET = "not recorded yet (first turn running)"  # card #177
+STARTING_FOR = 30 * 60  # seconds a begun start without a record counts as fresh, not as too old
 FINAL_TAG = re.compile(r"refs/tags/v(\d+)\.(\d+)\.(\d+)$")
 
 
@@ -78,12 +81,21 @@ def record_supervisor(ctx: Ctx, now: dt.datetime) -> None:
     _save(ctx, data)
 
 
+def mark_starting(ctx: Ctx, name: str, now: dt.datetime) -> None:
+    """A start has begun; its version is recorded once its first prompt is out (card #177), and the
+    agent's first brief, built before that, says it's not recorded yet rather than too old."""
+    data = load(ctx)
+    data.setdefault("starting", {})[name] = now.isoformat(timespec="seconds")
+    _save(ctx, data)
+
+
 def record_agent_start(ctx: Ctx, name: str, now: dt.datetime, codex_options: list[str] | None = None) -> None:
     data = load(ctx)
     rec = {"version": __version__, "since": now.isoformat(timespec="seconds")}
     if codex_options:  # what this start ran with, so status can tell a changed team.toml (card #169)
         rec["codex_options"] = list(codex_options)
     data.setdefault("agents", {})[name] = rec
+    data.get("starting", {}).pop(name, None)
     _save(ctx, data)
 
 
@@ -168,6 +180,10 @@ class Versions:
     supervisor: str | None  # None while running = started before xt recorded versions
     agents: dict[str, str | None] = field(default_factory=dict)  # running agents → version that started them
     supervisor_running: bool = True
+    starting: set[str] = field(default_factory=set)  # agents without a record whose start began lately (#177)
+
+    def _unknown(self, name: str) -> str:
+        return NOT_YET if name in self.starting else UNKNOWN
 
     @property
     def running(self) -> list[str | None]:
@@ -223,19 +239,21 @@ class Versions:
             who = (["supervisor"] if sup else []) + old
             notes.append(f"not yet running the installed version: {', '.join(who)} (restart to pick it up)")
         unknown = (["supervisor"] if self.supervisor_running and self.supervisor is None else []) + sorted(
-            n for n, v in self.agents.items() if v is None)
+            n for n, v in self.agents.items() if v is None and n not in self.starting)
+        fresh = sorted(n for n, v in self.agents.items() if v is None and n in self.starting)
+        if fresh:
+            notes.append(f"version {NOT_YET}: {', '.join(fresh)}")
         if unknown:
-            notes.append(f"version unknown (started before xt recorded versions): {', '.join(unknown)}")
+            notes.append(f"version {UNKNOWN}: {', '.join(unknown)}")
         if self.upgrade_available:
             notes.append(f"a newer release is published ({display(self.published)}); nothing upgrades on its own")
         return out + "".join(f"\n  {n}" for n in notes)
 
     def detail(self) -> str:
         sup = ("not running" if not self.supervisor_running else
-               display(self.supervisor) if self.supervisor else "unknown (started before xt recorded versions)")
+               display(self.supervisor) if self.supervisor else UNKNOWN)
         lines = [f"supervisor: {sup}"]
-        lines += [f"{n}: {display(v) if v else 'unknown (started before xt recorded versions)'}"
-                  for n, v in sorted(self.agents.items())]
+        lines += [f"{n}: {display(v) if v else self._unknown(n)}" for n, v in sorted(self.agents.items())]
         return "\n".join(lines)
 
 
@@ -262,7 +280,15 @@ def current(ctx: Ctx, live_names: set[str] | None = None, supervisor_running: bo
     if live_names is None:
         live_names = set(ctx.herdr.agents())
     agents = {n: (data.get("agents", {}).get(n) or {}).get("version") for n in sorted(live_names)}
-    return Versions(published, note, installed(ctx), supervisor, agents, supervisor_running)
+    starting = set()
+    for n, since in data.get("starting", {}).items():
+        try:
+            if n in agents and agents[n] is None and \
+                    (now - dt.datetime.fromisoformat(since)).total_seconds() < STARTING_FOR:
+                starting.add(n)
+        except (ValueError, TypeError):
+            continue
+    return Versions(published, note, installed(ctx), supervisor, agents, supervisor_running, starting)
 
 
 def _ago(iso: str | None, now: dt.datetime) -> str:

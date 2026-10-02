@@ -74,6 +74,9 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
     answered: list[str] = []
     began = time.time()
+    from . import versions
+
+    versions.mark_starting(ctx, name, ctx.ledger.clock())  # its first brief comes before the record (#177)
     try:
         ctx.herdr.start_agent(name, adapter.herdr_kind, pane, args)
     except HerdrError as e:
@@ -98,7 +101,7 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     if landed and adapter.check_prompt_in_log:
         note = check_prompt_in_log(ctx, name, adapter, began, settled)
-    from . import __version__, versions
+    from . import __version__
 
     versions.record_agent_start(ctx, name, ctx.ledger.clock(), a.codex_options)
     ctx.ledger.append(SYSTEM, HUMAN, "system",

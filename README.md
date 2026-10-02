@@ -293,7 +293,7 @@ equivalent and when you'd use it.
 | `xt send <to> --type <t> "..."`, `xt done <id> "..."`, `xt note "..."` | Messages, closing work, notes (agents add `--as <name>`) |
 | `xt friction "..."` | An agent's feedback about xt or its harness; lands in your Inbox |
 | `xt goal new\|dispatch\|list` | Goal drafts and dispatch (normally the liaison does this) |
-| `xt brief [name]`, `xt log` | Recovery summary and the newest 20 messages (`--limit N`, `--full` for the whole history; `xt log --watch`: the supervisor's events) |
+| `xt brief [name]`, `xt log` | Recovery summary and the newest 20 messages (`--limit N`, `--full` for the whole history; `xt log --events`: the supervisor's newest events, printed once) |
 | `xt harnesses` | Installed harnesses and their known limits |
 | `xt operator add NAME --pid PID` / `remove` / `list` / `pid` | Register an outside process acting for you under its own name (`pid`: the operator prints what to register) |
 | `xt delegate NAME [--for 30m] [--only …]` / `xt delegate --revoke` | Let an operator run `restart`, `reset`, `spawn` and `up` for at most an hour, each one logged |

@@ -13,7 +13,7 @@ from textual.widgets import Input, OptionList, Static, TextArea
 from textual.widgets.option_list import Option
 
 from . import flow, teampane, work
-from .model import PANELS, Row, Snapshot, fit
+from .model import INBOX_HEADINGS, PANELS, Row, Snapshot, fit
 from .thread import ThreadDetail
 
 REFRESH_SECONDS = 2.0
@@ -1703,15 +1703,15 @@ def demo_snapshot() -> Snapshot:
                        "dave · pi · modeler · BLOCKED on an approval prompt in its pane"),
             ],
             "Inbox": [
-                _row("hn", _t(("NEEDS YOU", "bold")), "", "heading"),
+                _row("hn", _t((INBOX_HEADINGS[0], "bold")), "", "heading"),
                 _row("a9", _t(("⚑ ", "yellow"), "#9 spawn erin ", ("(evaluator, pi)", "bright_black")),
                      "Approval #9: lead asks to spawn erin\n\nrole brief: …", "approval", id=9),
                 _row("al", _t(("⚠ ", "red"), "dave is blocked (usually an approval prompt)"),
                      "dave is blocked — f on dave in Team to jump there", "alert", key="blocked:dave"),
-                _row("hw", _t(("NEW", "bold")), "", "heading"),
+                _row("hw", _t((INBOX_HEADINGS[1], "bold")), "", "heading"),
                 _row("m47", _t(("✉ ", "cyan"), "#47 liaison: forecast team: 4 of 7 tasks done"),
                      "#47 report liaison→human\nforecast team: 4 of 7 tasks done", "message", id=47),
-                _row("hf", _t(("FRICTION", "bold")), "", "heading"),
+                _row("hf", _t((INBOX_HEADINGS[2], "bold")), "", "heading"),
                 _row("f51", _t(("✱ ", "magenta"), "#51 carol: the sandbox refused a plain curl"),
                      "#51 friction carol→human\nthe sandbox refused a plain curl", "friction", id=51),
                 _row("fold", _t(("(4 older, seen) ▸", "bright_black")), "4 older friction reports you have seen",

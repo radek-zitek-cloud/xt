@@ -168,3 +168,142 @@ def test_174_harnesses_without_a_log_format_raise_nothing(ctx):
     sup = Supervisor(ctx, out=lambda s: None)
     sup.check_context(ctx.herdr.agents(), usage.last_starts(ctx)["liaison"] + usage.GRACE)
     assert not [k for k in Alerts(ctx).active() if k.startswith("context:")]
+
+
+# --- #177: plainer wording -------------------------------------------------------------------------
+
+
+def test_177_the_demo_inbox_shows_the_real_group_labels(ctx, fake_home, clock):
+    from xt.tui.app import demo_snapshot
+    from xt.tui.model import INBOX_HEADINGS, build
+
+    from .test_tui_0170 import _acceptance
+
+    _acceptance(ctx, fake_home, clock)  # all three groups in a real team's Inbox
+    real = [r.text.plain for r in build(ctx).panels["Inbox"] if r.kind == "heading"]
+    demo = [r.text.plain for r in demo_snapshot().panels["Inbox"] if r.kind == "heading"]
+    assert demo == real == list(INBOX_HEADINGS) == ["NEEDS YOU", "NOTIFICATIONS", "FRICTION"]
+
+
+def test_177_a_starting_agent_is_not_recorded_yet_and_an_old_one_is_unknown(ctx):
+    from xt import versions
+
+    now = ctx.ledger.clock()
+    versions.mark_starting(ctx, "lead", now)
+    v = versions.current(ctx, live_names={"lead", "liaison"}, supervisor_running=False, now=now)
+    assert v.detail().splitlines()[1:] == ["lead: not recorded yet (first turn running)",
+                                          "liaison: unknown (started before xt recorded versions)"]
+    assert "\n  version not recorded yet (first turn running): lead" in v.line()
+    assert "\n  version unknown (started before xt recorded versions): liaison" in v.line()
+    later = now + versions.dt.timedelta(seconds=versions.STARTING_FOR)  # a start that never finished
+    assert "lead: unknown" in versions.current(ctx, live_names={"lead"}, supervisor_running=False, now=later).detail()
+    versions.record_agent_start(ctx, "lead", now)
+    assert "lead" not in versions.load(ctx).get("starting", {})
+    assert "not recorded" not in versions.current(ctx, live_names={"lead"}, supervisor_running=False, now=now).line()
+
+
+def test_177_the_start_is_marked_before_the_first_prompt_is_built(ctx, monkeypatch):
+    from xt import spawn, versions
+
+    seen = []
+    real = spawn.first_prompt
+
+    def first_prompt(ctx, name):
+        seen.append(dict(versions.load(ctx).get("starting", {})))
+        return real(ctx, name)
+
+    monkeypatch.setattr(spawn, "first_prompt", first_prompt)
+    request_spawn(ctx, "human", "liaison", None, None, None, None)
+    assert "liaison" in seen[0]  # its first brief sees the start under way
+    assert versions.load(ctx)["agents"]["liaison"]["version"] and "liaison" not in versions.load(ctx)["starting"]
+
+
+def _xt_log(ctx, monkeypatch, capsys, *argv):
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    cli.cmd_log(cli.build_parser().parse_args(["log", *argv]))
+    return capsys.readouterr().out
+
+
+def _help(command):
+    sub = next(a for a in cli.build_parser()._actions if getattr(a, "choices", None))
+    return " ".join(sub.choices[command].format_help().split())
+
+
+def test_177_log_id_of_a_missing_message_says_so_and_fails(ctx, monkeypatch, capsys):
+    from xt.paths import XtError
+
+    m = ctx.ledger.append("lead", "liaison", "report", "hello")
+    with pytest.raises(XtError, match=r"^no such message: #999999$"):
+        _xt_log(ctx, monkeypatch, capsys, "--id", "999999")
+    assert _xt_log(ctx, monkeypatch, capsys, "--id", str(m["id"]), "--type", "task") == "(no messages)\n"
+    assert f"#{m['id']} " in _xt_log(ctx, monkeypatch, capsys, "--id", str(m["id"]))
+
+
+def test_177_tui_help_describes_the_demo_plainly():
+    text = _help("tui")
+    assert "made-up example data" in text and "spike" not in text
+
+
+def test_177_approve_of_a_missing_id_names_it_once(ctx, monkeypatch, capsys):
+    monkeypatch.setattr(sys, "stdin", _Tty())
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    cli.cmd_approve(cli.build_parser().parse_args(["approve", "12345"]))
+    assert capsys.readouterr().out == "no pending approval #12345\n"
+
+
+# --- #178: xt log --events, and xt init without a terminal ---------------------------------------------
+
+
+def test_178_log_events_prints_the_events_and_watch_still_works(ctx, monkeypatch, capsys):
+    (ctx.paths.state / "watch.log").write_text("2026-09-26 12:00:00 delivered #1 to lead\n")
+    assert _xt_log(ctx, monkeypatch, capsys, "--events") == _xt_log(ctx, monkeypatch, capsys, "--watch")
+    assert "delivered #1 to lead" in _xt_log(ctx, monkeypatch, capsys, "--events")
+    text = _help("log")
+    assert "--events, --watch" in text and "printed once (it doesn't follow; --watch is the old name)" in text
+
+
+def _fresh_clone(where):
+    import shutil
+
+    from xt.paths import Paths
+
+    from .conftest import REPO
+
+    where.mkdir(parents=True)
+    for name in ("protocol.md", "roles", "harnesses"):
+        src = REPO / name
+        (shutil.copytree if src.is_dir() else shutil.copy)(src, where / name)
+    return Paths(where)
+
+
+@pytest.fixture
+def no_terminal(monkeypatch):
+    import io
+
+    from xt import herdr, init
+
+    monkeypatch.setattr(init, "prerequisites", lambda paths: (["git: ok"], []))
+    monkeypatch.setattr(herdr, "sessions", lambda: {})
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))  # a pipe, not a terminal
+    return init
+
+
+NO_TERMINAL = ("no terminal: used the defaults for the questions not given as options "
+               "(`--yes` does the same on purpose; `xt init --help` lists the options)")
+
+
+def test_178_init_without_a_terminal_says_it_used_the_defaults(tmp_path, no_terminal):
+    out = no_terminal.init(_fresh_clone(tmp_path / "piped"), None, None, None, None, None, yes=False, commit=False)
+    assert out.count(NO_TERMINAL) == 1
+    out = no_terminal.init(_fresh_clone(tmp_path / "yes"), None, None, None, None, None, yes=True, commit=False)
+    assert NO_TERMINAL not in out  # asked for on purpose: nothing to say
+    every = no_terminal.init(_fresh_clone(tmp_path / "all"), "t", "s", "codex", "codex", True, yes=False, commit=False)
+    assert NO_TERMINAL not in every  # every question given as an option: nothing was defaulted
+    assert "init" in _help("init") and "without a terminal xt uses them too, and says so" in _help("init")
+
+
+def test_178_init_without_a_terminal_writes_what_yes_writes(tmp_path, no_terminal):
+    piped, yes = _fresh_clone(tmp_path / "piped"), _fresh_clone(tmp_path / "yes")
+    no_terminal.init(piped, "t", None, None, None, None, yes=False, commit=False)
+    no_terminal.init(yes, "t", None, None, None, None, yes=True, commit=False)
+    assert piped.team_toml.read_text() == yes.team_toml.read_text()

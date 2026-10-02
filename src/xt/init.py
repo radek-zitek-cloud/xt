@@ -70,6 +70,9 @@ def init(paths: Paths, name: str | None, session: str | None, liaison: str | Non
         raise XtError("\n".join(out + [f"missing essentials: {', '.join(missing)} — install them and rerun"]))
     if interactive:
         print("\n".join(out))
+    elif not yes and None in (name, session, liaison, lead, approval):  # card #178: never silently
+        out.append("no terminal: used the defaults for the questions not given as options "
+                   "(`--yes` does the same on purpose; `xt init --help` lists the options)")
 
     team_name = name or _ask("Team name", paths.root.name, interactive)
     sess = session or _ask("Herdr session for this team", team_name, interactive)
