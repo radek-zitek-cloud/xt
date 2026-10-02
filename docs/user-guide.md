@@ -71,6 +71,10 @@ paste through the system clipboard (wl-copy/wl-paste on Wayland, xclip or xsel o
 macOS; if none is available the dialog says so, and your terminal's own paste still works). Enter
 starts a new line, ctrl+s sends, esc cancels.
 
+From 0.21.0, `xt chat` in any terminal of yours is the same conversation without the TUI: the
+last 30 messages with the liaison, new ones as they arrive, and questions answered in place (see
+[`xt chat`](#xt-chat)).
+
 You can also message the liaison from the TUI without switching workspaces: `S` always opens a
 message to the liaison. `s` does too, except when a question is selected in the Inbox: then it
 answers that question. The key line at the bottom of the TUI says `s answer #288` while it will do
@@ -938,8 +942,9 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt version`](#xt-version) | show, check: both; use/rollback: human | none |
 | [`xt status`](#xt-status) | both | Team pane (on top) |
 | [`xt inbox`](#xt-inbox) | human | Inbox panel (`1`) |
-| [`xt answer`](#xt-answer) | human | `s` on a question |
-| [`xt approve`, `xt deny`](#xt-approve-xt-deny) | human | `a` / `d` on an approval |
+| [`xt chat`](#xt-chat) | human | `S` and `s` (the same conversation, in the Inbox and Flow) |
+| [`xt answer`](#xt-answer) | human | `s` on a question or approval |
+| [`xt approve`, `xt deny`](#xt-approve-xt-deny) | human | `a` / `d` on an approval (or `s`, then `y` / `n`) |
 | [`xt clear`](#xt-clear) | human | `c` on an alert |
 | [`xt schedule`](#xt-schedule) | both | none (Team detail shows schedules) |
 | [`xt spawn`](#xt-spawn) | both | `u` / `U` for agents in the roster |
@@ -1056,6 +1061,35 @@ lists what the TUI keeps folded, under the TUI's labels (from 0.20.0; before, on
 `(N older, seen)` under Friction. Plain `xt inbox` is unchanged.
 **Use it** when you're not in the TUI; the Inbox panel shows the same (with `--seen`, its folds
 opened).
+
+### `xt chat`
+
+`xt chat` (from 0.21.0) — your conversation with the liaison, in this terminal. **Use it** as the
+everyday way to talk with the team; the TUI stays the view for understanding and debugging.
+
+- It opens with **the last 30 messages** between you and the liaison (fewer if there are fewer),
+  oldest first, and the hire and schedule requests waiting for you. Each shows its time, who wrote
+  it and its id; a question also shows its type (`⚑ yes/no`, `⚑ 4 options, Other`, `⚑ open
+  question`) and, while it waits, `waits for your answer`, or what you answered.
+- New messages from the liaison appear while it runs, **within 10 seconds** of the supervisor
+  delivering them (chat reads the ledger every 2 seconds).
+- Type a message and press enter: it goes to the liaison from you, recorded in the ledger like any
+  other message (the same as `S` in the TUI).
+- **Answer in place:** `tab` picks the oldest question or approval waiting for you (again: the
+  next one; after the last, back to the liaison; `esc` goes back at once). Its full text, with
+  every option wrapped to the terminal's width (also at 80 columns), shows above the input line,
+  which says `answer #812 ›`. Type `yes` or `no` for a yes/no question or an approval, an option's
+  number for options (your own words only when it offers Other), or text for an open question,
+  and press enter. The answer is checked and recorded exactly as `xt answer` records it; a refused
+  answer stays in the input line with the reason below it.
+- **Leaving:** `ctrl+d` (or `ctrl+q`, `ctrl+c`) on an empty line, or type `/exit` (`/quit`). What you
+  have typed but not sent is a **draft**: it lives only in the input line and is never written
+  anywhere, so leaving with one asks first (`ctrl+d` again leaves and discards it).
+- Chat keeps **nothing of its own**: it is a view over the ledger, the same messages the TUI's
+  Inbox, Flow and detail pane show, so what you send in chat is in the TUI at once and the other
+  way round.
+- It runs only in your own terminal: an agent's session can't use it to speak as you (it is
+  refused like `--as human`).
 
 ### `xt answer`
 

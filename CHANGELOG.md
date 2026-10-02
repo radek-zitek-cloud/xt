@@ -12,11 +12,23 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.21.0] — not released yet
 
 First release of Direction B (a power user without an AI operator). **0.21.0-rc1** has #182 and
-#183. The ledger gains optional fields (`question` on an ask, `answer` on a reply); older ledgers
+#183; **0.21.0-rc2** adds #184. The ledger gains optional fields (`question` on an ask, `answer` on a reply); older ledgers
 read unchanged and older xt versions ignore the fields.
 
 ### Added
 
+- **`xt chat` (#184).** One conversation with the liaison in the terminal. It opens with the last
+  30 messages between you and the liaison (and the hire and schedule requests waiting for you),
+  oldest first, and shows new ones within 10 seconds of their delivery (it reads the ledger every 2
+  seconds). Enter sends what you typed to the liaison, recorded like any other message; `tab` picks
+  a waiting question or approval, shows it in full above the input line (every option wrapped,
+  also at 80 columns), and the next enter answers it through the same path as `xt answer`, checked
+  against its type. `ctrl+d` (or `/exit`) leaves; an unsent draft is never written anywhere, and
+  leaving with one asks first. Chat is a view over the ledger shared with the TUI and stores
+  nothing of its own (Q1). It runs only in the human's own terminal. Built with Textual, which the
+  TUI already uses: it wraps to the terminal's width, keeps the input line apart from arriving
+  messages, and can be driven headlessly for tests and acceptance. The liaison's guidance asks it
+  to answer messages from the human through xt, so the answer reaches chat.
 - **One structured message format (#182).** A message to the human is a narrative that may end in
   one question with a declared answer type: **closed** (`xt send … --type ask --closed`: yes or
   no), **options** (two to four `--option "<option> :: <consequence>"`, one `--recommend <n>`, and

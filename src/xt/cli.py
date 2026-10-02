@@ -285,23 +285,26 @@ def cmd_done(args) -> None:
 
 def cmd_answer(args) -> None:
     ctx = Ctx.load()
-    who = _who(args)
-    if Approvals(ctx).is_approval(args.id):  # a hire or schedule is a closed question (card #183)
+    print(answer(ctx, _who(args), args.id, _body(args)))
+
+
+def answer(ctx: Ctx, who: str, qid: int, text: str) -> str:
+    """Answer question or approval `qid` as `who` (`xt answer` and `xt chat`); the result line."""
+    if Approvals(ctx).is_approval(qid):  # a hire or schedule is a closed question (card #183)
         if who != HUMAN:
             raise XtError("only the human approves spawns")
         from .choices import resolve_answer
 
-        word, _ = resolve_answer({"kind": "closed"}, _body(args))
-        print(f"#{args.id}: {decide(ctx, args.id, word == 'yes')}")
-        return
-    item = ctx.ledger.item(args.id)
+        word, _ = resolve_answer({"kind": "closed"}, text)
+        return f"#{qid}: {decide(ctx, qid, word == 'yes')}"
+    item = ctx.ledger.item(qid)
     if item is None or item["type"] != "ask":
-        raise XtError(f"#{args.id} is not an open question (see `xt inbox`)")
+        raise XtError(f"#{qid} is not an open question (see `xt inbox`)")
     if who != item["owner"]:
-        raise XtError(f"#{args.id} is a question for {item['owner']}, not {who}")
-    msg, status, data = answer_question(ctx, who, item, _body(args))
-    print(f"#{msg['id']} answer to #{args.id} → {item['opener']}: {status}"
-          + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
+        raise XtError(f"#{qid} is a question for {item['owner']}, not {who}")
+    msg, status, data = answer_question(ctx, who, item, text)
+    return (f"#{msg['id']} answer to #{qid} → {item['opener']}: {status}"
+            + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
 
 
 def answer_question(ctx: Ctx, who: str, item: dict, answer: str) -> tuple[dict, str, dict]:
@@ -736,6 +739,19 @@ def cmd_watch(args) -> None:
     run(Ctx.load())
 
 
+def cmd_chat(args) -> None:
+    """Card #184: the human's conversation with the liaison. Only the human's own terminal: an
+    agent (or an operator) can't speak as the human through it."""
+    if _who(args) != HUMAN:
+        raise XtError("xt chat is the human's conversation with the liaison: it runs only in the human's own "
+                      "terminal. Agents talk with xt send --as <your name>")
+    if not sys.stdin.isatty():
+        raise XtError("xt chat needs a terminal")
+    from .chat import run
+
+    run(Ctx.load())
+
+
 def cmd_tui(args) -> None:
     from .tui.app import run_demo, run_live
 
@@ -923,6 +939,8 @@ def build_parser() -> argparse.ArgumentParser:
     for gp in (g, g2, g3):
         gp.add_argument("--as", dest="as_", metavar="NAME", default=argparse.SUPPRESS)
 
+    add("chat", cmd_chat, "talk with the liaison in this terminal: the last 30 messages, new ones as they "
+                          "arrive, and questions answered in place (human only; ctrl+d or /exit leaves)")
     add("watch", cmd_watch, "run the supervisor (xt up starts it in its own pane)")
     sp = add("tui", cmd_tui, "the lazygit-style overview of the team (--demo: static sample data)")
     sp.add_argument("--demo", action="store_true",

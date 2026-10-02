@@ -63,6 +63,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/goals.py` | Goal drafts and dispatch (`xt goal new`, `dispatch`, `list`). |
 | `src/xt/goaldone.py` | One notification per goal the human dispatched, and the Inbox's done marker (`state/inbox_seen.json`). |
 | `src/xt/inbox.py` | The human's Inbox in three groups (Needs you, New, Friction; the TUI calls New Notifications) for the TUI and `xt inbox`, and friction's read marker. |
+| `src/xt/chat.py` | `xt chat` (from 0.21.0): the human's conversation with the liaison as a view over the ledger (the last 30 messages, new ones read every 2 s, pending questions and approvals answered in place through `cli.answer`); Textual, as the TUI; nothing stored of its own. |
 | `src/xt/choices.py` | Questions with a declared answer type (closed, options, open; from 0.21.0): validation, rendering, the `question` data stored on an ask (read from the text for older asks), and checking an answer against it, a numeric answer recorded as the option's text. |
 | `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |

@@ -58,6 +58,11 @@ description into the goal (under Constraints or Notes) and dispatch it.
 
 ## While the team works
 
+- The human may also write to you through xt (`xt chat` or the TUI): such a message arrives
+  stamped `from:human`. Answer it through xt as well (`xt send human --as liaison --type report
+  --ref <id>`, or an `ask` with its answer type), not only in your pane: `xt chat` shows the
+  conversation from the ledger, so a reply that is only in your pane never reaches it.
+
 - Status questions: answer from `xt brief --as liaison`, `xt status` and `xt log`, without
   interrupting the lead.
 - The lead's questions for the human arrive as messages to you. Answer from the goal brief when
