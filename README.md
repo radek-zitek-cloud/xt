@@ -10,12 +10,17 @@ approvals, recovery), so an agent only needs a shell and a prompt.
 and what we learned; and [Goals in practice](docs/examples.md): real goals given to teams, word
 for word.
 
-**Status:** 0.x, early but in daily use (current release: see [CHANGELOG.md](CHANGELOG.md)). Two teams run on it: a six-agent newsroom that hires its
-own scout, finds stories in RSS feeds every hour, and researches, writes, fact-checks and publishes
-articles; and a product team (a product manager and a quality analyst) that runs xt's own backlog
-and accepts its releases. Most runs so far used Codex for every agent. **Using it day to day:
-[docs/user-guide.md](docs/user-guide.md)** (lifecycles and every command); how it works inside:
-[docs/architecture.md](docs/architecture.md).
+**Status:** 0.x and experimental: built by one person with an AI team, and used every day by that
+team (current release: see [CHANGELOG.md](CHANGELOG.md)). The xt-team (a liaison, a lead, a product
+manager, a builder, a quality analyst and a UX researcher, on Claude Code, Codex and pi) plans, builds,
+checks and accepts xt's own releases; earlier a six-agent newsroom that hired its own scout ran on it
+for days. Where xt is heading: [the direction](https://sb.zvikov.zitek.cloud/xt-space/planning/direction-b-roadmap).
+**Using it day to day: [docs/user-guide.md](docs/user-guide.md)** (lifecycles and every command); how
+it works inside: [docs/architecture.md](docs/architecture.md).
+
+**Tried it? Say hello.** xt is made by Radek, mostly by the AI team it describes. If you try it, even
+for five minutes, I'd love to hear how it went, what you used it for or where it stopped you:
+[Say hello on GitHub Discussions](https://github.com/radek-zitek-cloud/xt/discussions/1).
 
 ![The xt-team in Herdr on xt 0.18.0: on the left the liaison's pane, telling the human what the v0.19.0-rc5 release candidate needs next; on the right the xt TUI in three bands: the Team pane grouped by harness and the Inbox's notifications on top, the Flow lane chart of messages between the human, xt and five agents in the middle, and the liaison's report in Detail at the bottom](docs/screen-v0180.png)
 
