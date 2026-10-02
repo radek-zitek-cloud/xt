@@ -9,9 +9,10 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.21.0] — not released yet
+## [0.21.0] — 2026-10-02
 
-First release of Direction B (a power user without an AI operator). **0.21.0-rc1** has #182 and
+The release: the same code and docs as 0.21.0-rc2 (only the version, this changelog and the site's
+badge and feature list changed). First release of Direction B (a power user without an AI operator). **0.21.0-rc1** has #182 and
 #183; **0.21.0-rc2** adds #184. The ledger gains optional fields (`question` on an ask, `answer` on a reply); older ledgers
 read unchanged and older xt versions ignore the fields.
 

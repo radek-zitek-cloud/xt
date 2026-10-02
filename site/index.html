@@ -32,7 +32,7 @@
 <header class="hero">
   <div class="grid-bg"></div>
   <div class="wrap">
-    <div class="eyebrow">open source · MIT · v0.20.0</div>
+    <div class="eyebrow">open source · MIT · v0.21.0</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You approve, decide and correct, and every step is on record.</p>
     <div class="cta">
@@ -115,7 +115,7 @@
         <ul>
           <li><b>Approvals:</b> every hire and every schedule waits for your yes.</li>
           <li><b>One Inbox</b> for questions, approvals and alerts, in the TUI or <code class="mono">xt inbox</code>, with a desktop notification, and exactly one notification when a goal you gave is done.</li>
-          <li><b>Decisions with options:</b> each question offers two or three options with their consequences and a recommendation; you answer with a number or your own words, and the TUI keeps your answers in view for a week.</li>
+          <li><b>Questions that say what answer they take:</b> yes/no, two to four options with their consequences and a recommendation, or open; xt checks your answer against it (your own words where the question allows them), hires and schedules are yes/no questions too, and the TUI keeps your answers in view for a week.</li>
           <li><b>Standing rules</b> instead of step-by-step instructions: "if I don't answer within the hour, pick the top story yourself, at most six a day".</li>
           <li><b>Corrections become rules:</b> a correction from you is recorded as a lesson, and the rule that allowed the mistake is fixed.</li>
         </ul>
@@ -232,6 +232,10 @@
       <div class="cell"><div class="k">22</div><h4>An operator, within limits</h4><p>Your own coding agent reports to the liaison under its own name, and runs restart, reset, spawn and up for up to an hour when you delegate them. Logged; never the team's stop, answers or approvals.</p></div>
       <div class="cell"><div class="k">23</div><h4>Network for one agent</h4><p>One Codex agent, say the quality analyst in a clean clone, gets the sandbox's network switch; nothing else is allowed.</p></div>
       <div class="cell"><div class="k">24</div><h4>pi starts whole</h4><p>A guard line and one resend make sure a pi agent's first prompt arrives whole, so its context and usage show from the first start.</p></div>
+      <div class="cell"><div class="k">25</div><h4>A chat with the team</h4><p><code class="mono">xt chat</code>: one conversation with the liaison in your terminal, the last 30 messages, new ones as they arrive, questions answered in place. A view over the same ledger the TUI shows.</p></div>
+      <div class="cell"><div class="k">26</div><h4>Questions with an answer type</h4><p>Yes/no, two to four options with a recommendation and an optional Other, or open; stored as data, and every answer checked against it.</p></div>
+      <div class="cell"><div class="k">27</div><h4>Approvals as questions</h4><p>Hires and schedules are yes/no questions: <code class="mono">xt answer 12 yes</code>, or <code class="mono">s</code> then <code class="mono">y</code> in the TUI; <code class="mono">xt approve</code> stays as an alias.</p></div>
+      <div class="cell"><div class="k">28</div><h4>Answered once, by you</h4><p>Every question and approval takes one answer, from chat, the TUI or <code class="mono">xt answer</code>, and only from your own terminal; a second one is refused.</p></div>
     </div>
   </div>
 </section>
