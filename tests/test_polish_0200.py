@@ -429,6 +429,40 @@ def test_180_codex_and_claude_prompts_have_no_reminder(ctx):
     assert adapters["codex"].first_prompt_note is None and adapters["claude"].first_prompt_note is None
 
 
+# --- #175: README highlights and a site quick start --------------------------------------------------
+
+
+def _readme():
+    from .conftest import REPO
+
+    return (REPO / "README.md").read_text()
+
+
+def test_175_the_site_shows_the_readmes_quick_start_command():
+    import html
+    import re
+
+    from .conftest import REPO
+
+    quick = _readme().split("## Quick start", 1)[1]
+    command = re.search(r"```sh\n(.*?)```", quick, re.S).group(1).strip().splitlines()
+    assert command[-1] == "sh xt-clone.sh my-team" and command[0].startswith("curl -fsSLO https://")
+    page = (REPO / "site/index.html").read_text()
+    block = re.search(r'<div class="quickstart" id="start">\s*<div class="install"><pre>(.*?)</pre>', page, re.S).group(1)
+    shown = [html.unescape(re.sub(r"<[^>]+>", "", line)).removeprefix("$ ") for line in block.splitlines()]
+    assert shown == command  # the same lines, in the same order
+    assert page.count('href="#start">Get started</a>') == 2  # both buttons go to it, on the page
+
+
+def test_175_the_quick_start_comes_before_any_release_notes():
+    readme = _readme()
+    head = readme.split("## Quick start", 1)[0]
+    assert "Added since" not in readme and "- **0.1" not in head  # no release-by-release list above it
+    highlights = head.split("Highlights of the releases since then", 1)[1].split("What it can't do yet", 1)[0]
+    assert 3 <= highlights.count("\n- **") <= 5 and "[CHANGELOG.md](CHANGELOG.md)" in highlights
+    assert "[Quick start](#quick-start)" in readme.split("## What xt can do", 1)[0]  # reachable from the top
+
+
 # --- #176: TUI help, detail cue and Flow key names (Pilot at four sizes) ------------------------------
 
 SIZES = [(120, 40), (100, 30), (80, 24), (60, 20)]

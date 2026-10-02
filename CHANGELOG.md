@@ -12,7 +12,7 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.20.0] — not released yet
 
 Polish from a fresh-eyes usability review of 0.19.0: seven small cards to their approved spec, no
-new feature. **0.20.0-rc1** has #174, #177 and #178; **0.20.0-rc2** adds #176, #179 and #180. No protocol or ledger format change; new state
+new feature. **0.20.0-rc1** has #174, #177 and #178; **0.20.0-rc2** adds #176, #179 and #180; **0.20.0-rc3** adds #175. No protocol or ledger format change; new state
 file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `starting`.
 
 ### Fixed
@@ -72,6 +72,15 @@ file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `s
   that xt checks stay where they were. Claude Code and Codex prompts are unchanged. The user guide
   says which harnesses were seen to comply. A "no issues" line isn't flagged in the ledger: the
   evidence is one run.
+
+### Documentation
+
+- **README highlights and a quick start on the site (#175).** The README's 24 "Added since"
+  entries (0.11.0 to 0.19.0), which sat between the pitch and the Quick start, are replaced by five
+  highlights and a link to this changelog, where every one of them is; a "Want to try it?" link at
+  the top goes to the Quick start. The site shows the README's Quick start command (`curl -fsSLO
+  …/xt-clone.sh`, then `sh xt-clone.sh my-team`) under its first screen, with what it does and
+  what it needs, and both "Get started" buttons go there instead of to GitHub.
 
 ### Upgrading
 

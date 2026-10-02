@@ -36,10 +36,14 @@
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You approve, decide and correct, and every step is on record.</p>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/radek-zitek-cloud/xt#quick-start">Get started</a>
+      <a class="btn primary" href="#start">Get started</a>
       <a class="btn" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/story.md">Read how it was built</a>
     </div>
-    <div class="install"><b>$</b> sh xt-clone.sh my-team <span>&nbsp;# clone, init, start the team, open the TUI</span></div>
+    <div class="quickstart" id="start">
+      <div class="install"><pre><b>$</b> curl -fsSLO https://raw.githubusercontent.com/radek-zitek-cloud/xt/main/bin/xt-clone.sh
+<b>$</b> sh xt-clone.sh my-team</pre></div>
+      <p>Clones xt into <code class="mono">./my-team</code>, asks which harness runs the liaison and the lead, starts the team in its own Herdr session and attaches you to it. Needs Linux with <a href="https://herdr.dev">Herdr</a>, <a href="https://mise.jdx.dev">mise</a> and one of <code class="mono">codex</code>, <code class="mono">claude</code> or <code class="mono">pi</code>. By hand, step by step: <a href="https://github.com/radek-zitek-cloud/xt#quick-start">the README's quick start</a>.</p>
+    </div>
   </div>
 </header>
 
@@ -282,7 +286,7 @@
   <div class="wrap">
     <blockquote>xt is for coordinating <span>accountable AI agent teams</span> across harnesses, not for replacing the tools those agents use to do their work.</blockquote>
     <div class="cta">
-      <a class="btn primary" href="https://github.com/radek-zitek-cloud/xt#quick-start">Get started</a>
+      <a class="btn primary" href="#start">Get started</a>
       <a class="btn" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/user-guide.md">User guide</a>
       <a class="btn" href="https://sb.zvikov.zitek.cloud/xt-space">Public backlog</a>
     </div>
