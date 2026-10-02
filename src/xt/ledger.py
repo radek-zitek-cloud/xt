@@ -116,8 +116,10 @@ class Ledger:
             self._write_snapshot(self._rebuild())
 
     def append(self, sender: str, to: str, mtype: str, body: str, ref: int | None = None,
-               fill_id: bool = False) -> dict:
-        """Log a message. With fill_id, "{id}" in the body becomes the message's own id."""
+               fill_id: bool = False, data: dict | None = None) -> dict:
+        """Log a message. With fill_id, "{id}" in the body becomes the message's own id. `data`
+        adds structured fields after the usual ones (a question's type, an answer: card #182);
+        older readers ignore them."""
         if mtype not in AGENT_TYPES + SYSTEM_TYPES:
             raise XtError(f"unknown message type {mtype!r}")
         with self.lock():
@@ -135,6 +137,8 @@ class Ledger:
                 "ref": ref,
                 "body": body,
             }
+            for k, v in (data or {}).items():
+                msg.setdefault(k, v)
             day = self.paths.log / f"{ts.date().isoformat()}.jsonl"
             with open(day, "a") as fh:
                 fh.write(json.dumps(msg, ensure_ascii=False) + "\n")

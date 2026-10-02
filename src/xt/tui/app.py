@@ -827,12 +827,12 @@ class Compose(ModalScreen[str | None]):
         self.options = options or {}  # a question's numbered options (card #111)
 
     def compose(self) -> ComposeResult:
-        box = Vertical(classes="popup compose")
+        box = Vertical(classes="popup compose" + (" question" if self.options else ""))
         box.border_title = self.title_text
-        box.border_subtitle = (("1-3 fill an option · " if self.options else "")
+        box.border_subtitle = ((f"1-{max(self.options)} fill an option · " if self.options else "")
                                + "ctrl+s send · enter new line · ctrl+c/ctrl+v copy/paste · esc cancel")
         with box:
-            if self.context:
+            if self.context:  # with options, it may take most of the dialog: every option shows, wrapped (#182)
                 with VerticalScroll(classes="compose-context"):
                     yield Static(Text(self.context))
             yield Editor(id="compose-text", soft_wrap=True, show_line_numbers=False)
@@ -850,6 +850,32 @@ class Compose(ModalScreen[str | None]):
 
     def action_send(self) -> None:
         self.dismiss(self.query_one("#compose-text", TextArea).text)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
+
+
+class YesNo(ModalScreen[str | None]):
+    """A closed question's answer (card #182): y or n, esc to leave it unanswered."""
+
+    BINDINGS = [Binding("y", "answer('yes')", show=False), Binding("n", "answer('no')", show=False),
+                Binding("escape", "cancel", show=False)]
+
+    def __init__(self, title: str, question: str):
+        super().__init__()
+        self.title_text = title
+        self.question = question
+
+    def compose(self) -> ComposeResult:
+        box = Vertical(classes="popup compose question yesno")
+        box.border_title = self.title_text
+        box.border_subtitle = "y yes · n no · esc cancel"
+        with box:
+            with VerticalScroll(classes="compose-context"):
+                yield Static(Text(self.question))
+
+    def action_answer(self, word: str) -> None:
+        self.dismiss(word)
 
     def action_cancel(self) -> None:
         self.dismiss(None)
@@ -1491,10 +1517,15 @@ class XtTui(App):
                 self.refresh_data()
 
         if question:
-            from ..choices import options_of
+            from ..choices import option_line, question_of
 
-            self.push_screen(Compose(f"Answer question #{question['id']} from {question['opener']}",
-                                     question.get("text"), options_of(question.get("text") or "")), done)
+            q = question.get("question") or question_of({"body": question.get("text") or ""})
+            title = f"Answer question #{question['id']} from {question['opener']}"
+            if q["kind"] == "closed":  # yes or no, one key (#182)
+                self.push_screen(YesNo(title, question.get("text") or ""), done)
+                return
+            opts = {n: option_line(o) for n, o in enumerate(q.get("options") or [], 1)}
+            self.push_screen(Compose(title, question.get("text"), opts), done)
         else:
             self.push_screen(Compose("Send to the liaison"), done)
 
@@ -1648,15 +1679,13 @@ class LiveActions:
         return f"#{msg['id']} to {liaison.name}: {status}"
 
     def answer(self, qid: int, text: str) -> str:
-        from ..choices import resolve
-        from ..dispatch import send
+        from ..cli import answer_question
         from ..team import HUMAN
 
         item = self.ctx.ledger.item(qid)
         if item is None or item["type"] != "ask":
             raise RuntimeError(f"#{qid} is no longer an open question")
-        text, _ = resolve((self.ctx.ledger.message(qid) or {}).get("body", ""), text)
-        msg, status = send(self.ctx, HUMAN, item["opener"], "report", text, qid)
+        msg, status, _ = answer_question(self.ctx, HUMAN, item, text)  # checked against its type (#182)
         return f"#{msg['id']} answer to #{qid} → {item['opener']}: {status}"
 
     def jump(self, workspace_id: str) -> None:

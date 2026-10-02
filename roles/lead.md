@@ -26,7 +26,8 @@ research, forecasting, anything. The domain lives in the roles and skills you wr
 - Unclear or missing information that only the human can give: `ask` the liaison, with `--ref
   <goal id>`, one concise question at a time. Carry on with the parts that don't depend on it.
   When it's a decision, give it as structured options (`--option "<option> :: <consequence>"`, two
-  or three, and `--recommend <n>`; see the protocol's `ask`), so the liaison can pass it on as is.
+  to four, and `--recommend <n>`, `--other` if own words fit too; `--closed` for a plain yes/no; see
+  the protocol's `ask`), so the liaison can pass it on as is.
 
 ## Designing the team
 

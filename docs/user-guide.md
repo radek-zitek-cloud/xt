@@ -93,7 +93,7 @@ it isn't shown:
 | In the Inbox | What it is | What you do |
 |---|---|---|
 | **NEEDS YOU** | Stays until you answer, decide or clear it; newest first (from 0.17.0) | |
-| `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options` when it offers choices) | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
+| `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options`, `4 options, Other` or `yes/no` says what answer it takes; see [`xt answer`](#xt-answer)) | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
 | `⚑ #12 spawn …` / `⚑ #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
 | `⚠ …` | An **alert**: an agent crashed, is blocked or went silent; or (from 0.16.0) the supervisor failed to wake an agent, to send a notification or to record usage (`⚠ ×3 wake-up failed: …`) | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
 | `(2 answered, last 7 days) ▸` | (from 0.16.1) The questions you answered in the last 7 days, folded: `✓ #2098 v0.16.1 spec → 1: Approve and build`, newest first; the detail pane shows the question with its options, your answer and the thread | `enter` or `space` shows them; again folds them |
@@ -1053,8 +1053,17 @@ a report and the question closes. **Use it** from a terminal; in the TUI press `
 Answering in the liaison's pane works too (it closes the question itself). A longer answer can come
 from a heredoc (see `xt send`).
 
-**Questions with options** (from 0.14.0). A decision question shows numbered options, each with
-what it leads to, and the asker's recommendation:
+**Questions and their answer types** (from 0.21.0; options from 0.14.0). A message from the
+liaison is a narrative that may end in one question, and the question says what kind of answer it
+takes. The type is stored with the question in the ledger, and your answer is checked against it:
+
+| Type | The question ends with | Your answer |
+|---|---|---|
+| **closed** | `Answer yes or no.` | `yes` or `no` (`y`, `n` too); the log records `yes` or `no` |
+| **options** | two to four numbered options, each with what it leads to, and one `Recommended:` | the option's number; your own words only when the question offers **Other** |
+| **open** | (nothing extra) | your own words |
+
+A message with no question at all (a report) needs no answer and never waits in Needs you.
 
 ```text
 When do we ship 0.14.0?
@@ -1063,17 +1072,29 @@ Options:
 1. Ship on Friday — the release waits two days
 2. Ship today — no staging check
 Recommended: 1
-Or answer in your own words.
+Other: answer in your own words.
 ```
 
 Answer with the number (`xt answer 1261 2`), and xt records the option's full text ("Option 2: Ship
 today — no staging check"), so the log says what you chose, not just "2"; a number that isn't an
-option is refused. In the TUI answer dialog, pressing 1, 2 or 3 while the answer is empty fills in
-that option's text, which you can still edit before ctrl+s; once there's text, digits are just
-digits. Your own words always work. Agents ask this way with `xt send … --type ask --option
-"<option> :: <consequence>" --option … --recommend <n> "the question"`; xt refuses a question with
-fewer than two or more than three options, an option without a consequence or no single
-recommendation, and sends nothing.
+option is refused. Without the `Other:` line the question ends with `Answer with the option's
+number.` and words are refused (message the liaison instead if none of the options fits). In the
+TUI answer dialog every option is shown in full, wrapped to the dialog's width (also at 80
+columns); pressing 1 to 4 while the answer is empty fills in that option's text, which you can
+still edit before ctrl+s; once there's text, digits are just digits. On a closed question `s`
+opens a short dialog that takes `y` or `n`. `xt inbox` and the Inbox row show the type: `yes/no`,
+`3 options`, `4 options, Other`. `xt log` adds a line with the stored type or answer, e.g.
+`[question: options 1-3, recommended 1, Other allowed]` and `[answer: option 2]`.
+
+Questions asked before 0.21.0 still read and answer as they did: one with 0.14.0's options takes a
+number or your own words, any other is an open question.
+
+Agents ask with flags on `xt send … --type ask`: `--closed` for yes/no, or `--option "<option> ::
+<consequence>"` two to four times with `--recommend <n>` (and `--other` to allow your own words);
+neither makes it an open question. xt refuses a question with fewer than two or more than four
+options, an empty option or one without a consequence, no or several recommendations, `--other`
+or `--option` on a closed question, sends nothing and prints the message text back, so it isn't
+lost.
 
 ### `xt approve`, `xt deny`
 
@@ -1134,7 +1155,9 @@ is no longer needed; `R` in the TUI (not for the liaison or lead).
 `xt send <to> --type goal|task|ask|report|done|note|friction [--ref ID] "text"` — the one way agents
 talk. xt checks the hierarchy (an agent messages only the one it reports to and its own reports),
 logs the message and delivers it when the recipient is idle. **Use it** yourself rarely: to message
-an agent directly (`xt send lead --type ask "…"`); `S` in the TUI messages the liaison.
+an agent directly (`xt send lead --type ask "…"`); `S` in the TUI messages the liaison. An `ask`
+may declare its answer type with `--closed`, or `--option … --recommend N [--other]` (from 0.21.0;
+see [`xt answer`](#xt-answer)).
 
 For text with quotes, apostrophes, backticks or several lines, pass it on standard input in a
 heredoc whose end word is **quoted** (the quotes stop the shell from touching the text), from your

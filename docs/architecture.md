@@ -58,12 +58,12 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/context.py` | `Ctx`: one command's paths, team, ledger and Herdr client, loaded once. |
 | `src/xt/paths.py` | Where everything lives in a team repo (`.xt/state`, `.xt/log`, …), finding the root (`XT_ROOT`, else the enclosing xt checkout), and `XtError`, the user-facing error. |
 | `src/xt/team.py` | `team.toml`: the roster, policy, notify, log and default settings, schedules and their windows (`next_due`), and the new-team template. |
-| `src/xt/ledger.py` | The message log (append-only daily JSONL) and the ledger of open goals, tasks and questions derived from it; rotation and archiving. |
+| `src/xt/ledger.py` | The message log (append-only daily JSONL, a message optionally carrying structured `question` or `answer` data) and the ledger of open goals, tasks and questions derived from it; rotation and archiving. |
 | `src/xt/dispatch.py` | `xt send`: the reporting-chain policy, the envelope and reply hint, delivery now or through the queue, and what's waiting on the human. |
 | `src/xt/goals.py` | Goal drafts and dispatch (`xt goal new`, `dispatch`, `list`). |
 | `src/xt/goaldone.py` | One notification per goal the human dispatched, and the Inbox's done marker (`state/inbox_seen.json`). |
 | `src/xt/inbox.py` | The human's Inbox in three groups (Needs you, New, Friction; the TUI calls New Notifications) for the TUI and `xt inbox`, and friction's read marker. |
-| `src/xt/choices.py` | Decision questions with options: validation, rendering, and turning a numeric answer into the option's text. |
+| `src/xt/choices.py` | Questions with a declared answer type (closed, options, open; from 0.21.0): validation, rendering, the `question` data stored on an ask (read from the text for older asks), and checking an answer against it, a numeric answer recorded as the option's text. |
 | `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
 | `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and their approvals, stop and retire. |

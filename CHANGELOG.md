@@ -9,6 +9,44 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.21.0] — not released yet
+
+First release of Direction B (a power user without an AI operator). **0.21.0-rc1** has #182 and
+#183. The ledger gains optional fields (`question` on an ask, `answer` on a reply); older ledgers
+read unchanged and older xt versions ignore the fields.
+
+### Added
+
+- **One structured message format (#182).** A message to the human is a narrative that may end in
+  one question with a declared answer type: **closed** (`xt send … --type ask --closed`: yes or
+  no), **options** (two to four `--option "<option> :: <consequence>"`, one `--recommend <n>`, and
+  `--other` when the human may also answer in their own words) or **open** (an ask with neither).
+  The type, the options, the recommendation and the human's answer are stored as data in the ledger
+  entry, and `xt log` shows them in a line under the text (`[question: options 1-4, recommended 2,
+  Other allowed]`, `[answer: option 2]`). `xt answer`, and `s` in the TUI, check the answer against
+  the type: `yes`/`no` for closed (stored as `yes` or `no`); an option's number for options (stored
+  as the option's full text, as since 0.14.0), and own words only with Other; any text for open.
+  xt refuses a malformed question (fewer than two or more than four options, an empty option or one
+  without a consequence, no or several recommendations, `--other` or options on a closed question),
+  sends nothing and prints the message text back. In the TUI, `s` on a closed question takes `y` or
+  `n`; on an options question the answer dialog shows every option in full, wrapped, also at 80
+  columns, and `1` to `4` fill one in; the Inbox row and `xt inbox` say `yes/no`, `3 options` or
+  `4 options, Other`. Asks written before 0.21.0 still read and answer as they did: 0.14.0's options
+  take a number or own words, any other ask is an open question.
+
+### Changed
+
+- **Decision questions take up to four options, and own words need `--other` (#182).** 0.14.0 took
+  two or three and always allowed own words (`Or answer in your own words.`); a new question ends
+  with `Other: answer in your own words.` or `Answer with the option's number.`. The protocol's
+  `ask`, the liaison's and the lead's guidance, `docs/examples.md` §5 and the user guide describe
+  the format.
+
+### Upgrading
+
+- Pull the release and `xt restart --all` (or restart the liaison and lead), so they read the new
+  guidance. Nothing to migrate.
+
 ## [0.20.0] — 2026-10-02
 
 The release: the same code and docs as 0.20.0-rc3 (only the version, this changelog and the site's

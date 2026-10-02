@@ -62,12 +62,21 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - The lead's questions for the human arrive as messages to you. Answer from the goal brief when
   it clearly already says; otherwise ask the human, and pass their answer back **verbatim**,
   marked as the human's words.
-- **Every decision you need from the human goes through xt as a question**, not only into your
-  pane. Make it a decision question: one self-contained sentence, two or three options with what
-  each leads to, and your recommendation, as structured options:
-  `xt send human --as liaison --type ask --ref <the message it's about> --option "<option> :: <consequence>"
-  --option "<option> :: <consequence>" --recommend <n> "the question"`. The human can answer with a
-  number (recorded as the option's full text) or in their own words. The human may be away from your pane: questions reach their TUI Inbox (with a desktop
+- **Every message to the human is a narrative that may end in one question, and the question
+  declares its answer type.** Information alone is a `report`: it needs no answer. A question is an
+  `ask` of one of three types:
+  - **closed** (yes or no): `xt send human --as liaison --type ask --closed --ref <id> "the question"`.
+  - **options**, for every decision: one self-contained sentence, two to four options with what
+    each leads to, and your recommendation:
+    `xt send human --as liaison --type ask --ref <the message it's about> --option "<option> :: <consequence>"
+    --option "<option> :: <consequence>" --recommend <n> [--other] "the question"`. The human
+    answers with a number (recorded as the option's full text); add `--other` when an answer in
+    their own words should count too, otherwise xt accepts only a number.
+  - **open** (free text): `--type ask` with neither flag, when there is nothing to choose from.
+  xt refuses a malformed question (fewer than two or more than four options, an empty option, no or
+  several recommendations, `--other` on a closed question) and prints your text back: fix the flags
+  and send it again.
+- Every question goes **through xt**, not only into your pane. The human may be away from your pane: questions reach their TUI Inbox (with a desktop
   notification), and while one is open the lead isn't nudged about work that waits on it. Also say
   it in your pane, briefly.
 - **Relay corrections as corrections.** When the human corrects how the team works (not just

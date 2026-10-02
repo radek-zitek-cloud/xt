@@ -287,7 +287,7 @@ def _cli(ctx, monkeypatch, *argv):
 
 
 OPTS = ["--option", "Ship on Friday :: the release waits two days", "--option", "Ship today :: no staging check",
-        "--option", "Split the release :: two smaller releases", "--recommend", "1"]
+        "--option", "Split the release :: two smaller releases", "--recommend", "1", "--other"]  # #182: own words need --other
 
 
 def test_a_decision_question_carries_numbered_options_and_one_recommendation(ctx, monkeypatch, capsys):
@@ -296,7 +296,7 @@ def test_a_decision_question_carries_numbered_options_and_one_recommendation(ctx
     q = list(ctx.ledger.messages())[-1]
     assert q["type"] == "ask" and q["body"].startswith("When do we ship 0.14.0?\n\nOptions:\n")
     assert "1. Ship on Friday — the release waits two days" in q["body"] and "Recommended: 1" in q["body"]
-    assert q["body"].endswith("Or answer in your own words.")
+    assert q["body"].endswith("Other: answer in your own words.")  # #182 (#111: "Or answer in your own words.")
     assert choices.options_of(q["body"])[3] == "Split the release — two smaller releases"
     from xt.tui.model import build
 
@@ -308,11 +308,11 @@ def test_malformed_option_sets_are_refused_and_nothing_is_sent(ctx, monkeypatch)
     _spawn(ctx, "human", "liaison", None, None, None, None)
     before = ctx.ledger.last_id()
     bad = [
-        (["--option", "only one :: x", "--recommend", "1"], "two or three options"),
+        (["--option", "only one :: x", "--recommend", "1"], "two to four options"),
         (["--option", "a :: x", "--option", "b", "--recommend", "1"], "needs a consequence"),
         (["--option", "a :: x", "--option", "b :: y"], "recommend exactly one"),
         (["--option", "a :: x", "--option", "b :: y", "--recommend", "3"], "recommend exactly one"),
-        (OPTS[:2] * 2 + OPTS[:2] * 2 + ["--recommend", "1"], "two or three options"),
+        (OPTS[:2] * 5 + ["--recommend", "1"], "two to four options"),  # #182: four are allowed, five aren't
     ]
     for extra, why in bad:
         with pytest.raises(XtError, match=why + r".*Nothing was sent"):

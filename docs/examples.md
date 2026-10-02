@@ -294,8 +294,8 @@ give every Claude agent the same file, set it once under `[defaults]`: `permissi
 ## 5. A decision question with options
 
 **Context.** When the team needs a decision only you can make, the liaison asks it through xt as
-one self-contained sentence with two or three options, each with what follows from it, and one
-recommendation.
+one self-contained sentence with two to four options, each with what follows from it, and one
+recommendation; `--other` lets you answer in your own words as well.
 
 What the liaison sends:
 
@@ -303,7 +303,7 @@ What the liaison sends:
 xt send human --as liaison --type ask --ref 212 \
   --option "Publish the digest today :: readers get it on time; the last section is unreviewed" \
   --option "Publish tomorrow :: fully reviewed, one day late" \
-  --recommend 2 <<'XT_END'
+  --recommend 2 --other <<'XT_END'
 Should the weekly digest go out today or tomorrow?
 XT_END
 ```
@@ -317,14 +317,16 @@ Options:
 1. Publish the digest today — readers get it on time; the last section is unreviewed
 2. Publish tomorrow — fully reviewed, one day late
 Recommended: 2
-Or answer in your own words.
+Other: answer in your own words.
 ```
 
 Answer with the number (`xt answer 230 2`, or in the TUI `s` on it, `2`, ctrl+s), and the log records
 "Option 2: Publish tomorrow — fully reviewed, one day late", so it says what you chose. Your own
-words work too. xt refuses a question with fewer than two or more than three options, an option
-without ` :: ` and its consequence, or no single recommendation. See
-[`xt answer`](user-guide.md#xt-answer).
+words work because the question has `--other`; without it, xt accepts only an option's number. A
+yes/no question is `--closed` instead of options (`xt answer 231 yes`, or `s` then `y` in the TUI).
+xt refuses a question with fewer than two or more than four options, an empty option or one
+without ` :: ` and its consequence, no single recommendation, or `--other` on a closed question,
+and shows your text back so nothing is lost. See [`xt answer`](user-guide.md#xt-answer).
 
 ## 6. Reset heavy agents automatically
 

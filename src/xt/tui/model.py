@@ -329,7 +329,7 @@ def build(ctx: Ctx) -> Snapshot:
 
     # Inbox: three groups, Needs you / New / Friction, empty groups hidden (card #127)
     from .. import inbox as _inbox
-    from ..choices import options_of
+    from ..choices import hint, question_of, summary
     from ..goaldone import first_line
 
     box = _inbox.build(ctx, msgs, list(open_items.values()))
@@ -346,15 +346,19 @@ def build(ctx: Ctx) -> Snapshot:
             if q.get("about") is not None and by_id.get(q["about"]):
                 more = _heading(f"about #{q['about']}")
                 more.append_text(_msg_block(by_id[q["about"]]))
-            return thread(m, out, f"s: answer (goes to {q['opener']}) · S: message the liaison instead · "
-                                  f"or answer in {q['opener']}'s pane", more)
+            typed = question_of(m)["kind"] != "open"  # say what the answer may be (#182)
+            return thread(m, out, f"s: answer (goes to {q['opener']})"
+                                  + (f" · {hint(question_of(m))}" if typed else "")
+                                  + f" · S: message the liaison instead · or answer in {q['opener']}'s pane", more)
 
         body = by_id[q["id"]]["body"] if q["id"] in by_id else q["title"]
-        n_opts = len(options_of(body))
+        question = question_of(by_id.get(q["id"]) or {"body": body})  # its declared type (#182)
+        kind = summary(question)
         needs.append(Row(f"question:{q['id']}", _t(("⚑ ", "bold yellow"), f"#{q['id']} {q['opener']}: ",
                                                    _line(q["title"]),
-                                                   (f"  {n_opts} options", "yellow") if n_opts else ""),
-                         qdetail, "question", {"id": q["id"], "opener": q["opener"], "text": body, "ts": q["opened"]},
+                                                   (f"  {kind}", "yellow") if kind else ""),
+                         qdetail, "question", {"id": q["id"], "opener": q["opener"], "text": body, "ts": q["opened"],
+                                               "question": question},
                          row_age(q["opened"], now)))
     for rid, r in box.approvals:
         ts = by_id[int(rid)]["ts"] if int(rid) in by_id else None

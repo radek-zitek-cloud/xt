@@ -660,7 +660,7 @@ def test_the_examples_settings_file_passes_the_preflight_and_its_question_render
     (shown,) = [b for b in _blocks(examples, "text") if "Options:" in b]
     rendered = choices.render("Should the weekly digest go out today or tomorrow?",
                               ["Publish the digest today :: readers get it on time; the last section is unreviewed",
-                               "Publish tomorrow :: fully reviewed, one day late"], 2)
+                               "Publish tomorrow :: fully reviewed, one day late"], 2, other=True)  # #182
     assert rendered == shown.rstrip("\n")
     assert choices.resolve(rendered, "2")[0] == "Option 2: Publish tomorrow — fully reviewed, one day late"
 

@@ -251,17 +251,24 @@ def cmd_version(args) -> None:
 def cmd_send(args) -> None:
     ctx = Ctx.load()
     body = _body(args)
-    if args.option or args.recommend is not None:
-        if args.type != "ask":
-            raise XtError("--option and --recommend belong to a question: add --type ask. Nothing was sent.")
-        from .choices import render
+    data = None
+    mtype = args.type
+    if mtype == "ask":
+        from .choices import build
 
-        body = render(body, args.option or [], args.recommend)  # refuses a malformed set before sending
+        try:  # refuses a malformed question before anything is sent, and shows the text back (#182)
+            body, q = build(body, args.option or [], args.recommend, closed=args.closed, other=args.other)
+        except XtError as e:
+            raise XtError(f"{e}\nYour message, as you wrote it:\n{body.rstrip()}" if body.strip() else str(e)) from None
+        data = {"question": q}  # the declared answer type, stored as data (#182)
+    elif args.closed or args.other or args.option or args.recommend:
+        raise XtError("--closed, --option, --recommend and --other belong to a question: add --type ask. "
+                      "Nothing was sent.")
     who = _who(args, operator=True)
     if operators.is_operator(ctx.paths, who):  # card #166: a report to the liaison, marked as such
-        msg, status = operators.send(ctx, who, args.to, args.type, body, args.ref)
+        msg, status = operators.send(ctx, who, args.to, mtype, body, args.ref)
     else:
-        msg, status = send(ctx, who, args.to, args.type, body, args.ref)
+        msg, status = send(ctx, who, args.to, mtype, body, args.ref, data=data)
     print(f"#{msg['id']} {msg['type']} → {msg['to']}: {status}")
 
 
@@ -284,13 +291,20 @@ def cmd_answer(args) -> None:
         raise XtError(f"#{args.id} is not an open question (see `xt inbox`)")
     if who != item["owner"]:
         raise XtError(f"#{args.id} is a question for {item['owner']}, not {who}")
-    from .choices import resolve
-
-    question = ctx.ledger.message(args.id) or {}
-    text, chosen = resolve(question.get("body", ""), _body(args))  # "2" → the option's full text
-    msg, status = send(ctx, who, item["opener"], "report", text, args.id)
+    msg, status, data = answer_question(ctx, who, item, _body(args))
     print(f"#{msg['id']} answer to #{args.id} → {item['opener']}: {status}"
-          + (f" (recorded as: {text})" if chosen else ""))
+          + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
+
+
+def answer_question(ctx: Ctx, who: str, item: dict, answer: str) -> tuple[dict, str, dict]:
+    """The one answer path (card #182): check the answer against the question's declared type,
+    record it as a report to the asker with the answer as data. `xt answer`, the TUI's `s` and
+    `xt chat` all come here."""
+    from .choices import question_of, resolve_answer
+
+    text, data = resolve_answer(question_of(ctx.ledger.message(item["id"])), answer)  # "2" → the option's text
+    msg, status = send(ctx, who, item["opener"], "report", text, item["id"], data={"answer": data})
+    return msg, status, data
 
 
 def cmd_friction(args) -> None:
@@ -323,6 +337,8 @@ WATCH_LIMIT = 50  # `xt log --events`: the newest supervisor events
 def cmd_log(args) -> None:
     if args.limit is not None and args.limit < 1:
         raise XtError("--limit needs a number of 1 or more (`--full` prints everything)")
+    from .choices import data_line
+
     ctx = Ctx.load()
     if args.events:  # `--watch` before 0.20.0: it never followed, so it's named for what it does (#178)
         from .watch import watch_log
@@ -348,6 +364,9 @@ def cmd_log(args) -> None:
         ref = f" ref:#{m['ref']}" if m.get("ref") is not None else ""
         print(f"#{m['id']} {m['ts']} {m['type']} {m['from']}→{m['to']}{ref}")
         print("   " + m["body"].replace("\n", "\n   "))
+        data = data_line(m)  # a question's declared type or an answer, stored as data (#182)
+        if data:
+            print(f"   [{data}]")
     if not shown:
         print("(no messages)")
 
@@ -501,7 +520,7 @@ def cmd_inbox(args) -> None:
     terminal the listing counts as a look: New clears and the friction it printed is seen. An
     agent's listing changes nothing."""
     from . import inbox
-    from .choices import options_of
+    from .choices import question_of, summary
     from .goaldone import first_line, mark_seen
 
     ctx = Ctx.load()
@@ -527,12 +546,11 @@ def cmd_inbox(args) -> None:
 
     if box.questions or box.approvals or box.alerts or answered:
         print("Needs you:")
-        bodies = {m["id"]: m["body"] for m in msgs}
+        by_id = {m["id"]: m for m in msgs}
         for q in box.questions:
-            n = len(options_of(bodies.get(q["id"], "")))
-            opts = f"  {n} options" if n else ""
-            print(f"  ⚑ #{q['id']} {q['opened'][5:16]} from {q['opener']}: {q['title']}{opts}  "
-                  f"(xt answer {q['id']} \"...\")")
+            kind = summary(question_of(by_id.get(q["id"]) or {"body": q["title"]}))
+            print(f"  ⚑ #{q['id']} {q['opened'][5:16]} from {q['opener']}: {q['title']}"
+                  f"{f'  {kind}' if kind else ''}  (xt answer {q['id']} \"...\")")
         for rid, r in box.approvals:
             print(f"  ⚑ #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
         for k, a in box.alerts:
@@ -766,9 +784,14 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("to")
     sp.add_argument("--type", choices=AGENT_TYPES, default="report")
     sp.add_argument("--ref", type=int, help="goal/task/message id this is about")
+    sp.add_argument("--closed", action="store_true", help="with --type ask: a question answered yes or no")
     sp.add_argument("--option", action="append", metavar="'OPTION :: CONSEQUENCE'",
-                    help="with --type ask: one of two or three numbered options (repeat the flag)")
-    sp.add_argument("--recommend", type=int, metavar="N", help="with --option: the option you recommend")
+                    help="with --type ask: one of two to four numbered options (repeat the flag); "
+                         "an ask with neither --closed nor --option is an open question")
+    sp.add_argument("--recommend", type=int, action="append", metavar="N",
+                    help="with --option: the one option you recommend")
+    sp.add_argument("--other", action="store_true",
+                    help="with --option: the human may also answer in their own words (Other)")
     sp.add_argument("body", nargs="*", help="message text (or stdin)")
 
     sp = add("done", cmd_done, "close an open goal or task you own (reports to whoever opened it)")

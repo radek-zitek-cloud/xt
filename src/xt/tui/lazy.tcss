@@ -168,6 +168,25 @@ ModalScreen {
     margin: 0 0 1 0;
 }
 
+/* answering a question with options (card #182): every option shows, wrapped, even at 80x24 */
+.popup.compose.question {
+    height: 95%;
+    max-height: 100%;
+}
+
+.popup.compose.question .compose-context {
+    max-height: 80%;
+}
+
+.popup.compose.yesno {
+    height: auto;
+    min-height: 5;
+}
+
+.popup.compose.yesno .compose-context {
+    margin: 0;
+}
+
 #compose-text {
     height: 1fr;
     min-height: 3;

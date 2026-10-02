@@ -183,7 +183,8 @@ def done_recipient(team: Team, sender: str, item: dict) -> str:
 
 
 def send(
-    ctx: Ctx, sender: str, to: str, mtype: str, body: str, ref: int | None = None, deliver: bool = True
+    ctx: Ctx, sender: str, to: str, mtype: str, body: str, ref: int | None = None, deliver: bool = True,
+    data: dict | None = None,
 ) -> tuple[dict, str]:
     body = body.strip()
     if not body:
@@ -223,7 +224,7 @@ def send(
         if item is None or item["type"] != "goal":
             raise XtError(f"--ref for a task must be an open goal id; #{ref} isn't one")
     closing_goal = mtype == "done" and ctx.ledger.item(ref) and ctx.ledger.item(ref)["type"] == "goal"
-    msg = ctx.ledger.append(sender, to, mtype, body, ref)
+    msg = ctx.ledger.append(sender, to, mtype, body, ref, data=data)
     if closing_goal:
         close_leftover_tasks(ctx, ref)
     status = deliver_or_queue(ctx, msg) if deliver else "logged"
