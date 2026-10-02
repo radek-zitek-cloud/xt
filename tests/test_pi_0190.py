@@ -228,7 +228,8 @@ def test_status_gives_a_reason_when_no_session_log_is_found(pi_team, monkeypatch
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     cli.cmd_status(cli.build_parser().parse_args(["status"]))
     out = capsys.readouterr().out
-    assert "no session log found for dave: its context and today's usage can't be read" in out
+    # v0.20.0 #174: which of context and usage can be read, and the precise reason
+    assert "dave: nothing can be read: no context and no usage recorded today (no pi session logs at" in out
 
 
 def test_status_has_no_reason_line_when_the_log_is_found(pi_team, monkeypatch, capsys):
@@ -237,4 +238,4 @@ def test_status_has_no_reason_line_when_the_log_is_found(pi_team, monkeypatch, c
     monkeypatch.setattr(sys, "stdin", _Tty())
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     cli.cmd_status(cli.build_parser().parse_args(["status"]))
-    assert "no session log found" not in capsys.readouterr().out
+    assert "can't be read" not in capsys.readouterr().out  # a fresh agent's first turn: no line

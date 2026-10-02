@@ -179,6 +179,7 @@ class Supervisor:
         if now - self.last_usage >= USAGE_EVERY:
             self.last_usage = now
             self.record_usage()
+            self.check_context(live, now)
             self.auto_reset()
             self.check_launch(live)
         self.check_published()
@@ -259,6 +260,51 @@ class Supervisor:
 
         for name in launch.alert(self.ctx, launch.check(self.ctx, live), live):
             self.say(f"alert: {name} runs without xt's launch settings")
+
+    def check_context(self, live: dict, now: float) -> None:
+        """An agent whose context still can't be read `usage.GRACE` after its start raises one
+        `context:<name>` alert per start (card #174), cleared when the context becomes readable or
+        the agent stops; `.xt/state/context_alerts.json` keeps which start was alerted."""
+        from . import turns, usage
+        from .adapters import load_adapters
+
+        path = self.ctx.paths.state / "context_alerts.json"
+        try:
+            alerted = json.loads(path.read_text()) if path.exists() else {}
+        except ValueError:
+            alerted = {}
+        adapters = load_adapters(self.ctx.paths)
+        starts = usage.last_starts(self.ctx)
+        names = [a.name for a in self.ctx.team.agents()
+                 if a.kind != HUMAN and a.active and a.name in live and a.name in starts
+                 and getattr(adapters.get(a.harness or ""), "session_format", None)]
+        due = [n for n in names if now - starts[n] >= usage.GRACE]
+        readings = usage.readings(self.ctx, due) if due else {}
+        spend = None
+        for name, r in readings.items():
+            if r.known:
+                self.alerts.resolve(f"context:{name}")
+                continue
+            if alerted.get(name) == starts[name]:
+                continue  # said once for this start
+            spend = spend or turns.today(self.ctx)
+            usage_txt = ("today's usage is recorded" if name in spend.agents_today
+                         else "no usage is recorded either")
+            self.alerts.raise_(
+                f"context:{name}",
+                f"{name}'s context still can't be read {usage.GRACE // 60} minutes after its start "
+                f"({r.reason}); {usage_txt}. It may be working normally: look at its pane. "
+                f"`xt status` shows what xt can read; the user guide's \"How full is an agent's "
+                f"context?\" says when this is expected.")
+            self.say(f"alert: {name}'s context can't be read")
+            alerted[name] = starts[name]
+        for name in [n for n in alerted if n not in names]:
+            self.alerts.resolve(f"context:{name}")  # stopped or retired: a new start is checked anew
+            del alerted[name]
+        try:
+            path.write_text(json.dumps(alerted))
+        except OSError:
+            pass
 
     def auto_reset(self) -> None:
         """The automatic reset policy (card #114, off by default): queues resets that run_resets

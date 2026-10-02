@@ -245,8 +245,8 @@ def _partprompt(ctx: Ctx, name: str, harness: str, settled: bool) -> None:
         f"partprompt:{name}",
         f"{name}'s first prompt reached {harness} without its opening, and so did xt's one resend "
         f"(the harness wasn't ready for input{'' if settled else '; its screen never settled'}). It has "
-        f"its identity and protocol, but xt can't find its session log, so `xt status` can't show its "
-        f"context or today's usage. `xt stop {name}` and `xt spawn {name}` start it again.",
+        f"its identity and protocol, but it worked from a prompt without its opening. "
+        f"`xt stop {name}` and `xt spawn {name}` start it again.",
     )
 
 

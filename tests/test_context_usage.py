@@ -93,7 +93,7 @@ def test_other_teams_and_other_agents_dont_match(ctx, fake_home):
     f = codex_session(fake_home, ctx, "liaison", 54000)
     f.write_text(f.read_text().replace(f'team \\"{ctx.team.name}\\"', 'team \\"another\\"'))
     r = usage.reading(ctx, "liaison")
-    assert not r.known and "session not found" in r.reason
+    assert not r.known and r.missing and "none with its first prompt" in r.reason  # v0.20.0 #174 wording
 
 
 def test_claude_context_ignores_subagent_turns_and_takes_the_window_from_the_adapter(ctx, fake_home):

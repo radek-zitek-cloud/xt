@@ -9,6 +9,30 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.20.0] — not released yet
+
+Polish from a fresh-eyes usability review of 0.19.0: seven small cards to their approved spec, no
+new feature. **0.20.0-rc1** has #174, #177 and #178. No protocol or ledger format change; new state
+file `.xt/state/context_alerts.json`.
+
+### Fixed
+
+- **A pi agent's context is readable, or xt says why not (#174).** A hired pi member's context
+  stayed `—` for its whole life with only "no session log found", while its usage was recorded
+  later. A session log whose first prompt lost its opening now still counts as the agent's, by two
+  later parts of the prompt (the team repo's path and `Always pass --as <name>`), for both the
+  context and the usage. When the context still can't be read, `xt status` says under the agent's
+  row which of context and today's usage xt can read (`<name>: today's usage recorded; context
+  can't be read (…)` or `<name>: nothing can be read: no context and no usage recorded today
+  (…)`), and the reason, also in the TUI's agent detail, names what xt found: no session logs where
+  the harness keeps them (or none it may read), none written since the agent started, or some
+  written since but none with its first prompt. In an agent's first 10 minutes a found log without
+  usage yet is expected and says nothing. After them, the supervisor raises one `context:<name>`
+  alert per start, cleared when the context becomes readable or the agent stops. The `partprompt`
+  alert no longer says xt can't find the log. The user guide says when an unreadable context is
+  expected. The cause seen in the review is not confirmed yet: it needs a real pi member on a
+  non-Anthropic provider (staging).
+
 ## [0.19.0] — 2026-10-01
 
 The release: the same code and docs as 0.19.0-rc6 (only the version and this changelog changed).

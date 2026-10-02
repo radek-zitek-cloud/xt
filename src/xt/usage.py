@@ -22,7 +22,7 @@ from .adapters import Adapter, load_adapters
 from .context import Ctx
 from .team import HUMAN, SYSTEM
 
-NOT_FOUND = "session not found since the agent started"
+GRACE = 10 * 60  # seconds after a start in which an unread context is expected: the first turns (card #174)
 HEAD_BYTES = 256 * 1024  # where the first prompt is (session header + first user message)
 TAIL_BYTES = 512 * 1024  # where the latest usage record is
 MODEL_WINDOWS_TTL = 24 * 3600
@@ -37,6 +37,7 @@ class Reading:
     source: str = ""  # e.g. "codex session log"
     reason: str = ""  # why it's unknown, when it is
     model: str | None = None  # the model the session log names (card #128: `default` made real)
+    missing: bool = False  # no session log of this agent was found (card #174: `reason` says why)
 
     @property
     def known(self) -> bool:
@@ -148,19 +149,53 @@ def _recent_logs(adapter: Adapter, since: float | None) -> list[str]:
     return sorted(candidates, key=os.path.getmtime, reverse=True)
 
 
+def carries_prompt(ctx: Ctx, name: str, head: str) -> bool:
+    """Whether a log's start holds this agent's first prompt: its opening, or, when the harness lost
+    the opening, both later parts of its first paragraph (card #174; the loss is card #167)."""
+    return bool(_marker_re(name, ctx.team.name).search(head)) or all(m in head for m in _later_markers(ctx, name))
+
+
 def find_session(ctx: Ctx, adapter: Adapter, name: str, since: float | None) -> str | None:
     """The newest main session log whose first prompt is this agent's, written since it started."""
     if not adapter.sessions:
         return None
-    marker = _marker_re(name, ctx.team.name)
     for path in _recent_logs(adapter, since):
         try:
             head = _head(path, _head_size(adapter))
         except OSError:
             continue
-        if marker.search(head) and _is_main_session(adapter.session_format, head):
+        if carries_prompt(ctx, name, head) and _is_main_session(adapter.session_format, head):
             return path
     return None
+
+
+def not_found_reason(adapter: Adapter, name: str, since: float | None) -> str:
+    """Why no session log of the agent was found, as precisely as the files tell (card #174): none
+    at all where the harness keeps them, none written since the agent started, or some written
+    since then but none carrying its first prompt."""
+    try:
+        every = glob.glob(os.path.expanduser(adapter.sessions))
+        newest = max((os.path.getmtime(p) for p in every), default=None)
+    except OSError:
+        every, newest = [], None
+    if not every:
+        return f"no {adapter.name} session logs at {adapter.sessions}, or xt can't read there"
+    recent = _recent_logs(adapter, since)
+    if not recent:
+        return (f"no {adapter.name} session log written since {name} started "
+                f"(the newest is from {dt.datetime.fromtimestamp(newest):%d %b %H:%M})")
+    n = len(recent)
+    return f"{n} {adapter.name} session log{'s' if n != 1 else ''} written since {name} started, none with its first prompt"
+
+
+def unreadable_line(name: str, r: Reading, usage_today: bool, age: float | None) -> str | None:
+    """What xt can read of an agent whose context is unknown, for `xt status` (card #174); None when
+    the context is known, or in the agent's first turns while its log is found but has no usage yet."""
+    if r.known or (not r.missing and not usage_today and age is not None and age < GRACE):
+        return None
+    what = ("today's usage recorded; context can't be read" if usage_today
+            else "nothing can be read: no context and no usage recorded today")
+    return f"{name}: {what} ({r.reason or 'no usage recorded yet'})"
 
 
 WHOLE, INCOMPLETE = "whole", "incomplete"
@@ -333,7 +368,8 @@ def reading(ctx: Ctx, name: str, adapters: dict[str, Adapter] | None = None,
         return Reading(reason=f"xt can't read {a.harness if a else '?'} sessions yet")
     path = session_for(ctx, adapter, name, starts.get(name))
     if not path:
-        return Reading(source=f"{adapter.name} session log", reason=NOT_FOUND)
+        return Reading(source=f"{adapter.name} session log", missing=True,
+                       reason=not_found_reason(adapter, name, starts.get(name)))
     try:
         lines = _tail_lines(path)
     except OSError as e:

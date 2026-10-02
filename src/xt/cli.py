@@ -3,6 +3,7 @@ import contextlib
 import datetime as dt
 import os
 import sys
+import time
 
 from . import __version__
 from . import brief as brief_mod
@@ -359,6 +360,7 @@ def cmd_status(args) -> None:
     print(versions.current(ctx, live_names=set(live)).line())
 
     contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
+    starts = usage.last_starts(ctx)
     adapters = load_adapters(ctx.paths)
     spend = turns.today(ctx)
     from .reset import queued, queued_text
@@ -381,9 +383,13 @@ def cmd_status(args) -> None:
         today_txt += f"  next wake {dt.datetime.fromtimestamp(nxt):%a %H:%M}" if nxt else ""
         print(f"  {a.name:<12} {a.role or '':<12} {harness_model(a.harness, a.model):<18} {state:<12} "
               f"open:{mine:<3} context:{ctx_txt:<12} today:{today_txt}")
-        if a.name in live and a.name in contexts and contexts[a.name].reason == usage.NOT_FOUND:
-            # blanks with no reason looked like nothing to read (card #167)
-            print(f"  {'':<12} no session log found for {a.name}: its context and today's usage can't be read")
+        if a.name in live and a.name in contexts:
+            # blanks with no reason looked like nothing to read (card #167); say which can be (#174)
+            since = starts.get(a.name)
+            line = usage.unreadable_line(a.name, contexts[a.name], a.name in spend.agents_today,
+                                         time.time() - since if since else None)
+            if line:
+                print(f"  {'':<12} {line}")
         settings_path = permissions.shown(ctx.team, a, adapters.get(a.harness))
         if settings_path:
             print(f"  {'':<12} settings: {settings_path}")

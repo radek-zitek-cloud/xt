@@ -588,7 +588,8 @@ xt alerts, it never repairs. Alerts appear in the Inbox (red `⚠`) and as notif
 | `missing:<name>` | An agent xt started isn't running any more (crashed, or its workspace was closed outside xt) | Find out why (its pane, `xt log --member <name>`), then `u` / `xt spawn <name>` |
 | `missing:lead` with goals open | The lead isn't running though there's work | `xt up` |
 | `noprompt:<name>` | An agent started but its first prompt never showed up on its screen, so it doesn't know who it is | Stop and start it again (`xt restart <name>`) |
-| `partprompt:<name>` | (from 0.19.0, pi) The agent's first prompt reached it without its opening, and so did xt's one resend of it. It has its identity and protocol, but xt can't link its session log, so its context and today's usage stay empty | Stop and start it again (`xt restart <name>`); clears at its next start |
+| `partprompt:<name>` | (from 0.19.0, pi) The agent's first prompt reached it without its opening, and so did xt's one resend of it. It has its identity and protocol, but it worked from a prompt without its opening | Stop and start it again (`xt restart <name>`); clears at its next start |
+| `context:<name>` | (from 0.20.0) The agent's context still can't be read 10 minutes after its start; the alert says why and whether today's usage is recorded. Raised once per start. The agent may be working normally | Look at its pane; `xt status` says what xt can read. See "How full is an agent's context?" in [Memory and recovery](#11-memory-and-recovery); clears when the context becomes readable or the agent stops |
 | `silent:<id>` | The owner of an open item ignored two nudges | Look at its pane; ask the liaison or restart the agent |
 | `volume:<date>` | Today's message log is unusually big: probably two agents in a loop | `xt log` to see who; stop them |
 | `launch:<name>` | The agent runs without xt's launch settings: something other than xt started it, typically the terminal multiplexer restoring its session after a reboot or power cycle and resuming the agent's old conversation | `xt restart <name>`, or `xt restart --all` for the whole team; clears by itself |
@@ -778,9 +779,27 @@ agent to its log by its first prompt, so a restarted agent starts again from its
 `~` means approximate (Codex reports the latest turn's usage, not a live figure); tokens with no
 bar and no share mean the window isn't known for that model (`?` in the detail); `—` means nothing
 is recorded yet, or the agent isn't running
-(its detail then shows the last session's figure, labelled as such). When a running agent has no
-session log xt can link, `xt status` says so under its row (`no session log found for <name>: its
-context and today's usage can't be read`; from 0.19.0). pi has lost the first few characters of a
+(its detail then shows the last session's figure, labelled as such). When a running agent's context
+can't be read, `xt status` says under its row which of context and today's usage xt can read, and
+why (from 0.20.0):
+
+```text
+writer: today's usage recorded; context can't be read (no pi session log written since writer started (the newest is from 02 Oct 09:12))
+writer: nothing can be read: no context and no usage recorded today (no pi session logs at ~/.pi/agent/sessions/*/*.jsonl, or xt can't read there)
+```
+
+The reason names what xt found: no session logs where the harness keeps them (or none it may
+read), none written since the agent started, or some written since then but none carrying the
+agent's first prompt; the agent's detail in the TUI shows the same reason. An unreadable context is
+expected in an agent's first turns (a harness may write its log or its first usage only after its
+first reply), so status says nothing then unless no log is found at all. It is also expected for a harness xt can't read
+(none of the supported three) and when xt runs where it may not read the harness's folder (for
+example inside a sandboxed agent's shell, where an agent's own `xt status` sees less than yours).
+It is not expected 10 minutes after a start: then the supervisor raises one `context:<name>` alert
+for that start, which clears when the context becomes readable; the agent may well be working
+normally, so look at its pane before restarting it. A log whose first prompt lost its opening
+still counts as the agent's, by two later parts of the prompt (the team repo's path and
+`Always pass --as <name>`). pi has lost the first few characters of a
 first prompt on some first starts, which hid its log from xt. So for pi (from 0.19.0) xt waits until
 its screen has stopped changing, and types one guard line before the prompt: `(xt: this line only
 guards your first prompt against lost characters; ignore it. The prompt follows.)`. A lost start

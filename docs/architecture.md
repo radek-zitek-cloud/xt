@@ -111,6 +111,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | | `state/resets.json`: queued resets and each agent's last reset, for the automatic policy's cool-down |
 | | `state/board_watch.json` (+ `.out`, `.err` of the last run): the board watch's last success or current failure, for status |
 | | `state/prompt_resends.json`: pi first prompts that arrived damaged, waiting to be resent once or checked after the resend |
+| | `state/context_alerts.json`: which start of each agent got its `context:<name>` alert, so it's raised once per start |
 | | `state/operators.json`: registered operators (pid, start time, token hash) and their delegation grants; `operators/<name>.token`: an operator's token (mode 600) |
 
 xt's own files (`bin/`, `src/`, `tests/`, `docs/`, `protocol.md`, `harnesses/`, `roles/lead.md`,
@@ -243,8 +244,10 @@ Agents talk only through `xt send <to> --as <me> --type … [--ref id]` (or `xt 
 Each harness adapter declares where its logs are (`sessions`, a glob under `~`), their
 `session_format` (`codex`, `claude`, `pi`) and, where the log doesn't state it, `context_windows`
 per model. An agent is linked to its log by its first prompt ("You are **name**, an agent in the
-xt team "team""), looking only at logs written since xt last started it (the ledger's `started …`
-entry), so a restart moves it to the new session; Codex's "guardian" sub-sessions (its automatic
+xt team "team""), or, when the harness lost that opening, by two later parts of the prompt's first
+paragraph (the team repo's path and `Always pass --as name`; card #174), looking only at logs
+written since xt last started it (the ledger's `started …` entry), so a restart moves it to the new
+session; Codex's "guardian" sub-sessions (its automatic
 reviewer) repeat the prompt and are skipped. The link is kept in `state/sessions.json`. From the
 log's tail xt takes the latest usage record: Codex's `token_count` (latest turn's total out of
 `model_context_window`, marked approximate), Claude Code's `message.usage` (input, cache and
@@ -252,7 +255,10 @@ output tokens, skipping subagent turns; window from the adapter's table), pi's m
 (window from `pi --list-models`, cached a day). The same read keeps the model the log names
 (Codex's newest `turn_context`, else the session's first in its head; Claude Code's and pi's
 `message.model`), which the TUI's Team pane shows for an agent configured as `default`. Only
-counters and the model name are read. Anything missing is reported as unknown, never guessed. The
+counters and the model name are read. Anything missing is reported as unknown, never guessed; a
+log not found says why (`usage.not_found_reason`: no logs where the harness keeps them, none since
+the start, or none with the first prompt), and `xt status` says which of context and today's usage
+can be read (`usage.unreadable_line`). The
 TUI's Team pane and agent detail, `xt status` and the lead's and liaison's briefs show it;
 members' briefs don't.
 
@@ -347,7 +353,10 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    the ask drops it. About once a minute (with usage recording), the **automatic reset policy** (card
    #114, `[policy] auto_reset`, off by default) queues a reset for each idle agent without open
    work whose fresh context reading is above its threshold in tokens and that had no reset within
-   the cool-down (`state/resets.json`). Also about once a minute, the **launch check** (card
+   the cool-down (`state/resets.json`). Also about once a minute, the **context check** (card #174,
+   `Supervisor.check_context`): a running agent whose context still can't be read 10 minutes after
+   its start raises one `context:<name>` alert for that start (`state/context_alerts.json`),
+   cleared when it becomes readable or the agent stops. And the **launch check** (card
    #165, `src/xt/launch.py`): harness processes in the team repo are matched to agents by their
    `XT_AGENT`; running agents left without a match are warned about (one `launch:<name>` alert,
    cleared when xt starts the agent again or it stops running) only on positive evidence, when at

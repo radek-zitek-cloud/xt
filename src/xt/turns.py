@@ -143,7 +143,6 @@ def agent_logs(ctx: Ctx, adapter, name: str, since: float) -> list[tuple[str, bo
     """(path, auxiliary) for every log of this agent modified since `since`: its sessions (the
     current one and earlier ones, e.g. before a restart) and, for Codex, the reviewer sub-sessions
     that carry its first prompt. Read positions keep each log from being counted twice."""
-    marker = usage._marker_re(name, ctx.team.name)
     floor = since
     out = []
     for path in glob.glob(os.path.expanduser(adapter.sessions or "")):
@@ -153,7 +152,7 @@ def agent_logs(ctx: Ctx, adapter, name: str, since: float) -> list[tuple[str, bo
             head = usage._head(path)
         except OSError:
             continue
-        if marker.search(head):
+        if usage.carries_prompt(ctx, name, head):  # a lost opening still counts (card #174)
             out.append((path, not usage._is_main_session(adapter.session_format, head)))
     return out
 
