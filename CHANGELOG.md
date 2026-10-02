@@ -12,7 +12,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.21.1] — not released yet
 
 A patch release with one card (#188). No command, protocol, ledger or state-file change.
-**0.21.1-rc1** (2026-10-02) has it.
+**0.21.1-rc1** (2026-10-02) has it. **0.21.1-rc2** (2026-10-02) adds only a docs sentence: the
+flag also turns off built-in slash commands.
 
 ### Changed
 
@@ -21,7 +22,9 @@ A patch release with one card (#188). No command, protocol, ledger or state-file
   operator's personal and plugin skills are no longer listed in the agents' sessions. That listing
   was about 9k input tokens at every start (measured 2026-10-02). The team's skills are files under
   `skills/` that the protocol points to, so they keep working; your own Claude Code sessions keep
-  your skills.
+  your skills. This also disables built-in slash commands such as `/context`, `/compact`, `/model`
+  and `/cost` in team Claude agents' panes (xt sends none, so nothing breaks); use `xt status` for
+  context.
 
 ### Upgrading
 

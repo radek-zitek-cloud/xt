@@ -677,6 +677,8 @@ when a harness can't block everything. Agents are told to ask you for anything o
 `harnesses/claude.toml`'s `args`), so your own and your plugins' skills aren't listed in their
 sessions: that listing cost about 9k tokens at every start. The team's skills are files under
 `skills/` that the protocol points to, so they keep working. Your own sessions keep your skills.
+The flag also disables built-in slash commands such as `/context`, `/compact`, `/model` and `/cost`
+in team Claude agents' panes (xt sends none, so nothing breaks); use `xt status` for context.
 
 **No account connectors.** Harnesses can reach your accounts through connectors: Claude Code's
 claude.ai connectors (Gmail, Drive, Calendar…) and MCP servers, Codex's apps. xt starts agents

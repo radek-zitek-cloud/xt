@@ -192,7 +192,8 @@ settings file (its own `permissions` line, else `[defaults] permissions` when th
 a Codex or pi agent with its own line is refused), `permissions.preflight` checks it (inside the
 repo, JSON, known `defaultMode`, well-formed rules; a bad file refuses the start) and
 `Adapter.start_args` builds the arguments: the adapter's own `args` (for Claude Code, Claude in
-Chrome refused and `--disable-slash-commands`, card #188), then a Codex agent's
+Chrome refused and `--disable-slash-commands`, card #188, which also turns off built-in slash
+commands such as `/context`; xt sends none), then a Codex agent's
 `codex_options` as `-c key=value` (checked by `adapters.codex_option_args` against the allowlist
 `CODEX_OPTIONS`, which is the sandbox network switch alone; anything else, or the line on another
 harness, refuses the start; card #169), then `--settings <file>` (the
