@@ -46,6 +46,9 @@ class Adapter:
     # A line typed before the first prompt (and before a resent one) that a lost start eats instead
     # of the prompt's opening (card #167, rc5). None: the prompt is typed as it is.
     first_prompt_prefix: str | None = None
+    # A line the first prompt carries just before its last line, for a protocol rule this harness's
+    # agents were seen to break (card #180); away from the start, so the guard above is untouched.
+    first_prompt_note: str | None = None
 
     @property
     def installed(self) -> bool:
@@ -172,6 +175,7 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
             ready_settle=int(d.get("ready_settle", 0)),
             check_prompt_in_log=bool(d.get("check_prompt_in_log", False)),
             first_prompt_prefix=d.get("first_prompt_prefix") or None,
+            first_prompt_note=d.get("first_prompt_note") or None,
         )
     return out
 

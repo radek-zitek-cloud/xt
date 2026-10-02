@@ -281,7 +281,7 @@ equivalent and when you'd use it.
 | `xt up` | Start the supervisor and liaison (and the lead if goals are open) |
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, context and today's usage per agent, team usage and allowance (Codex, and Claude's five-hour and weekly windows through `bin/xt-statusline`), open work, questions, queue, approvals, alerts |
-| `xt inbox` | The Inbox as in the TUI: what needs you (questions, approvals, alerts), what's new since you last looked (goals done, reports), unread friction (`--seen`: also the friction you've seen) |
+| `xt inbox` | The Inbox as in the TUI: what needs you (questions, approvals, alerts), what's new since you last looked (goals done, reports), unread friction (`--seen`: also what the TUI folds: questions you answered and notifications you've seen in the last 7 days, and the friction you've seen) |
 | `xt answer <id> "..."` | Answer a question the liaison asked you (a number picks one of its options) |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting) |
 | `xt clear <alert>` | Dismiss an alert |

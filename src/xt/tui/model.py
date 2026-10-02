@@ -20,6 +20,7 @@ from ..dispatch import Queue
 from ..jobs import Jobs
 from ..paths import XtError
 from ..alerts import FAILURES
+from ..inbox import answer_text, fold_labels  # shared with `xt inbox --seen` (card #179)
 from ..team import HUMAN, SYSTEM, harness_model, schedule_text
 from . import flow, teampane
 from .flow import Data as FlowData
@@ -32,15 +33,6 @@ PANELS = ("Inbox", "Work", "Flow")
 # the Inbox's folds (cards #127, #157): their rows carry the fold's key in `under`
 FRICTION_FOLD, EARLIER_FOLD, ANSWERED_FOLD = "fold:friction", "fold:earlier", "fold:answered"
 INBOX_HEADINGS = ("NEEDS YOU", "NOTIFICATIONS", "FRICTION")  # the demo uses them too (card #177)
-OPTION_ANSWER = re.compile(r"^Option (\d+): (.+?)(?: — .*)?$", re.S)
-
-
-def answer_text(body: str) -> str:
-    """An answer as its row shows it: `1: Approve and build` for a picked option (recorded as
-    `Option 1: Approve and build — <consequence>`), else its first line."""
-    first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
-    m = OPTION_ANSWER.match(first)
-    return f"{m.group(1)}: {m.group(2)}" if m else first
 STATUS_STYLE = {"idle": "green", "done": "green", "working": "yellow", "blocked": "red"}
 TYPE_STYLE = {"goal": "magenta", "task": "magenta", "done": "green", "report": "cyan", "ask": "cyan",
               "alert": "red", "approval": "yellow", "nudge": "yellow", "note": "bright_black",
@@ -427,7 +419,7 @@ def build(ctx: Ctx) -> Snapshot:
     needs.sort(key=lambda r: r.data.get("ts") or "", reverse=True)  # newest on top (card #162)
     if box.answered:  # the human's decisions stay in view for a week (card #157)
         n = len(box.answered)
-        needs.append(Row(ANSWERED_FOLD, _t((f"({n} answered, last {_inbox.EARLIER_DAYS} days) ▸", "bright_black")),
+        needs.append(Row(ANSWERED_FOLD, _t((f"{fold_labels(box)['answered']} ▸", "bright_black")),
                          lambda n=n: Text(f"{n} questions you answered in the last {_inbox.EARLIER_DAYS} days, "
                                           "newest first: enter or space shows or hides them\n", style="bright_black"),
                          "fold", {"n": n}))
@@ -476,7 +468,7 @@ def build(ctx: Ctx) -> Snapshot:
     new_rows = [new_row(m, goal, False) for m, goal in box.new]  # since the human last looked (#125, #127)
     if box.earlier:
         n = len(box.earlier)
-        new_rows.append(Row(EARLIER_FOLD, _t((f"({n} earlier, seen) ▸", "bright_black")),
+        new_rows.append(Row(EARLIER_FOLD, _t((f"{fold_labels(box)['earlier']} ▸", "bright_black")),
                             lambda n=n: Text(f"{n} items from New you have seen in the last {_inbox.EARLIER_DAYS} days, "
                                              "newest first: enter or space shows or hides them\n",
                                              style="bright_black"),
@@ -490,7 +482,7 @@ def build(ctx: Ctx) -> Snapshot:
                                  "friction", {"id": m["id"], "seen": False},
                                  row_age(m["ts"], now)))
     if box.seen:
-        friction_rows.append(Row(FRICTION_FOLD, _t((f"({len(box.seen)} older, seen) ▸", "bright_black")),
+        friction_rows.append(Row(FRICTION_FOLD, _t((f"{fold_labels(box)['friction']} ▸", "bright_black")),
                                  lambda n=len(box.seen): Text(f"{n} older friction reports you have seen, newest "
                                                               "first: enter or space shows or hides them\n",
                                                               style="bright_black"),

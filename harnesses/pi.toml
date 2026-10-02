@@ -29,3 +29,8 @@ session_format = "pi"
 ready_settle = 3
 check_prompt_in_log = true
 first_prompt_prefix = "(xt: this line only guards your first prompt against lost characters; ignore it. The prompt follows.)"
+
+# A pi agent ended a `done` with "No issues.", which the protocol forbids (card #180, seen once;
+# Codex agents complied). The first prompt carries this line just before its last one, far from
+# the guard line and the opening the log check reads.
+first_prompt_note = "Reminder (protocol §4): add a `Friction:` line to a report or `done` only when something got in the way; otherwise write nothing about it, never \"no issues\" or \"no friction\"."

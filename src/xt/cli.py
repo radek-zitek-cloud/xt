@@ -509,7 +509,23 @@ def cmd_inbox(args) -> None:
     box = inbox.build(ctx, msgs)
     one = lambda text, n=160: " ".join(text.split())[:n]
     printed = False
-    if box.questions or box.approvals or box.alerts:
+    # --seen lists what the TUI folds, under the same labels (card #179): answered questions under
+    # Needs you, seen notifications under New, seen friction under Friction
+    labels = inbox.fold_labels(box)
+    answered = box.answered if args.seen else []
+    earlier = box.earlier if args.seen else []
+
+    def more(n: int) -> None:
+        if n > 0:
+            print(f"  … {n} more (xt inbox --limit {args.limit + n}{' --seen' if args.seen else ''})")
+
+    def new_row(m: dict, goal: dict | None) -> str:
+        if goal:
+            return (f"✓ #{goal['id']} {first_line(goal['body'], 80)} — done #{m['id']} {m['ts'][5:16]} by "
+                    f"{m['from']}: {first_line(m['body'], 160)}  (xt log --id {goal['id']})")
+        return f"✉ #{m['id']} {m['ts'][5:16]} {m['type']} from {m['from']}: {one(m['body'])}"
+
+    if box.questions or box.approvals or box.alerts or answered:
         print("Needs you:")
         bodies = {m["id"]: m["body"] for m in msgs}
         for q in box.questions:
@@ -521,21 +537,24 @@ def cmd_inbox(args) -> None:
             print(f"  ⚑ #{rid} {r['requester']} → {approval_what(r)}  xt approve {rid} | xt deny {rid}")
         for k, a in box.alerts:
             print(f"  ⚠ #{a['id']} {a['ts'][5:16]} {a['text']}{repeats(a)}  (clear: xt clear {k})")
+        if answered:
+            print(f"  {labels['answered']}")
+            for q, a in answered[:args.limit]:
+                print(f"    ✓ #{q['id']} {first_line(q['body'], 60)} → {inbox.answer_text(a['body'])}  "
+                      f"(answer #{a['id']} {a['ts'][5:16]})")
+            more(len(answered) - args.limit)
         printed = True
 
-    def more(n: int) -> None:
-        if n > 0:
-            print(f"  … {n} more (xt inbox --limit {args.limit + n})")
-
-    if box.new:
+    if box.new or earlier:
         print("New since you last looked:")
         for m, goal in box.new[:args.limit]:
-            if goal:
-                print(f"  ✓ #{goal['id']} {first_line(goal['body'], 80)} — done #{m['id']} {m['ts'][5:16]} by "
-                      f"{m['from']}: {first_line(m['body'], 160)}  (xt log --id {goal['id']})")
-            else:
-                print(f"  ✉ #{m['id']} {m['ts'][5:16]} {m['type']} from {m['from']}: {one(m['body'])}")
+            print(f"  {new_row(m, goal)}")
         more(len(box.new) - args.limit)
+        if earlier:
+            print(f"  {labels['earlier']}")
+            for m, goal in earlier[:args.limit]:
+                print(f"    {new_row(m, goal)}")
+            more(len(earlier) - args.limit)
         printed = True
     shown = box.unread[:args.limit]
     if box.unread or box.seen:
@@ -544,7 +563,7 @@ def cmd_inbox(args) -> None:
             print(f"  ✱ #{m['id']} {m['ts'][5:16]} {m['from']}: {one(m['body'])}")
         more(len(box.unread) - args.limit)
         if box.seen and args.seen:
-            print(f"  ({len(box.seen)} older, seen)")
+            print(f"  {labels['friction']}")
             for m in box.seen[:args.limit]:
                 print(f"    #{m['id']} {m['ts'][5:16]} {m['from']}: {one(m['body'])}")
             more(len(box.seen) - args.limit)
@@ -789,7 +808,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp = add("inbox", cmd_inbox, "what needs the human, what's new, and unread friction")
     sp.add_argument("--days", type=int, default=DONE_DAYS, help=f"how far back to look (default {DONE_DAYS})")
     sp.add_argument("--limit", type=int, default=20, help="rows per group (default 20)")
-    sp.add_argument("--seen", action="store_true", help="also list the friction you have already seen")
+    sp.add_argument("--seen", action="store_true",
+                    help="also list what the TUI folds: questions you answered and notifications you have "
+                         "seen (last 7 days), and the friction you have seen")
 
     sp = add("clear", cmd_clear, "dismiss an alert")
     sp.add_argument("key")

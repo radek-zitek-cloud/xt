@@ -7,7 +7,7 @@ import shlex
 import time
 
 from . import brief, permissions, skills
-from .adapters import codex_option_args, codex_options_text, get_adapter
+from .adapters import codex_option_args, codex_options_text, get_adapter, load_adapters
 from .alerts import Alerts
 from .herdr import HerdrError
 from .context import Ctx
@@ -31,6 +31,8 @@ def first_prompt(ctx: Ctx, name: str) -> str:
     protocol = ctx.paths.protocol.read_text()
     role = role_file.read_text()
     xt = ctx.paths.xt_bin
+    harness = load_adapters(ctx.paths).get(a.harness or "")
+    note =f"{harness.first_prompt_note}\n\n" if harness and harness.first_prompt_note else ""  # card #180
     return f"""You are **{name}**, an agent in the xt team "{ctx.team.name}". Your role is **{a.role}**; \
 you report to **{a.reports_to}**. The team's repo (your home, not your workspace) is {ctx.paths.root}. \
 Run xt as `{xt}` (absolute path — don't rely on PATH). Always pass `--as {name}` when you use xt.
@@ -47,7 +49,7 @@ Run xt as `{xt}` (absolute path — don't rely on PATH). Always pass `--as {name
 ===== your brief (`{xt} brief --as {name}`) =====
 {brief.build(ctx, name)}
 
-{START_NOW} follow your role's "on start" instructions. If you have nothing to do, say so briefly and stop."""
+{note}{START_NOW} follow your role's "on start" instructions. If you have nothing to do, say so briefly and stop."""
 
 
 AGENT_ENV = "XT_AGENT"  # set in every agent's pane: marks its shells as an agent's, never the human's

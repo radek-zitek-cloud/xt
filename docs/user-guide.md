@@ -178,7 +178,16 @@ leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it h
 your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
 first run on 0.15.0, so older goals don't appear. From 0.16.1 what you've seen isn't gone from the
 TUI: it folds under Notifications as `(N earlier, seen)` for 7 days, also after you quit and start it again
-(`xt inbox` still lists only what's new).
+(`xt inbox --seen` lists that fold too, from 0.20.0).
+
+**When a notification counts as seen** (written down in 0.20.0): in the TUI, everything
+Notifications held while you had the Inbox focused counts as seen at the moment you **leave the
+Inbox** (another pane's key, `tab`, a click elsewhere) **or quit**; merely having it on screen
+doesn't. With `xt inbox`, at the moment it prints in your own terminal. The marker is one file
+(`.xt/state/inbox_seen.json`) that every TUI reads on each refresh, so two TUIs open at once can
+differ only while one of them still has the Inbox focused: the other one keeps showing `✉ 2 new`
+until the first leaves its Inbox or exits, and then folds them under `(N earlier, seen)` within
+2 seconds.
 
 The **detail pane** (from 0.16.0) shows the selected item with its **thread**: for anything under
 a goal (a goal, a task, a question or report about it), the whole goal in time order: the goal, its
@@ -1029,9 +1038,13 @@ last looked** (goals done and reports to you) and **Friction** (unread only, the
 …)`). A group with nothing in it is left out; with nothing at all it prints `Nothing for you.`
 In your own terminal it clears New and marks the friction it printed as seen; run by an agent it
 changes nothing. `--limit` caps each group (default 20; what it leaves out, such as older unread
-friction, stays unread), `--seen` also lists the friction you've seen, `--days` is how far back it
-looks (default 30, as the TUI).
-**Use it** when you're not in the TUI; the Inbox panel shows the same.
+friction, stays unread), `--days` is how far back it looks (default 30, as the TUI). `--seen` also
+lists what the TUI keeps folded, under the TUI's labels (from 0.20.0; before, only the friction):
+`(N answered, last 7 days)` under Needs you, each `✓ #question first line → your answer`;
+`(N earlier, seen)` under New, the notifications you've seen in the last 7 days; and
+`(N older, seen)` under Friction. Plain `xt inbox` is unchanged.
+**Use it** when you're not in the TUI; the Inbox panel shows the same (with `--seen`, its folds
+opened).
 
 ### `xt answer`
 
@@ -1155,6 +1168,14 @@ to keep decisions in the ledger (the liaison records what you asked for this way
 harness (a command refused something reasonable, a sandbox blocked it). It reaches your Inbox as
 `✱`, outside the reporting chain. Friction with the team's own work goes in a `Friction:` line of
 the agent's report instead, for the lead.
+
+**How the harnesses keep the rule "no friction, no line"** (protocol §4: never write "no issues").
+Seen so far (one review of 0.19.0, 2026-10-02): Codex agents complied; one pi agent (with a
+non-Anthropic default model) ended a `done` with "No issues."; Claude Code agents weren't checked in
+that review. From 0.20.0 a pi agent's first prompt carries a one-line reminder of the rule just
+before its last line (`first_prompt_note` in `harnesses/pi.toml`, away from pi's guard line); a
+"no issues" line isn't flagged or refused, so if you see one, tell the lead. The evidence is one
+run: whether the reminder changes the habit is still to be seen.
 
 ### `xt goal`
 

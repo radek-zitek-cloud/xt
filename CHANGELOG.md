@@ -12,7 +12,7 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.20.0] — not released yet
 
 Polish from a fresh-eyes usability review of 0.19.0: seven small cards to their approved spec, no
-new feature. **0.20.0-rc1** has #174, #177 and #178; **0.20.0-rc2** adds #176. No protocol or ledger format change; new state
+new feature. **0.20.0-rc1** has #174, #177 and #178; **0.20.0-rc2** adds #176, #179 and #180. No protocol or ledger format change; new state
 file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `starting`.
 
 ### Fixed
@@ -58,6 +58,20 @@ file `.xt/state/context_alerts.json`, and `.xt/state/versions.json` may carry `s
   scroll`. Flow's `f` is called focus (key line `f focus`, the picker `Focus Flow on`, `Flow: focus
   cleared`) and `/` filter, in the key lines, the help and the user guide. Checked with Textual's
   headless Pilot at 120x40, 100x30, 80x24 and 60x20.
+- **`xt inbox --seen` shows what the TUI folds (#179).** It lists, under the TUI's own labels and
+  in its order, the questions you answered in the last 7 days (`(N answered, last 7 days)` under
+  Needs you, each `✓ #id question → your answer`), the notifications you've seen in the last 7
+  days (`(N earlier, seen)` under New) and the friction you've seen (`(N older, seen)`, as before);
+  the labels come from one place for both. Plain `xt inbox` is unchanged. The user guide says when
+  a notification counts as seen (when you leave the Inbox or quit the TUI, or when `xt inbox`
+  prints it in your terminal) and that two open TUIs differ only while one still has its Inbox
+  focused.
+- **pi agents are reminded of "no friction, no line" (#180).** A pi agent's first prompt (and a
+  resent one) carries one line just before its last, reminding it never to write "no issues"
+  (`first_prompt_note` in `harnesses/pi.toml`, a new adapter key); the guard line and the opening
+  that xt checks stay where they were. Claude Code and Codex prompts are unchanged. The user guide
+  says which harnesses were seen to comply. A "no issues" line isn't flagged in the ledger: the
+  evidence is one run.
 
 ### Upgrading
 

@@ -16,6 +16,7 @@ human's own terminal for the friction it printed. An agent's `xt inbox` changes 
 """
 
 import datetime as dt
+import re
 from dataclasses import dataclass, field
 
 from .alerts import Alerts
@@ -28,6 +29,22 @@ from .team import HUMAN
 KEEP_SEEN = 1000  # friction ids kept one by one; older ones fold into friction_upto
 NEW_TYPES = ("report", "done")  # what counts as a report to the human in New
 EARLIER_DAYS = 7  # how far back the TUI's `(N earlier, seen)` fold under New reaches (card #157)
+OPTION_ANSWER = re.compile(r"^Option (\d+): (.+?)(?: — .*)?$", re.S)
+
+
+def answer_text(body: str) -> str:
+    """An answer as its row shows it: `1: Approve and build` for a picked option (recorded as
+    `Option 1: Approve and build — <consequence>`), else its first line."""
+    first = next((ln.strip() for ln in body.splitlines() if ln.strip()), "")
+    m = OPTION_ANSWER.match(first)
+    return f"{m.group(1)}: {m.group(2)}" if m else first
+
+
+def fold_labels(box: "Inbox") -> dict[str, str]:
+    """The folds' labels, the same in the TUI and `xt inbox --seen` (card #179)."""
+    return {"answered": f"({len(box.answered)} answered, last {EARLIER_DAYS} days)",
+            "earlier": f"({len(box.earlier)} earlier, seen)",
+            "friction": f"({len(box.seen)} older, seen)"}
 
 
 @dataclass

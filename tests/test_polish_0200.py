@@ -309,6 +309,126 @@ def test_178_init_without_a_terminal_writes_what_yes_writes(tmp_path, no_termina
     assert piped.team_toml.read_text() == yes.team_toml.read_text()
 
 
+# --- #179: xt inbox --seen shows what the TUI folds -----------------------------------------------------
+
+
+def _folds_in_the_tui(ctx):
+    """{fold label: [ids of the rows under it, in order]} from the TUI's Inbox."""
+    from xt.tui.model import build
+
+    rows = build(ctx).panels["Inbox"]
+    folds = {r.key: r.text.plain.removesuffix(" ▸") for r in rows if r.kind == "fold"}
+    return {label: [r.data["id"] for r in rows if r.data.get("under") == key] for key, label in folds.items()}
+
+
+def _folds_in_the_cli(out):
+    """The same from `xt inbox --seen`: each fold line, then its rows indented under it."""
+    import re
+
+    folds, label = {}, None
+    for line in out.splitlines():
+        if line.startswith("  (") and line.endswith(")") and "xt inbox --seen" not in line:
+            label = line.strip()
+            folds[label] = []
+        elif label and line.startswith("    "):
+            folds[label].append(int(re.search(r"#(\d+)", line).group(1)))
+        elif not line.startswith("    "):
+            label = None
+    return folds
+
+
+@pytest.fixture
+def folded_inbox(ctx, monkeypatch):
+    """A team whose Inbox has all three folds: an answered question, notifications seen in the TUI
+    and seen friction."""
+    from xt.tui.app import LiveActions
+
+    from .test_batch_0160 import _fixture
+    from .test_tui_0161 import _look_and_leave
+
+    f = _fixture(ctx)
+    LiveActions(ctx).answer(f["q"], "1")
+    _look_and_leave(ctx)
+    return f
+
+
+def test_179_inbox_seen_lists_the_tuis_folds_with_its_labels_and_order(ctx, folded_inbox, monkeypatch, capsys):
+    from .test_batch_0160 import _xt_inbox
+
+    tui = _folds_in_the_tui(ctx)
+    assert {label.split(" ", 2)[1] for label in tui} == {"answered,", "earlier,", "older,"}  # all three folds
+    out = _xt_inbox(ctx, monkeypatch, capsys, False, "--seen")
+    assert _folds_in_the_cli(out) == tui  # the same labels, the same rows, the same order
+    groups = [line for line in out.splitlines() if not line.startswith(" ")]
+    assert groups == ["Needs you:", "New since you last looked:", "Friction reported about xt or a harness:"]
+    answered = next(label for label in tui if "answered" in label)
+    assert out.index(answered) < out.index("New since you last looked:")  # under Needs you, as in the TUI
+    assert f"✓ #{folded_inbox['q']} How should goal #9 finish? → 1: Close it" in out
+
+
+def test_179_plain_inbox_is_unchanged(ctx, folded_inbox, monkeypatch, capsys):
+    from .test_batch_0160 import _xt_inbox
+
+    plain = _xt_inbox(ctx, monkeypatch, capsys, False)
+    seen = _xt_inbox(ctx, monkeypatch, capsys, False, "--seen")
+    assert "answered" not in plain and "earlier, seen" not in plain
+    assert "xt inbox --seen lists them" in plain  # the friction hint, as before
+    rest = iter(seen.splitlines())
+    assert all(line in rest for line in plain.splitlines() if "xt inbox --seen lists them" not in line)  # in order
+
+
+def test_179_the_help_says_what_seen_lists():
+    text = _help("inbox")
+    assert "also list what the TUI folds: questions you answered and notifications you have seen (last 7 days)" in text
+
+
+# --- #180: pi agents follow the never-write-no-issues rule ------------------------------------------------
+
+
+def test_180_a_pi_first_prompt_carries_the_reminder_before_its_last_line(pi_team):
+    from xt import spawn
+
+    ctx = pi_team
+    _no_wait(ctx)
+    request_spawn(ctx, "human", "dave", None, None, None, None)
+    typed = ctx.herdr.last_prompt("dave").splitlines()
+    note = load_adapters(ctx.paths)["pi"].first_prompt_note
+    assert "\n" not in note and 'never "no issues"' in note and "§4" in note  # one line, naming the rule
+    assert typed[-1].startswith(spawn.START_NOW) and typed[-3] == note and typed[-2] == ""
+    # the 0.19.0 guard is untouched: the guard line (its five lost characters taken), then the opening
+    assert typed[0] == load_adapters(ctx.paths)["pi"].first_prompt_prefix[5:]
+    assert typed[1].startswith("You are **dave**, an agent in the xt team")
+    assert "FIRST PROMPT" not in [m["body"] for m in ctx.ledger.messages() if m["body"].startswith("started dave")][-1]
+    assert usage.reading(ctx, "dave").missing is False  # the log check still finds the opening
+
+
+def test_180_the_reminder_is_in_a_resent_prompt_too(pi_team):
+    from xt.spawn import Resends, run_resends
+
+    ctx = pi_team
+    _no_wait(ctx)
+    ctx.herdr.lost = DAMAGE
+    request_spawn(ctx, "human", "dave", None, None, None, None)
+    ctx.herdr.live["dave"].status = "idle"
+    ctx.herdr.left.clear()
+    run_resends(ctx, ctx.herdr.agents(), 1000.0)
+    assert load_adapters(ctx.paths)["pi"].first_prompt_note in ctx.herdr.last_prompt("dave")
+    assert run_resends(ctx, ctx.herdr.agents(), 1001.0) == ["dave's resent first prompt arrived whole"]
+    assert not Resends(ctx).load()
+
+
+def test_180_codex_and_claude_prompts_have_no_reminder(ctx):
+    from .conftest import add_member
+
+    add_member(ctx, "carol")  # claude
+    request_spawn(ctx, "human", "liaison", None, None, None, None)  # codex
+    request_spawn(ctx, "human", "carol", None, None, None, None)
+    for name in ("liaison", "carol"):
+        assert "Reminder (protocol §4)" not in ctx.herdr.last_prompt(name)
+    adapters = load_adapters(ctx.paths)
+    assert adapters["codex"].first_prompt_note is None and adapters["claude"].first_prompt_note is None
+
+
 # --- #176: TUI help, detail cue and Flow key names (Pilot at four sizes) ------------------------------
 
 SIZES = [(120, 40), (100, 30), (80, 24), (60, 20)]

@@ -68,7 +68,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
 | `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and their approvals, stop and retire. |
 | `src/xt/permissions.py` | Claude Code settings files: which file applies (`effective`), the preflight check, the start note. |
-| `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`, `first_prompt_prefix`), limits. |
+| `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`, `first_prompt_prefix`), `first_prompt_note`, limits. |
 | `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |
 | `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor. |
 | `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. |
@@ -177,6 +177,8 @@ supervisor, never inside an agent's shell.
    `noprompt:<name>` alert. (Without this, a codex liaison twice ran with no identity and acted as
    a plain assistant.) An adapter's `first_prompt_prefix` (pi only) is typed as the prompt's first
    line (`spawn.guarded`), so characters lost at the start come out of that line (card #167, rc5).
+   An adapter's `first_prompt_note` (pi only: the protocol's "never write no issues" rule, card
+   #180) goes just before the prompt's last line, away from the guard and the opening.
    With `check_prompt_in_log` (pi), xt then reads the harness's session log (`usage.prompt_in_log`,
    the first 2 MB of each log written since the start): the opening `You are **name**, an agent in
    the xt team "team"` anywhere in it is whole; the first paragraph's later parts (the team repo's
@@ -513,8 +515,9 @@ harness goes to the human with `xt friction`.
   `xt tui --demo` shows sample data.
 - `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; agents
   running without xt's launch settings (card #165); says whenever the supervisor isn't running.
-- `xt inbox`: the Inbox's three groups as in the TUI; in the human's terminal it clears New and
-  marks the friction it printed as seen. `xt answer <id> "..."` (a number picks a decision question's
+- `xt inbox`: the Inbox's three groups as in the TUI; `--seen` adds the TUI's folds (answered
+  questions, seen notifications, seen friction) under the TUI's labels (`inbox.fold_labels`, card
+  #179); in the human's terminal it clears New and marks the friction it printed as seen. `xt answer <id> "..."` (a number picks a decision question's
   option), `xt approve <id>…`, `xt deny <id>`, `xt clear <alert>`.
 - `xt schedule <name> <interval>|off [--message …] [--between HH:MM-HH:MM] [--at HH:MM]`.
 - `xt reset <name>`: a fresh context for one agent after it saved its notes (`xt checkpoint`);
