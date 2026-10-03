@@ -33,7 +33,7 @@
 <header class="hero">
   <div class="grid-bg"></div>
   <div class="wrap">
-    <div class="eyebrow">open source · MIT · v0.21.1</div>
+    <div class="eyebrow">open source · MIT · v0.22.0</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You talk to one of them in a chat: approve, decide and correct, and every step is on record.</p>
     <div class="cta">
@@ -187,7 +187,9 @@
           <li><b>Narrative first:</b> the liaison tells you what happened in plain words; when it needs you, the message ends in a question.</li>
           <li><b>Every question says what answer it takes:</b> yes or no; two to four options, each with its consequence and one recommended, sometimes with room for your own words; or open.</li>
           <li><b>Approvals are questions too:</b> a hire, a schedule or a goal ready to dispatch is a yes/no question, answered in the same place.</li>
-          <li><b>Answered once, by you:</b> <code class="mono">tab</code> picks the waiting question; xt checks the answer against its type and accepts it only from your own terminal.</li>
+          <li><b>Answered once, by you:</b> <code class="mono">tab</code> picks the waiting question; xt checks the answer against its type and accepts it only from your own terminal, or from your own agent while you've handed it the wheel.</li>
+          <li><b>The whole picture:</b> your operator's messages, labelled as its own, and the goals the liaison gives the team, as quiet one-line notes (<code class="mono">ctrl+t</code> shows more or none).</li>
+          <li><b>The liaison's pane counts too:</b> what is typed there shows in the chat, labelled <i>typed in the pane, unverified</i>: it is on record, but it never answers or approves anything.</li>
         </ul>
         <div class="pills">
           <a class="pill arrow" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/user-guide.md">User guide</a>
@@ -251,7 +253,7 @@ The lead wants to hire a writer for the digest. Which model should it run on?
       <div class="cell"><div class="k">operations</div><h4>A fresh context, safely</h4><p><code class="mono">xt reset</code> waits until the agent has saved its notes and has no open work, or queues until it's idle.</p></div>
       <div class="cell"><div class="k">visibility</div><h4>Context and cost you can see</h4><p>Per agent, per turn and per goal, with Codex's week and Claude's five-hour and weekly windows.</p></div>
       <div class="cell"><div class="k">bounds</div><h4>Agents in bounds</h4><p>No desktop, browser or account connectors by default, a checked permissions file per Claude agent, and no posing as the human.</p></div>
-      <div class="cell"><div class="k">bounds</div><h4>Your own agent as operator</h4><p>A coding agent of yours can report to the liaison under its own name and, for a time you set, run restarts and resets. Logged.</p></div>
+      <div class="cell"><div class="k">bounds</div><h4>Your own agent as operator</h4><p>A coding agent of yours can report to the liaison under its own name and, for a time you set, run restarts and resets, or drive: answer, approve and give goals for you. Logged under its name.</p></div>
       <div class="cell"><div class="k">product</div><h4>Independent acceptance</h4><p>A quality analyst checks every card against its spec in a clean copy. A final PASS closes it; anything else waits for you.</p></div>
       <div class="cell"><div class="k">product</div><h4>Release candidates first</h4><p>A release starts as <code class="mono">-rc1</code>; the team stays on the accepted version until every card passes.</p></div>
       <div class="cell"><div class="k">product</div><h4>Hears when a card is ready</h4><p>A command you name lists a board column; the lead is told about each card that enters it. Any board tool works.</p></div>

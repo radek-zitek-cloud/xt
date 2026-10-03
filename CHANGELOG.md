@@ -9,10 +9,19 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.22.0] — not released yet
+## [0.22.0] — 2026-10-03
 
-A minor release: the operator acting for the human, visible in chat. Candidates add cards in the
-order #190, #172, #197 (rc1), then #200, #199 and #193.
+The release: the same code and docs as 0.22.0-rc9 (only the version, this changelog and the site's
+version, chat list and operator line changed). Second release of Direction B: the operator acting
+for the human, visible in chat. **0.22.0-rc1** has #190, #172 and #197; **rc2** adds #200; **rc3**
+adds #199; **rc4** adds #193 and fixes #197 (notes byte for byte); **rc5** fixes #193's first line
+and padded lines; **rc6** fixes a false "lead is not running" alert for an operator's goal; **rc7**
+fits chat's hint line to 80 columns and says "pane input" once in `xt status`; **rc8** labels pane
+input unverified and stops it answering anything (Radek's correction); **rc9** is docs only (the
+architecture, README and user guide brought in line with rc8, PM's docs check). The ledger gains optional
+fields (`delegated` on a drive action, `source: pane` on pane input); older xt versions ignore
+them. New state: `.xt/state/pane_input.json`, `.xt/state/settings/<liaison>.json` (a Claude
+liaison's generated settings), and `scope` and `ended` in `.xt/state/operators.json`.
 
 ### Changed
 
@@ -60,7 +69,8 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   liaison's messages to the team show as dimmed one-liners cut to one row
   (`12:04 to lead: goal #3020 …`): `ctrl+t` cycles goals only (the default), all and hidden; `↑`/`↓`
   pick one and `enter` on an empty input line expands it. The hint line names the keys and the
-  mode, and fits 80 columns in every state (rc7: also while answering a question). A line arriving while you've scrolled up no longer moves the view.
+  mode, and fits 80 columns in every state (rc7: also while answering a question). A line arriving
+  while you've scrolled up no longer moves the view.
 - **What is typed in the liaison's pane is recorded** (#193). The supervisor reads the liaison's
   session log (Claude Code, Codex, pi) and records each line typed in the pane as a message to the
   liaison, once, logged and not delivered; slash commands, `!` lines, the
@@ -76,8 +86,20 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   Anything that can type into the liaison's pane through Herdr (`herdr agent prompt`, a script, an
   operator) is recorded the same way, so the label means "typed in the pane", not "proven to be
   the human": such a message shows as `you (typed in the pane, unverified)` in chat and `human
-  (typed in the pane, unverified)` in `xt log`, the TUI and briefs, and it never answers, approves
-  or closes anything, whatever its text or ref (rc8, Radek's correction).
+  (typed in the pane, unverified)` in `xt log`, the TUI and briefs. xt never takes it as an
+  answer, an approval or a closing, whatever its text or ref (rc8, Radek's correction); until card
+  #209 (v0.23.0) the liaison agent can still close a question by hand from such a line, as it does
+  when the human answers in its pane.
+
+### Upgrading
+
+- From 0.21.x: `git pull upstream main` (or `xt version use v0.22.0`), then `xt restart --all`, so
+  every agent gets the new protocol text (operator reports, notes in the first prompt) and a
+  Claude Code liaison starts with the pane-input hook. Until the liaison is restarted, its pane
+  input is recorded from where its session log stood at the upgrade, and a Claude liaison has no
+  hook. Nothing to migrate.
+- Teams that changed `roles/lead.md` or `roles/liaison.md` merge the new first start step (notes
+  are in the first prompt) and the liaison's lines on operator goals and pane input.
 
 ## [0.21.1] — 2026-10-02
 
