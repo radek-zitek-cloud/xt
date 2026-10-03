@@ -242,7 +242,8 @@ class Supervisor:
             ):
                 self.say(f"alert: {n} not running")
 
-        goals_open = any(i["type"] == "goal" for i in self.ctx.ledger.open_items())
+        goals_open = any(i["type"] == "goal" and i["owner"] != getattr(team.lead_of_role("liaison"), "name", None)
+                         for i in self.ctx.ledger.open_items())  # an operator's goal waits on the liaison (#200)
         lead = team.lead_of_role("lead")
         starting = {j["args"].get("name") for j in Jobs(self.ctx).pending() if j["kind"] in ("start", "spawn")}
         if lead and goals_open and lead.name not in live and lead.name not in missing \

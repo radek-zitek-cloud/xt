@@ -51,7 +51,8 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   `drive grant for NAME ended HH:MM`, and `xt status` and the TUI header show it for an hour.
   `down`, `restart --all`, version switches, `operator add` and `delegate` stay the human's.
   protocol.md says how agents treat such a message; the liaison role closes an operator's goal
-  once dispatched.
+  once dispatched. Such a goal, waiting on the liaison, doesn't raise "lead is not running but
+  goals are open" (rc6).
 - **`xt chat` shows the operator and the liaison's team activity** (#199). A registered operator's
   messages to the liaison and its drive actions are part of the conversation, labelled
   `» NAME (operator)` (a different colour, and the words alone without colour), and a question it

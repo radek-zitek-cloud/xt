@@ -4,7 +4,7 @@ import pytest
 
 from xt import operators
 from xt.paths import XtError
-from xt.spawn import Approvals
+from xt.spawn import Approvals, request_spawn
 from xt.tui.model import build
 
 from .conftest import REPO, add_member
@@ -220,6 +220,30 @@ def test_10_the_humans_later_answer_names_the_operator_and_quotes_the_answer(tea
     agent(monkeypatch, "answer", str(rid), "no", "--as", "op")
     with pytest.raises(XtError, match=rf"approval #{rid}: answered by op \(operator, delegated by you until {until}\)"):
         cli.answer(team, "human", rid, "yes")
+
+
+def test_an_operators_goal_waiting_on_the_liaison_doesnt_raise_lead_not_running(ctx):
+    # rc6, Claude's live round on rc5 (xt #3176): the alert fired between the goal and its dispatch
+    from xt.alerts import Alerts
+    from xt.watch import Supervisor
+
+    request_spawn(ctx, "human", "liaison", None, None, None, None)  # the lead never started
+    ctx.ledger.append("op", "liaison", "goal", "Build the digest\n(op, delegated by human until 14:30: …)",
+                      data={"delegated": {"by": "human", "until": "2026-09-26T14:30:00+00:00"}})
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.tick(now=0)
+    assert "missing:lead" not in Alerts(ctx).active()
+
+
+def test_a_goal_owned_by_the_lead_still_raises_lead_not_running(ctx):
+    from xt.alerts import Alerts
+    from xt.watch import Supervisor
+
+    request_spawn(ctx, "human", "liaison", None, None, None, None)
+    ctx.ledger.append("liaison", "lead", "goal", "Build the digest")  # dispatched; the lead never started
+    sup = Supervisor(ctx, out=lambda s: None)
+    sup.tick(now=0)
+    assert "missing:lead" in Alerts(ctx).active()
 
 
 def test_9_the_user_guide_and_examples_explain_drive():
