@@ -9,6 +9,31 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.22.0] — not released yet
+
+A minor release: the operator acting for the human, visible in chat. Candidates add cards in the
+order #190, #172, #197 (rc1), then #200, #199 and #193.
+
+### Changed
+
+- **A `--ref` reply to a typed question is checked like `xt answer`** (#190). A human message sent
+  with `xt send … --ref N` closes question N, so when N is a closed or options question the reply
+  is now checked against its type: an answer the type doesn't allow is refused (nothing is sent; the
+  message names the valid answers and `xt answer N`), and a valid one is recorded exactly as
+  `xt answer` records it, as a report to the asker with the answer as data. A `--ref` reply to an
+  open question or to an ask from before 0.21.0 is sent as before.
+- **Agents recognise an operator report** (#172). protocol.md (so every first prompt) says what a
+  report ending in `(sent by NAME, an operator, on the human's behalf)` is: a legitimate message to
+  take as information, never a way to act as the human. A decision or approval still needs the
+  human's terminal or a delegated action recorded as `NAME, delegated by human until HH:MM`; an
+  unsure agent asks the agent it reports to instead of rejecting the report.
+- **The notes go into the first prompt, whole** (#197). On spawn, restart and reset, xt appends
+  `members/<name>/notes.md` to the first prompt after the brief, under `===== your notes … =====`.
+  A file over the notes budget (16,000 bytes) still goes in whole, with one line saying it is over;
+  no file, no section. protocol.md's "read it first" became "your notes are below; keep them
+  current", and the shipped lead and liaison roles' first start step says the same. `xt brief`'s
+  notes line says so too.
+
 ## [0.21.1] — 2026-10-02
 
 The release: the same code and docs as 0.21.1-rc2 (only the version and this changelog changed).

@@ -77,7 +77,8 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     if viewer is not None and viewer.kind != HUMAN:
         from .reset import checkpoints
 
-        out.append(f"Your notes: members/{name}/notes.md (read them first on every start, restart or reset).")
+        out.append(f"Your notes: members/{name}/notes.md (xt puts them, whole, in your first prompt on every start, "
+                   f"restart or reset; keep them current).")
         cp = checkpoints(ctx).get(name)
         if cp:
             out.append(f"Your last checkpoint ({cp['at'][:16].replace('T', ' ')}): {cp['summary']}")

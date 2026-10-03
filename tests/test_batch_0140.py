@@ -18,19 +18,19 @@ def _on_start(role: str) -> str:
 
 
 def test_protocol_and_shipped_roles_make_notes_the_first_start_step():
-    assert "**On every start**" in PROTOCOL and "**read it first**" in PROTOCOL
-    assert "Skip\n  it if there's no such file" in PROTOCOL
+    # v0.22.0 (#197): xt puts the notes in the first prompt, so "read them first" became "they're below"
+    assert "**Your notes are below**" in PROTOCOL and "**read it first**" not in PROTOCOL
     for role, name in ((LIAISON, "liaison"), (LEAD, "lead")):
         step1 = _on_start(role).split("\n2. ", 1)[0]
-        assert f"1. Read your notes, `members/{name}/notes.md`, first (skip if the file doesn't exist)" in step1
-    assert "lessons file your notes point to" in _on_start(LEAD)
+        assert f"1. Your notes, `members/{name}/notes.md`, are at the end of your first prompt" in step1
+    assert "lessons file they point to" in _on_start(LEAD)
 
 
-def test_the_first_prompt_carries_the_notes_first_rule_and_the_brief_says_first(ctx):
+def test_the_first_prompt_carries_the_notes_rule_and_the_brief_says_so(ctx):
     request_spawn(ctx, "human", "liaison", None, None, None, None)
     text = first_prompt(ctx, "liaison")
-    assert "1. Read your notes, `members/liaison/notes.md`, first" in text and "**read it first**" in text
-    assert "read them first on every start, restart or reset" in brief.build(ctx, "liaison")
+    assert "1. Your notes, `members/liaison/notes.md`, are at the end" in text and "**Your notes are below**" in text
+    assert "whole, in your first prompt on every start, restart or reset" in brief.build(ctx, "liaison")
 
 
 # --- #119 never --as human, whoever asks ------------------------------------------------------------

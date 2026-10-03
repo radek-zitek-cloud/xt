@@ -267,6 +267,18 @@ def cmd_send(args) -> None:
     who = _who(args, operator=True)
     if operators.is_operator(ctx.paths, who):  # card #166: a report to the liaison, marked as such
         msg, status = operators.send(ctx, who, args.to, mtype, body, args.ref)
+    elif (item := _typed_question(ctx, who, args.ref)) is not None:
+        # card #190: a --ref reply closes the question, so it is checked and recorded like `xt answer`
+        try:
+            msg, status, data = answer_question(ctx, who, item, body)
+        except XtError as e:
+            from .choices import hint, question_of
+
+            raise XtError(f"#{args.ref} is a typed question: {e}. Nothing was sent. Answer with "
+                          f"`xt answer {args.ref}` ({hint(question_of(ctx.ledger.message(args.ref)))})") from None
+        print(f"#{msg['id']} answer to #{args.ref} → {item['opener']}: {status}"
+              + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
+        return
     else:
         msg, status = send(ctx, who, args.to, mtype, body, args.ref, data=data)
     print(f"#{msg['id']} {msg['type']} → {msg['to']}: {status}")
@@ -305,6 +317,18 @@ def answer(ctx: Ctx, who: str, qid: int, text: str) -> str:
     msg, status, data = answer_question(ctx, who, item, text)
     return (f"#{msg['id']} answer to #{qid} → {item['opener']}: {status}"
             + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
+
+
+def _typed_question(ctx: Ctx, who: str, ref: int | None) -> dict | None:
+    """The open question `ref` that a message from `who` would close, when its type is declared
+    (yes/no or options); None for anything else, which `send` handles as before (card #190)."""
+    if ref is None:
+        return None
+    item = ctx.ledger.item(ref)
+    if item is None or item["type"] != "ask" or item["owner"] != who:
+        return None
+    q = (ctx.ledger.message(ref) or {}).get("question")  # stored by --type ask since #182; older asks have none
+    return item if isinstance(q, dict) and q.get("kind") in ("closed", "options") else None
 
 
 def answer_question(ctx: Ctx, who: str, item: dict, answer: str) -> tuple[dict, str, dict]:

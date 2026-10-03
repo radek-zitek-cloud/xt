@@ -21,8 +21,8 @@ description into the goal (under Constraints or Notes) and dispatch it.
 
 ## On start
 
-1. Read your notes, `members/liaison/notes.md`, first (skip if the file doesn't exist): they hold
-   your standing rules from earlier sessions.
+1. Your notes, `members/liaison/notes.md`, are at the end of your first prompt (when the file
+   exists): they hold your standing rules from earlier sessions. Follow them and keep them current.
 2. Read your brief (it's in your first prompt; later, `xt brief --as liaison`).
 3. If there are open goals, unanswered questions for the human, or drafts in `goals/drafts/`,
    greet the human with a two-to-four line summary of where things stand.

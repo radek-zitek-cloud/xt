@@ -3,8 +3,8 @@
 Different from `xt restart <name>`, which simply starts a new session: a reset refuses while the
 agent owns open work, first asks the agent to save what it needs into its notes and confirm with
 `xt checkpoint`, and only then replaces the session. If the checkpoint doesn't come, or new work
-arrives meanwhile, nothing is reset. The fresh session recovers from its first prompt, its brief
-(which points to the notes and the last checkpoint) and the ledger. xt suggests a reset when an
+arrives meanwhile, nothing is reset. The fresh session recovers from its first prompt (its brief,
+with the last checkpoint, and its notes, whole: card #197) and the ledger. xt suggests a reset when an
 agent's context passes a share of its window.
 
 `xt reset <name> --when-idle` (card #134) queues the same reset instead of refusing a busy agent: the

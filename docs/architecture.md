@@ -308,7 +308,8 @@ show first in the Inbox with their age, in `xt inbox` and `xt status`, and in th
 `xt brief [name]` summarises the team (with schedules), live state, open work, drafts and recent
 messages in about 2k tokens; the liaison's and lead's briefs add **Waiting on the human** (open
 questions, pending approvals and alerts, with the exact commands). Every first prompt includes the
-brief, and any agent runs it after a restart or context loss; nothing depends on an agent's own
+brief and, after it, the agent's `members/<name>/notes.md` whole (`spawn.notes_section`, card #197;
+one extra line when it is over `NOTES_BUDGET`, 16,000 bytes), and any agent runs it after a restart or context loss; nothing depends on an agent's own
 memory. Agents may read their own brief and their reports' briefs. `xt log` gives the history: the newest
 20 matching messages by default, `--full` for all of it.
 

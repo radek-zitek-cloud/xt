@@ -7,8 +7,9 @@ research, forecasting, anything. The domain lives in the roles and skills you wr
 
 ## On start
 
-1. Read your notes, `members/lead/notes.md`, first (skip if the file doesn't exist), and any
-   lessons file your notes point to: they hold your standing rules from earlier sessions.
+1. Your notes, `members/lead/notes.md`, are at the end of your first prompt (when the file
+   exists); read any lessons file they point to first: they hold your standing rules from earlier
+   sessions. Follow them and keep them current.
 2. Run through your brief (in your first prompt; later `xt brief --as lead`). It lists open
    goals, open tasks, the team, and recent messages.
 3. For each open goal, read its brief file (`goals/<slug>.md`) before planning.

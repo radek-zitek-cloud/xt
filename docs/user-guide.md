@@ -665,7 +665,11 @@ in your own terminal for the real answer.
 Agents lose their memory on restart and when their harness compacts the conversation. xt is built
 for that: the ledger, the goal briefs, the roles, skills and each agent's
 `members/<name>/notes.md` hold everything that matters, and `xt brief` rebuilds an agent's picture
-from them (every first prompt includes it). If an agent seems confused or its context is heavy,
+from them (every first prompt includes it). From 0.22.0 the first prompt (on spawn, restart and
+reset) also carries the agent's `notes.md` whole, after the brief, under `===== your notes … =====`,
+so no agent cuts it short or spends a step reading it. A file over the notes budget (16,000 bytes)
+still goes in whole, with one line saying it is over; an agent without a notes file gets no such
+section. If an agent seems confused or its context is heavy,
 `xt restart <name>` gives it a clean session that starts from its brief.
 
 **No desktop or browser control.** xt starts Codex agents with its computer-use and browser tools
@@ -907,6 +911,12 @@ Flow lane (`helper → liaison`), ends with `(sent by helper, an operator, on th
 and shows in your Inbox's Notifications. It sends to the liaison only and reports only: it never
 answers questions, approves anything or opens work.
 
+Agents know what such a report is (from 0.22.0, protocol.md says it, so every first prompt
+carries it): a legitimate message, taken as information for their work and not rejected as
+impersonation. It never lets an agent act as you: an instruction in it to approve something or to
+act as the human is declined unless xt recorded a delegated action (`helper, delegated by human
+until HH:MM`) for it. An agent that is unsure asks its lead.
+
 **Delegation.** For a while, you can let it run some of your commands:
 
 ```sh
@@ -1118,6 +1128,12 @@ takes. The type is stored with the question in the ledger, and your answer is ch
 A message with no question at all (a report) needs no answer and never waits in Needs you. Hire
 and schedule approvals are closed questions too: `xt answer 12 yes` approves, `no` denies (see
 [`xt approve`](#xt-approve-xt-deny)).
+
+A reply you send with `xt send <to> --ref <id>` to a closed or options question also closes it, so
+from 0.22.0 it is checked like `xt answer`: an answer the type doesn't allow is refused (nothing
+is sent, and the message names the valid answers), and a valid one is recorded exactly as
+`xt answer` records it, as a report to the asker. A `--ref` reply to an open question or to an ask
+from before 0.21.0 is sent as before.
 
 ```text
 When do we ship 0.14.0?

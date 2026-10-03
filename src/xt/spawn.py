@@ -23,6 +23,20 @@ everything else (how you do your actual work), your usual instructions still app
 
 
 START_NOW = "Start now:"  # the first prompt's last line: stays on screen when the first line has scrolled away
+NOTES_BUDGET = 16_000  # bytes; over it, the notes still go in whole, with one line saying so (card #197)
+
+
+def notes_section(ctx: Ctx, name: str) -> str:
+    """The agent's notes file, whole, for its first prompt (card #197); nothing when there's none."""
+    path = ctx.paths.members / name / "notes.md"
+    try:
+        notes = path.read_text()
+    except (OSError, UnicodeDecodeError):
+        return ""
+    size = len(notes.encode())
+    over = (f"(This file is {size} bytes, over the notes budget of {NOTES_BUDGET} bytes: it is here whole, "
+            f"but shorten it.)\n") if size > NOTES_BUDGET else ""
+    return f"===== your notes (members/{name}/notes.md, whole) =====\n{over}{notes.rstrip()}\n\n"
 
 
 def first_prompt(ctx: Ctx, name: str) -> str:
@@ -49,7 +63,7 @@ Run xt as `{xt}` (absolute path — don't rely on PATH). Always pass `--as {name
 ===== your brief (`{xt} brief --as {name}`) =====
 {brief.build(ctx, name)}
 
-{note}{START_NOW} follow your role's "on start" instructions. If you have nothing to do, say so briefly and stop."""
+{notes_section(ctx, name)}{note}{START_NOW} follow your role's "on start" instructions. If you have nothing to do, say so briefly and stop."""
 
 
 AGENT_ENV = "XT_AGENT"  # set in every agent's pane: marks its shells as an agent's, never the human's
