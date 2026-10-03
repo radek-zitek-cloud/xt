@@ -73,6 +73,11 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   hand only when it isn't. A line is recorded as submitted, spaces included, and a liaison xt
   starts is read from its session's first line, so a line typed before the supervisor's first look
   isn't lost (rc5; only a liaison an older xt started is read from where its log stood).
+  Anything that can type into the liaison's pane through Herdr (`herdr agent prompt`, a script, an
+  operator) is recorded the same way, so the label means "typed in the pane", not "proven to be
+  the human": such a message shows as `you (typed in the pane, unverified)` in chat and `human
+  (typed in the pane, unverified)` in `xt log`, the TUI and briefs, and it never answers, approves
+  or closes anything, whatever its text or ref (rc8, Radek's correction).
 
 ## [0.21.1] — 2026-10-02
 

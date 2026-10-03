@@ -29,6 +29,7 @@ from .choices import hint, question_of, summary
 from .context import Ctx
 from .operators import is_operator_message
 from .paths import XtError
+from .ledger import PANE_LABEL, is_pane
 from .team import HUMAN, SYSTEM
 
 HISTORY = 30  # messages shown when chat starts (spec: the last 30)
@@ -150,6 +151,8 @@ def render(m: dict, open_ids: set[int], answers: dict[int, dict], operators: set
     else:
         who = "you" if m["from"] == HUMAN else "xt" if m["from"] == SYSTEM else m["from"]
         out.append(who, style="bold cyan" if who == "you" else "bold yellow" if who == "xt" else "bold")
+        if is_pane(m):  # card #193: what was typed in the pane, not proven to be you
+            out.append(f" ({PANE_LABEL})", style="yellow")
     out.append(f"  #{m['id']}", style="bright_black")
     if m["type"] in ("ask", "approval") and m["to"] == HUMAN:
         kind = summary(question_of(m)) or "open question"
@@ -268,7 +271,7 @@ class ChatApp(App):
         out: dict[int, dict] = {}
         for m in msgs:
             by_operator = isinstance(m.get("delegated"), dict) and "answer" in m  # card #200
-            if (m["from"] == HUMAN or by_operator) and m.get("ref") is not None:
+            if (m["from"] == HUMAN or by_operator) and m.get("ref") is not None and not is_pane(m):
                 out.setdefault(m["ref"], m)
         return out
 

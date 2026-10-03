@@ -3,6 +3,7 @@
 import datetime as dt
 
 from .context import Ctx
+from .ledger import sender
 from .team import HUMAN, harness_model, schedule_text
 
 MAX_ITEMS = 50
@@ -27,7 +28,7 @@ def _trim(s: str) -> str:
 
 def _line(m: dict) -> str:
     ref = f" ref:#{m['ref']}" if m.get("ref") is not None else ""
-    return f"#{m['id']} {m['ts'][5:16]} {m['type']} {m['from']}→{m['to']}{ref}: {_trim(m['body'])}"
+    return f"#{m['id']} {m['ts'][5:16]} {m['type']} {sender(m)}→{m['to']}{ref}: {_trim(m['body'])}"  # #193
 
 
 def build(ctx: Ctx, name: str | None = None) -> str:

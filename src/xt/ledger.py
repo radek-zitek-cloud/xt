@@ -19,6 +19,20 @@ from .paths import Paths, XtError
 AGENT_TYPES = ("goal", "task", "ask", "report", "done", "note", "friction")
 SYSTEM_TYPES = ("alert", "approval", "nudge", "system", "wake")
 OPENING = ("goal", "task")
+# Card #193: a line typed in the liaison's pane, recorded from its session log. Anything that can
+# type into that pane (the human, or a Herdr `agent prompt`) lands there, so it is labelled as
+# typed in the pane, not as proven to be the human, and never answers, approves or closes anything.
+PANE = "pane"
+PANE_LABEL = "typed in the pane, unverified"
+
+
+def is_pane(m: dict) -> bool:
+    return m.get("source") == PANE
+
+
+def sender(m: dict) -> str:
+    """Who a message is from, as shown: a pane-input message says it is unverified."""
+    return f"{m['from']} ({PANE_LABEL})" if is_pane(m) else m["from"]
 HUMAN = "human"  # same as team.HUMAN (not imported, to keep the ledger free of team logic)
 
 
@@ -63,6 +77,8 @@ class Ledger:
     @staticmethod
     def _apply(snap: dict, msg: dict) -> None:
         snap["seq"] = max(snap.get("seq", 0), msg["id"])
+        if is_pane(msg):
+            return  # card #193: never answers, closes or opens anything, whatever its ref or text
         items = snap.setdefault("open", {})
         ref = str(msg["ref"]) if msg.get("ref") is not None else None
         if msg["type"] in OPENING:

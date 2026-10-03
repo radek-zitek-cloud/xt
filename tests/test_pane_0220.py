@@ -247,6 +247,87 @@ def test_7_status_and_the_chat_header_say_whether_pane_input_is_recorded(ctx, fa
     _run(ctx, steps)
 
 
+# --- rc8 (Radek's correction, xt #3209): unverified, never an answer -------------------------------
+
+
+def _closed_question(ctx):
+    from xt.dispatch import send
+
+    return send(ctx, "liaison", "human", "ask", "Ship it?\n\nAnswer yes or no.", data={"question": {"kind": "closed"}})[0]
+
+
+def test_rc8_a_pane_yes_never_answers_closes_or_approves(ctx, fake_home):
+    from xt import inbox
+    from xt.spawn import Approvals
+
+    log = _liaison(ctx, fake_home)
+    q = _closed_question(ctx)
+    rid = Approvals(ctx).add({"kind": "schedule", "requester": "liaison", "name": "liaison", "every": "1d",
+                              "message": None, "between": None, "at": None})
+    _type(log, "codex", "yes", f"yes #{q['id']}")
+    paneinput.scan(ctx)
+    # even a pane-input entry that carries a ref (as a forged or future one might)
+    ctx.ledger.append("human", "liaison", "report", "yes", q["id"], data={"source": "pane"})
+    ctx.ledger.rebuild()
+    assert ctx.ledger.item(q["id"]) is not None and str(rid) in Approvals(ctx).pending()
+    msgs = list(ctx.ledger.messages())
+    assert inbox.answered(ctx, msgs, {i["id"] for i in ctx.ledger.open_items()}) == []
+    # the human's own answer still works afterwards: nothing counts the pane line as an answer (#190, #200)
+    assert "answer to #" in cli.answer(ctx, "human", q["id"], "no")
+    assert ctx.ledger.item(q["id"]) is None
+
+
+def test_rc8_chat_does_not_mark_a_question_answered_by_pane_input(ctx, fake_home):
+    from .test_chat_0210 import _bodies, _run
+
+    _liaison(ctx, fake_home)
+    q = _closed_question(ctx)
+    ctx.ledger.append("human", "liaison", "report", "yes", q["id"], data={"source": "pane"})
+
+    async def steps(app, pilot):
+        body = next(b for b in _bodies(app) if f"#{q['id']}" in b and "Ship it?" in b)
+        assert "waits for your answer" in body and "✓ answered" not in body
+
+    _run(ctx, steps)
+
+
+def test_rc8_pane_input_is_labelled_unverified_in_chat_log_tui_and_brief(ctx, fake_home, monkeypatch, capsys):
+    from rich.console import Console
+
+    from xt import brief
+    from xt.tui.model import _msg_block
+    from xt.tui.thread import ThreadDetail
+
+    from .test_chat_0210 import _bodies, _run
+
+    log = _liaison(ctx, fake_home)
+    paneinput.scan(ctx)
+    _type(log, "codex", "Please ship it")
+    paneinput.scan(ctx)
+    (m,) = _from_human(ctx)
+    label = "human (typed in the pane, unverified)"
+
+    async def steps(app, pilot):
+        assert "you (typed in the pane, unverified)" in next(b for b in _bodies(app) if "Please ship it" in b)
+
+    _run(ctx, steps)
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    args = cli.build_parser().parse_args(["log", "--id", str(m["id"])])
+    args.func(args)
+    assert f"{label}→liaison" in capsys.readouterr().out
+    assert f"{label} → liaison" in _msg_block(m).plain
+    assert f"{label}→liaison" in brief.build(ctx, "liaison")
+    sent = cli.send(ctx, "human", "liaison", "ask", "From chat")[0]  # an ordinary message has no label
+    assert "unverified" not in _msg_block(sent).plain
+    td = ThreadDetail.__new__(ThreadDetail)
+    td.thread, td.selected, td.now, td.type_style = [m], None, None, {}
+    row = Console(width=120, record=True)
+    row.print(td.row(m, 120))
+    assert "(typed in the pane, unverified)" in row.export_text()
+
+
 def test_5_the_user_guide_says_so():
     guide = (REPO / "docs" / "user-guide.md").read_text()
     assert "pane input is recorded" in guide and "NOT recorded" in guide and "prompt hook" in guide
+    assert 'The label means "typed in the pane", not "proven to be you":' in guide  # rc8
+    assert "**An operator with Herdr access can type into the liaison's pane.**" in guide

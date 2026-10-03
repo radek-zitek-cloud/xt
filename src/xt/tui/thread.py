@@ -19,6 +19,8 @@ import datetime as dt
 from rich.console import Group
 from rich.text import Text
 
+from ..ledger import PANE_LABEL, is_pane
+
 HERE = "  ◀ you are here"
 MIN_ROWS = 3  # thread rows Detail always shows, however long the head
 
@@ -85,6 +87,8 @@ class ThreadDetail:
         out.append(f"{m['from'][:names]:<{names}} → {m['to'][:names]:<{names}} ")
         out.append(f"{m['type']:<8} ", style=self.type_style.get(m["type"], ""))
         out.append(f"#{m['id']} ", style="bright_black")
+        if is_pane(m):  # card #193
+            out.append(f"({PANE_LABEL}) ", style="yellow")
         body = m.get("body") or ""
         first = body.strip().splitlines()[0] if body.strip() else ""
         room = width - out.cell_len - (len(HERE) if here else 0)

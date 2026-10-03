@@ -12,7 +12,7 @@ from .adapters import CODEX, allowed_codex_options, load_adapters
 from .alerts import Alerts, repeats
 from .context import Ctx
 from .dispatch import Queue, done_recipient, send
-from .ledger import AGENT_TYPES
+from .ledger import AGENT_TYPES, sender
 from .paths import Paths, XtError, find_root
 from .spawn import AGENT_ENV, Approvals, approval_what, decide, request_spawn, retire, stop
 from .team import ALWAYS, HUMAN, harness_model, parse_window, schedule_text
@@ -432,7 +432,7 @@ def cmd_log(args) -> None:
               f"`--limit N` for more, `--full` for all)")
     for m in shown:
         ref = f" ref:#{m['ref']}" if m.get("ref") is not None else ""
-        print(f"#{m['id']} {m['ts']} {m['type']} {m['from']}→{m['to']}{ref}")
+        print(f"#{m['id']} {m['ts']} {m['type']} {sender(m)}→{m['to']}{ref}")  # pane input: unverified (#193)
         print("   " + m["body"].replace("\n", "\n   "))
         data = data_line(m)  # a question's declared type or an answer, stored as data (#182)
         if data:

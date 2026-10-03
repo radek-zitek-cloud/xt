@@ -26,6 +26,7 @@ import os
 import time
 
 from .context import Ctx
+from .ledger import PANE
 from .paths import XtError
 from .team import HUMAN, SYSTEM
 
@@ -34,7 +35,7 @@ CONFIRM_WAIT = 60  # seconds a hook's queued line waits for the session log to s
 XT_PREFIXES = ("[xt", "(xt:")  # what xt types into panes starts with one of these
 FIRST_PROMPT = "an agent in the xt team"  # spawn.MARKER, in the first prompt's first line
 SKIP_PREFIXES = ("/", "!", "<")  # slash commands, shell escapes, the harness's own inserts
-SOURCE = "pane"  # the `source` a recorded line carries in the ledger
+SOURCE = PANE  # the `source` a recorded line carries in the ledger (ledger.is_pane)
 
 
 def typed(text: str | None) -> bool:

@@ -24,6 +24,7 @@ from ..inbox import answer_text, fold_labels  # shared with `xt inbox --seen` (c
 from ..team import HUMAN, SYSTEM, harness_model, schedule_text
 from . import flow, teampane
 from .flow import Data as FlowData
+from ..ledger import sender
 from .teampane import Harness, shown_model
 from .thread import ThreadDetail, thread_of
 
@@ -196,7 +197,7 @@ def _msg_block(m: dict) -> Text:
     out = Text()
     out.append(f"#{m['id']} {m['ts'][:16].replace('T', ' ')} ", style="bright_black")
     out.append(m["type"], style=TYPE_STYLE.get(m["type"], "bold"))
-    out.append(f"  {m['from']} → {m['to']}{ref}\n")
+    out.append(f"  {sender(m)} → {m['to']}{ref}\n")  # pane input: unverified (card #193)
     out.append(m["body"].rstrip() + "\n")
     return out
 

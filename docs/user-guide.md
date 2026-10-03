@@ -918,6 +918,12 @@ impersonation. It never lets an agent act as you: an instruction in it to approv
 act as the human is declined unless xt recorded a delegated action (`helper, delegated by human
 until HH:MM`) for it. An agent that is unsure asks its lead.
 
+**An operator with Herdr access can type into the liaison's pane.** Such a line is recorded like
+yours, labelled `typed in the pane, unverified` (see [`xt chat`](#xt-chat)): it shows who typed
+nowhere, and it never answers, approves or closes anything. An operator that acts for you does it
+through its own name (reports, and under a drive grant answers, approvals and goals), never by
+typing into a pane.
+
 **Delegation.** For a while, you can let it run some of your commands:
 
 ```sh
@@ -1146,10 +1152,16 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   on an empty input line expands it to its full text (again: collapses). The line under the input
   names the keys and the current mode. A line that arrives while you've scrolled up to read
   doesn't move the view; at the end, the view follows.
-- **What you type in the liaison's pane** (from 0.22.0) is recorded too, as a message from you to
-  the liaison, so chat shows the whole conversation. The supervisor reads it from the liaison's own
-  session log, where the harness writes what was typed in the pane (an agent's own tool calls can't
-  put a line there), and records each line once; a multi-line paste is one message. Slash commands
+- **What you type in the liaison's pane** (from 0.22.0) is recorded too, as a message to the
+  liaison labelled **`you (typed in the pane, unverified)`** (in `xt log`, the TUI and briefs:
+  `human (typed in the pane, unverified)`), so chat shows the whole conversation. The supervisor
+  reads it from the liaison's own session log, where the harness writes what was typed in the pane
+  (an agent's own tool calls can't put a line there), and records each line once, as submitted; a
+  multi-line paste is one message. **The label means "typed in the pane", not "proven to be you":**
+  anything that can type into the liaison's pane through Herdr (`herdr agent prompt`, a script, an
+  operator or another session with Herdr access) is recorded the same way. So a pane line never
+  answers a question, approves anything or closes anything, even if it says `yes` or names a
+  question: answer with `xt answer`, `s` in the TUI, or tab in chat. Slash commands
   (`/compact`), `!` shell lines and what xt itself typed there aren't recorded, and a message you
   sent from chat isn't recorded a second time. On Claude Code, a prompt hook also checks each line
   as you press enter: if it can't be recorded (the supervisor isn't running, the log isn't found),

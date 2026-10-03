@@ -24,6 +24,7 @@ from .context import Ctx
 from .goaldone import done_since, liaison_goal, load_seen, save_seen, seen_upto
 from .operators import is_operator_message
 from .spawn import Approvals
+from .ledger import is_pane
 from .team import HUMAN
 
 KEEP_SEEN = 1000  # friction ids kept one by one; older ones fold into friction_upto
@@ -120,7 +121,8 @@ def answered(ctx: Ctx, msgs: list[dict], open_ids: set[int]) -> list[tuple[dict,
     out: dict[int, tuple[dict, dict]] = {}
     for m in msgs:
         q = questions.get(m.get("ref"))
-        if q and m["from"] == HUMAN and q["id"] not in open_ids and q["id"] not in out and recent(m):
+        if q and m["from"] == HUMAN and not is_pane(m) and q["id"] not in open_ids and q["id"] not in out \
+                and recent(m):  # pane input never answers (card #193)
             out[q["id"]] = (q, m)
     return sorted(out.values(), key=lambda p: -p[1]["id"])
 
