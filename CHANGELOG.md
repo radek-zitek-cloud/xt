@@ -69,7 +69,9 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   line can't be recorded, and a line it queued that the log doesn't confirm within a minute is
   refused with an alert and a chat line, which is also what an agent's own attempt gets. `xt status`
   and the chat header say per harness whether pane input is recorded. The liaison role records by
-  hand only when it isn't.
+  hand only when it isn't. A line is recorded as submitted, spaces included, and a liaison xt
+  starts is read from its session's first line, so a line typed before the supervisor's first look
+  isn't lost (rc5; only a liaison an older xt started is read from where its log stood).
 
 ## [0.21.1] — 2026-10-02
 

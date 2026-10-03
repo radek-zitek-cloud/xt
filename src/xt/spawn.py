@@ -99,6 +99,8 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     from . import versions
 
     versions.mark_starting(ctx, name, ctx.ledger.clock())  # its first brief comes before the record (#177)
+    if a.role == "liaison":
+        paneinput.mark_start(ctx, name)  # card #193: its new session log is read from the start
     try:
         ctx.herdr.start_agent(name, adapter.herdr_kind, pane, args)
     except HerdrError as e:

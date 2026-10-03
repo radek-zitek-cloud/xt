@@ -157,11 +157,21 @@ def hook_settings(ctx: Ctx, name: str, base: str | None) -> str:
     return str(out)
 
 
+def mark_start(ctx: Ctx, name: str) -> None:
+    """The liaison is starting (do_spawn: spawn, restart, reset): its new session log is read from
+    its first line, so a line typed before the supervisor's first scan isn't lost (rc5, QA #3159).
+    Only a liaison xt never marked starts at the end of its log, so old history isn't recorded."""
+    with ctx.ledger.lock():
+        d = _load(ctx)
+        d.setdefault("cursor", {})[name] = {"log": None, "offset": 0}
+        _save(ctx, d)
+
+
 def queue(ctx: Ctx, name: str, text: str) -> None:
     """Queue a line the hook saw: recorded only when the session log shows it was typed."""
     with ctx.ledger.lock():
         d = _load(ctx)
-        d.setdefault("queued", []).append({"agent": name, "text": text.strip(), "at": time.time()})
+        d.setdefault("queued", []).append({"agent": name, "text": text, "at": time.time()})  # as submitted
         _save(ctx, d)
 
 
@@ -216,9 +226,9 @@ def scan(ctx: Ctx, now: float | None = None) -> list[str]:
         cursor = d.setdefault("cursor", {})
         rec = cursor.get(a.name)
         if path:
-            if rec is None:  # first time: from now on; earlier sessions' history isn't imported
+            if rec is None:  # never marked (a liaison started before this xt): from now on, no old history
                 rec = {"log": path, "offset": os.path.getsize(path)}
-            elif rec["log"] != path:  # a new session (restart, reset): all of it
+            elif rec["log"] != path:  # a session xt started (mark_start) or a new one: all of it
                 rec = {"log": path, "offset": 0}
             try:
                 lines, rec["offset"] = _new_lines(path, rec["offset"])
@@ -228,7 +238,7 @@ def scan(ctx: Ctx, now: float | None = None) -> list[str]:
             for line in lines:
                 text = user_text(adapter.session_format, line)
                 if typed(text):
-                    recorded.append(text.strip())
+                    recorded.append(text)  # the line as submitted, spaces and all (rc5, QA #3159)
         queued = d.get("queued", [])
         for text in recorded:  # a queued line the log shows is confirmed
             hit = next((q for q in queued if q["agent"] == a.name and q["text"] == text), None)

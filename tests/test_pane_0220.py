@@ -85,6 +85,45 @@ def test_1_6_a_typed_line_is_recorded_once_as_the_humans_and_not_delivered(ctx, 
     assert len(_from_human(ctx)) == 2  # once
 
 
+@pytest.mark.parametrize("harness", ["claude", "codex", "pi"])
+def test_1_a_line_typed_before_the_first_scan_is_recorded(ctx, fake_home, harness):
+    # rc5, QA #3159: the first scan put the cursor at the end of a non-empty log and lost the line
+    log = _liaison(ctx, fake_home, harness)
+    _type(log, harness, "typed before the supervisor looked")
+    paneinput.scan(ctx)
+    assert [m["body"] for m in _from_human(ctx)] == ["typed before the supervisor looked"]
+
+
+def test_1_a_liaison_xt_never_marked_keeps_its_old_history_out(ctx, fake_home):
+    log = _liaison(ctx, fake_home)
+    _type(log, "codex", "said long before this xt version")
+    (ctx.paths.state / "pane_input.json").unlink()  # as for a liaison started by an older xt
+    paneinput.scan(ctx)
+    _type(log, "codex", "said afterwards")
+    paneinput.scan(ctx)
+    assert [m["body"] for m in _from_human(ctx)] == ["said afterwards"]
+
+
+@pytest.mark.parametrize("harness", ["claude", "codex", "pi"])
+def test_1_a_padded_line_is_recorded_as_submitted(ctx, fake_home, harness):
+    # rc5, QA #3159: '  ship now  ' was recorded as 'ship now'
+    log = _liaison(ctx, fake_home, harness)
+    _type(log, harness, "  ship now  ", "\tindented\nand trailing  ")
+    paneinput.scan(ctx)
+    assert [m["body"] for m in _from_human(ctx)] == ["  ship now  ", "\tindented\nand trailing  "]
+
+
+def test_2_a_padded_queued_line_is_confirmed_by_the_same_line_in_the_log(ctx, fake_home, monkeypatch, capsys):
+    log = _liaison(ctx, fake_home, "claude")
+    monkeypatch.setattr(watch, "recently_ticked", lambda c: True)
+    _hook(monkeypatch, ctx, {"prompt": "  ship now  "})
+    _type(log, "claude", "  ship now  ")
+    paneinput.scan(ctx, now=time.time() + paneinput.CONFIRM_WAIT + 1)
+    assert [m["body"] for m in _from_human(ctx)] == ["  ship now  "]
+    assert json.loads((ctx.paths.state / "pane_input.json").read_text())["queued"] == []
+    assert not [m for m in ctx.ledger.messages() if m["type"] == "system" and "NOT recorded" in m["body"]]
+
+
 def test_1_a_new_session_is_read_from_its_start(ctx, fake_home):
     log = _liaison(ctx, fake_home)
     paneinput.scan(ctx)
@@ -148,7 +187,8 @@ def test_a_hook_in_another_agents_pane_or_a_slash_command_does_nothing(ctx, fake
     monkeypatch.setattr(watch, "recently_ticked", lambda c: False)
     _hook(monkeypatch, ctx, {"prompt": "Ship it"}, agent="lead")
     _hook(monkeypatch, ctx, {"prompt": "/compact"})
-    assert capsys.readouterr().out == "" and not (ctx.paths.state / "pane_input.json").exists()
+    assert capsys.readouterr().out == ""
+    assert json.loads((ctx.paths.state / "pane_input.json").read_text()).get("queued", []) == []
 
 
 # --- the hook is installed for a Claude liaison only, beside its own settings ------------------------
