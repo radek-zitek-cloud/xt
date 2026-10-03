@@ -61,9 +61,9 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   (`12:04 to lead: goal #3020 …`): `ctrl+t` cycles goals only (the default), all and hidden; `↑`/`↓`
   pick one and `enter` on an empty input line expands it. The hint line names the keys and the
   mode, and fits 80 columns in every state (rc7: also while answering a question). A line arriving while you've scrolled up no longer moves the view.
-- **What the human types in the liaison's pane is recorded** (#193). The supervisor reads the
-  liaison's session log (Claude Code, Codex, pi) and records each line the human typed as a message
-  from the human to the liaison, once, logged and not delivered; slash commands, `!` lines, the
+- **What is typed in the liaison's pane is recorded** (#193). The supervisor reads the liaison's
+  session log (Claude Code, Codex, pi) and records each line typed in the pane as a message to the
+  liaison, once, logged and not delivered; slash commands, `!` lines, the
   harness's own inserts and xt's deliveries are left out, and a multi-line paste is one message. On
   Claude Code the liaison also gets a prompt hook (`xt pane-input --hook`, in a settings file xt
   generates beside its own permissions file, which stays unchanged): it warns in the pane when a

@@ -72,8 +72,10 @@ in [CHANGELOG.md](CHANGELOG.md).
   chart, and the whole thread of what you select; `xt tui --demo` tries it on made-up data
   ([Day to day](docs/user-guide.md#4-day-to-day-questions-approvals-alerts-friction)).
 - **A conversation in your terminal, with questions that say what answer they take (0.14 to
-  0.21).** `xt chat` is one conversation with the liaison: the last 30 messages, new ones as they
-  arrive, and questions answered in place ([`xt chat`](docs/user-guide.md#xt-chat)). A question is
+  0.22).** `xt chat` is one conversation with the liaison: the last 30 messages, new ones as they
+  arrive, and questions answered in place ([`xt chat`](docs/user-guide.md#xt-chat)). Lines typed in
+  the liaison's pane show there too, labelled unverified, and so do your operator's messages and
+  the liaison's goals to the team. A question is
   yes/no, two to four numbered options with their consequences and a recommendation, or open, and
   xt checks your answer against it; hires and schedules are yes/no questions too. Each goal you
   gave sends exactly one notification when it's done ([`xt answer`](docs/user-guide.md#xt-answer)).
@@ -235,7 +237,7 @@ equivalent and when you'd use it.
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, context and today's usage per agent, team usage and allowance (Codex, and Claude's five-hour and weekly windows through `bin/xt-statusline`), open work, questions, queue, approvals, alerts |
 | `xt inbox` | The Inbox as in the TUI: what needs you (questions, approvals, alerts), what's new since you last looked (goals done, reports), unread friction (`--seen`: also what the TUI folds: questions you answered and notifications you've seen in the last 7 days, and the friction you've seen) |
-| `xt chat` | Talk with the liaison in this terminal: the last 30 messages, new ones as they arrive, questions and approvals answered in place (`tab`), `ctrl+d` leaves |
+| `xt chat` | Talk with the liaison in this terminal: the last 30 messages, new ones as they arrive, questions and approvals answered in place (`tab`), your operator's lines and the liaison's team activity (`ctrl+t`), `ctrl+d` leaves |
 | `xt answer <id> "..."` | Answer a question the liaison asked you (yes or no, a number that picks one of its options, or your words where it takes them), or a hire or schedule request (yes or no) |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting); aliases of `xt answer <id> yes\|no` from 0.21.0 |
 | `xt clear <alert>` | Dismiss an alert |
@@ -338,6 +340,10 @@ xt restart --all
 - Account connectors are off for agents, but command-line tools that hold your credentials (a
   mail CLI, say) are just programs to the harness: xt can't switch them off. A Claude agent's
   settings file can refuse them; a Codex agent is bounded only by its sandbox's escalation review.
+- Anything that can type into the liaison's pane through Herdr (`herdr agent prompt`, a script, an
+  operator) is recorded as pane input from you, labelled unverified. It never answers or approves
+  anything in xt, but until card #209 (v0.23.0) the liaison can still close a question from it by
+  hand, as it does when you answer in its pane.
 
 ## Versioning
 
