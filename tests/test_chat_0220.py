@@ -2,6 +2,7 @@
 
 from textual.containers import VerticalScroll
 
+from xt import chat
 from xt.dispatch import send
 from xt.spawn import request_spawn
 from xt.team import SYSTEM
@@ -106,6 +107,33 @@ def test_3a_at_80_columns_a_one_liner_and_the_hint_fit_one_row_and_the_label_nee
         status = app.query_one("#status")
         assert status.size.height == 1 and len(_text(status)) <= 80, _text(status)
         assert "(operator)" in next(b for b in _bodies(app) if "Staging" in b)  # the words alone tell it apart
+
+    _run(ctx, steps, size=(80, 24))
+
+
+def test_3a_the_hint_line_fits_80_columns_in_every_state():
+    # rc7, ux on rc4: tab-picked was 93 characters at 80 columns
+    for waiting in (0, 1, 12, 123):
+        for answering in (False, True):
+            for picked in (None, "picked", "expanded"):
+                for mode in chat.MODES:
+                    line = chat.hint_line(80, waiting, answering and waiting > 0, picked, mode)
+                    assert len(line) <= 80 and "ctrl+t team:" in line and "ctrl+d leave" in line, line
+    assert chat.hint_line(80, 2, True, None, "goals") == \
+        "enter send · tab next · esc back · ctrl+t team: goals · ↑↓ pick · ctrl+d leave"
+    assert "esc message the liaison" in chat.hint_line(120, 2, True, None, "goals")
+
+
+def test_3a_the_tab_picked_hint_is_one_row_at_80_columns(ctx):
+    _team(ctx)
+    send(ctx, "liaison", "human", "ask", "Approve?\n\nAnswer yes or no.", data={"question": {"kind": "closed"}})
+    send(ctx, "liaison", "human", "ask", "And this?\n\nAnswer yes or no.", data={"question": {"kind": "closed"}})
+
+    async def steps(app, pilot):
+        await pilot.press("tab")
+        await pilot.pause()
+        status = app.query_one("#status")
+        assert "tab next" in _status(app) and status.size.height == 1 and len(_status(app)) <= 80, _status(app)
 
     _run(ctx, steps, size=(80, 24))
 

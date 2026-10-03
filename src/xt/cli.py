@@ -522,9 +522,9 @@ def cmd_status(args) -> None:
         print(f"delegation: {line}")
     from .paneinput import signal
 
-    pane = signal(ctx)  # card #193
+    pane = signal(ctx)  # card #193; the line names "pane input" itself
     if pane:
-        print(f"pane input: {pane}")
+        print(pane)
     from .watch import recently_ticked
 
     if not watch_pid(ctx) and not recently_ticked(ctx):  # said plainly whenever it's down (card #165)

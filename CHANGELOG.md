@@ -60,7 +60,7 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   liaison's messages to the team show as dimmed one-liners cut to one row
   (`12:04 to lead: goal #3020 …`): `ctrl+t` cycles goals only (the default), all and hidden; `↑`/`↓`
   pick one and `enter` on an empty input line expands it. The hint line names the keys and the
-  mode, and fits 80 columns. A line arriving while you've scrolled up no longer moves the view.
+  mode, and fits 80 columns in every state (rc7: also while answering a question). A line arriving while you've scrolled up no longer moves the view.
 - **What the human types in the liaison's pane is recorded** (#193). The supervisor reads the
   liaison's session log (Claude Code, Codex, pi) and records each line the human typed as a message
   from the human to the liaison, once, logged and not delivered; slash commands, `!` lines, the

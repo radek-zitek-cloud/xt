@@ -236,7 +236,8 @@ def test_7_status_and_the_chat_header_say_whether_pane_input_is_recorded(ctx, fa
     monkeypatch.setattr(cli, "human_terminal", lambda: True)
     args = cli.build_parser().parse_args(["status"])
     args.func(args)
-    assert "pane input: liaison (pi): pane input is NOT recorded now" in capsys.readouterr().out
+    out = capsys.readouterr().out
+    assert "\nliaison (pi): pane input is NOT recorded now" in out and out.count("pane input") == 1  # rc7, ux note 2
 
     from .test_chat_0210 import _run, _text
 

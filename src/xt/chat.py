@@ -116,6 +116,27 @@ def _time(ts: str) -> str:
         return "--:--"
 
 
+def hint_line(width: int, waiting: int, answering: bool, picked: str | None, mode: str) -> str:
+    """The keys under the input line, in one row of `width` (card #199): shorter words below 100
+    columns; if it is still too long, `↑↓ pick` goes, then the end is cut with an ellipsis.
+    `picked`: None, "picked" or "expanded" (a one-liner chosen with ↑/↓)."""
+    narrow = width < 100
+    first = {"picked": "enter expand", "expanded": "enter collapse"}.get(picked, "enter send")
+    keys = [first]
+    if waiting:
+        if answering:
+            keys.append("tab next · esc back" if narrow else "tab next · esc message the liaison")
+        else:
+            keys.append(f"tab answer ({waiting})" if narrow else f"tab answer ({waiting} waiting)")
+    keys.append(f"ctrl+t team: {mode}" if narrow else f"ctrl+t team activity ({mode})")
+    keys.append("↑↓ pick" if narrow else "↑/↓ enter: expand")
+    keys.append("ctrl+d leave")
+    line = " · ".join(keys)
+    if len(line) > width:
+        line = " · ".join(k for k in keys if k != "↑↓ pick")
+    return line if len(line) <= width else line[:max(width - 1, 0)] + "…"
+
+
 OPERATOR_PREFIX = "» "  # with "(operator)", tells an operator's lines from yours without colour (#199)
 
 
@@ -348,18 +369,8 @@ class ChatApp(App):
             label = f"{self.liaison} › "
         self.query_one("#target", Static).update(label)
         if status is None:
-            narrow = self.size.width < 100  # at 80 columns the hint stays one row (card #199)
-            keys = ["enter send"]
-            if self.waiting:
-                n = len(self.waiting)
-                keys.append((f"tab answer ({n})" if narrow else f"tab answer ({n} waiting)") if not self.target
-                            else "tab next · esc message the liaison")
-            if self.selected is not None:
-                keys[0] = "enter expand" if self.selected not in self.expanded else "enter collapse"
-            keys.append(f"ctrl+t team: {self.mode}" if narrow else f"ctrl+t team activity ({self.mode})")
-            keys.append("↑↓ pick" if narrow else "↑/↓ enter: expand")
-            keys.append("ctrl+d leave")
-            status = " · ".join(keys)
+            picked = None if self.selected is None else "expanded" if self.selected in self.expanded else "picked"
+            status = hint_line(self.size.width, len(self.waiting), bool(self.target), picked, self.mode)
         self.query_one("#status", Static).update(status)
 
     def action_next_target(self) -> None:
