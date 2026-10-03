@@ -98,8 +98,10 @@ class Ledger:
             }
         elif msg["type"] == "done" and ref in items:
             del items[ref]
-        elif ref in items and items[ref]["type"] == "ask" and msg["from"] == items[ref]["owner"]:
-            del items[ref]  # the human answered
+        elif ref in items and items[ref]["type"] == "ask" and (
+                msg["from"] == items[ref]["owner"]
+                or (items[ref]["owner"] == HUMAN and isinstance(msg.get("delegated"), dict) and "answer" in msg)):
+            del items[ref]  # the human answered, or an operator under a drive grant did (card #200)
         elif ref in items:
             items[ref]["last_activity"] = msg["ts"]
             if msg["from"] == items[ref]["owner"]:

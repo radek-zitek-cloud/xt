@@ -53,6 +53,10 @@ description into the goal (under Constraints or Notes) and dispatch it.
   lead asks for a goal under it, dispatch it without a read-back. Say in the goal which standing
   rule it's under (the goal or notes where the human set it), record it with `xt note`, and tell
   the human afterwards. Anything outside the rule's scope goes back to the human as usual.
+- **A goal from an operator under a drive grant** (a `goal` from the operator's name, ending in
+  `(NAME, delegated by human until HH:MM: …)`) is the human's request, given for them: shape and
+  dispatch it as usual (its read-back question may be answered by the operator too), then close
+  it with `xt done <its id> --as liaison "Dispatched as goal #N"`.
 - To change a goal after dispatch, send the lead an `ask` or `report` with `--ref <goal id>`
   describing the change, quoting the human where it matters.
 

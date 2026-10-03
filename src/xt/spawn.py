@@ -439,6 +439,11 @@ class Approvals:
         if req is None:
             asked = self.ctx.ledger.message(req_id)
             if asked and asked["type"] == "approval":  # answered before, through any route (card #183)
+                from .operators import answered_by
+
+                by = answered_by(self.ctx, req_id)  # card #200: by an operator under a drive grant
+                if by:
+                    raise XtError(f"approval #{req_id}: {by}; nothing changed")
                 raise XtError(f"approval #{req_id} was already answered; nothing changed (xt log --id {req_id})")
             raise XtError(f"no pending approval #{req_id}")
         return req
@@ -546,7 +551,9 @@ def approval_what(r: dict) -> str:
             + (f" — {r['settings_note']}" if r.get("settings_note") else ""))
 
 
-def decide(ctx: Ctx, req_id: int, approve: bool) -> str:
+def decide(ctx: Ctx, req_id: int, approve: bool, by: str | None = None) -> str:
+    """Carry out the answer to approval `req_id`. `by` names who decided when it isn't the human
+    (an operator under a drive grant, card #200), for the requester's message."""
     req = Approvals(ctx).pop(req_id)
     if req.get("kind") == "schedule":
         if approve:
@@ -564,7 +571,7 @@ def decide(ctx: Ctx, req_id: int, approve: bool) -> str:
         from .dispatch import send
 
         send(ctx, SYSTEM, req["requester"], "system",
-             f"Human {'approved' if approve else 'denied'} approval #{req_id}: {result}")
+             f"{by or 'Human'} {'approved' if approve else 'denied'} approval #{req_id}: {result}")
     return result
 
 

@@ -17,6 +17,11 @@ session. It is never the human: `--as human` stays the human's terminal only (ca
   the delegable human-only commands until it expires or `xt delegate --revoke` ends it. Each one is
   recorded as "NAME, delegated by human until HH:MM". Expiry is checked when a command runs, from
   the stored end time: there is no timer.
+- `xt delegate NAME --scope drive` (card #200) is a grant of another scope: the operator answers the
+  human's questions, approves or denies hires and schedules, and gives goals to the liaison, each
+  one message under its own name ending in DRIVE_MARK. Scopes don't combine: a new grant replaces
+  the old one. When a drive grant ends (expired, noticed by the supervisor or the next command, or
+  revoked), one ledger line says so.
 
 Operators and grants live in the team's runtime state (`.xt/state/operators.json`, gitignored), not
 in team.toml, so agents can't edit them through the roster. Per team: a new team needs a new
@@ -41,6 +46,10 @@ NEVER = "down, answers, approvals, version switches, registering operators and g
 MAX_GRANT = 3600
 DEFAULT_GRANT = "30m"
 MARK = "(sent by {name}, an operator, on the human's behalf)"  # the last line of an operator's message
+DRIVE = "drive"  # card #200: the one scope besides the default commands
+DRIVE_WHAT = "answers, approvals and goals"
+# the last line of a drive action: starts with the record text the protocol names (card #172)
+DRIVE_MARK = "({name}, delegated by human until {until}: an operator acting on the human's behalf)"
 
 
 def _state(paths: Paths):
@@ -229,37 +238,49 @@ def verify(paths: Paths, name: str, env=None, proc: str = "/proc") -> None:
                   f"The human registers the operator's current session with `xt operator add {name} --pid PID`.")
 
 
-def outgoing(ctx: Ctx, name: str, to: str, mtype: str, body: str) -> str:
-    """Check an operator's message and mark it: reports to the liaison only."""
+def outgoing(ctx: Ctx, name: str, to: str, mtype: str, body: str) -> tuple[str, dict | None]:
+    """Check an operator's message and mark it: reports to the liaison, and under a drive grant
+    goals to the liaison too (card #200). (the marked body, the drive grant or None)"""
     liaison = ctx.team.lead_of_role("liaison")
     if liaison is None or to != liaison.name:
         raise XtError(f"operator {name} sends to the liaison only"
                       + (f" ({liaison.name})" if liaison else " (this team has none)"))
+    if mtype == "goal":
+        g = drive(ctx, name, "gives the liaison goals")
+        return body.strip() + "\n" + drive_mark(name, g), g
     if mtype != "report":
-        raise XtError(f"operator {name} sends reports only (--type report); it never answers questions, "
-                      f"approves anything or opens work")
-    return body.strip() + "\n" + MARK.format(name=name)
+        raise XtError(f"operator {name} sends reports (--type report) and, under a drive grant, goals "
+                      f"(--type goal); it answers with `xt answer` under a drive grant, and never opens tasks")
+    return body.strip() + "\n" + MARK.format(name=name), None
 
 
-def send(ctx: Ctx, name: str, to: str, mtype: str, body: str, ref: int | None = None) -> tuple[dict, str]:
-    """Log and queue an operator's report to the liaison under the operator's own name. The
-    supervisor delivers it; the liaison gets no reply hint, since nobody in the team messages an
-    operator."""
-    from .dispatch import deliver_or_queue
-
-    if not body.strip():
-        raise XtError("empty message")
-    body = outgoing(ctx, name, to, mtype, body)
+def _check_size(ctx: Ctx, body: str) -> None:
     limit = int(ctx.team.log_setting("message_max_kb")) * 1024
     if len(body.encode()) > limit:
         raise XtError(f"message is {len(body.encode())} bytes, over the {limit} limit — "
                       "write the payload to a file and send its path instead")
-    msg = ctx.ledger.append(name, to, "report", body, ref)
+
+
+def send(ctx: Ctx, name: str, to: str, mtype: str, body: str, ref: int | None = None) -> tuple[dict, str]:
+    """Log and queue an operator's report (or, under drive, goal) to the liaison under the
+    operator's own name. The supervisor delivers it; the liaison gets no reply hint, since nobody in
+    the team messages an operator."""
+    from .dispatch import deliver_or_queue
+
+    if not body.strip():
+        raise XtError("empty message")
+    body, g = outgoing(ctx, name, to, mtype, body)
+    _check_size(ctx, body)
+    msg = ctx.ledger.append(name, to, mtype, body, ref, data=delegated(g) if g else None)
     return msg, deliver_or_queue(ctx, msg)
 
 
 def is_operator_message(m: dict) -> bool:
-    return m.get("type") == "report" and str(m.get("body", "")).endswith(MARK.format(name=m.get("from")))
+    """An operator's report, or one of its drive actions (card #200), as recorded."""
+    body = str(m.get("body", ""))
+    if isinstance(m.get("delegated"), dict):
+        return True
+    return m.get("type") == "report" and body.endswith(MARK.format(name=m.get("from")))
 
 
 # --- delegation --------------------------------------------------------------------------------
@@ -269,42 +290,97 @@ def _local(ts: str) -> dt.datetime:
     return dt.datetime.fromisoformat(ts).astimezone()
 
 
-def grant(ctx: Ctx, name: str, length: str | None, only: list[str] | None) -> str:
-    """The human grants operator NAME the delegable commands for a while (one grant per operator)."""
+def grant(ctx: Ctx, name: str, length: str | None, only: list[str] | None, scope: str | None = None) -> str:
+    """The human grants operator NAME the delegable commands, or with scope drive answers, approvals
+    and goals (card #200), for a while. One grant per operator: a new one replaces the old."""
     if not is_operator(ctx.paths, name):
         raise XtError(f"no operator named {name!r}: register it first (`xt operator add {name} --pid PID`)")
+    if scope not in (None, DRIVE):
+        raise XtError(f"unknown scope {scope!r}: the one scope is {DRIVE} ({DRIVE_WHAT})")
+    if scope and only:
+        raise XtError(f"--only picks commands of the default grant; a {DRIVE} grant covers {DRIVE_WHAT} only")
     secs = parse_interval(length or DEFAULT_GRANT)
     if secs > MAX_GRANT:
         raise XtError(f"a grant lasts at most 60 minutes (asked for {length}); grant again when it ends")
-    commands = list(DELEGABLE) if not only else [c.strip() for c in only if c.strip()]
+    commands = [] if scope else list(DELEGABLE) if not only else [c.strip() for c in only if c.strip()]
     bad = [c for c in commands if c not in DELEGABLE]
     if bad:
         raise XtError(f"not delegable: {', '.join(bad)}. Delegable: {', '.join(DELEGABLE)}; never: {NEVER}")
     now = ctx.ledger.clock()
     until = now + dt.timedelta(seconds=secs)
+    g = {"until": until.isoformat(timespec="seconds"), "commands": commands, "granted": now.isoformat(timespec="seconds")}
+    if scope:
+        g["scope"] = scope
     with ctx.ledger.lock():
         d = load(ctx.paths)
-        d.setdefault("grants", {})[name] = {"until": until.isoformat(timespec="seconds"), "commands": commands,
-                                            "granted": now.isoformat(timespec="seconds")}
+        d.setdefault("grants", {})[name] = g
+        d.get("ended", {}).pop(name, None)
         _save(ctx.paths, d)
-    text = f"human delegated {', '.join(commands)} to operator {name} until {_local(until.isoformat()):%H:%M}"
+    what = f"{DRIVE} ({DRIVE_WHAT})" if scope else ", ".join(commands)
+    text = f"human delegated {what} to operator {name} until {_local(until.isoformat()):%H:%M}"
     ctx.ledger.append(SYSTEM, HUMAN, "system", text)
     return text
 
 
+def _ended_line(name: str, at: dt.datetime) -> str:
+    return f"drive grant for {name} ended {_local(at.isoformat()):%H:%M}"
+
+
 def revoke(ctx: Ctx, name: str | None) -> str:
+    announce_ended(ctx)  # a drive grant that already ran out says so as expired, not revoked
+    now = ctx.ledger.clock()
     with ctx.ledger.lock():
         d = load(ctx.paths)
         grants = d.get("grants", {})
         gone = [n for n in list(grants) if name in (None, n)]
+        drives = []
         for n in gone:
-            del grants[n]
+            g = grants.pop(n)
+            if g.get("scope") == DRIVE:
+                drives.append(n)
+                d.setdefault("ended", {})[n] = {"at": now.isoformat(timespec="seconds"), "how": "revoked"}
         _save(ctx.paths, d)
     if not gone:
         return "no active delegation" + (f" for {name}" if name else "")
     text = f"human revoked the delegation to {', '.join(gone)}"
+    if drives:  # card #200: the one visible line that the drive grant ended
+        text += ": " + "; ".join(_ended_line(n, now) for n in drives)
     ctx.ledger.append(SYSTEM, HUMAN, "system", text)
     return text
+
+
+def announce_ended(ctx: Ctx) -> list[str]:
+    """Drive grants that ran out: one ledger line each, once (card #200). The supervisor calls it
+    every tick, and the drive check before it refuses, so the line comes even without a timer."""
+    now = ctx.ledger.clock()
+    lines = []
+    with ctx.ledger.lock():
+        d = load(ctx.paths)
+        for n, g in list(d.get("grants", {}).items()):
+            until = dt.datetime.fromisoformat(g["until"])
+            if g.get("scope") == DRIVE and until <= now:
+                del d["grants"][n]
+                d.setdefault("ended", {})[n] = {"at": g["until"], "how": "expired"}
+                lines.append(_ended_line(n, until))
+        if lines:
+            _save(ctx.paths, d)
+    for line in lines:
+        ctx.ledger.append(SYSTEM, HUMAN, "system", line)
+    return lines
+
+
+ENDED_SHOWN = 3600  # seconds `xt status` and the TUI header keep showing that a drive grant ended
+
+
+def ended_grants(ctx: Ctx) -> list[str]:
+    """Drive grants that ended within the last hour, for `xt status` and the TUI header."""
+    now = ctx.ledger.clock()
+    out = []
+    for n, e in sorted(load(ctx.paths).get("ended", {}).items()):
+        at = dt.datetime.fromisoformat(e["at"])
+        if (now - at).total_seconds() <= ENDED_SHOWN:
+            out.append(_ended_line(n, at) + f" ({e['how']})")
+    return out
 
 
 def active_grant(ctx: Ctx, name: str) -> dict | None:
@@ -315,13 +391,23 @@ def active_grant(ctx: Ctx, name: str) -> dict | None:
     return g
 
 
+def scope_text(g: dict) -> str:
+    """What a grant covers, in a few words: `drive` or the commands."""
+    return DRIVE if g.get("scope") == DRIVE else ", ".join(g["commands"])
+
+
 def grant_text(name: str, g: dict) -> str:
-    return f"delegated to {name} until {_local(g['until']):%H:%M}: {', '.join(g['commands'])}"
+    return f"delegated to {name} until {_local(g['until']):%H:%M}: {scope_text(g)}"
 
 
 def active_grants(ctx: Ctx) -> list[str]:
-    """One line per active grant, for `xt status` and the TUI header."""
-    return [grant_text(n, g) for n in names(ctx.paths) if (g := active_grant(ctx, n))]
+    """One line per active grant, then drive grants that ended lately, for `xt status` and the TUI
+    header."""
+    return [grant_text(n, g) for n in names(ctx.paths) if (g := active_grant(ctx, n))] + ended_grants(ctx)
+
+
+def _active(g: dict) -> str:
+    return f"grant active: {scope_text(g)} until {_local(g['until']):%H:%M}"
 
 
 def allowed(ctx: Ctx, name: str, command: str) -> dict:
@@ -334,8 +420,65 @@ def allowed(ctx: Ctx, name: str, command: str) -> dict:
         raise XtError(f"operator {name} has no active delegation: only the human runs `xt {command}` "
                       f"(the human grants one with `xt delegate {name} --for 30m`)")
     if command not in g["commands"]:
+        if g.get("scope") == DRIVE:  # card #200: the refusal names the active grant
+            raise XtError(f"{_active(g)}; {command} not included (scopes don't combine: the human grants "
+                          f"`xt delegate {name}` for commands, which replaces the {DRIVE} grant)")
         raise XtError(f"operator {name}'s delegation covers {', '.join(g['commands'])}, not {command}")
     return g
+
+
+def drive(ctx: Ctx, name: str, action: str) -> dict:
+    """The drive grant under which operator NAME may act for the human now (card #200); refuses
+    with what's active instead, or that the grant ended. `action` completes "only the human …"."""
+    announce_ended(ctx)
+    g = active_grant(ctx, name)
+    if g is not None and g.get("scope") == DRIVE:
+        return g
+    if g is not None:
+        raise XtError(f"{_active(g)}; {DRIVE_WHAT} not included: the human grants them with "
+                      f"`xt delegate {name} --scope {DRIVE}`, which replaces this grant")
+    e = load(ctx.paths).get("ended", {}).get(name)
+    if e:
+        raise XtError(f"operator {name}'s {DRIVE} grant ended {_local(e['at']):%H:%M} ({e['how']}): "
+                      f"only the human {action} now")
+    raise XtError(f"operator {name} has no {DRIVE} grant: only the human {action} (the human grants one "
+                  f"with `xt delegate {name} --for 30m --scope {DRIVE}`)")
+
+
+def until_text(g: dict) -> str:
+    return f"{_local(g['until']):%H:%M}"
+
+
+def drive_mark(name: str, g: dict) -> str:
+    return DRIVE_MARK.format(name=name, until=until_text(g))
+
+
+def delegated(g: dict) -> dict:
+    """The data a drive action carries: who delegated it and until when (card #200)."""
+    return {"delegated": {"by": HUMAN, "until": g["until"]}}
+
+
+def act(ctx: Ctx, name: str, g: dict, to: str, mtype: str, text: str, ref: int | None,
+        data: dict | None = None) -> tuple[dict, str]:
+    """Record one drive action as a message under the operator's own name, marked, and deliver it
+    (the supervisor does, as for any operator message). It never reads as sent by `human`."""
+    from .dispatch import deliver_or_queue
+
+    body = text.strip() + "\n" + drive_mark(name, g)
+    _check_size(ctx, body)
+    msg = ctx.ledger.append(name, to, mtype, body, ref, data={**(data or {}), **delegated(g)})
+    return msg, deliver_or_queue(ctx, msg)
+
+
+def answered_by(ctx: Ctx, qid: int) -> str | None:
+    """`answered by NAME (operator, delegated by you until HH:MM): ANSWER` when an operator's drive
+    action answered question or approval `qid` (card #200); else None."""
+    for m in ctx.ledger.messages():
+        d = m.get("delegated")
+        if m.get("ref") == qid and isinstance(d, dict) and isinstance(m.get("answer"), dict):
+            answer = m["body"].rsplit("\n", 1)[0]
+            return f"answered by {m['from']} (operator, delegated by you until {_local(d['until']):%H:%M}): {answer}"
+    return None
 
 
 def record(ctx: Ctx, name: str, g: dict, what: str, failed: str | None = None) -> None:

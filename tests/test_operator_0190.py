@@ -140,10 +140,13 @@ def test_an_operator_sends_reports_to_the_liaison_only(team, monkeypatch):
     register(team, monkeypatch)
     with pytest.raises(XtError, match="to the liaison only"):
         agent(monkeypatch, "send", "lead", "--as", "op", "x")
-    with pytest.raises(XtError, match="reports only"):
+    with pytest.raises(XtError, match="sends reports .* never opens tasks"):  # v0.22.0: goals under drive (#200)
         agent(monkeypatch, "send", "liaison", "--as", "op", "--type", "task", "x")
     msg = team.ledger.append("liaison", "human", "ask", "Which one?")
-    for argv in (["answer", str(msg["id"]), "1"], ["approve"], ["done", str(msg["id"])], ["note", "x"],
+    for argv in (["answer", str(msg["id"]), "1"], ["approve"]):  # v0.22.0: only under a drive grant (#200)
+        with pytest.raises(XtError, match="operator op has no drive grant"):
+            agent(monkeypatch, *argv, "--as", "op")
+    for argv in (["done", str(msg["id"])], ["note", "x"],
                  ["friction", "x"], ["brief"], ["stop", "lead"], ["retire", "lead"], ["schedule", "lead", "1h"]):
         with pytest.raises(XtError, match="is an operator"):
             agent(monkeypatch, *argv, "--as", "op")
@@ -251,7 +254,8 @@ def test_non_delegable_commands_are_refused_even_under_a_grant(team, monkeypatch
     register(team, monkeypatch)
     human(monkeypatch, "delegate", "op", "--for", "60m")
     for argv, why in ((["down"], "is an operator"), (["restart", "--all"], "with --all"),
-                      (["version", "use", "v0.18.0"], "is an operator"), (["approve"], "is an operator"),
+                      (["version", "use", "v0.18.0"], "is an operator"),
+                      (["approve"], "answers, approvals and goals not included"),  # v0.22.0: drive only (#200)
                       (["operator", "add", "op2", "--pid", "1"], "is an operator"),
                       (["delegate", "op", "--for", "60m"], "is an operator")):
         with pytest.raises(XtError, match=why):

@@ -935,9 +935,43 @@ lead`; one that fails (say, `spawn` of an agent that is already running) is reco
 each command, so there's nothing to clean up. `xt status` (`delegation: delegated to helper until
 14:45: …`) and the TUI's Team header show an active grant.
 
-**Never delegated:** `xt down` and `xt restart --all` (only you stop the team), answers, approvals,
-`xt version use`/`rollback`, registering operators and granting delegation. Without a grant, after
-it expires or after a revoke, the operator's commands are refused as before.
+**Drive** (from 0.22.0). A grant of another scope hands the operator the wheel for a while: it
+answers your questions, approves or denies hires and schedules, and gives the liaison goals. It
+never comes by default; you grant it from your own terminal:
+
+```sh
+xt delegate helper --for 30m --scope drive   # answers, approvals and goals; at most 60m, 30m by default
+```
+
+Scopes don't combine: a new grant replaces the one before (a drive grant doesn't run `restart`,
+and a plain grant doesn't answer), and a refusal names the active grant, as in `grant active:
+drive until 14:45; restart not included`. Under a drive grant the operator runs, with `--as
+helper`:
+
+```sh
+xt inbox --questions                          # what waits for an answer, whole: text, type, options, recommendation
+xt answer 1290 yes --as helper                # a question (checked like yours: yes/no, an option's number, Other, open)
+xt answer 1291 yes --as helper                # a hire or schedule approval (xt approve / xt deny work too)
+xt send liaison --as helper --type goal <<'XT_END'
+Build the weekly digest
+XT_END
+```
+
+Each is one message under the operator's own name, never `human`, ending in `(helper, delegated by
+human until 14:45: an operator acting on the human's behalf)`: an answer goes to the asker and
+closes the question; an approval decision goes to your Inbox, and the requester hears `Operator
+helper, delegated by human until 14:45, approved approval #1291: …`; a goal goes to the liaison,
+which shapes and dispatches it as it would yours. A goal dispatch read-back is a yes/no question,
+so the operator answers it like any other. If you answer a question the operator already answered
+(`xt answer`, `xt chat`, the TUI), xt refuses and shows what was decided: `answered by helper
+(operator, delegated by you until 14:45): Option 2: …`. When a drive grant ends, expired or
+revoked, one line says so in the log (`drive grant for helper ended 14:45`), and `xt status` and
+the TUI header show it for an hour; the operator's next answer is refused with "drive grant ended".
+
+**Never delegated:** `xt down` and `xt restart --all` (only you stop the team),
+`xt version use`/`rollback`, registering operators and granting or revoking delegation, drive or
+not; answers and approvals only under a drive grant. Without a grant, after it expires or after a
+revoke, the operator's commands are refused as before.
 
 Limits: the process check needs to see the operator's process tree. A command run inside Codex's
 sandbox (its own PID namespace) can't be matched, so use an operator whose commands run in your

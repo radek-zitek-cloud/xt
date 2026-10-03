@@ -32,7 +32,8 @@ def _who(args, operator: bool = False) -> str:
             operators.verify(paths, who)
             if not operator:
                 raise XtError(f"{who} is an operator: it sends reports to the liaison and, under the human's "
-                              f"delegation, runs {', '.join(operators.DELEGABLE)}; nothing else")
+                              f"delegation, runs {', '.join(operators.DELEGABLE)}, or with a drive grant "
+                              f"gives {operators.DRIVE_WHAT}; nothing else")
         return who
     # Acting as the human needs the human's own terminal, so an agent can't simply claim
     # `--as human` to skip approvals. Soft, but it closes the easy paths (card #103).
@@ -297,26 +298,56 @@ def cmd_done(args) -> None:
 
 def cmd_answer(args) -> None:
     ctx = Ctx.load()
-    print(answer(ctx, _who(args), args.id, _body(args)))
+    print(answer(ctx, _who(args, operator=True), args.id, _body(args)))
+
+
+def _drive_grant(ctx: Ctx, who: str, action: str) -> dict | None:
+    """An operator's drive grant (card #200), refusing without one; None for anyone else."""
+    return operators.drive(ctx, who, action) if operators.is_operator(ctx.paths, who) else None
+
+
+def _decide(ctx: Ctx, who: str, grant: dict | None, rid: int, approve: bool) -> str:
+    """Approve or deny `rid`: the human, or an operator under a drive grant, recorded under the
+    operator's name (card #200)."""
+    if grant is None:
+        return decide(ctx, rid, approve)
+    req = Approvals(ctx).pending().get(str(rid))
+    word = "yes" if approve else "no"
+    data = {"answer": {"kind": "closed", "value": word}}
+    what = f"{'approved' if approve else 'denied'} approval #{rid}" + (f" ({approval_what(req)})" if req else "")
+    by = f"Operator {who}, delegated by human until {operators.until_text(grant)},"
+    try:
+        result = decide(ctx, rid, approve, by=by)
+    except XtError as e:
+        if req is not None:  # popped and failed: say so under the operator's name too
+            operators.act(ctx, who, grant, HUMAN, "report", f"{what}: failed: {' '.join(str(e).split())}", rid, data)
+        raise
+    operators.act(ctx, who, grant, HUMAN, "report", f"{what}: {result}", rid, data)
+    return result
 
 
 def answer(ctx: Ctx, who: str, qid: int, text: str) -> str:
-    """Answer question or approval `qid` as `who` (`xt answer` and `xt chat`); the result line."""
+    """Answer question or approval `qid` as `who` (`xt answer` and `xt chat`); the result line. An
+    operator answers the human's questions under a drive grant (card #200)."""
+    grant = _drive_grant(ctx, who, "answers questions and approves")
     if Approvals(ctx).is_approval(qid):  # a hire or schedule is a closed question (card #183)
-        if who != HUMAN:
+        if who != HUMAN and grant is None:
             raise XtError("only the human approves spawns")
         from .choices import resolve_answer
 
         word, _ = resolve_answer({"kind": "closed"}, text)
-        return f"#{qid}: {decide(ctx, qid, word == 'yes')}"
+        return f"#{qid}: {_decide(ctx, who, grant, qid, word == 'yes')}"
     item = ctx.ledger.item(qid)
     if item is None or item["type"] != "ask":
+        if by := operators.answered_by(ctx, qid):
+            raise XtError(f"#{qid}: {by}; nothing was sent")
         raise XtError(f"#{qid} is not an open question (see `xt inbox`)")
-    if who != item["owner"]:
+    if who != item["owner"] and not (grant and item["owner"] == HUMAN):
         raise XtError(f"#{qid} is a question for {item['owner']}, not {who}")
-    msg, status, data = answer_question(ctx, who, item, text)
+    msg, status, data = answer_question(ctx, who, item, text, grant)
+    recorded = msg["body"].rsplit("\n", 1)[0] if grant else msg["body"]  # without the drive mark
     return (f"#{msg['id']} answer to #{qid} → {item['opener']}: {status}"
-            + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
+            + (f" (recorded as: {recorded})" if data.get("option") else ""))
 
 
 def _typed_question(ctx: Ctx, who: str, ref: int | None) -> dict | None:
@@ -331,14 +362,18 @@ def _typed_question(ctx: Ctx, who: str, ref: int | None) -> dict | None:
     return item if isinstance(q, dict) and q.get("kind") in ("closed", "options") else None
 
 
-def answer_question(ctx: Ctx, who: str, item: dict, answer: str) -> tuple[dict, str, dict]:
+def answer_question(ctx: Ctx, who: str, item: dict, answer: str,
+                    grant: dict | None = None) -> tuple[dict, str, dict]:
     """The one answer path (card #182): check the answer against the question's declared type,
     record it as a report to the asker with the answer as data. `xt answer`, the TUI's `s` and
-    `xt chat` all come here."""
+    `xt chat` all come here; with `grant`, an operator's answer under its drive grant (card #200)."""
     from .choices import question_of, resolve_answer
 
     text, data = resolve_answer(question_of(ctx.ledger.message(item["id"])), answer)  # "2" → the option's text
-    msg, status = send(ctx, who, item["opener"], "report", text, item["id"], data={"answer": data})
+    if grant is not None:
+        msg, status = operators.act(ctx, who, grant, item["opener"], "report", text, item["id"], {"answer": data})
+    else:
+        msg, status = send(ctx, who, item["opener"], "report", text, item["id"], data={"answer": data})
     return msg, status, data
 
 
@@ -482,6 +517,7 @@ def cmd_status(args) -> None:
     board = status_line(ctx)  # card #135
     if board:
         print(board)
+    operators.announce_ended(ctx)  # card #200: an expired drive grant shows as ended, logged once
     for line in operators.active_grants(ctx):  # card #166
         print(f"delegation: {line}")
     from .watch import recently_ticked
@@ -550,6 +586,24 @@ def cmd_checkpoint(args) -> None:
 DONE_DAYS = 30  # how far back the Inbox looks, as the TUI does (model.HISTORY_DAYS)
 
 
+def _questions(box, by_id: dict) -> list[str]:
+    """Every question and approval waiting for the human, whole: id, asker, answer type, the text
+    (options and recommendation included) and the command that answers it (card #200)."""
+    from .choices import hint, question_of, summary
+
+    out = []
+    for q in box.questions:
+        m = by_id.get(q["id"]) or {"body": q["title"]}
+        qd = question_of(m)
+        out += [f"#{q['id']} {q['opened'][5:16]} question from {q['opener']} — "
+                f"{summary(qd) or 'open'}: {hint(qd)}", *(f"  {ln}" for ln in m["body"].splitlines()),
+                f"  answer: xt answer {q['id']} \"...\"", ""]
+    for rid, r in box.approvals:
+        out += [f"#{rid} approval requested by {r['requester']} — yes/no: answer yes or no",
+                f"  {approval_what(r)}", f"  answer: xt answer {rid} yes|no", ""]
+    return out[:-1] or ["Nothing waits for an answer."]
+
+
 def cmd_inbox(args) -> None:
     """The Inbox in the TUI's three groups, empty ones left out (card #127). In the human's own
     terminal the listing counts as a look: New clears and the friction it printed is seen. An
@@ -561,6 +615,10 @@ def cmd_inbox(args) -> None:
     ctx = Ctx.load()
     msgs = list(ctx.ledger.messages(since_days=args.days))
     box = inbox.build(ctx, msgs)
+    if args.questions:  # card #200: the read path for an operator under a drive grant; changes nothing
+        for line in _questions(box, {m["id"]: m for m in msgs}):
+            print(line)
+        return
     one = lambda text, n=160: " ".join(text.split())[:n]
     printed = False
     # --seen lists what the TUI folds, under the same labels (card #179): answered questions under
@@ -640,9 +698,11 @@ DEPRECATED_APPROVE = ("note: approvals are yes/no questions from 0.21.0: `xt ans
 
 
 def cmd_approve(args, approve: bool = True) -> None:
-    if _who(args) != HUMAN:
-        raise XtError("only the human approves spawns")
+    who = _who(args, operator=True)
     ctx = Ctx.load()
+    grant = _drive_grant(ctx, who, "approves")  # card #200: an operator under a drive grant
+    if who != HUMAN and grant is None:
+        raise XtError("only the human approves spawns")
     print(DEPRECATED_APPROVE, file=sys.stderr)  # card #183, Q3: one line, nothing removed
     if not args.ids:  # no ids: show what's waiting, with the commands
         pending = Approvals(ctx).pending()
@@ -655,7 +715,7 @@ def cmd_approve(args, approve: bool = True) -> None:
         return
     for rid in args.ids:
         try:
-            print(f"#{rid}: {decide(ctx, rid, approve)}")
+            print(f"#{rid}: {_decide(ctx, who, grant, rid, approve)}")
         except XtError as e:
             print(str(e) if f"#{rid}" in str(e) else f"#{rid}: {e}")  # the id once (card #177)
 
@@ -715,7 +775,7 @@ def cmd_delegate(args) -> None:
     if not args.name:
         raise XtError("name the operator: xt delegate NAME --for 30m")
     only = [c for part in (args.only or []) for c in part.split(",")]
-    print(operators.grant(ctx, args.name, args.for_, only))
+    print(operators.grant(ctx, args.name, args.for_, only, args.scope))
 
 
 def cmd_retire(args) -> None:
@@ -888,6 +948,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--seen", action="store_true",
                     help="also list what the TUI folds: questions you answered and notifications you have "
                          "seen (last 7 days), and the friction you have seen")
+    sp.add_argument("--questions", action="store_true",
+                    help="only what waits for an answer, each in full: its text, answer type, options and "
+                         "recommendation (what an operator with a drive grant reads)")
 
     sp = add("clear", cmd_clear, "dismiss an alert")
     sp.add_argument("key")
@@ -949,6 +1012,9 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--only", action="append", metavar="COMMANDS",
                     help=f"limit the grant to some of: {', '.join(operators.DELEGABLE)} (comma-separated)")
     sp.add_argument("--revoke", action="store_true", help="end the grant now (without NAME: every grant)")
+    sp.add_argument("--scope", choices=[operators.DRIVE],
+                    help=f"{operators.DRIVE}: the operator gives {operators.DRIVE_WHAT} for you instead of running "
+                         f"commands (replaces any other grant)")
 
     add("harnesses", cmd_harnesses, "which harnesses xt can use here")
 

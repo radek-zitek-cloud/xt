@@ -184,6 +184,10 @@ class Supervisor:
             self.check_launch(live)
         self.check_published()
         self.watch_board(now)
+        from .operators import announce_ended
+
+        for line in announce_ended(self.ctx):  # card #200: a drive grant that ran out says so once
+            self.say(line)
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
             for line in self.ctx.ledger.rotate(

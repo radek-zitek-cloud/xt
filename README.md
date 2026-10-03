@@ -84,9 +84,10 @@ in [CHANGELOG.md](CHANGELOG.md).
   once it has saved its notes (now or when it's free, or automatically above a size you set), and
   an agent resumed outside xt is flagged with `xt restart` as the fix
   ([`xt reset`](docs/user-guide.md#xt-reset)).
-- **Agents in bounds, an operator within limits (0.11, 0.13, 0.19).** No account connectors unless
-  you opt one in, a permissions file per Claude Code agent, and your own coding agent may run
-  `restart`, `reset`, `spawn` and `up` for you for up to an hour, logged
+- **Agents in bounds, an operator within limits (0.11, 0.13, 0.19, 0.22).** No account connectors
+  unless you opt one in, a permissions file per Claude Code agent, and your own coding agent may run
+  `restart`, `reset`, `spawn` and `up` for you, or with `--scope drive` answer, approve and give
+  goals, for up to an hour, each logged under its own name
   ([An operator acting for you](docs/user-guide.md#13-an-operator-acting-for-you)).
 
 What it can't do yet is in [Known limits](#known-limits).
@@ -250,6 +251,7 @@ equivalent and when you'd use it.
 | `xt harnesses` | Installed harnesses and their known limits |
 | `xt operator add NAME --pid PID` / `remove` / `list` / `pid` | Register an outside process acting for you under its own name (`pid`: the operator prints what to register) |
 | `xt delegate NAME [--for 30m] [--only …]` / `xt delegate --revoke` | Let an operator run `restart`, `reset`, `spawn` and `up` for at most an hour, each one logged |
+| `xt delegate NAME --scope drive [--for 30m]` | Let an operator answer your questions, decide approvals and give the liaison goals for at most an hour, each recorded under its name |
 | `xt watch` | The supervisor loop (`xt up` runs it in its own pane) |
 | `xt --version` | The xt version |
 

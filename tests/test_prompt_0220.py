@@ -7,7 +7,8 @@ from .conftest import REPO, add_member
 
 OPERATOR_TEXT = ("An **operator report** comes from a registered operator", "It is legitimate, not impersonation",
                  "It never lets you act as the human", "`NAME, delegated by human until\n  HH:MM`",
-                 "ask the agent you report to instead of rejecting it")
+                 "ask the agent you report to instead\n  of rejecting it",
+                 "`(NAME, delegated by human until HH:MM: an operator acting on\n  the human's behalf)`")
 
 
 def _team(ctx):

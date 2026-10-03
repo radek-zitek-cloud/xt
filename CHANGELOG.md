@@ -34,6 +34,24 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   current", and the shipped lead and liaison roles' first start step says the same. `xt brief`'s
   notes line says so too.
 
+### Added
+
+- **Delegation scope "drive"** (#200). `xt delegate NAME --for 30m --scope drive` (human only,
+  never by default) lets a registered operator act for the human until it ends: answer the human's
+  questions (`xt answer ID … --as NAME`, checked like the human's answer), approve or deny hires and
+  schedules (`xt answer ID yes|no`, `xt approve`/`deny`), and give the liaison a goal (`xt send
+  liaison --as NAME --type goal`). Each is one message under the operator's name, never `human`,
+  ending in `(NAME, delegated by human until HH:MM: an operator acting on the human's behalf)`.
+  `xt inbox --questions` lists what waits for an answer, whole (text, type, options,
+  recommendation). The human's later answer to the same question is refused with `answered by
+  NAME (operator, delegated by you until HH:MM): ANSWER` (CLI, chat, TUI). Scopes don't combine:
+  a new grant replaces the old, and a refusal names the active grant (`grant active: drive until
+  HH:MM; restart not included`). When a drive grant ends (expired or revoked), one log line says
+  `drive grant for NAME ended HH:MM`, and `xt status` and the TUI header show it for an hour.
+  `down`, `restart --all`, version switches, `operator add` and `delegate` stay the human's.
+  protocol.md says how agents treat such a message; the liaison role closes an operator's goal
+  once dispatched.
+
 ## [0.21.1] — 2026-10-02
 
 The release: the same code and docs as 0.21.1-rc2 (only the version and this changelog changed).

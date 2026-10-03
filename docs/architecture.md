@@ -78,7 +78,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
 | `src/xt/launch.py` | Card #165: whether each running agent is the process xt started, by its `XT_AGENT` in `/proc` (a harness process working in the team repo); the warning and one Inbox alert per agent running without xt's launch settings. |
-| `src/xt/operators.py` | Card #166: named operators acting for the human. Registration (`xt operator add NAME --pid PID`: a harness process that isn't a team agent, its start time, and a token in `.xt/operators/NAME.token`, mode 600), recognition (token in `XT_OPERATOR_TOKEN` *and* the registered process among the command's ancestors), the operator's reports to the liaison, and time-bound grants of `restart`, `reset`, `spawn` (existing agent) and `up` (at most 60 minutes, checked against the stored end time at each command). |
+| `src/xt/operators.py` | Card #166: named operators acting for the human. Registration (`xt operator add NAME --pid PID`: a harness process that isn't a team agent, its start time, and a token in `.xt/operators/NAME.token`, mode 600), recognition (token in `XT_OPERATOR_TOKEN` *and* the registered process among the command's ancestors), the operator's reports to the liaison, and time-bound grants of `restart`, `reset`, `spawn` (existing agent) and `up` (at most 60 minutes, checked against the stored end time at each command). Card #200: the grant's scope `drive` (`drive`, `act`, `answered_by`, `announce_ended`): the operator's answers, approvals and goals as messages under its own name with a `delegated` field, and one line when a drive grant ends. |
 | `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. The queued reset (`--when-idle`, `state/resets.json`), the supervisor's non-blocking step that runs it, and the opt-in automatic policy that queues one above a token threshold. |
 | `src/xt/usage.py` | Live context per agent, from its harness's session log. |
 | `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines and windows. |
@@ -543,10 +543,20 @@ harness goes to the human with `xt friction`.
   and the delegable ones. `xt delegate NAME [--for ≤60m, default 30m] [--only …]` grants
   `restart`, `reset`, `spawn` of an existing agent as it is, and `up`; `cli._delegated` checks the
   stored end time at each command and records `NAME, delegated by human until HH:MM: xt …`.
-  `down`, `restart --all` (it takes the team down), answers, approvals, version switches,
-  registering and granting stay the human's. `xt status` and the Team header show an active grant.
+  `down`, `restart --all` (it takes the team down), version switches, registering and granting
+  stay the human's. `xt status` and the Team header show an active grant.
   The process check needs the operator's process tree to be visible: a command run in Codex's
   sandbox (its own PID namespace) can't be recognised.
+- **Drive** (card #200). `xt delegate NAME --scope drive` stores `scope: drive` on the grant, with no
+  commands; a new grant replaces it (scopes don't combine), and refusals name the active grant.
+  `operators.drive` is the check for `xt answer`, `xt approve`/`deny` and `xt send --type goal` by an
+  operator. `operators.act` records each action as one message from the operator (an answer to the
+  asker, an approval decision to the human, a goal to the liaison), ending in `(NAME, delegated by
+  human until HH:MM: …)` and carrying `delegated: {by, until}`; the ledger closes the human's
+  question on an operator answer with that field. `operators.answered_by` gives the refusal the
+  human sees afterwards (CLI, chat, TUI). `xt inbox --questions` is the operator's read path. When a
+  drive grant ends, `announce_ended` (supervisor tick, `xt status`, the next drive check) or the
+  revoke writes `drive grant for NAME ended HH:MM` once, kept in `state/operators.json` `ended`.
 
 ## Harnesses
 

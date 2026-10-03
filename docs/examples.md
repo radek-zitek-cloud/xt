@@ -516,11 +516,47 @@ behalf)`. When the check is done:
 xt delegate --revoke                    # or let it expire
 ```
 
-- **Never delegated:** `xt down`, `xt restart --all`, answers, approvals, `xt version use` and
-  `rollback`, `xt operator add` and `xt delegate`. They stay yours, grant or no grant, and `--as
-  human` keeps working only from your own terminal.
+- **Never delegated:** `xt down`, `xt restart --all`, `xt version use` and `rollback`, `xt operator
+  add` and `xt delegate`. They stay yours, grant or no grant, and `--as human` keeps working only
+  from your own terminal. Answers and approvals need a drive grant (section 10).
 - Both the token and the registered process are needed: the token copied into another shell, or the
   operator's process without the token, is refused. A new operator session needs a new `xt
   operator add`.
 - `xt status` and the TUI's Team header show the grant and its end time while it lasts. See the
   [user guide](user-guide.md#13-an-operator-acting-for-you).
+
+## 10. Hand your coding agent the wheel for half an hour
+
+**Context.** The same operator as in section 9, while you're away from the keyboard for half an
+hour: the team shouldn't wait on you, so the operator answers your questions, decides approvals and
+gives the liaison its next goal (from 0.22.0). In **your own terminal**:
+
+```sh
+xt delegate helper --for 30m --scope drive   # replaces any other grant; at most 60m
+```
+
+The operator finds what waits for you, whole (text, answer type, options, recommendation):
+
+```sh
+XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/helper.token) \
+  /path/to/team/bin/xt inbox --questions
+```
+
+and answers it, approves a hire, and gives a goal, each with the token and `--as helper`:
+
+```sh
+xt answer 1290 2 --as helper            # recorded as "Option 2: …", checked like your answer
+xt answer 1291 yes --as helper          # approves hire #1291
+xt send liaison --as helper --type goal <<'XT_END'
+After the digest: draft next week's reading list from the scout's stories.
+XT_END
+```
+
+Each lands under `helper`, never `human`, ending in `(helper, delegated by human until 15:30: an
+operator acting on the human's behalf)`, and shows in your Inbox. Back at the keyboard, answering
+#1290 yourself shows what was decided: `answered by helper (operator, delegated by you until
+15:30): Option 2: …`. At 15:30 the log says `drive grant for helper ended 15:30`, and the
+operator's next answer is refused; `xt delegate --revoke` ends it sooner.
+
+- A drive grant doesn't run `restart` or `spawn`; grant those separately when you need them (the new
+  grant replaces drive).
