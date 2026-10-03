@@ -2,7 +2,6 @@
 
 from textual.containers import VerticalScroll
 
-from xt import chat
 from xt.dispatch import send
 from xt.spawn import request_spawn
 from xt.team import SYSTEM

@@ -520,6 +520,11 @@ def cmd_status(args) -> None:
     operators.announce_ended(ctx)  # card #200: an expired drive grant shows as ended, logged once
     for line in operators.active_grants(ctx):  # card #166
         print(f"delegation: {line}")
+    from .paneinput import signal
+
+    pane = signal(ctx)  # card #193
+    if pane:
+        print(f"pane input: {pane}")
     from .watch import recently_ticked
 
     if not watch_pid(ctx) and not recently_ticked(ctx):  # said plainly whenever it's down (card #165)
@@ -778,6 +783,24 @@ def cmd_delegate(args) -> None:
     print(operators.grant(ctx, args.name, args.for_, only, args.scope))
 
 
+def cmd_pane_input(args) -> None:
+    """Card #193: Claude Code's prompt-submit hook in the liaison's pane. It queues the typed line for
+    the supervisor, which records it only when the session log shows it was typed; on any problem it
+    prints a warning the pane shows. It never blocks the prompt and never records anything itself."""
+    import json
+
+    from . import paneinput
+
+    try:
+        data = json.loads(sys.stdin.read() or "{}")
+        ctx = Ctx.load()
+        warn = paneinput.hook(ctx, os.environ.get(AGENT_ENV), data.get("prompt") if isinstance(data, dict) else None)
+    except Exception as e:  # the human must see it, never silence (spec: failure feedback)
+        warn = str(e) or type(e).__name__
+    if warn:
+        print(paneinput.warning(warn))
+
+
 def cmd_retire(args) -> None:
     print(retire(Ctx.load(), _who(args), args.name))
 
@@ -1015,6 +1038,11 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--scope", choices=[operators.DRIVE],
                     help=f"{operators.DRIVE}: the operator gives {operators.DRIVE_WHAT} for you instead of running "
                          f"commands (replaces any other grant)")
+
+    sp = add("pane-input", cmd_pane_input, "(run by the liaison's prompt hook, not by hand) queue a line the "
+                                          "human typed in the liaison's pane; it is recorded only if the "
+                                          "session log shows it was typed")
+    sp.add_argument("--hook", action="store_true", help="read Claude Code's hook input on stdin")
 
     add("harnesses", cmd_harnesses, "which harnesses xt can use here")
 

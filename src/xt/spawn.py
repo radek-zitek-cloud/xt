@@ -6,7 +6,7 @@ import re
 import shlex
 import time
 
-from . import brief, permissions, skills
+from . import brief, paneinput, permissions, skills
 from .adapters import codex_option_args, codex_options_text, get_adapter, load_adapters
 from .alerts import Alerts
 from .herdr import HerdrError
@@ -86,8 +86,11 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     rel, skipped = permissions.effective(ctx.team, a, adapter)  # may refuse a `permissions` line
     settings = permissions.preflight(ctx.paths.root, rel) if rel else None  # refuses a bad file
     options = codex_option_args(name, a.harness, a.codex_options)  # refuses one off the allowlist (#169)
+    settings_file = str(settings.path) if settings else None
+    if a.role == "liaison" and adapter.name in paneinput.HOOKED:  # card #193: its own file plus the prompt hook
+        settings_file = paneinput.hook_settings(ctx, name, rel if settings else None)
     args = adapter.start_args(a.model, a.connectors, str(ctx.paths.root),
-                              str(settings.path) if settings else None, options)  # may refuse an opt-in
+                              settings_file, options)  # may refuse an opt-in
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
     # Before the harness starts, so it and every shell it opens inherit it (card #103).
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")

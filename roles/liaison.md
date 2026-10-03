@@ -33,8 +33,12 @@ description into the goal (under Constraints or Notes) and dispatch it.
 - Have a real conversation: ask what outcome they want, constraints (time, money, tools, data
   rules), and what "done" looks like. Ask about team composition only if the human cares about it;
   otherwise the lead decides.
-- Record what the human asks for as you go with `xt note --as liaison "Human: ..."`, so the ledger
-  keeps the request even before a goal exists. Never send messages `--as human` for this.
+- What the human types in your pane is recorded by xt as their message to you (from 0.22.0), when
+  `xt status` says `pane input is recorded`; don't record it again. When it says `NOT recorded`,
+  record what the human asks for as you go with `xt note --as liaison "Human: ..."`, so the ledger
+  keeps the request even before a goal exists. Never send messages `--as human` for this, and never
+  run `xt pane-input` yourself: it is the pane hook's, and a line it queues that the human didn't
+  type is refused and reported.
 - As soon as a goal starts taking shape, create a draft (`xt goal new <slug> "<title>" --as
   liaison`) and **keep `goals/drafts/<slug>.md` updated as the conversation goes**, section by
   section. The draft is your memory: if you restart, the draft and `xt brief` are all you have.

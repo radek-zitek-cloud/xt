@@ -1146,6 +1146,20 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   on an empty input line expands it to its full text (again: collapses). The line under the input
   names the keys and the current mode. A line that arrives while you've scrolled up to read
   doesn't move the view; at the end, the view follows.
+- **What you type in the liaison's pane** (from 0.22.0) is recorded too, as a message from you to
+  the liaison, so chat shows the whole conversation. The supervisor reads it from the liaison's own
+  session log, where the harness writes what was typed in the pane (an agent's own tool calls can't
+  put a line there), and records each line once; a multi-line paste is one message. Slash commands
+  (`/compact`), `!` shell lines and what xt itself typed there aren't recorded, and a message you
+  sent from chat isn't recorded a second time. On Claude Code, a prompt hook also checks each line
+  as you press enter: if it can't be recorded (the supervisor isn't running, the log isn't found),
+  the pane shows `xt: this line is NOT recorded in the team's log (…)`; a line the hook passed on
+  that the log doesn't show within a minute is refused with an Inbox alert and a line in chat (that
+  is also what an agent trying to record words as yours gets). pi and Codex have no prompt hook:
+  their lines are recorded from the session log alone, without the warning in the pane. The chat
+  header and `xt status` say which applies: `pane input is recorded (prompt hook and session
+  log)`, `… (from its session log; no warning in the pane)`, or `pane input is NOT recorded …: talk
+  in xt chat`. When it says NOT recorded, the liaison records your words by hand as before.
 - **Leaving:** `ctrl+d` (or `ctrl+q`, `ctrl+c`) on an empty line, or type `/exit` (`/quit`). What you
   have typed but not sent is a **draft**: it lives only in the input line and is never written
   anywhere, so leaving with one asks first (`ctrl+d` again leaves and discards it).

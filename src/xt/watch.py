@@ -188,6 +188,14 @@ class Supervisor:
 
         for line in announce_ended(self.ctx):  # card #200: a drive grant that ran out says so once
             self.say(line)
+        from . import paneinput
+
+        try:
+            for line in paneinput.scan(self.ctx):  # card #193: what the human typed in the liaison's pane
+                self.say(line)
+        except Exception as e:  # a log xt can't parse mustn't stop the supervisor
+            self.say(f"pane input: {e}")
+            self.failed("pane-input", str(e))
         if now - self.last_rotate >= 3600:
             self.last_rotate = now
             for line in self.ctx.ledger.rotate(

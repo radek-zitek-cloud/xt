@@ -9,7 +9,7 @@ from .team import HUMAN, SYSTEM
 
 # Supervisor failures that raise one Inbox alert per kind (card #131): kind -> alert key
 FAILURES = {"wake-up": "failed:wake-up", "notification": "failed:notification",
-            "usage recording": "failed:usage-recording"}
+            "usage recording": "failed:usage-recording", "pane-input": "failed:pane-input"}
 
 
 def repeats(alert: dict) -> str:

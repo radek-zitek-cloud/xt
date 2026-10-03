@@ -34,10 +34,11 @@ from .team import HUMAN, SYSTEM
 HISTORY = 30  # messages shown when chat starts (spec: the last 30)
 REFRESH_S = 2.0  # how often chat reads the ledger: a delivered message shows within this (spec: 10 s)
 EXIT_WORDS = ("/exit", "/quit")
+HEADER_S = 30.0  # how often the header re-checks whether pane input is recorded (card #193)
 MODES = ("hidden", "goals", "all")  # the liaison's team activity lines (card #199)
 DEFAULT_MODE = "goals"  # Radek, 2026-10-03
 # xt's own lines about delegation, shown in the conversation (card #200: the drive grant ended)
-DELEGATION = re.compile(r"^(human delegated |human revoked the delegation |drive grant for )")
+DELEGATION = re.compile(r"^(human delegated |human revoked the delegation |drive grant for |pane input to )")
 
 
 def liaison_of(ctx: Ctx) -> str:
@@ -167,6 +168,7 @@ class ChatApp(App):
 
     CSS = """
     Screen { background: ansi_default; }
+    #header { height: auto; color: ansi_bright_black; }
     #history { height: 1fr; scrollbar-size-vertical: 1; }
     .msg { margin: 0 0 1 0; }
     .activity { margin: 0 0 1 0; text-wrap: nowrap; text-overflow: ellipsis; }
@@ -210,6 +212,7 @@ class ChatApp(App):
         self.expanded: set[int] = set()
 
     def compose(self) -> ComposeResult:
+        yield Static(id="header")
         yield VerticalScroll(id="history")
         yield Static(id="question")
         with Horizontal(id="line"):
@@ -224,6 +227,18 @@ class ChatApp(App):
         self.load(conversation(msgs, self.liaison, operators=self.operators), msgs, follow=True)
         self.query_one("#draft", Input).focus()
         self.set_interval(self.refresh_s, self.refresh_messages)
+        self.update_header()
+        self.set_interval(HEADER_S, self.update_header)
+
+    def update_header(self) -> None:
+        """Who you talk to, and whether what you type in the liaison's pane is recorded (card #193)."""
+        from .paneinput import signal
+
+        try:
+            pane = signal(self.ctx)
+        except Exception:  # a header line must never stop the chat
+            pane = None
+        self.query_one("#header", Static).update(f"xt chat with {self.liaison}" + (f" · {pane}" if pane else ""))
 
     # --- the conversation ------------------------------------------------------------------------
 
