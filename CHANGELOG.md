@@ -51,6 +51,14 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   `down`, `restart --all`, version switches, `operator add` and `delegate` stay the human's.
   protocol.md says how agents treat such a message; the liaison role closes an operator's goal
   once dispatched.
+- **`xt chat` shows the operator and the liaison's team activity** (#199). A registered operator's
+  messages to the liaison and its drive actions are part of the conversation, labelled
+  `» NAME (operator)` (a different colour, and the words alone without colour), and a question it
+  answered shows `✓ answered by NAME (operator)`; xt's drive start and end lines show too. The
+  liaison's messages to the team show as dimmed one-liners cut to one row
+  (`12:04 to lead: goal #3020 …`): `ctrl+t` cycles goals only (the default), all and hidden; `↑`/`↓`
+  pick one and `enter` on an empty input line expands it. The hint line names the keys and the
+  mode, and fits 80 columns. A line arriving while you've scrolled up no longer moves the view.
 
 ## [0.21.1] — 2026-10-02
 

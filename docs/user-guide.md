@@ -1133,6 +1133,18 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   number for options (your own words only when it offers Other), or text for an open question,
   and press enter. The answer is checked and recorded exactly as `xt answer` records it; a refused
   answer stays in the input line with the reason below it.
+- **The operator and the team** (from 0.22.0). A registered operator's messages to the liaison,
+  and its drive actions (answers, approvals, goals; see [Drive](#13-an-operator-acting-for-you)),
+  are part of the conversation, labelled `» NAME (operator)` (magenta, and the words alone tell
+  them from yours without colour) with their `NAME, delegated by human until HH:MM` text; a question
+  the operator answered shows `✓ answered by NAME (operator)`. xt's lines that a drive grant
+  started or ended show too. What the liaison sends the team shows as dimmed one-liners, each
+  cut to one row: `12:04 to lead: goal #3020 Patch release v0.21.1`. `ctrl+t` cycles them
+  through **goals only** (the default), all of them (forwards and questions to the lead too) and
+  hidden (a plain `t` would go into your message, so it's `ctrl+t`); `↑`/`↓` pick one and `enter`
+  on an empty input line expands it to its full text (again: collapses). The line under the input
+  names the keys and the current mode. A line that arrives while you've scrolled up to read
+  doesn't move the view; at the end, the view follows.
 - **Leaving:** `ctrl+d` (or `ctrl+q`, `ctrl+c`) on an empty line, or type `/exit` (`/quit`). What you
   have typed but not sent is a **draft**: it lives only in the input line and is never written
   anywhere, so leaving with one asks first (`ctrl+d` again leaves and discards it).
