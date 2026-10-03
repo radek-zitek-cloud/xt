@@ -28,7 +28,8 @@ order #190, #172, #197 (rc1), then #200, #199 and #193.
   human's terminal or a delegated action recorded as `NAME, delegated by human until HH:MM`; an
   unsure agent asks the agent it reports to instead of rejecting the report.
 - **The notes go into the first prompt, whole** (#197). On spawn, restart and reset, xt appends
-  `members/<name>/notes.md` to the first prompt after the brief, under `===== your notes … =====`.
+  `members/<name>/notes.md` to the first prompt after the brief, byte for byte (rc4: rc1 trimmed
+  trailing whitespace), between `===== your notes … =====` and `===== end of your notes =====`.
   A file over the notes budget (16,000 bytes) still goes in whole, with one line saying it is over;
   no file, no section. protocol.md's "read it first" became "your notes are below; keep them
   current", and the shipped lead and liaison roles' first start step says the same. `xt brief`'s

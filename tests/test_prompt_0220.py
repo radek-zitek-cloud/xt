@@ -51,7 +51,7 @@ def test_197_the_notes_go_in_whole_after_the_brief_for_every_role(ctx):
         text = first_prompt(ctx, name)
         head = f"===== your notes (members/{name}/notes.md, whole) =====\n"
         assert text.index("===== your brief (") < text.index(head) < text.index(spawn.START_NOW)
-        assert f"{head}# {name} notes\n- first rule\n- newest rule at the bottom\n\n" in text
+        assert f"{head}# {name} notes\n- first rule\n- newest rule at the bottom\n===== end of your notes =====\n" in text
         assert "over the notes budget" not in text
 
 
@@ -63,6 +63,19 @@ def test_197_a_long_file_goes_in_whole_with_the_over_budget_line(ctx):
     text = first_prompt(ctx, "liaison")
     assert f"(This file is {len((body + '- the newest rule\n').encode())} bytes, over the notes budget of 16000 bytes" in text
     assert body + "- the newest rule\n" in text
+
+
+def test_197_trailing_newlines_and_spaces_go_in_byte_for_byte(ctx):
+    # rc1 QA (#3118): notes.rstrip() dropped trailing whitespace
+    request_spawn(ctx, "human", "liaison", None, None, None, None)
+    head = "===== your notes (members/liaison/notes.md, whole) =====\n"
+    end = "===== end of your notes =====\n"
+    for body in ("rule\n\n\n", "rule  \n  \n\n", "line one\r\nline two  \r\n\r\n", "rule"):
+        _notes(ctx, "liaison", "")
+        (ctx.paths.members / "liaison" / "notes.md").write_bytes(body.encode())
+        text = first_prompt(ctx, "liaison")
+        between = text.split(head, 1)[1].split(end, 1)[0]
+        assert between == (body if body.endswith("\n") else body + "\n"), repr(between)
 
 
 def test_197_a_missing_file_adds_nothing(ctx):

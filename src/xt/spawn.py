@@ -27,16 +27,19 @@ NOTES_BUDGET = 16_000  # bytes; over it, the notes still go in whole, with one l
 
 
 def notes_section(ctx: Ctx, name: str) -> str:
-    """The agent's notes file, whole, for its first prompt (card #197); nothing when there's none."""
+    """The agent's notes file, whole and byte for byte (trailing whitespace too, no newline
+    translation), for its first prompt (card #197), between a heading and an end line; nothing when
+    there's no file."""
     path = ctx.paths.members / name / "notes.md"
     try:
-        notes = path.read_text()
+        raw = path.read_bytes()
+        notes = raw.decode()
     except (OSError, UnicodeDecodeError):
         return ""
-    size = len(notes.encode())
-    over = (f"(This file is {size} bytes, over the notes budget of {NOTES_BUDGET} bytes: it is here whole, "
-            f"but shorten it.)\n") if size > NOTES_BUDGET else ""
-    return f"===== your notes (members/{name}/notes.md, whole) =====\n{over}{notes.rstrip()}\n\n"
+    over = (f"(This file is {len(raw)} bytes, over the notes budget of {NOTES_BUDGET} bytes: it is here whole, "
+            f"but shorten it.)\n") if len(raw) > NOTES_BUDGET else ""
+    return (f"===== your notes (members/{name}/notes.md, whole) =====\n{over}{notes}"
+            f"{'' if notes.endswith(chr(10)) or not notes else chr(10)}===== end of your notes =====\n\n")
 
 
 def first_prompt(ctx: Ctx, name: str) -> str:

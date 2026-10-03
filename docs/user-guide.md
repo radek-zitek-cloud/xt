@@ -666,8 +666,9 @@ Agents lose their memory on restart and when their harness compacts the conversa
 for that: the ledger, the goal briefs, the roles, skills and each agent's
 `members/<name>/notes.md` hold everything that matters, and `xt brief` rebuilds an agent's picture
 from them (every first prompt includes it). From 0.22.0 the first prompt (on spawn, restart and
-reset) also carries the agent's `notes.md` whole, after the brief, under `===== your notes … =====`,
-so no agent cuts it short or spends a step reading it. A file over the notes budget (16,000 bytes)
+reset) also carries the agent's `notes.md` whole, byte for byte (trailing blank lines and spaces
+too), after the brief, between `===== your notes … =====` and `===== end of your notes =====`, so no
+agent cuts it short or spends a step reading it. A file over the notes budget (16,000 bytes)
 still goes in whole, with one line saying it is over; an agent without a notes file gets no such
 section. If an agent seems confused or its context is heavy,
 `xt restart <name>` gives it a clean session that starts from its brief.
