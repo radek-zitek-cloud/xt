@@ -248,6 +248,240 @@ def test_208_chat_log_brief_and_detail_keep_the_full_label(ctx, fake_home, monke
     assert full in _log(ctx, monkeypatch, capsys)
 
 
+# --- #210: keys for scrolling the chat history ----------------------------------------------------------
+
+
+def _long_history(ctx, n=30):
+    from xt.dispatch import send
+
+    from .test_chat_0220 import _team
+
+    _team(ctx)
+    for i in range(n):
+        send(ctx, "liaison", "human", "report", f"news {i}\nsecond line\nthird line")
+
+
+def test_210_page_keys_home_and_end_scroll_the_history_and_leave_the_draft(ctx):
+    from textual.containers import VerticalScroll
+    from textual.widgets import Input
+
+    from .test_chat_0210 import _run, _type
+
+    _long_history(ctx)
+
+    async def steps(app, pilot):
+        history = app.query_one("#history", VerticalScroll)
+        draft = app.query_one("#draft", Input)
+        await _type(pilot, "half a thought")
+        end = history.max_scroll_y
+        assert end > 0 and history.scroll_y == end
+        page = history.scrollable_content_region.height - 2  # about 2 rows of overlap
+        await pilot.press("pageup")
+        await pilot.pause()
+        assert history.scroll_y == end - page
+        await pilot.press("pageup", "pagedown")
+        await pilot.pause()
+        assert history.scroll_y == end - page
+        await pilot.press("home")
+        await pilot.pause()
+        assert history.scroll_y == 0
+        await pilot.press("end")
+        await pilot.pause()
+        assert history.scroll_y == end
+        assert app.focused is draft and draft.value == "half a thought"  # focus and draft unchanged
+
+    _run(ctx, steps, refresh_s=60)
+
+
+async def _at_end(pilot, history):
+    """Whether the view reaches the end within ten frames (new lines get their height a frame or
+    two after they're mounted, later under load)."""
+    for _ in range(10):
+        if history.scroll_y == history.max_scroll_y:
+            return True
+        await pilot.pause(0.05)
+    return False
+
+
+def test_210_an_arrival_while_scrolled_up_keeps_the_view_and_shows_the_marker(ctx):
+    from textual.containers import VerticalScroll
+
+    from xt.dispatch import send
+
+    from .test_chat_0210 import _run, _text, _type
+
+    _long_history(ctx)
+
+    async def steps(app, pilot):
+        history = app.query_one("#history", VerticalScroll)
+        mark = app.query_one("#newmark")
+        assert not mark.display
+        await pilot.press("pageup")
+        await pilot.pause()
+        y = history.scroll_y
+        send(ctx, "liaison", "human", "report", "first arrival")
+        send(ctx, "liaison", "human", "report", "second arrival")
+        app.refresh_messages()
+        await pilot.pause()
+        assert history.scroll_y == y and mark.display and _text(mark) == "↓ 2 new (End)"
+        await pilot.press("end")
+        await pilot.pause()
+        assert history.scroll_y == history.max_scroll_y and not mark.display
+        send(ctx, "liaison", "human", "report", "arrives at the end")  # at the end: the view follows
+        app.refresh_messages()
+        await pilot.pause()
+        assert await _at_end(pilot, history) and not mark.display
+        await pilot.press("home")
+        await pilot.pause()
+        await _type(pilot, "sent from the top")
+        await pilot.press("enter")  # sending returns the view to the end
+        await pilot.pause()
+        assert await _at_end(pilot, history) and not mark.display
+
+    _run(ctx, steps, refresh_s=60)
+
+
+def test_210_page_keys_scroll_the_history_while_a_question_is_open(ctx):
+    from textual.containers import VerticalScroll
+
+    from xt.dispatch import send
+
+    from .test_chat_0210 import _run
+
+    _long_history(ctx)
+    send(ctx, "liaison", "human", "ask", "Ship it?\n\nAnswer yes or no.", data={"question": {"kind": "closed"}})
+
+    async def steps(app, pilot):
+        history = app.query_one("#history", VerticalScroll)
+        await pilot.press("tab")
+        await pilot.pause()
+        assert app.target is not None and app.query_one("#question").display
+        end = history.scroll_y
+        await pilot.press("pageup")
+        await pilot.pause()
+        assert history.scroll_y < end and app.target is not None
+
+    _run(ctx, steps, refresh_s=60)
+
+
+# --- #206: the hint fits at every width, with every key named ---------------------------------------
+
+BASE = ["ctrl+t", "pgup/pgdn", "ctrl+d"]
+INVENTORY = {  # (state, pickable) -> the keys named, in order
+    "plain": ["enter", "↑↓", *BASE],
+    "plain, nothing to pick": ["enter", *BASE],
+    "waiting": ["enter", "tab", "↑↓", *BASE],
+    "answering": ["enter", "esc", *BASE],
+    "picked": ["enter", "↑↓", "esc", *BASE],
+    "expanded": ["enter", "↑↓", "esc", *BASE],
+}
+
+
+def _keys(line):
+    return [part.split(" ", 1)[0] for part in line.split(" · ")]
+
+
+def _expected(state, mode):
+    keys = INVENTORY[state]
+    return [k for k in keys if k != "↑↓"] if mode == "hidden" and state in ("plain", "waiting") else keys
+
+
+def _args(state):
+    return {"plain": (0, False, None, True), "plain, nothing to pick": (0, False, None, False),
+            "waiting": (12, False, None, True), "answering": (12, True, None, True),
+            "picked": (0, False, "picked", True), "expanded": (0, False, "expanded", True)}[state]
+
+
+@pytest.mark.parametrize("state", list(INVENTORY))
+def test_206_every_width_80_to_120_every_state_and_mode(state):
+    from rich.text import Text
+
+    from xt import chat
+
+    for mode in chat.MODES:
+        if state in ("picked", "expanded") and mode == "hidden":
+            continue  # hidden mode shows no line to pick
+        for width in range(80, 121):
+            waiting, answering, picked, pickable = _args(state)
+            line = chat.hint_line(width, waiting, answering, picked, mode, pickable, 1234 if answering else None)
+            assert Text(line).cell_len <= width - 4 and "…" not in line, (width, line)
+            assert _keys(line) == _expected(state, mode), (width, mode, line)
+            assert f"ctrl+t {mode}" in line or f"ctrl+t team activity ({mode})" in line
+
+
+def test_206_the_strings_quoted_in_the_guide():
+    from xt import chat
+
+    from .conftest import REPO
+
+    guide = (REPO / "docs" / "user-guide.md").read_text()
+    lines = {
+        (80, 2, False, None, "goals", True, None): "enter · tab answer (2) · ↑↓ pick · ctrl+t goals · pgup/pgdn · ctrl+d leave",
+        (80, 2, False, None, "hidden", True, None): "enter send · tab answer (2) · ctrl+t hidden · pgup/pgdn · ctrl+d leave",
+        (80, 0, False, "picked", "goals", True, None): "enter expand · ↑↓ pick · esc back · ctrl+t goals · pgup/pgdn · ctrl+d leave",
+        (80, 2, True, None, "goals", True, 812): "enter send #812 · esc back · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave",
+        (80, 0, False, None, "goals", False, None): "enter send · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave",
+        (120, 2, False, None, "goals", True, None): "enter send · tab answer (2 waiting) · ↑↓ pick · "
+                                                     "ctrl+t team activity (goals) · pgup/pgdn scroll · ctrl+d leave",
+        (120, 2, True, None, "goals", True, 812): "enter send #812 · esc message the liaison · "
+                                                   "ctrl+t team activity (goals) · pgup/pgdn scroll · ctrl+d leave",
+    }
+    for args, line in lines.items():
+        assert chat.hint_line(*args) == line, (args, chat.hint_line(*args))
+        assert f"`{line}`" in guide, line
+
+
+@pytest.mark.parametrize("state", ["plain", "waiting", "answering", "picked"])
+def test_206_the_rendered_hint_at_every_width_in_pilot(ctx, state):
+    from rich.text import Text
+
+    from xt.dispatch import send
+
+    from .test_chat_0210 import _run, _status
+    from .test_chat_0220 import _team
+
+    _team(ctx)
+    if state in ("waiting", "answering"):
+        for q in ("Ship it?", "And this?"):
+            send(ctx, "liaison", "human", "ask", f"{q}\n\nAnswer yes or no.", data={"question": {"kind": "closed"}})
+    send(ctx, "liaison", "lead", "goal", "A goal to pick")  # after the conversation's first line, so it shows
+
+    async def steps(app, pilot):
+        if state == "answering":
+            await pilot.press("tab")
+        if state == "picked":
+            await pilot.press("up")
+        for _ in range(1 if state == "picked" else 3):  # goals, all, hidden (picking needs a shown line)
+            for width in range(80, 121):
+                await pilot.resize_terminal(width, 24)
+                await pilot.pause()
+                status = app.query_one("#status")
+                line = _status(app)
+                assert status.size.height == 1 and Text(line).cell_len <= width - 4 and "…" not in line, (width, line)
+                assert _keys(line) == _expected(state, app.mode), (width, app.mode, line)
+            await pilot.press("ctrl+t")
+
+    _run(ctx, steps, refresh_s=60)
+
+
+def test_206_esc_puts_a_picked_line_back(ctx):
+    from xt.dispatch import send
+
+    from .test_chat_0210 import _run, _status
+    from .test_chat_0220 import _team
+
+    _team(ctx)
+    send(ctx, "liaison", "lead", "goal", "A goal to pick")
+
+    async def steps(app, pilot):
+        await pilot.press("up")
+        assert app.selected is not None and "esc back" in _status(app)
+        await pilot.press("escape")
+        assert app.selected is None and _status(app).startswith("enter send")
+
+    _run(ctx, steps, refresh_s=60)
+
+
 def test_201_a_retired_liaison_isnt_running(ctx, fake_home):
     from xt.spawn import retire
 

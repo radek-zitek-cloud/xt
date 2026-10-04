@@ -1157,9 +1157,33 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   cut to one row: `12:04 to lead: goal #3020 Patch release v0.21.1`. `ctrl+t` cycles them
   through **goals only** (the default), all of them (forwards and questions to the lead too) and
   hidden (a plain `t` would go into your message, so it's `ctrl+t`); `↑`/`↓` pick one and `enter`
-  on an empty input line expands it to its full text (again: collapses). The line under the input
-  names the keys and the current mode. A line that arrives while you've scrolled up to read
-  doesn't move the view; at the end, the view follows.
+  on an empty input line expands it to its full text (again: collapses); `esc` puts it back.
+- **Scrolling** (from 0.22.1). Your draft keeps the focus while you scroll the conversation:
+  `PageUp` and `PageDown` move it by a page (two rows of the page before stay in view), `Home`
+  goes to the oldest message shown and `End` to the latest, as in Flow. In the input line,
+  `ctrl+a` and `ctrl+e` still move the cursor to the start and end of your draft. When a question
+  is open above the input line, the page keys still scroll the conversation, not the question. `g`
+  and `G` are not chat keys: chat has the oldest message at the top and Flow the newest, so the
+  same letters would mean the opposite. A line that arrives while you've scrolled up doesn't move
+  the view; one line under the conversation says how many wait below, `↓ 2 new (End)`, until you
+  are back at the end. At the end, arrivals and what you send keep the view at the end.
+- **The line under the input** names every key that applies now, in one row. Chat needs **80
+  columns**: from 80 to 100 it uses short words, above 100 the full ones, and where a line is still
+  too long it drops `scroll`, then `send`, never a key; below 80 the header and this line may be
+  cut. For example, at 80 columns:
+
+  | When | The line |
+  |---|---|
+  | nothing waits, goals mode, nothing to pick | `enter send · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave` |
+  | hidden mode, two questions waiting | `enter send · tab answer (2) · ctrl+t hidden · pgup/pgdn · ctrl+d leave` |
+  | two questions waiting and a line to pick | `enter · tab answer (2) · ↑↓ pick · ctrl+t goals · pgup/pgdn · ctrl+d leave` |
+  | answering #812 | `enter send #812 · esc back · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave` |
+  | a line picked | `enter expand · ↑↓ pick · esc back · ctrl+t goals · pgup/pgdn · ctrl+d leave` |
+
+  and at 120 columns `enter send · tab answer (2 waiting) · ↑↓ pick · ctrl+t team activity (goals) · pgup/pgdn scroll · ctrl+d leave`,
+  or while answering `enter send #812 · esc message the liaison · ctrl+t team activity (goals) · pgup/pgdn scroll · ctrl+d leave`.
+  Between 100 and 120 columns the full words come in where they fit. In hidden mode the line never
+  offers `↑↓ pick`; while you answer, `tab` still moves to the next question.
 - **What you type in the liaison's pane** (from 0.22.0) is recorded too, as a message to the
   liaison labelled **`you (typed in the pane, unverified)`**, so chat shows the whole
   conversation. Every place that shows such a message says "unverified":

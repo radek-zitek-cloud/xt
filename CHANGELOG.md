@@ -38,6 +38,16 @@ specs/polish-for-0-22-1).
   shortens to `(pane, unverified)`, then `(unverified)`, so the row keeps at least 12 characters of
   the message; in a very narrow pane the row drops the date, the name padding and the type first.
   Chat, log, brief and detail keep the full label; the guide lists every rendering.
+- **#210** Chat's history scrolls from the keyboard while the draft keeps the focus: `PageUp` and
+  `PageDown` by a page (two rows overlap), `Home` to the oldest message and `End` to the latest.
+  `Home` and `End` no longer move the draft's cursor (`ctrl+a` and `ctrl+e` still do). Lines that
+  arrive while you're scrolled up leave the view where it is and show `↓ N new (End)` until you're
+  back at the end. No `g`/`G` in chat (its order is the opposite of Flow's).
+- **#206** Chat's hint is one row with 4 columns to spare at every width from 80 to 120, and names
+  every key that applies (`pgup/pgdn` included): full words above 100 columns, short ones below,
+  then `scroll` and `send` drop, never a key. While you answer it names `enter send #N` and `esc
+  back` (`tab` still moves to the next question); with a line picked, `esc back` puts it back
+  (new). The guide quotes the strings.
 
 ## [0.22.0] — 2026-10-03
 

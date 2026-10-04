@@ -38,6 +38,7 @@ EXIT_WORDS = ("/exit", "/quit")
 HEADER_S = 30.0  # how often the header re-checks whether pane input is recorded (card #193)
 MODES = ("hidden", "goals", "all")  # the liaison's team activity lines (card #199)
 DEFAULT_MODE = "goals"  # Radek, 2026-10-03
+PAGE_OVERLAP = 2  # rows PageUp / PageDown keep from the page before (card #210)
 # xt's own lines about delegation, shown in the conversation (card #200: the drive grant ended)
 DELEGATION = re.compile(r"^(human delegated |human revoked the delegation |drive grant for |pane input to )")
 
@@ -117,28 +118,68 @@ def _time(ts: str) -> str:
         return "--:--"
 
 
+HINT_SPARE = 4  # columns the hint and the header leave free (cards #202, #206)
+FULL_WORDS = 100  # the hint uses its full words only above this width (card #206)
+SHORT_FIRST = ("↑↓", "tab", "ctrl+t", "esc", "enter", "pgup/pgdn", "ctrl+d")  # which key takes short words first
+SHORTEST_FIRST = ("pgup/pgdn", "enter")  # then which takes its shortest
+
+
+def hint_keys(waiting: int, answering: bool, picked: str | None, mode: str, pickable: bool = True,
+              target: int | None = None) -> list[tuple[str, tuple[str, str, str]]]:
+    """The keys the hint names in this state, each with its words in three tiers (full, short,
+    shortest), in order (card #206; the inventory its test asserts):
+
+    - plain: enter send, (↑↓ pick when a line can be picked), ctrl+t MODE, pgup/pgdn, ctrl+d leave
+    - questions waiting: the same with `tab answer (N)` after enter
+    - answering: enter send #N, esc back, ctrl+t, pgup/pgdn, ctrl+d leave
+    - a one-liner picked: enter expand, ↑↓ pick, esc back, ctrl+t, pgup/pgdn, ctrl+d leave
+    - hidden mode: as plain, never pick (card #204)
+    """
+    pick = ("↑↓", ("pick a line", "pick", "pick"))
+    if answering:
+        n = f"#{target}" if target is not None else ""
+        keys = [("enter", (f"send {n}".strip(), f"send {n}".strip(), n)),
+                ("esc", ("message the liaison", "back", "back"))]
+    elif picked:
+        word = "expand" if picked == "picked" else "collapse"
+        keys = [("enter", (word, word, "expand" if picked == "picked" else "close")), pick,
+                ("esc", ("back", "back", "back"))]
+    else:
+        keys = [("enter", ("send", "send", ""))]
+        if waiting:
+            keys.append(("tab", (f"answer ({waiting} waiting)", f"answer ({waiting})", f"answer ({waiting})")))
+        if pickable and mode != "hidden":
+            keys.append(pick)
+    return keys + [("ctrl+t", (f"team activity ({mode})", mode, mode)),
+                   ("pgup/pgdn", ("scroll", "scroll", "")),
+                   ("ctrl+d", ("leave", "leave", "leave"))]
+
+
 def hint_line(width: int, waiting: int, answering: bool, picked: str | None, mode: str,
-              pickable: bool = True) -> str:
-    """The keys under the input line, in one row of `width` (card #199): shorter words below 100
-    columns; if it is still too long, `↑↓ pick` goes, then the end is cut with an ellipsis.
-    `picked`: None, "picked" or "expanded" (a one-liner chosen with ↑/↓). `pickable`: whether a
-    one-liner is shown to pick; never in hidden mode (card #204)."""
-    narrow = width < 100
-    first = {"picked": "enter expand", "expanded": "enter collapse"}.get(picked, "enter send")
-    keys = [first]
-    if waiting:
-        if answering:
-            keys.append("tab next · esc back" if narrow else "tab next · esc message the liaison")
-        else:
-            keys.append(f"tab answer ({waiting})" if narrow else f"tab answer ({waiting} waiting)")
-    keys.append(f"ctrl+t team: {mode}" if narrow else f"ctrl+t team activity ({mode})")
-    if pickable and mode != "hidden":
-        keys.append("↑↓ pick" if narrow else "↑/↓ enter: expand")
-    keys.append("ctrl+d leave")
-    line = " · ".join(keys)
-    if len(line) > width:
-        line = " · ".join(k for k in keys if k != "↑↓ pick")
-    return line if len(line) <= width else line[:max(width - 1, 0)] + "…"
+              pickable: bool = True, target: int | None = None) -> str:
+    """The keys under the input line in one row of `width` with HINT_SPARE columns to spare
+    (cards #199, #206): the longest tier that fits (full words only above FULL_WORDS columns),
+    every key named in each. Below 80 columns, where nothing is promised, the shortest tier is cut
+    at the end. `picked`: None, "picked" or "expanded" (a one-liner chosen with ↑/↓); `pickable`:
+    a one-liner is shown to pick (card #204); `target`: the question being answered."""
+    keys = hint_keys(waiting, answering, picked, mode, pickable, target)
+
+    def line(tier: dict[str, int]) -> str:
+        return " · ".join(f"{k} {w[tier.get(k, 1)]}".strip() for k, w in keys)
+
+    # Shorter words come in one key at a time, the least needed first, so the line keeps as many
+    # words as fit: full words (above FULL_WORDS only), then short, then shortest.
+    tier = {k: 0 for k, _ in keys} if width > FULL_WORDS else {}
+    tiers = [line(tier)]
+    for k in SHORT_FIRST:
+        tier = {**tier, k: 1}
+        tiers.append(line(tier))
+    for k in SHORTEST_FIRST:
+        tier = {**tier, k: 2}
+        tiers.append(line(tier))
+    fits = [t for t in tiers if Text(t).cell_len <= width - HINT_SPARE]
+    best = fits[0] if fits else tiers[-1]
+    return best if Text(best).cell_len <= width else best[:max(width - 1, 0)] + "…"
 
 
 OPERATOR_PREFIX = "» "  # with "(operator)", tells an operator's lines from yours without colour (#199)
@@ -197,6 +238,8 @@ class ChatApp(App):
     Screen { background: ansi_default; }
     #header { height: auto; color: ansi_bright_black; }
     #history { height: 1fr; scrollbar-size-vertical: 1; }
+    #newmark { display: none; height: 1; color: ansi_yellow; text-style: bold; }
+    #newmark.shown { display: block; }
     .msg { margin: 0 0 1 0; }
     .activity { margin: 0 0 1 0; text-wrap: nowrap; text-overflow: ellipsis; }
     .activity.expanded { text-wrap: wrap; }
@@ -218,6 +261,13 @@ class ChatApp(App):
         Binding("ctrl+t", "cycle_activity", show=False, priority=True),
         Binding("up", "select(-1)", show=False, priority=True),
         Binding("down", "select(1)", show=False, priority=True),
+        # card #210: the history scrolls while the draft keeps the focus (the input doesn't use the
+        # page keys; Home and End leave it, ctrl+a and ctrl+e still move its cursor). No g/G: chat is
+        # oldest at the top, Flow newest, so the same letters would mean the opposite.
+        Binding("pageup", "page(-1)", show=False, priority=True),
+        Binding("pagedown", "page(1)", show=False, priority=True),
+        Binding("home", "history_home", show=False, priority=True),
+        Binding("end", "history_end", show=False, priority=True),
     ]
 
     def __init__(self, ctx: Ctx, refresh_s: float = REFRESH_S):
@@ -238,10 +288,14 @@ class ChatApp(App):
         self.selected: int | None = None  # the one-liner ↑/↓ picked
         self.expanded: set[int] = set()
         self.pane: tuple[str, str, str, str] | None = None  # the pane-input state (paneinput), read every HEADER_S
+        self.unseen = 0  # lines that arrived while the view was scrolled up (card #210)
+        self._width = 0  # set by each resize
+        self.stick = True  # the view is at the end and follows new lines (card #210)
 
     def compose(self) -> ComposeResult:
         yield Static(id="header")
         yield VerticalScroll(id="history")
+        yield Static(id="newmark")
         yield Static(id="question")
         with Horizontal(id="line"):
             yield Static(id="target")
@@ -254,6 +308,9 @@ class ChatApp(App):
         self.last_id = msgs[-1]["id"] if msgs else 0
         self.load(conversation(msgs, self.liaison, operators=self.operators), msgs, follow=True)
         self.query_one("#draft", Input).focus()
+        history = self.query_one("#history", VerticalScroll)
+        self.watch(history, "scroll_y", self._scrolled, init=False)
+        self.watch(history, "virtual_size", self._grown, init=False)
         self.set_interval(self.refresh_s, self.refresh_messages)
         self.update_header()
         self.set_interval(HEADER_S, self.update_header)
@@ -269,12 +326,18 @@ class ChatApp(App):
             self.pane = None
         self.paint_header()
 
+    @property
+    def width(self) -> int:
+        """The terminal's width; the newest a resize said (card #206: it may arrive before `size`)."""
+        return self._width or self.size.width
+
     def paint_header(self) -> None:
         from .paneinput import header
 
-        self.query_one("#header", Static).update(header(self.pane, self.liaison, self.size.width))
+        self.query_one("#header", Static).update(header(self.pane, self.liaison, self.width))
 
     def on_resize(self, event) -> None:
+        self._width = event.size.width
         self.paint_header()
         self.update_line()
 
@@ -297,7 +360,7 @@ class ChatApp(App):
         open_ids = {p["id"] for p in self.waiting}
         answers = self._answers(msgs)
         history = self.query_one("#history", VerticalScroll)
-        at_end = follow or history.scroll_y >= history.max_scroll_y - 1
+        at_end = follow or self.stick
         for m in shown:
             if kind_of(m, self.liaison, self.operators) == "activity":
                 w = Static(one_liner(m), classes="activity")
@@ -308,6 +371,8 @@ class ChatApp(App):
                 self.shown[m["id"]] = w
             w.msg_id = m["id"]  # every line is a ledger message (card #199, criterion 4)
             history.mount(w)
+            if not at_end and w.display:  # card #210: counted for the marker
+                self.unseen += 1
         for qid, w in self.shown.items():  # a question answered meanwhile (here, in the TUI, …)
             if qid in answers or qid not in open_ids:
                 m = self.ctx.ledger.message(qid)
@@ -317,7 +382,45 @@ class ChatApp(App):
             self.target = None
         self.update_line()
         if at_end:
+            self.unseen = 0
+            self.stick = True
             history.scroll_end(animate=False)
+        self.paint_mark()
+
+    # --- scrolling the history (card #210) -------------------------------------------------------
+
+    def _at_end(self) -> bool:
+        history = self.query_one("#history", VerticalScroll)
+        return history.scroll_y >= history.max_scroll_y - 1
+
+    def _scrolled(self, _y: float) -> None:
+        self.stick = self._at_end()
+        if self.unseen and self.stick:
+            self.unseen = 0
+            self.paint_mark()
+
+    def _grown(self, _size) -> None:
+        """New lines got their height: a view that was at the end stays there."""
+        if self.stick:
+            self.query_one("#history", VerticalScroll).scroll_end(animate=False)
+
+    def paint_mark(self) -> None:
+        """One line under the history while lines that arrived wait below the view: `↓ N new (End)`."""
+        mark = self.query_one("#newmark", Static)
+        mark.update(f"↓ {self.unseen} new (End)")
+        mark.set_class(bool(self.unseen), "shown")
+
+    def action_page(self, step: int) -> None:
+        """PageUp / PageDown: the history by a page, two rows kept from the page before."""
+        history = self.query_one("#history", VerticalScroll)
+        page = max(1, history.scrollable_content_region.height - PAGE_OVERLAP)
+        history.scroll_to(y=history.scroll_y + step * page, animate=False)
+
+    def action_history_home(self) -> None:
+        self.query_one("#history", VerticalScroll).scroll_home(animate=False)
+
+    def action_history_end(self) -> None:
+        self.query_one("#history", VerticalScroll).scroll_end(animate=False)
 
     def refresh_messages(self, follow: bool = False) -> None:
         """Read what's new in the ledger and show it (every REFRESH_S)."""
@@ -387,8 +490,8 @@ class ChatApp(App):
         self.query_one("#target", Static).update(label)
         if status is None:
             picked = None if self.selected is None else "expanded" if self.selected in self.expanded else "picked"
-            status = hint_line(self.size.width, len(self.waiting), bool(self.target), picked, self.mode,
-                               bool(self._visible()))
+            status = hint_line(self.width, len(self.waiting), bool(self.target), picked, self.mode,
+                               bool(self._visible()), self.target["id"] if self.target else None)
         self.query_one("#status", Static).update(status)
 
     def action_next_target(self) -> None:
@@ -402,6 +505,11 @@ class ChatApp(App):
         self.update_line()
 
     def action_to_liaison(self) -> None:
+        """esc: back from an answer to messaging the liaison, or from a picked one-liner to the
+        draft (card #206: the hint's `esc back`)."""
+        if self.target is None and self.selected is not None:
+            old, self.selected = self.selected, None
+            self._paint(old)
         self.target = None
         self.update_line()
 
