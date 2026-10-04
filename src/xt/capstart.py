@@ -126,6 +126,16 @@ def row(caps: Caps, adapter, legacy: list[str], name: str, width: int = ROW_WIDT
     return t[: width - 1] + "…"
 
 
+BUILTIN_NOTE = "claude cmds: Claude Code's own read-only commands (date, ls…) run anyway"
+
+
+def builtin_caveat(caps: Caps, adapter) -> bool:
+    """Whether a row's `commands` is Claude's: its allow list covers commands beyond the built-in
+    read-only set, which dontAsk lets through (date ran in the live round on rc8)."""
+    return (adapter is not None and bool(adapter.settings_flag) and caps.configured and caps.commands is not None
+            and cap.support(adapter, "commands") == ENFORCED)
+
+
 def spawn_sentence(caps: Caps, adapter, source: str = "generated") -> str:
     """The spawn approval's line: `Approve its start: write, network enforced; deny, commands
     advisory (role text only).` (at most two rows of 80 columns)."""

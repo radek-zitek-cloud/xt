@@ -191,7 +191,10 @@ def claude_rules(name: str, caps: Caps, xt_bin: str) -> dict:
     if caps.commands is None:
         allow.append("Bash")
     else:
-        allow += [f"Bash({xt_bin} *)", f"Bash({xt_bin})"]
+        # xt in every spelling agents use (the reply hint's absolute path, bin/xt and ./bin/xt from the
+        # team repo, xt on PATH), and cd, so `cd <repo> && xt …` passes too (live round on rc8)
+        for x in (xt_bin, "bin/xt", "./bin/xt", "xt", "cd"):
+            allow += [f"Bash({x} *)", f"Bash({x})"]
         for c in caps.commands:
             allow += [f"Bash({c} *)", f"Bash({c})"]
     for c in caps.credential_clis:
@@ -272,9 +275,12 @@ def resolve(p: str, root) -> str:
 
 
 def codex_args(caps: Caps, root) -> list[str]:
-    """Codex start arguments: the sandbox's network switch, and each `write` path as `--add-dir`
-    (plain paths, nothing for Herdr's shell to quote)."""
-    args = ["-c", f"sandbox_workspace_write.network_access={'true' if caps.network == 'on' else 'false'}"]
+    """Codex start arguments: the workspace-write sandbox (the only mode in which the network switch
+    and extra writable roots apply: without it, codex-cli 0.160.0 in a folder it doesn't trust yet
+    exits 1 on `--add-dir`; live round on rc8), its network switch, and each `write` path as
+    `--add-dir` (plain paths, nothing for Herdr's shell to quote)."""
+    args = ["-s", "workspace-write",
+            "-c", f"sandbox_workspace_write.network_access={'true' if caps.network == 'on' else 'false'}"]
     for p in caps.write:
         args += ["--add-dir", resolve(p, root)]
     return args

@@ -21,11 +21,15 @@ the model, the three harness adapters, `require`, `xt capabilities`, the status 
 sentence; **rc6** completes #186: the same row in the brief and the TUI's detail, the old `settings:`
 and `codex options:` status lines folded into it, and the guide section; **rc7** keeps a #185
 follow-up row in the Work outline within 76 columns at any pane width (QA on rc4); **rc8** makes the
-#186 conversion round-trip with an `extras` key (QA on rc6).
+#186 conversion round-trip with an `extras` key (QA on rc6); **rc9** fixes three findings of the
+live round on rc8: a Codex agent with a block starts in the workspace-write sandbox (with `write`
+it exited at start before), a Claude agent with `commands` may run xt in every spelling and
+`cd … && xt …`, and status, the start note and the guide say that Claude Code's own read-only
+commands (such as `date`) run anyway.
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc8`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc9`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
   follow-ups). Nothing to
@@ -74,9 +78,10 @@ follow-up row in the Work outline within 76 columns at any pane width (QA on rc4
   xt loads `team.toml`. Each harness turns the block into its own mechanism and says per capability
   whether it is `enforced` or `advisory` (role text only), from checks on Claude Code 2.1.289,
   codex-cli 0.160.0 and pi 1.0.2: Claude gets a generated `dontAsk` settings file (file edits by
-  path, shell commands and credential CLIs by name; network stays advisory), Codex its sandbox's
-  network switch and `--add-dir` for the write paths, pi `--no-skills` with the team's skills
-  passed back. A capability marked `require` that the harness can't enforce refuses the start (and
+  path, shell commands and credential CLIs by name, beyond Claude Code's own read-only commands,
+  which run anyway; xt itself and `cd` always allowed; network stays advisory), Codex the
+  workspace-write sandbox with its network switch and `--add-dir` for the write paths, pi
+  `--no-skills` with the team's skills passed back. A capability marked `require` that the harness can't enforce refuses the start (and
   a hire request, before any approval) naming the capability, the harness and the nearest
   alternative, storing nothing. A legacy settings file on top of a team default block may only
   restrict: a rule that would loosen it is refused, naming both. `xt status`, the brief and the

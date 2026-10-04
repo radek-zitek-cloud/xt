@@ -776,8 +776,13 @@ harnesses` lists the table and the harness versions it was checked on:
 | advisory | network | write, deny, commands, skills, credential_clis | write, deny, commands, network, credential_clis |
 
 What that means: for Claude Code xt writes a settings file (`dontAsk`): file edits only under
-`write`, nothing under `deny`, shell commands only from `commands`, credential CLIs denied **by
-name**. A command it may run can still use the network or a credential another way: that's a
+`write`, nothing under `deny`, shell commands only from `commands` **beyond Claude Code's own
+built-in read-only commands** (such as `date`, `echo` or `ls`, which it runs anyway; `xt status`
+says so under the agents), credential CLIs denied **by name**. xt itself is always allowed, in
+every spelling (the reply hint's absolute path, `bin/xt`, `./bin/xt`, `xt`), and so is `cd`, so
+`cd <team repo> && xt …` passes. One thing no rule opens: Claude Code refuses a command whose
+quoted heredoc text holds backticks or `<`, `>` characters, as if they were part of the command; an
+agent rewords such a message (the protocol's heredoc otherwise works as written). A command it may run can still use the network or a credential another way: that's a
 limit by name, not isolation, so `network` stays advisory there. Codex's sandbox enforces the
 network; `write` paths are added with `--add-dir` so the agent can write there, but it can also
 write the whole team repo, so `write` and `deny` stay advisory. pi enforces skills only.

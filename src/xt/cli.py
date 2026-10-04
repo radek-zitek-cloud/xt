@@ -494,6 +494,7 @@ def cmd_status(args) -> None:
 
     launched = launch.check(ctx, live)  # card #165
     launch.alert(ctx, launched, live)
+    builtin_note = False  # card #186: a started Claude agent has `commands` set
     for a in ctx.team.agents():
         if a.kind == HUMAN:
             continue
@@ -525,6 +526,8 @@ def cmd_status(args) -> None:
         caps_line = capstart.status_row(ctx, a, adapters.get(a.harness))  # card #186
         if caps_line:
             print(capstart.INDENT + caps_line)
+            if capstart.builtin_caveat(capabilities.effective(ctx.team, a), adapters.get(a.harness)):
+                builtin_note = True
         if a.name in resets:
             print(f"  {'':<12} {queued_text(resets[a.name])}")
         state_launch, why = launched.get(a.name, (None, ""))
@@ -532,6 +535,8 @@ def cmd_status(args) -> None:
             print(f"  {'':<12} WARNING: {launch.warning(a.name)}")
         elif state_launch == launch.UNCHECKED:
             print(f"  {'':<12} launch settings: not checked ({why})")
+    if builtin_note:  # card #186, live round on rc8: said once, under the agents
+        print(capstart.BUILTIN_NOTE)
     from .lifecycle import Jobs, suggestion, watch_pid
 
     now = dt.datetime.now(dt.timezone.utc).astimezone()

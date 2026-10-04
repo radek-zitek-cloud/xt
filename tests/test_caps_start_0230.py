@@ -524,6 +524,73 @@ def test_186_extras_is_claude_only_and_not_mixing(ctx):
         _start(ctx, "dana")
 
 
+# --- live round on rc8 (members/operator/live-v0230-rc8.md) ------------------------------------------
+
+
+def test_186_c_a_codex_agent_with_a_block_runs_in_the_workspace_write_sandbox(ctx):
+    _team(ctx, dana="codex")
+    _edit(ctx, dana={"capabilities": {"write": ["/tmp/dana"]}})
+    args = _start(ctx, "dana")
+    i = args.index("-s")
+    assert args[i + 1] == "workspace-write" and i < args.index("--add-dir")  # else codex exits 1 on --add-dir
+    assert "sandbox_workspace_write.network_access=false" in args
+
+
+def _allowed(command: str, allow: list[str], deny: list[str]) -> bool:
+    """An approximation of Claude Code's Bash prefix rules: the first line (a heredoc's text is
+    stdin), split on && ; | into commands, each matched by `Bash(X *)` / `Bash(X)`, deny first."""
+    first = command.splitlines()[0].split("<<")[0]
+    parts = [p.strip() for p in first.replace("&&", ";").replace("|", ";").split(";") if p.strip()]
+
+    def match(p, rules):
+        for r in rules:
+            if not r.startswith("Bash("):
+                continue
+            spec = r[5:-1]
+            if spec.endswith(" *") and (p == spec[:-2] or p.startswith(spec[:-1])):
+                return True
+            if p == spec:
+                return True
+        return "Bash" in rules
+
+    return all(not match(p, deny) and match(p, allow) for p in parts)
+
+
+def test_186_b_the_protocols_xt_forms_pass_the_generated_rules(ctx):
+    _team(ctx, carol="claude")
+    _edit(ctx, carol={"capabilities": {"commands": ["echo"]}})
+    s = _settings(_start(ctx, "carol"))["permissions"]
+    xt, root = str(ctx.paths.xt_bin), str(ctx.paths.root)
+    forms = [
+        f"{xt} send lead --as carol --type report --ref 3 <<'XT_END'\nThe report, as the reply hint writes it.\nXT_END",
+        f"{xt} done 3 --as carol <<'XT_END'\nDone: results in members/carol/out.md\nXT_END",
+        f"{xt} answer 7 --as carol <<'XT_END'\nyes\nXT_END",
+        f"{xt} note --as carol <<'XT_END'\na decision\nXT_END",
+        f"cd {root} && {xt} send lead --as carol --type report <<'XT_END'\ntext\nXT_END",
+        f"cd {root} && bin/xt brief --as carol",
+        "./bin/xt log --member carol --limit 5",
+        "xt brief --as carol",
+    ]
+    for form in forms:
+        assert _allowed(form, s["allow"], s["deny"]), form
+    assert not _allowed("date && rm -rf /tmp/x", s["allow"], s["deny"])  # the rest of the shell stays closed
+    assert not _allowed("cd /tmp && gh auth status", s["allow"], s["deny"])
+
+
+def test_186_a_status_and_the_start_note_say_claudes_built_in_commands_run_anyway(ctx, monkeypatch, capsys):
+    _team(ctx, carol="claude", dana="codex")
+    _edit(ctx, carol={"capabilities": {"commands": ["git"]}}, dana={"capabilities": {"commands": ["git"]}})
+    _start(ctx, "dana")
+    assert capstart.BUILTIN_NOTE not in _status(ctx, monkeypatch, capsys)  # codex: commands is advisory anyway
+    _start(ctx, "carol")
+    out = _status(ctx, monkeypatch, capsys)
+    assert out.count(capstart.BUILTIN_NOTE) == 1 and len(capstart.BUILTIN_NOTE) <= 76
+    note = [m for m in ctx.ledger.messages() if m["body"].startswith("started carol")][-1]["body"]
+    assert note.endswith(capstart.BUILTIN_NOTE)
+    guide = " ".join((REPO / "docs" / "user-guide.md").read_text().split())
+    assert "beyond Claude Code's own built-in read-only commands" in guide
+
+
 def test_186_the_harness_files_parse_and_keep_their_other_keys(paths):
     ad = load_adapters(paths)
     assert ad["claude"].settings_flag == "--settings" and ad["claude"].context_windows

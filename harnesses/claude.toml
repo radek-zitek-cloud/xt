@@ -21,7 +21,8 @@ settings_flag = "--settings"
 model_flag = "--model"
 summary = "Claude Code: careful multi-step work and writing; reads repo skills via .claude/skills"
 # Card #186: what xt's generated settings file (dontAsk) enforces. write and deny: Claude's file
-# tools by path rule; commands: shell commands by name; credential_clis: denied by name (a command
+# tools by path rule; commands: shell commands by name, beyond Claude Code's built-in read-only ones
+# (date ran in the live round on rc8; status and the guide say so); credential_clis: denied by name (a command
 # that is allowed can still use credentials or the network: no isolation). network stays advisory:
 # WebFetch and WebSearch are denied by name, but no settings key limits the shell's network.
 capabilities_checked = "Claude Code 2.1.289 (operator check 2026-10-04: --help; settings rule syntax)"

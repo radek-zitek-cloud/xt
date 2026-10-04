@@ -134,7 +134,8 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         note = check_prompt_in_log(ctx, name, adapter, began, settled)
     versions.record_agent_start(ctx, name, ctx.ledger.clock(), a.codex_options, capstart.record(plan))
     caps_line = (f"capabilities: {capstart.row(plan.caps, adapter, plan.legacy, name, 200, plan.was_loaded, plan.source)}"
-                 + (f" (settings generated: .xt/state/settings/{name}.json)" if plan.generated else ""))
+                 + (f" (settings generated: .xt/state/settings/{name}.json)" if plan.generated else "")
+                 + (f"; {capstart.BUILTIN_NOTE}" if capstart.builtin_caveat(plan.caps, adapter) else ""))
     ctx.ledger.append(SYSTEM, HUMAN, "system",
                       f"started {name} ({a.role}, {a.harness}) in workspace {workspace} with xt "
                       f"{versions.display(__version__)}{note}\n{caps_line}")  # card #186: one start, one note
