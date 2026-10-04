@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.22.0** (2026-10-03), after real runs with a newsroom team and xt's
+What the code does as of **v0.22.1** (2026-10-04), after real runs with a newsroom team and xt's
 own product team, and the fixes they led to. Release-by-release changes are in
 [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the [user guide](user-guide.md).
 
