@@ -169,7 +169,7 @@ wheels = [
 
 [[package]]
 name = "xt"
-version = "0.23.0rc8"
+version = "0.23.0rc9"
 source = { editable = "." }
 dependencies = [
     { name = "textual" },
