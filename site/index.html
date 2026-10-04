@@ -33,7 +33,7 @@
 <header class="hero">
   <div class="grid-bg"></div>
   <div class="wrap">
-    <div class="eyebrow">open source · MIT · v0.22.0</div>
+    <div class="eyebrow">open source · MIT · v0.22.1</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You talk to one of them in a chat: approve, decide and correct, and every step is on record.</p>
     <div class="cta">
@@ -116,7 +116,7 @@
         <p class="sub">The team runs without you watching. You are needed only for decisions.</p>
         <ul>
           <li><b>Approvals:</b> every hire and every schedule waits for your yes.</li>
-          <li><b>One Inbox</b> for questions, approvals and alerts, in the TUI or <code class="mono">xt inbox</code>, with a desktop notification, and exactly one notification when a goal you gave is done.</li>
+          <li><b>One Inbox</b> for questions, approvals and alerts, in the TUI or <code class="mono">xt inbox</code>, with a desktop notification, and exactly one notification when a goal you gave is done. A message that waits two minutes for a stopped member raises an alert too.</li>
           <li><b>Questions that say what answer they take:</b> yes/no, two to four options with their consequences and a recommendation, or open; xt checks your answer against it (your own words where the question allows them), hires and schedules are yes/no questions too, and the TUI keeps your answers in view for a week.</li>
           <li><b>Standing rules</b> instead of step-by-step instructions: "if I don't answer within the hour, pick the top story yourself, at most six a day".</li>
           <li><b>Corrections become rules:</b> a correction from you is recorded as a lesson, and the rule that allowed the mistake is fixed.</li>
@@ -190,6 +190,7 @@
           <li><b>Answered once, by you:</b> <code class="mono">tab</code> picks the waiting question; xt checks the answer against its type and accepts it only from your own terminal, or from your own agent while you've handed it the wheel.</li>
           <li><b>The whole picture:</b> your operator's messages, labelled as its own, and the goals the liaison gives the team, as quiet one-line notes (<code class="mono">ctrl+t</code> shows more or none).</li>
           <li><b>The liaison's pane counts too:</b> what is typed there shows in the chat, labelled <i>typed in the pane, unverified</i>: it is on record, but it never answers or approves anything.</li>
+          <li><b>Scroll from the keyboard:</b> <code class="mono">pgup</code>/<code class="mono">pgdn</code>, <code class="mono">home</code> and <code class="mono">end</code> move through the history while your draft stays put, and a <i>↓ N new</i> marker says what arrived while you were scrolled up.</li>
         </ul>
         <div class="pills">
           <a class="pill arrow" href="https://github.com/radek-zitek-cloud/xt/blob/main/docs/user-guide.md">User guide</a>

@@ -76,7 +76,8 @@ in [CHANGELOG.md](CHANGELOG.md).
   0.22).** `xt chat` is one conversation with the liaison: the last 30 messages, new ones as they
   arrive, and questions answered in place ([`xt chat`](docs/user-guide.md#xt-chat)). Lines typed in
   the liaison's pane show there too, labelled unverified, and so do your operator's messages and
-  the liaison's goals to the team. A question is
+  the liaison's goals to the team; `pgup`/`pgdn`, `home` and `end` scroll the history while your
+  draft stays put. A question is
   yes/no, two to four numbered options with their consequences and a recommendation, or open, and
   xt checks your answer against it; hires and schedules are yes/no questions too. Each goal you
   gave sends exactly one notification when it's done ([`xt answer`](docs/user-guide.md#xt-answer)).
@@ -168,8 +169,8 @@ release's **Upgrading** note in [CHANGELOG.md](CHANGELOG.md). From 0.14.0 on, `x
 - **You stay in control of spending.** Hires and agent-set schedules wait for your approval;
   schedules have a minimum interval and can be limited to local hours (`--between 05:00-21:00`).
   A hire's approval names the Claude agent's permissions file, or warns that it has none.
-- **Alerts, never repairs.** A crashed, blocked or silent agent raises an alert for you; xt
-  doesn't guess at fixes.
+- **Alerts, never repairs.** A crashed, blocked or silent agent raises an alert for you, and so
+  does a message that waits two minutes for a member you stopped; xt doesn't guess at fixes.
 - **Any harness per agent.** Adapters in [harnesses/](harnesses/) describe how to start Claude
   Code, Codex and pi, answer their startup dialogs, and check that the first prompt landed.
 
@@ -238,7 +239,7 @@ equivalent and when you'd use it.
 | `xt down` | Stop every agent and the supervisor cleanly (`--keep-supervisor`: agents only) |
 | `xt status` | Team, live state, context and today's usage per agent, team usage and allowance (Codex, and Claude's five-hour and weekly windows through `bin/xt-statusline`), open work, questions, queue, approvals, alerts |
 | `xt inbox` | The Inbox as in the TUI: what needs you (questions, approvals, alerts), what's new since you last looked (goals done, reports), unread friction (`--seen`: also what the TUI folds: questions you answered and notifications you've seen in the last 7 days, and the friction you've seen) |
-| `xt chat` | Talk with the liaison in this terminal: the last 30 messages, new ones as they arrive, questions and approvals answered in place (`tab`), your operator's lines and the liaison's team activity (`ctrl+t`), `ctrl+d` leaves |
+| `xt chat` | Talk with the liaison in this terminal: the last 30 messages, new ones as they arrive, questions and approvals answered in place (`tab`), your operator's lines and the liaison's team activity (`ctrl+t`), `pgup`/`pgdn`, `home`, `end` scroll, `ctrl+d` leaves |
 | `xt answer <id> "..."` | Answer a question the liaison asked you (yes or no, a number that picks one of its options, or your words where it takes them), or a hire or schedule request (yes or no) |
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting); aliases of `xt answer <id> yes\|no` from 0.21.0 |
 | `xt clear <alert>` | Dismiss an alert |

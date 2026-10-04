@@ -9,9 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.22.1] — not released yet
+## [0.22.1] — 2026-10-04
 
-Polish for chat, the log and the pane-input signal, and one new alert (Space
+The release: the same code as 0.22.1-rc4 (the version, this changelog, the README's chat bullet,
+Alerts line and `xt chat` row, and the site's version, chat list and Inbox line changed). Polish
+for chat, the log and the pane-input signal, and one new alert (Space
 specs/polish-for-0-22-1). **0.22.1-rc1** has all ten cards; **rc2** makes `xt status` print
 its pane line (`unknown`) before it stops when the Herdr server can't be reached (#201); **rc3**
 adds QA's and ux's rc2 findings: a 30-second limit on the saved live state for the pane line,
