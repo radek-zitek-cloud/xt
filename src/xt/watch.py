@@ -569,17 +569,18 @@ def age_text(seconds: float) -> str:
 
 
 def start_command(ctx: Ctx, name: str) -> str:
-    """What starts this member now: `xt up` for the liaison, `xt approve N` when its start waits
-    on the human's approval, else the TUI's `u` or `xt spawn NAME` (card #187)."""
+    """What starts this member now, as the alert's last sentence: `Start it: xt up` for the
+    liaison, `Approve its start: xt approve N` when its start waits on the human's approval (ux on
+    rc2, xt #3389), else `Start it: u (or xt spawn NAME)` (card #187)."""
     from .spawn import Approvals
 
     a = ctx.team.agent(name)
     if a is not None and a.role == "liaison":
-        return "xt up"
+        return "Start it: xt up"
     for rid, r in Approvals(ctx).pending().items():
         if r.get("kind", "spawn") == "spawn" and r.get("name") == name:
-            return f"xt approve {rid}"
-    return f"u (or xt spawn {name})"
+            return f"Approve its start: xt approve {rid}"
+    return f"Start it: u (or xt spawn {name})"
 
 
 def queued_text(ctx: Ctx, name: str, msgs: list[dict], now: dt.datetime) -> tuple[str, str]:
@@ -594,7 +595,7 @@ def queued_text(ctx: Ctx, name: str, msgs: list[dict], now: dt.datetime) -> tupl
     else:
         line, about = f"{len(msgs)} messages waiting, oldest {age}", f"{first['type']} #{first['id']} from {first['from']}"
     who = f"{name} isn't running" + (" (you stopped it)" if name in stopped(ctx) else "")
-    return f"{who}: {line} ({about}). Start it: {start_command(ctx, name)}.", line
+    return f"{who}: {line} ({about}). {start_command(ctx, name)}.", line
 
 
 def run(ctx: Ctx) -> None:

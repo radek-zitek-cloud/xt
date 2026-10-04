@@ -13,7 +13,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 Polish for chat, the log and the pane-input signal, and one new alert (Space
 specs/polish-for-0-22-1). **0.22.1-rc1** has all ten cards; **rc2** makes `xt status` print
-its pane line (`unknown`) before it stops when the Herdr server can't be reached (#201).
+its pane line (`unknown`) before it stops when the Herdr server can't be reached (#201); **rc3**
+adds QA's and ux's rc2 findings: a 30-second limit on the saved live state for the pane line,
+`tab (N)` before `enter` loses its verb, the #201 status and header wording, spaces on both sides
+of the labelled arrow, the human's own sender line, `Approve its start`, and the architecture's
+version.
 
 ### Upgrading
 
@@ -25,19 +29,21 @@ its pane line (`unknown`) before it stops when the Herdr server can't be reached
 
 - **#187** One Inbox alert when a message has waited 2 minutes or more for a team member that isn't
   running (one xt didn't start this run, or one you stopped): `queued:NAME`, with the count, the
-  oldest message's age and the command that starts it (`u (or xt spawn NAME)`, `xt up` for the
-  liaison, `xt approve N` when its start waits on your approval), also listed in `xt status`. A
+  oldest message's age and the command that starts it (`Start it: u (or xt spawn NAME).`, `Start
+  it: xt up.` for the liaison, `Approve its start: xt approve N.` when its start waits on your
+  approval), also listed in `xt status`. A
   running member's queue never alerts, nor do messages to you or a retired member; an open
   `missing:NAME` alert takes the queue as one line instead. It clears when the member runs; after
   `xt clear queued:NAME` it returns only for a newer message or a new stop. `xt send` to a member
   that isn't running adds one line on standard error: `queued: builder isn't running; the human is
-  alerted if it is still not running in 2 minutes.` The guide's stop sentences no longer say that
+  alerted if it still isn't in 2 minutes.`, or from your own terminal `queued: builder isn't
+  running; you get an alert (queued:builder) if it still isn't in 2 minutes.` The guide's stop sentences no longer say that
   nothing alerts about a stopped agent.
 
 ### Changed
 
-- **#207** `xt log` (also `--full`, `--member`) and the brief put a space between the pane label and
-  the arrow: `human (typed in the pane, unverified) →liaison`. Other senders are unchanged
+- **#207** `xt log` (also `--full`, `--member`) and the brief put a space on both sides of the arrow
+  after the pane label: `human (typed in the pane, unverified) → liaison`. Other senders are unchanged
   (`human→liaison`).
 - **#204** In hidden mode chat's hint no longer offers `↑↓ pick`; in goals and all modes it offers
   it only when a one-liner is shown to pick. `ctrl+t hidden` stays named.
@@ -48,9 +54,9 @@ its pane line (`unknown`) before it stops when the Herdr server can't be reached
   grant covers drive only. The human runs xt down in their own terminal.`); the `xt status` pane
   line (`liaison (claude): pane input recorded (prompt hook and session log)`); and chat's NOT
   recorded advice (`— type here`, no longer "talk in xt chat").
-- **#201** The pane-input signal says `pane input: liaison isn't running` when the liaison is
-  stopped or retired (it said "recorded"), and `pane input: unknown (herdr server not reachable)`
-  when the Herdr server can't be reached (chat showed nothing; `xt status` prints that line, then
+- **#201** `xt status` says `pane input not recorded (the liaison isn't running)` when the liaison
+  is stopped or retired (it said "recorded"; the chat header: `pane input: not running`), and `pane
+  input unknown (herdr server not reachable)` when the Herdr server can't be reached (chat showed nothing; `xt status` prints that line, then
   stops with Herdr's error as before). In any shell that can't reach Herdr, the line goes by the
   supervisor's saved live state only while it is at most 30 seconds old, so a server that is
   down reads `unknown` within half a minute; other commands read the saved state as before.
@@ -68,7 +74,8 @@ its pane line (`unknown`) before it stops when the Herdr server can't be reached
   back at the end. No `g`/`G` in chat (its order is the opposite of Flow's).
 - **#206** Chat's hint is one row with 4 columns to spare at every width from 80 to 120, and names
   every key that applies (`pgup/pgdn` included): full words above 100 columns, short ones below,
-  then `scroll` and `send` drop, never a key. While you answer it names `enter send #N` and `esc
+  then `scroll` drops and `tab answer (N)` becomes `tab (N)`; never a key, and `enter` keeps its
+  verb and `ctrl+d` its `leave`. While you answer it names `enter send #N` and `esc
   back` (`tab` still moves to the next question); with a line picked, `esc back` puts it back
   (new). The guide quotes the strings.
 - **#211** `docs/examples.md` example 11: a chat session with an operator's line, a pane line with

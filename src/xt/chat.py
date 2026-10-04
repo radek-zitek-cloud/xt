@@ -121,7 +121,9 @@ def _time(ts: str) -> str:
 HINT_SPARE = 4  # columns the hint and the header leave free (cards #202, #206)
 FULL_WORDS = 100  # the hint uses its full words only above this width (card #206)
 SHORT_FIRST = ("↑↓", "tab", "ctrl+t", "esc", "enter", "pgup/pgdn", "ctrl+d")  # which key takes short words first
-SHORTEST_FIRST = ("pgup/pgdn", "enter")  # then which takes its shortest
+# then which takes its shortest: `scroll` goes, then `tab answer (N)` becomes `tab (N)`, then a picked
+# line's `collapse` becomes `close`; enter keeps its verb and ctrl+d its `leave` (xt #3389)
+SHORTEST_FIRST = ("pgup/pgdn", "tab", "enter")
 
 
 def hint_keys(waiting: int, answering: bool, picked: str | None, mode: str, pickable: bool = True,
@@ -138,16 +140,16 @@ def hint_keys(waiting: int, answering: bool, picked: str | None, mode: str, pick
     pick = ("↑↓", ("pick a line", "pick", "pick"))
     if answering:
         n = f"#{target}" if target is not None else ""
-        keys = [("enter", (f"send {n}".strip(), f"send {n}".strip(), n)),
+        keys = [("enter", (f"send {n}".strip(), f"send {n}".strip(), f"send {n}".strip())),
                 ("esc", ("message the liaison", "back", "back"))]
     elif picked:
         word = "expand" if picked == "picked" else "collapse"
         keys = [("enter", (word, word, "expand" if picked == "picked" else "close")), pick,
                 ("esc", ("back", "back", "back"))]
     else:
-        keys = [("enter", ("send", "send", ""))]
+        keys = [("enter", ("send", "send", "send"))]  # never a bare enter (ux on rc2, xt #3389)
         if waiting:
-            keys.append(("tab", (f"answer ({waiting} waiting)", f"answer ({waiting})", f"answer ({waiting})")))
+            keys.append(("tab", (f"answer ({waiting} waiting)", f"answer ({waiting})", f"({waiting})")))
         if pickable and mode != "hidden":
             keys.append(pick)
     return keys + [("ctrl+t", (f"team activity ({mode})", mode, mode)),

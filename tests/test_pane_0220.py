@@ -314,9 +314,9 @@ def test_rc8_pane_input_is_labelled_unverified_in_chat_log_tui_and_brief(ctx, fa
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     args = cli.build_parser().parse_args(["log", "--id", str(m["id"])])
     args.func(args)
-    assert f"{label} →liaison" in capsys.readouterr().out  # #207: a space after the label
+    assert f"{label} → liaison" in capsys.readouterr().out  # #207: spaces around the arrow
     assert f"{label} → liaison" in _msg_block(m).plain
-    assert f"{label} →liaison" in brief.build(ctx, "liaison")
+    assert f"{label} → liaison" in brief.build(ctx, "liaison")
     sent = cli.send(ctx, "human", "liaison", "ask", "From chat")[0]  # an ordinary message has no label
     assert "unverified" not in _msg_block(sent).plain
     td = ThreadDetail.__new__(ThreadDetail)

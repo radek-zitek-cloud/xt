@@ -289,19 +289,19 @@ def cmd_send(args) -> None:
                           f"`xt answer {args.ref}` ({hint(question_of(ctx.ledger.message(args.ref)))})") from None
         print(f"#{msg['id']} answer to #{args.ref} → {item['opener']}: {status}"
               + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
-        _not_running(ctx, msg["to"])
+        _not_running(ctx, msg["to"], who)
         return
     else:
         msg, status = send(ctx, who, args.to, mtype, body, args.ref, data=data)
     print(f"#{msg['id']} {msg['type']} → {msg['to']}: {status}")
-    _not_running(ctx, msg["to"])
+    _not_running(ctx, msg["to"], who)
 
 
-def _not_running(ctx: Ctx, to: str) -> None:
+def _not_running(ctx: Ctx, to: str, sender: str) -> None:
     """Card #187: one line on standard error when the recipient isn't running."""
     from .dispatch import not_running_note
 
-    note = not_running_note(ctx, to)
+    note = not_running_note(ctx, to, sender)
     if note:
         print(note, file=sys.stderr)
 
@@ -469,7 +469,7 @@ def cmd_status(args) -> None:
     except XtError:
         from .paneinput import signal
 
-        pane = signal(ctx)  # card #201: `… pane input: unknown (herdr server not reachable)`
+        pane = signal(ctx)  # card #201: `… pane input unknown (herdr server not reachable)`
         if pane:
             print(pane)
         raise

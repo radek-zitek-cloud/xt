@@ -167,8 +167,8 @@ def signal(ctx: Ctx) -> str | None:
     name, harness, kind, reason = s
     said = {RECORDED: f"pane input recorded ({reason})",
             LOG_ONLY: f"pane input recorded (session log only; {reason})",
-            NOT_RUNNING: f"pane input: {name} isn't running",
-            UNKNOWN: f"pane input: unknown ({reason})",
+            NOT_RUNNING: "pane input not recorded (the liaison isn't running)",  # ux on rc2, xt #3389
+            UNKNOWN: f"pane input unknown ({reason})",
             NOT_RECORDED: f"pane input NOT recorded ({reason}): talk in xt chat"}[kind]
     return f"{name} ({harness}): {said}"
 
@@ -181,7 +181,7 @@ def header(s: tuple[str, str, str, str] | None, liaison_name: str, width: int) -
     name, harness, kind, reason = s
     short = {RECORDED: "pane input recorded",
              LOG_ONLY: "pane input: session log only",
-             NOT_RUNNING: f"pane input: {name} isn't running",
+             NOT_RUNNING: "pane input: not running",  # the header names the liaison already (xt #3389)
              UNKNOWN: "pane input: unknown (herdr unreachable)",
              NOT_RECORDED: "pane input NOT recorded — type here"}[kind]
     wide = {RECORDED: f"pane input recorded ({reason})",

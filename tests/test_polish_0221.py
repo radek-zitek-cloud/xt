@@ -32,7 +32,7 @@ def test_207_one_space_after_the_label_in_log_and_brief_and_none_added_elsewhere
     paneinput.scan(ctx)
     (m,) = _from_human(ctx)
     plain = cli.send(ctx, "human", "liaison", "ask", "From chat")[0]
-    labelled = "human (typed in the pane, unverified) →liaison"
+    labelled = "human (typed in the pane, unverified) → liaison"  # spaces on both sides (xt #3389)
     assert pair(m) == labelled and pair(plain) == "human→liaison"
     for argv in ([], ["--full"], ["--member", "liaison"]):
         out = _log(ctx, monkeypatch, capsys, *argv)
@@ -143,7 +143,7 @@ def test_203_4_5_the_status_line_and_the_chat_advice(ctx, fake_home, monkeypatch
 SHORT = {  # card #202, string-exact at 80 columns
     "recorded": "xt chat with liaison (claude) · pane input recorded",
     "log only": "xt chat with liaison (pi) · pane input: session log only",
-    "not running": "xt chat with liaison (claude) · pane input: liaison isn't running",
+    "not running": "xt chat with liaison (claude) · pane input: not running",  # xt #3389
     "unknown": "xt chat with liaison (claude) · pane input: unknown (herdr unreachable)",
     "not recorded": "xt chat with liaison (claude) · pane input NOT recorded — type here",
 }
@@ -157,8 +157,8 @@ WIDE = {  # above 96 columns, with the reason
 STATUS = {  # xt status keeps the full wording
     "recorded": "liaison (claude): pane input recorded (prompt hook and session log)",
     "log only": "liaison (pi): pane input recorded (session log only; no warning in the pane)",
-    "not running": "liaison (claude): pane input: liaison isn't running",
-    "unknown": "liaison (claude): pane input: unknown (herdr server not reachable)",
+    "not running": "liaison (claude): pane input not recorded (the liaison isn't running)",  # xt #3389
+    "unknown": "liaison (claude): pane input unknown (herdr server not reachable)",
     "not recorded": "liaison (claude): pane input NOT recorded (no session log): talk in xt chat",
 }
 
@@ -411,6 +411,8 @@ def test_206_every_width_80_to_120_every_state_and_mode(state):
             assert Text(line).cell_len <= width - 4 and "…" not in line, (width, line)
             assert _keys(line) == _expected(state, mode), (width, mode, line)
             assert f"ctrl+t {mode}" in line or f"ctrl+t team activity ({mode})" in line
+            # ux on rc2 (xt #3389): enter always says what it does, ctrl+d always says leave
+            assert not line.startswith("enter ·") and line.endswith("ctrl+d leave"), (width, line)
 
 
 def test_206_the_strings_quoted_in_the_guide():
@@ -420,7 +422,7 @@ def test_206_the_strings_quoted_in_the_guide():
 
     guide = (REPO / "docs" / "user-guide.md").read_text()
     lines = {
-        (80, 2, False, None, "goals", True, None): "enter · tab answer (2) · ↑↓ pick · ctrl+t goals · pgup/pgdn · ctrl+d leave",
+        (80, 2, False, None, "goals", True, None): "enter send · tab (2) · ↑↓ pick · ctrl+t goals · pgup/pgdn · ctrl+d leave",
         (80, 2, False, None, "hidden", True, None): "enter send · tab answer (2) · ctrl+t hidden · pgup/pgdn · ctrl+d leave",
         (80, 0, False, "picked", "goals", True, None): "enter expand · ↑↓ pick · esc back · ctrl+t goals · pgup/pgdn · ctrl+d leave",
         (80, 2, True, None, "goals", True, 812): "enter send #812 · esc back · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave",
@@ -651,7 +653,7 @@ def test_187_the_start_command_matches_the_state(ctx, clock):
     set_stopped(ctx, "builder", True)
     _tick(ctx)
     assert _alerts(ctx)["queued:builder"]["text"].startswith("builder isn't running (you stopped it): 1 message")
-    assert _alerts(ctx)["queued:builder"]["text"].endswith(f"Start it: xt approve {rid}.")
+    assert _alerts(ctx)["queued:builder"]["text"].endswith(f"Approve its start: xt approve {rid}.")  # xt #3389
 
 
 def test_187_ages_over_a_day():
@@ -669,13 +671,18 @@ def test_187_the_sender_line_at_xt_send(team, monkeypatch, capsys):
     capsys.readouterr()
     agent(monkeypatch, "send", "builder", "--as", "lead", "--type", "task", "Build it")
     out = capsys.readouterr()
-    assert out.err == ("queued: builder isn't running; the human is alerted if it is still not running "
-                       "in 2 minutes.\n")
+    assert out.err == "queued: builder isn't running; the human is alerted if it still isn't in 2 minutes.\n"
     assert out.out.startswith("#") and out.out.count("\n") == 1  # stdout as before
+    from .test_operator_0190 import human
+
+    human(monkeypatch, "send", "builder", "--type", "ask", "Are you there?")  # the human gets the alert
+    out = capsys.readouterr()
+    assert out.err == "queued: builder isn't running; you get an alert (queued:builder) if it still isn't in 2 minutes.\n"
+    assert out.out.startswith("#") and out.out.count("\n") == 1
     agent(monkeypatch, "send", "lead", "--as", "liaison", "--type", "report", "Hi")  # running: no line
     assert capsys.readouterr().err == ""
 
-    def unreadable():
+    def unreadable(max_snapshot_age=None):
         raise XtError("herdr: server_unreachable")
 
     monkeypatch.setattr(team.herdr, "agents", unreadable)
@@ -690,7 +697,8 @@ def test_187_the_guide_has_the_row_and_the_amended_sentences():
 
     guide = (REPO / "docs" / "user-guide.md").read_text()
     assert "| `queued:<name>` |" in guide
-    assert "queued: builder isn't running; the human is alerted if it is still not running in 2 minutes." in guide
+    assert "`queued: builder isn't running; the human is alerted if it still isn't in 2 minutes.`" in guide
+    assert "`queued: builder isn't running; you get an alert (queued:builder) if it still isn't in 2 minutes.`" in guide
     assert "nothing alerts about an agent you stopped" not in guide
     assert guide.count("a message queued for it still alerts") == 2
 
@@ -780,4 +788,4 @@ def test_201_a_retired_liaison_isnt_running(ctx, fake_home):
 
     _liaison(ctx, fake_home, "claude")
     retire(ctx, "human", "liaison")
-    assert paneinput.signal(ctx) == "liaison (claude): pane input: liaison isn't running"
+    assert paneinput.signal(ctx) == STATUS["not running"]

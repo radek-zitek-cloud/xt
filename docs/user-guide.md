@@ -623,7 +623,7 @@ xt alerts, it never repairs. Alerts appear in the Inbox (red `⚠`) and as notif
 | `blocked:<name>` | The agent is stuck on something in its pane, usually its harness asking for permission | `f` to its workspace, answer it; clears by itself |
 | `missing:<name>` | An agent xt started isn't running any more (crashed, or its workspace was closed outside xt) | Find out why (its pane, `xt log --member <name>`), then `u` / `xt spawn <name>` |
 | `missing:lead` with goals open | The lead isn't running though there's work | `xt up` |
-| `queued:<name>` | (from 0.22.1) A message has waited 2 minutes or more for a member that isn't running: one xt didn't start this run, or one you stopped (`(you stopped it)`). One alert per member, with the count and the oldest message: `builder isn't running: 1 message waiting 17m (task #42 from lead, since 22:05). Start it: u (or xt spawn builder).` (`3 messages waiting, oldest 17m (task #42 from lead)` for several; ages over a day read `1d3h`). The start command fits the case: `xt up` for the liaison, `xt approve <id>` when its start waits on your approval. A running member's queue (a busy agent) never alerts, nor do messages to you or to a retired member; when `missing:<name>` is already open, the queue joins it as one line (`1 message waiting 17m`) instead | Start it. Clears when it runs; once you clear it, it comes back only when a newer message is queued or the member runs and stops again. The supervisor checks every few seconds, so it shows about 2 minutes after the message |
+| `queued:<name>` | (from 0.22.1) A message has waited 2 minutes or more for a member that isn't running: one xt didn't start this run, or one you stopped (`(you stopped it)`). One alert per member, with the count and the oldest message: `builder isn't running: 1 message waiting 17m (task #42 from lead, since 22:05). Start it: u (or xt spawn builder).` (`3 messages waiting, oldest 17m (task #42 from lead)` for several; ages over a day read `1d3h`). The start command fits the case: `Start it: xt up.` for the liaison, `Approve its start: xt approve 7.` when its start waits on your approval. A running member's queue (a busy agent) never alerts, nor do messages to you or to a retired member; when `missing:<name>` is already open, the queue joins it as one line (`1 message waiting 17m`) instead | Start it. Clears when it runs; once you clear it, it comes back only when a newer message is queued or the member runs and stops again. The supervisor checks every few seconds, so it shows about 2 minutes after the message |
 | `noprompt:<name>` | An agent started but its first prompt never showed up on its screen, so it doesn't know who it is | Stop and start it again (`xt restart <name>`) |
 | `partprompt:<name>` | (from 0.19.0, pi) The agent's first prompt reached it without its opening, and so did xt's one resend of it. It has its identity and protocol, but it worked from a prompt without its opening | Stop and start it again (`xt restart <name>`); clears at its next start |
 | `context:<name>` | (from 0.20.0) The agent's context still can't be read 10 minutes after its start; the alert says why and whether today's usage is recorded. Raised once per start. The agent may be working normally | Look at its pane; `xt status` says what xt can read. See "How full is an agent's context?" in [Memory and recovery](#11-memory-and-recovery); clears when the context becomes readable or the agent stops |
@@ -1172,14 +1172,14 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   are back at the end. At the end, arrivals and what you send keep the view at the end.
 - **The line under the input** names every key that applies now, in one row. Chat needs **80
   columns**: from 80 to 100 it uses short words, above 100 the full ones, and where a line is still
-  too long it drops `scroll`, then `send`, never a key; below 80 the header and this line may be
-  cut. For example, at 80 columns:
+  too long it drops `scroll`, then shortens `tab answer (2)` to `tab (2)`, never a key, and never
+  `send` or `leave`; below 80 the header and this line may be cut. For example, at 80 columns:
 
   | When | The line |
   |---|---|
   | nothing waits, goals mode, nothing to pick | `enter send · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave` |
   | hidden mode, two questions waiting | `enter send · tab answer (2) · ctrl+t hidden · pgup/pgdn · ctrl+d leave` |
-  | two questions waiting and a line to pick | `enter · tab answer (2) · ↑↓ pick · ctrl+t goals · pgup/pgdn · ctrl+d leave` |
+  | two questions waiting and a line to pick | `enter send · tab (2) · ↑↓ pick · ctrl+t goals · pgup/pgdn · ctrl+d leave` |
   | answering #812 | `enter send #812 · esc back · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave` |
   | a line picked | `enter expand · ↑↓ pick · esc back · ctrl+t goals · pgup/pgdn · ctrl+d leave` |
 
@@ -1194,7 +1194,7 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   | Where | How |
   |---|---|
   | chat | `you (typed in the pane, unverified)` |
-  | `xt log` (`--full`, `--member`) and briefs | `human (typed in the pane, unverified) →liaison` |
+  | `xt log` (`--full`, `--member`) and briefs | `human (typed in the pane, unverified) → liaison` |
   | the TUI's detail | `human (typed in the pane, unverified) → liaison` |
   | a TUI thread row | `(typed in the pane, unverified)`, or where the row is narrow `(pane, unverified)`, then `(unverified)`: the row keeps at least 12 characters of the message when it can, and in a very narrow pane drops the date, the name padding and the type (always `ask`) before it would drop the word |
 
@@ -1221,8 +1221,8 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   |---|---|
   | prompt hook and log | `liaison (claude): pane input recorded (prompt hook and session log)` |
   | log only (pi, Codex) | `liaison (pi): pane input recorded (session log only; no warning in the pane)` |
-  | the liaison is stopped or retired | `liaison (claude): pane input: liaison isn't running` |
-  | the Herdr server can't be reached | `liaison (claude): pane input: unknown (herdr server not reachable)` |
+  | the liaison is stopped or retired | `liaison (claude): pane input not recorded (the liaison isn't running)` |
+  | the Herdr server can't be reached | `liaison (claude): pane input unknown (herdr server not reachable)` |
   | its session log isn't found | `liaison (claude): pane input NOT recorded (no session log): talk in xt chat` |
 
   When xt can't reach the Herdr server, from any shell (yours, or an agent's sandboxed one such as
@@ -1232,7 +1232,7 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   shell says `unknown` (`xt status` prints that line, then stops with Herdr's error).
 
   The chat header says the same in one row: at 80 to 96 columns `xt chat with liaison (claude) ·
-  pane input recorded`, `· pane input: session log only`, `· pane input: liaison isn't running`,
+  pane input recorded`, `· pane input: session log only`, `· pane input: not running`,
   `· pane input: unknown (herdr unreachable)` or `· pane input NOT recorded — type here`; wider, it
   adds the reason: `· pane input recorded (prompt hook and session log)`, `· pane input: session
   log only (no warning in the pane)`, `· pane input: unknown (herdr server not reachable)`, `· pane
@@ -1375,11 +1375,12 @@ may declare its answer type with `--closed`, or `--option … --recommend N [--o
 see [`xt answer`](#xt-answer)).
 
 When the recipient is a team member that isn't running (from 0.22.1), the message is queued as
-before and xt adds one line on standard error for whoever sent it, agent or you:
-`queued: builder isn't running; the human is alerted if it is still not running in 2 minutes.`
-Nothing is added for
-a running member, for you as the recipient or for a retired member, nor when xt can't tell whether
-it runs; the message is queued and the exit status is the same either way.
+before and xt adds one line on standard error for whoever sent it. An agent reads
+`queued: builder isn't running; the human is alerted if it still isn't in 2 minutes.`;
+from your own terminal it reads
+`queued: builder isn't running; you get an alert (queued:builder) if it still isn't in 2 minutes.`
+Nothing is added for a running member, for you as the recipient or for a retired member, nor when
+xt can't tell whether it runs; the message is queued and the exit status is the same either way.
 
 For text with quotes, apostrophes, backticks or several lines, pass it on standard input in a
 heredoc whose end word is **quoted** (the quotes stop the shell from touching the text), from your
