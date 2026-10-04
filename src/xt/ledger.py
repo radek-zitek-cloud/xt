@@ -103,6 +103,8 @@ class Ledger:
                 "last_activity": msg["ts"],
                 "last_from_owner": None,
             }
+            if msg.get("follow_up"):  # card #185: a task under a goal that was already closed
+                items[str(msg["id"])]["follow_up"] = True
         elif msg["type"] == "ask" and msg["to"] == HUMAN:
             # A question for the human stays open (in their Inbox) until they answer it (any
             # message from them with --ref to it) or the asker closes it with `done`.

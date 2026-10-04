@@ -117,6 +117,10 @@ several agents need the same know-how, or the same instructions keep recurring i
 - **Work under a standing rule still needs a goal.** When a rule the human set lets you start work
   without them (e.g. an auto-pick), ask the liaison to dispatch a goal for it, naming the rule;
   the liaison dispatches those without a read-back. Tasks always refer to a goal.
+- **Follow-ups under a closed goal.** For 24 hours after you close a goal, you may still send a
+  task with `--ref <that goal>` (xt marks it a follow-up; the goal stays closed). Use it only to
+  carry an answer or decision that came after the closing, and say which in the task; new scope
+  still needs a new goal from the liaison. After 24 hours xt refuses it.
 
 ## Improving the team (friction)
 

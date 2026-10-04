@@ -36,6 +36,21 @@ def _line(m: dict) -> str:
     return f"#{m['id']} {m['ts'][5:16]} {m['type']} {pair(m)}{ref}: {_trim(m['body'])}"  # #193, #207
 
 
+FOLLOW_UP_WIDTH = 76  # card #185: 80 columns with 4 to spare
+FOLLOW_UP_LABELS = ("follow-up to closed goal #{g}", "follow-up, goal #{g}", "f/u #{g}")
+
+
+def follow_up_line(i: dict, now: dt.datetime, width: int = FOLLOW_UP_WIDTH) -> str:
+    """`- #12 task → carol [follow-up to closed goal #3], open 2h: title` for a follow-up (card
+    #185), in at most `width` columns: shorter label words first, then the title cut with `…`."""
+    for label in FOLLOW_UP_LABELS:
+        head = f"- #{i['id']} task → {i['owner']} [{label.format(g=i['goal'])}], open {_age(i['opened'], now)}: "
+        if len(head) + len(i["title"]) <= width:
+            return head + i["title"]
+    room = width - len(head)
+    return head + (i["title"][: room - 1] + "…" if room > 1 else "")
+
+
 def build(ctx: Ctx, name: str | None = None) -> str:
     now = ctx.ledger.clock()
     live = ctx.herdr.agents()
@@ -91,6 +106,9 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     if len(items) > MAX_ITEMS:
         out.append(f"({len(items) - MAX_ITEMS} older open items not shown — `xt log --full` for all)")
     for i in shown:
+        if i.get("follow_up"):  # card #185
+            out.append(follow_up_line(i, now))
+            continue
         goal = f" [goal #{i['goal']}]" if i.get("goal") else ""
         out.append(f"- #{i['id']} {i['type']} → {i['owner']}{goal}, open {_age(i['opened'], now)}: {i['title']}")
 

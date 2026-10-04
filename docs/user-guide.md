@@ -171,6 +171,12 @@ tasks under them. From 0.17.0 it shares its pane with Flow: `2` shows Work, `3` 
 - The liaison's **drafts** follow the open goals.
 - **Done goals** are folded under `done (63)`; unfold it to see them newest first, each folded with
   its `n/n ✓`, and unfold any of them to see its tasks.
+- A **follow-up** (from 0.23.0) is a task the lead opened under a goal after the goal closed (see
+  [`xt send`](#xt-send)). It sits below that goal's own tasks as `↳ follow-up` (`↳ f/u` where
+  the row is short of room), with its owner and age. The goal row stays as it was: closed, in its
+  place, with the same `n/n ✓`. While a follow-up is open, the `done` fold says
+  `done (63) · 1 follow-up open` and starts unfolded, and so does its goal, so the open task is in
+  view; `o` keeps them.
 - `space` folds or unfolds the selected row (on a task: folds its goal). `o` shows open work only:
   it hides `done (N)` and the done tasks, and the panel's bottom edge says `open only`; `o` again
   shows them. Folds, `o` and the selected row stay
@@ -1141,7 +1147,9 @@ reverts the last switch. **Use it** to upgrade to a chosen release, or to go bac
 context (e.g. `~211k/258k`) and today's usage; today's team total and, where reported, the
 account allowance (Codex from its logs; Claude's five-hour and weekly windows through the status
 line, see **Claude plan usage in status**);
-counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts; the
+counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts (an
+open follow-up counts as an open task, its closed goal never as an open goal), then one line per
+open follow-up, as in the brief (`- #12 task → carol [follow-up to closed goal #3], open 2h: …`); the
 board watch (from 0.19.0, see 5) and an active delegation to an operator (see 13); a
 warning if the supervisor isn't running. **Use it** for a quick look without the TUI (e.g. over
 ssh), or in scripts.
@@ -1433,6 +1441,18 @@ XT_END
 
 Agents are told to send every message this way (protocol section 2): text in a quoted argument
 goes through the shell first, so backticks and `$(…)` in it would run as commands.
+
+**Follow-ups under a closed goal** (from 0.23.0). A task's `--ref` must be an open goal, with one
+exception: for 24 hours after a goal is closed, the lead that owned it may send a task with
+`--ref` to it, to carry an answer or decision that came after the closing. xt delivers it like any
+task and marks it a follow-up (`follow-up to closed goal #3; …` after the send, `(follow-up to a
+closed goal)` in `xt log`); the goal stays closed and its record unchanged, and the follow-up's
+own `done` closes only the task. The brief and `xt status` list it as `[follow-up to closed goal
+#3]`, in shorter words where the line would pass 76 columns. From 24 hours after the closing
+(the window is a fixed 24 hours, `FOLLOW_UP_HOURS`), the same command is refused: `goal #3 closed
+26h ago; the follow-up window is 24h. New work needs a new goal: ask the liaison to dispatch
+one.` Anyone else, or a goal the lead didn't own, is refused too. Reports and `done` with `--ref`
+to a closed goal work as before.
 
 ### `xt done`
 

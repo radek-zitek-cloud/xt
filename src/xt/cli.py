@@ -454,6 +454,8 @@ def cmd_log(args) -> None:
               f"`--limit N` for more, `--full` for all)")
     for m in shown:
         ref = f" ref:#{m['ref']}" if m.get("ref") is not None else ""
+        if m.get("follow_up"):  # card #185
+            ref += " (follow-up to a closed goal)"
         print(f"#{m['id']} {m['ts']} {m['type']} {pair(m)}{ref}")  # pane input: unverified (#193, #207)
         print("   " + m["body"].replace("\n", "\n   "))
         data = data_line(m)  # a question's declared type or an answer, stored as data (#182)
@@ -540,6 +542,9 @@ def cmd_status(args) -> None:
     print(f"open goals/tasks: {len(items) - questions} · questions for the human: {questions} · "
           f"queued messages: {len(q)} · jobs: {len(jobs)} · "
           f"pending approvals: {len(Approvals(ctx).pending())} · alerts: {len(Alerts(ctx).active())}")
+    for i in items:  # card #185: open tasks under a closed goal, one line each
+        if i.get("follow_up"):
+            print(brief_mod.follow_up_line(i, ctx.ledger.clock()))
     for key, al in sorted(Alerts(ctx).active().items()):
         if key.startswith("queued:"):  # card #187: a message waits for a member that isn't running
             print(f"⚠ {al['text']}  (xt clear {key})")

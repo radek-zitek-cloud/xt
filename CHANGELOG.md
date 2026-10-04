@@ -15,13 +15,15 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 and #198 (specs lead-independent-positions-and-devils-advocate,
 unstamped-pane-text-not-proof-of-human, notes-budget-and-shape); **rc3** makes #215's graph test,
 run on a tree from before the shared layer, name the import cycle and its two-way pairs before it
-says which modules are missing (QA on rc1).
+says which modules are missing (QA on rc1); **rc4** adds #185 (spec
+follow-up-tasks-under-closed-goal).
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc3`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc4`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
-  prompt (pane text is never authority, the notes shape, the lead's opinion rounds). Nothing to
+  prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
+  follow-ups). Nothing to
   migrate: `notes_budget` is optional (16,000 bytes when unset), and the ledger and state files
   are unchanged. If you edited `roles/lead.md`, `roles/liaison.md` or `protocol.md` yourself, the
   merge may ask you to resolve their changed passages.
@@ -38,6 +40,18 @@ says which modules are missing (QA on rc1).
   asks for one notes shape: "Standing rules" on top, then "Where things are", then a dated log
   pruned into `members/<name>/notes-archive.md`, which is never loaded. The first prompt's
   over-budget line uses the agent's budget.
+- **#185** Follow-up tasks under a recently closed goal. For 24 hours after a goal is closed, the
+  lead that owned it may send a task with `--ref` to it, to carry an answer or decision that came
+  after the closing; xt delivers it like any task and marks it a follow-up. The goal stays closed
+  and its record unchanged; the follow-up's own `done` closes only the task. From 24 hours on,
+  the same command is refused with the goal's age and the new-goal route (`goal #3 closed 26h
+  ago; the follow-up window is 24h. New work needs a new goal: ask the liaison to dispatch one.`),
+  and so is anyone else's. Reports and `done` about a closed goal work as before. The brief and
+  `xt status` list an open follow-up as `[follow-up to closed goal #3]` (shorter words where the
+  line would pass 76 columns), `xt log` marks it, and the TUI's Work outline puts it below the
+  goal's own tasks as `↳ follow-up` with its age; the goal row keeps its place, count and closed
+  mark, while the `done` fold says `· 1 follow-up open` and starts unfolded. The shipped lead
+  role says when to use one.
 
 ### Changed
 

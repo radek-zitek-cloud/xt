@@ -1,5 +1,6 @@
 """`xt send`: policy check, log, then deliver now or queue until the target is idle."""
 
+import datetime as dt
 import json
 import os
 
@@ -220,16 +221,60 @@ def send(
         expected = done_recipient(ctx.team, sender, item)
         if to != expected and sender != HUMAN:
             raise XtError(f"report done for #{ref} to {expected} (`xt done {ref}` picks the right recipient)")
+    follow_up = False
     if mtype == "task" and ref is not None:
         item = ctx.ledger.item(ref)
-        if item is None or item["type"] != "goal":
+        if item is not None and item["type"] == "goal":
+            pass
+        elif item is None and follow_up_allowed(ctx, sender, ref):  # card #185: raises past the window
+            follow_up = True
+            data = {**(data or {}), "follow_up": True}
+        else:
             raise XtError(f"--ref for a task must be an open goal id; #{ref} isn't one")
     closing_goal = mtype == "done" and ctx.ledger.item(ref) and ctx.ledger.item(ref)["type"] == "goal"
     msg = ctx.ledger.append(sender, to, mtype, body, ref, data=data)
     if closing_goal:
         close_leftover_tasks(ctx, ref)
     status = deliver_or_queue(ctx, msg) if deliver else "logged"
+    if follow_up:
+        status = f"follow-up to closed goal #{ref}; {status}"
     return msg, status
+
+
+FOLLOW_UP_HOURS = 24  # card #185: how long after its closing a goal takes follow-up tasks from the lead
+
+
+def goal_closed_at(ctx: Ctx, goal_id: int) -> tuple[dict, dt.datetime] | None:
+    """(the goal's message, when its `done` closed it) for a goal that is closed; None otherwise."""
+    goal, closed = None, None
+    for m in ctx.ledger.messages():
+        if m["id"] == goal_id and m["type"] == "goal":
+            goal = m
+        elif goal is not None and m["type"] == "done" and m.get("ref") == goal_id:
+            closed = dt.datetime.fromisoformat(m["ts"])
+            break
+    if goal is None or closed is None or ctx.ledger.item(goal_id) is not None:
+        return None
+    return goal, closed
+
+
+def follow_up_allowed(ctx: Ctx, sender: str, goal_id: int) -> bool:
+    """Card #185: a task under a closed goal is a follow-up when the lead that owned the goal sends
+    it within FOLLOW_UP_HOURS of the goal's closing. False when `goal_id` isn't a closed goal (the
+    caller says what a task's --ref must be); a refusal naming why for anyone else, or too late."""
+    found = goal_closed_at(ctx, goal_id)
+    if found is None:
+        return False
+    goal, closed = found
+    s = ctx.team.agent(sender)
+    if goal["to"] != sender or s is None or s.role != "lead":
+        raise XtError(f"#{goal_id} is a closed goal: only the lead that owned it ({goal['to']}) may open a "
+                      f"follow-up task under it, within {FOLLOW_UP_HOURS}h of its closing")
+    age = (ctx.ledger.clock() - closed).total_seconds()
+    if age >= FOLLOW_UP_HOURS * 3600:
+        raise XtError(f"goal #{goal_id} closed {int(age // 3600)}h ago; the follow-up window is "
+                      f"{FOLLOW_UP_HOURS}h. New work needs a new goal: ask the liaison to dispatch one.")
+    return True
 
 
 def waiting_on_human(ctx: Ctx) -> dict[int, int]:

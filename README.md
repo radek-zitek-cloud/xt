@@ -47,7 +47,8 @@ each one is in [the story so far](docs/story.md).
 - **Deliver every message through a supervisor, with a ledger.** Nothing is lost, and every step
   can be audited later: the quality analyst accepts work partly on evidence from the ledger.
 - **Work in goals, read back before dispatch.** The liaison reads a goal back to you, lets you
-  revise it, and dispatches it exactly once.
+  revise it, and dispatches it exactly once. For a day after a goal closes, the lead can still
+  send a follow-up task under it for your late answer, without a new goal (0.23).
 - **Run on schedules.** Daily wakes at a fixed local time, hourly scouts, quiet hours that hold.
 - **Act on its own within rules you set.** The newsroom picked and published stories when you
   didn't answer within an hour, let your own picks go first, and stopped at its limit of six a day.

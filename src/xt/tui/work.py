@@ -19,6 +19,7 @@ OPEN, DONE, FAILED = "●", "✓", "✗"
 GLYPH_STYLE = {OPEN: "yellow", DONE: "green", FAILED: "red"}
 DONE_FOLD, NO_GOAL = "fold:done", "nogoal"
 INDENT = "    "
+INDENT_LEN = len(INDENT)
 MIN_TEXT = 16  # cells a goal's first line keeps before its owner column gives way
 # a task closed with a failed or blocked result: its `done` starts with the verdict word
 FAILED_DONE = re.compile(r"^\W*(FAIL|FAILED|BLOCKED)\b")
@@ -36,6 +37,9 @@ class Goal:
     open: bool
     tasks: list[Task] = field(default_factory=list)
     newest: str = ""  # ts of the newest message anywhere under the goal
+    # card #185: tasks the lead opened after the goal closed; listed below its own tasks, and left
+    # out of its count and its newest activity, so the closed goal's row stays as it was
+    follow_ups: list[Task] = field(default_factory=list)
 
     @property
     def done_n(self) -> int:
@@ -64,6 +68,18 @@ def root_goal(mid: int, by_id: dict[int, dict]) -> int | None:
     return None
 
 
+def under_follow_up(mid: int, by_id: dict[int, dict]) -> bool:
+    """Whether a message is a follow-up task (card #185) or reaches one through its `ref` chain."""
+    seen = set()
+    m = by_id.get(mid)
+    while m is not None and m["id"] not in seen and m["type"] != "goal":
+        if m.get("follow_up"):
+            return True
+        seen.add(m["id"])
+        m = by_id.get(m["ref"]) if m.get("ref") is not None else None
+    return False
+
+
 def outline(msgs: list[dict], open_items: dict[int, dict], blocked: set[str]) -> Outline:
     """Goals, their tasks and the orphans. Open goals and tasks older than the messages read are
     added from the ledger's open items, so an old open goal still shows."""
@@ -72,7 +88,8 @@ def outline(msgs: list[dict], open_items: dict[int, dict], blocked: set[str]) ->
     for i in open_items.values():
         if i["type"] in ("goal", "task") and i["id"] not in have:
             msgs.append({"id": i["id"], "ts": i["opened"], "type": i["type"], "from": i["opener"],
-                         "to": i["owner"], "ref": i.get("goal"), "body": i["title"]})
+                         "to": i["owner"], "ref": i.get("goal"), "body": i["title"],
+                         **({"follow_up": True} if i.get("follow_up") else {})})
     msgs.sort(key=lambda m: m["id"])
     by_id = {m["id"]: m for m in msgs}
     roots = {m["id"]: root_goal(m["id"], by_id) for m in msgs}
@@ -82,7 +99,7 @@ def outline(msgs: list[dict], open_items: dict[int, dict], blocked: set[str]) ->
         if m["type"] == "done" and m.get("ref") is not None:
             closing[m["ref"]] = m
         g = roots[m["id"]]
-        if g is not None:
+        if g is not None and not under_follow_up(m["id"], by_id):
             goal_newest[g] = max(goal_newest.get(g, ""), m["ts"])
 
     goals = {m["id"]: Goal(m, m["id"] in open_items, newest=goal_newest.get(m["id"], m["ts"]))
@@ -97,7 +114,10 @@ def outline(msgs: list[dict], open_items: dict[int, dict], blocked: set[str]) ->
             end = closing.get(m["id"])
             state = FAILED if end and FAILED_DONE.match(end["body"]) else DONE
         g = roots[m["id"]]
-        (goals[g].tasks if g in goals else orphans).append(Task(m, state))
+        if g in goals:
+            (goals[g].follow_ups if m.get("follow_up") else goals[g].tasks).append(Task(m, state))
+        else:
+            orphans.append(Task(m, state))
     newest_first = lambda gs: sorted(gs, key=lambda g: (g.newest, g.msg["id"]), reverse=True)
     return Outline(newest_first(g for g in goals.values() if g.open),
                    newest_first(g for g in goals.values() if not g.open), orphans)
@@ -108,6 +128,9 @@ def line(text: Text, data: dict, age: str, width: int, expanded: bool) -> Text:
     doesn't fit, then the goal's owner and `done/total` (never cut; in a narrow pane the owner goes
     first), then the age (#132's helper)."""
     head = Text(no_wrap=True)
+    short = data.get("short")  # card #185: the same row in shorter words, before any `…`
+    if short is not None and INDENT_LEN + text.cell_len + (len(age) + 1 if age else 0) > width:
+        text = short
     if data.get("level") == 2:
         head.append(INDENT)
     elif data.get("foldable"):

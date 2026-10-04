@@ -709,7 +709,7 @@ def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread)
     out = work.outline(msgs, open_items, {n for n, a in live.items() if a.status == "blocked"})
     goals = out.open + out.done
     ow = min(12, max((len(m["to"]) for m in [g.msg for g in goals] + [t.msg for g in goals for t in g.tasks]
-                      + [t.msg for t in out.orphans]), default=4))
+                      + [t.msg for g in goals for t in g.follow_ups] + [t.msg for t in out.orphans]), default=4))
     count = lambda tasks: f"{sum(1 for t in tasks if t.state != work.OPEN)}/{len(tasks)}"
     cw = max((len(count(g.tasks)) for g in goals), default=3)
     if out.orphans:
@@ -761,10 +761,36 @@ def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread)
             return thread(m, o, "space: fold · o: open work only · S: message the liaison", more)
 
         key = f"goal:{m['id']}"
+        follow_open = any(t.msg["id"] in open_items for t in g.follow_ups)  # card #185
         row = Row(key, _t((f"#{m['id']} ", "bright_black"), _line(m["body"])), detail, "goal",
-                  {"id": m["id"], "level": 1, "foldable": True, "expanded": g.open, "parent": parent,
-                   "open": g.open, **tail(m["to"], g.tasks, g.open)}, row_age(g.newest, now))
-        return [row] + task_rows(g.tasks, key)
+                  {"id": m["id"], "level": 1, "foldable": True, "expanded": g.open or follow_open,
+                   "parent": parent, "open": g.open or follow_open, **tail(m["to"], g.tasks, g.open)},
+                  row_age(g.newest, now))
+        return [row] + task_rows(g.tasks, key) + follow_up_rows(g, key)
+
+    def follow_up_rows(g, parent: str) -> list[Row]:
+        """Card #185: tasks the lead opened after the goal closed, below its own tasks, newest on top,
+        labelled `↳ follow-up` (`↳ f/u` where the row is short of room)."""
+        rows = []
+        for t in reversed(g.follow_ups):
+            m, is_open = t.msg, t.msg["id"] in open_items
+
+            def detail(m=m, is_open=is_open):
+                o = Text()
+                o.append(f"#{m['id']} task · follow-up to closed goal #{g.msg['id']} · {m['from']} → {m['to']} · "
+                         f"opened {_age(m['ts'], now)} ago · ", style="bright_black")
+                o.append("open\n" if is_open else "done\n", style="yellow" if is_open else "green")
+                o.append(m["body"].rstrip() + "\n")
+                return thread(m, o, "space: fold its goal · o: open work only · S: message the liaison")
+
+            def text(label: str, m=m, t=t) -> Text:
+                return _t((t.state + " ", work.GLYPH_STYLE[t.state]), (f"↳ {label} ", "cyan"),
+                          (f"#{m['id']} ", "bright_black"), m["to"][:ow].ljust(ow) + "  ", _line(m["body"]))
+
+            rows.append(Row(f"task:{m['id']}", text("follow-up"), detail, "task",
+                            {"id": m["id"], "level": 2, "parent": parent, "open": is_open,
+                             "short": text("f/u")}, row_age(m["ts"], now)))
+        return rows
 
     rows = [r for g in out.open for r in goal_rows(g, None)]
     drafts = sorted(ctx.paths.drafts.glob("*.md")) if ctx.paths.drafts.exists() else []
@@ -781,10 +807,13 @@ def _work(ctx: Ctx, msgs: list[dict], open_items: dict, live: dict, now, thread)
                         {"path": rel, "level": 1, "open": True}))
     if out.done:
         n = len(out.done)
-        rows.append(Row(work.DONE_FOLD, _t((f"done ({n})", "bright_black")),
+        follow = sum(1 for g in out.done for t in g.follow_ups if t.msg["id"] in open_items)  # card #185
+        rows.append(Row(work.DONE_FOLD, _t((f"done ({n})", "bright_black"),
+                                           (f" · {follow} follow-up{'s' if follow != 1 else ''} open", "cyan")
+                                           if follow else ""),
                         lambda: Text(f"{n} done goals, newest first: space shows or hides them\n",
                                      style="bright_black"),
-                        "donefold", {"level": 1, "foldable": True, "expanded": False, "open": False}))
+                        "donefold", {"level": 1, "foldable": True, "expanded": bool(follow), "open": bool(follow)}))
         rows += [r for g in out.done for r in goal_rows(g, work.DONE_FOLD)]
     if out.orphans:
         orphans = out.orphans
