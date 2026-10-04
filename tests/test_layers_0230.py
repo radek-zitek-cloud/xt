@@ -90,10 +90,13 @@ def lifecycle_problems(src: Path) -> list[str]:
         bad = sorted(graph.get(shared, set()) & set(LIFECYCLE))
         if bad:
             problems.append(f"the shared layer's {shared} imports {', '.join(bad)}")
+    # after the cycles, so a tree from before the shared layer (v0.22.1) still names its pairs first
+    missing = [m for m in LIFECYCLE + SHARED if not (src / f"{m}.py").exists()]
+    if missing:
+        problems.append(f"modules missing: {', '.join(missing)}")
     return problems
 
 
 def test_215_no_import_cycle_through_the_lifecycle_modules():
-    src = Path(xt.__file__).parent
-    assert all((src / f"{m}.py").exists() for m in LIFECYCLE + SHARED)
-    assert lifecycle_problems(src) == []
+    problems = lifecycle_problems(Path(xt.__file__).parent)
+    assert not problems, "\n".join(problems)

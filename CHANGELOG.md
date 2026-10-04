@@ -13,11 +13,13 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 **0.23.0-rc1** has #215 (Space specs/untangle-agent-lifecycle-modules); **rc2** adds #196, #209
 and #198 (specs lead-independent-positions-and-devils-advocate,
-unstamped-pane-text-not-proof-of-human, notes-budget-and-shape).
+unstamped-pane-text-not-proof-of-human, notes-budget-and-shape); **rc3** makes #215's graph test,
+run on a tree from before the shared layer, name the import cycle and its two-way pairs before it
+says which modules are missing (QA on rc1).
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc2`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc3`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds). Nothing to
   migrate: `notes_budget` is optional (16,000 bytes when unset), and the ledger and state files
