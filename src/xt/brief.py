@@ -2,7 +2,8 @@
 
 import datetime as dt
 
-from . import notes, turns, usage, versions
+from . import capstart, notes, turns, usage, versions
+from .adapters import load_adapters
 from .alerts import Alerts, repeats
 from .approvals import Approvals, approval_what
 from .context import Ctx
@@ -69,6 +70,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     contexts = {}
     if show_context:
         contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
+    adapters = load_adapters(ctx.paths)
     for a in ctx.team.agents():
         if a.kind == HUMAN or not a.active:
             continue
@@ -77,9 +79,12 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
         cx = (f", context {usage.compact(contexts[a.name])}"
               if la and a.name in contexts and contexts[a.name].known else "")
-        opts = codex_options_line(ctx, a, la is not None)  # card #169
-        opts = f", {opts}" if opts else ""
+        opts = codex_options_line(ctx, a, la is not None)  # card #169; otherwise in the caps row (#186)
+        opts = f", {opts}" if "(running with" in opts else ""
         out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}{opts}): {state}")
+        caps = capstart.status_row(ctx, a, adapters.get(a.harness or ""))  # card #186: once it has started
+        if caps:
+            out.append(f"  {caps}")
     if show_context:
         out.append(f"Team usage today: {turns.fmt(turns.today(ctx).team_today)}")
         for n, r in contexts.items():

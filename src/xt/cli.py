@@ -514,11 +514,10 @@ def cmd_status(args) -> None:
                                          time.time() - since if since else None)
             if line:
                 print(f"  {'':<12} {line}")
-        settings_path = permissions.shown(ctx.team, a, adapters.get(a.harness))
-        if settings_path:
-            print(f"  {'':<12} settings: {settings_path}")
+        # card #186: the settings file and Codex options fold into the caps row below; a Codex
+        # option changed since the start still says what the running agent has
         opts = launch.codex_options_line(ctx, a, a.name in live)
-        if opts:
+        if "(running with" in opts:
             print(f"  {'':<12} {opts}")
         notes_line = notes.status_text(ctx, a)  # card #198: only when over budget
         if notes_line:

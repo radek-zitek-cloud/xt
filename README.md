@@ -91,8 +91,11 @@ in [CHANGELOG.md](CHANGELOG.md).
   ([`xt reset`](docs/user-guide.md#xt-reset)). Each agent's notes have a budget (16,000 bytes
   unless you set `notes_budget`): `xt status` shows notes over it, and a day over it raises an
   alert ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
-- **Agents in bounds, an operator within limits (0.11, 0.13, 0.19, 0.22).** No account connectors
-  unless you opt one in, a permissions file per Claude Code agent, and your own coding agent may run
+- **Agents in bounds, an operator within limits (0.11, 0.13, 0.19, 0.22, 0.23).** One capability
+  block per agent for every harness (what it may write, run and reach; credential-holding CLIs
+  denied by name; your personal skills off), each shown as enforced or advisory, and `require` refuses
+  a start the harness can't back ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
+  No account connectors unless you opt one in, and your own coding agent may run
   `restart`, `reset`, `spawn` and `up` for you, or with `--scope drive` answer, approve and give
   goals, for up to an hour, each logged under its own name
   ([An operator acting for you](docs/user-guide.md#13-an-operator-acting-for-you)).
@@ -343,8 +346,12 @@ xt restart --all
   Codex's reviewer (or you) approves.
 - Costs are estimates from public list prices (`prices.toml`), not bills; no budgets yet.
 - Account connectors are off for agents, but command-line tools that hold your credentials (a
-  mail CLI, say) are just programs to the harness: xt can't switch them off. A Claude agent's
-  settings file can refuse them; a Codex agent is bounded only by its sandbox's escalation review.
+  mail CLI, say) are just programs to the harness. From 0.23.0 a Claude agent's capabilities deny
+  them by name (not isolation: a command it may run could still use a credential another way); on
+  Codex and pi that is `advisory`, and a Codex agent is bounded only by its sandbox's escalation
+  review.
+- Capabilities are only as strong as the harness: pi enforces none of write, deny, commands or
+  network, Codex enforces the network, Claude Code no OS-level limit. `xt status` says which.
 - Anything that can type into the liaison's pane through Herdr (`herdr agent prompt`, a script, an
   operator) is recorded as pane input from you, labelled unverified. It never answers or approves
   anything in xt, and from 0.23.0 agents treat pane text as conversation, never as authority: the

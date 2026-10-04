@@ -744,7 +744,70 @@ covers. Removing the line restores the default at the next start. **Not covered:
 tools that hold your credentials (a mail CLI, for example) are ordinary programs to the harness;
 keep such skills out of an agent's reach if it shouldn't use them.
 
-**Permission settings for Claude Code agents.** A Claude Code agent starts in Claude's default
+**Capabilities: one model for every harness** (from 0.23.0). Say what an agent may do once, in
+`team.toml`, and xt turns it into each harness's own mechanism. A team default and each agent's
+own block (the agent's settings win, key by key; `require` adds up):
+
+```toml
+[defaults.capabilities]
+network = "off"                    # "off" (default) or "on"
+credential_clis = ["mytool"]       # more tools that hold your credentials, denied by name
+
+[[agent]]
+name = "builder"
+[agent.capabilities]
+write = ["/home/me/work/clone", "/tmp/builder"]   # it may change these (its notes always)
+deny = ["~/Work"]                  # it must never touch these (team.toml, settings/ and xt's code always)
+commands = ["git", "uv", "rg"]     # it may run only these (unset: not restricted)
+connectors = []                    # named account connectors (Claude Code only)
+skills = "none"                    # your personal skills: "none" (default) or names
+credential_clis = { allow = ["gh"] }   # named exceptions to the denied list (gh, aws, gcloud, op, fizzy, …)
+require = ["write", "commands"]    # these must be enforced, or the agent doesn't start
+```
+
+An unknown name or a bad value is refused when xt loads `team.toml`, naming it. Each harness says
+for each capability whether it is **enforced** or only **advisory** (role text only); `xt
+harnesses` lists the table and the harness versions it was checked on:
+
+| | claude | codex | pi |
+|---|---|---|---|
+| enforced | write, deny, commands, connectors, skills, credential_clis | network, connectors | connectors, skills |
+| advisory | network | write, deny, commands, skills, credential_clis | write, deny, commands, network, credential_clis |
+
+What that means: for Claude Code xt writes a settings file (`dontAsk`): file edits only under
+`write`, nothing under `deny`, shell commands only from `commands`, credential CLIs denied **by
+name**. A command it may run can still use the network or a credential another way: that's a
+limit by name, not isolation, so `network` stays advisory there. Codex's sandbox enforces the
+network; `write` paths are added with `--add-dir` so the agent can write there, but it can also
+write the whole team repo, so `write` and `deny` stay advisory. pi enforces skills only.
+
+**`require` refuses rather than pretends.** With `commands` set and `require = ["commands"]` on a
+pi agent, `xt spawn erin` (and a hire request, before any approval) refuses:
+`erin can't start: commands is marked require, and pi can only keep it advisory (role text only).
+Drop require on commands, or hire erin under claude`. Nothing is stored for a refused start.
+
+What you see: `xt status` shows one row under each agent that has started, only what differs from
+the defaults; for the builder above, under Claude Code, `caps: require write, cmds; deny, creds
+enforced; net advisory` (within 80 columns the names shorten: `cmds`, `conn`, `net`, `creds`, before
+anything is cut). The brief, the agent's detail in the TUI and the start note show the same row
+(the start note in full words), and a hire's approval one sentence, in at most two rows:
+`Approve its start: require write, commands; deny, credential_clis enforced; network advisory (role
+text only).` **Codex and pi
+agents now show `advisory` for what they can't enforce. That was always true; it is now visible.**
+
+**Agents with only the old lines.** `permissions`, `codex_options` and `connectors` (below) keep
+working in 0.23.0 and show as deprecated in the row; they are removed in 0.24.0. An agent with
+only these lines, or none, gets two changes from 0.23.0 and nothing else: its personal skills are
+off (a pi agent starts with `--no-skills`, the team's own skills passed back; its first start says
+`skills: none, was loaded`), and the `caps:` row. With a team default block, an agent's old
+settings file still applies on top as **extras**, which may only add restrictions: a rule that would
+loosen the block is refused at start, naming the rule and the file. An agent's own block beside its
+own old line is refused at load. `xt capabilities <name>` prints the block equivalent to an
+agent's old lines and file, marks what the block can't say as "kept in extras", and changes
+nothing: paste it under the agent and remove the old lines.
+
+**Permission settings for Claude Code agents** (the old way; deprecated in 0.23.0, use the
+capabilities above). A Claude Code agent starts in Claude's default
 permission mode: its first command outside Claude's built-in safe set waits at a permission
 prompt, and an unattended agent then sits blocked (`blocked:<name>`) until you answer it. Give it
 a settings file instead, per agent or once for all Claude agents:

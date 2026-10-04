@@ -291,6 +291,27 @@ rule refuses the start) and the start note shows its path, a hash of its content
 give every Claude agent the same file, set it once under `[defaults]`: `permissions =
 "settings/claude-agents.json"`. See the [user guide](user-guide.md#11-memory-and-recovery).
 
+**From 0.23.0: the same with capabilities.** The `permissions` line is deprecated (removed in
+0.24.0). `xt capabilities researcher` prints the equivalent block and changes nothing:
+
+```text
+# xt capabilities researcher: the block equivalent to its legacy lines and settings/researcher.json (nothing was changed).
+# Under its [[agent]] entry (name = "researcher"), replacing `permissions`:
+[agent.capabilities]
+commands = ["rg", "cat", "git status", "git log"]
+# kept in extras (settings/researcher.json: the block can't say these; they keep restricting on top):
+#   deny Bash(git push *)
+#   deny Bash(curl *)
+#   deny Bash(rm *)
+#   key statusLine
+```
+
+Its own notes, `team.toml`, `settings/`, network off and the credential CLIs need no line: they are
+the defaults. Put the block under the agent and remove the `permissions` line; the three `deny`
+rules are already covered here, since `commands` lets it run only those four (keep a trimmed file
+on a team default block if you want them said anyway: it may only restrict). The start then
+generates the settings file, and `xt status` shows the agent's `caps:` row.
+
 ## 5. A decision question with options
 
 **Context.** When the team needs a decision only you can make, the liaison asks it through xt as
@@ -397,9 +418,26 @@ codex_options = ["sandbox_workspace_write.network_access=true"]
 ```
 
 Then `xt restart qa`: options apply at the next start. xt passes the option as
-`-c sandbox_workspace_write.network_access=true`, and the start note, `xt status`, the brief and the
-agent's detail show `codex options: sandbox_workspace_write.network_access=true (network on: it can
-reach any host)`.
+`-c sandbox_workspace_write.network_access=true`; the start note and the agent's detail show
+`codex options: sandbox_workspace_write.network_access=true (network on: it can reach any host)`.
+
+From 0.23.0 `codex_options` is deprecated (removed in 0.24.0; `xt status` shows it in the agent's
+`caps:` row as `deprecated codex network on`). The same with capabilities, which also lets the
+sandbox write the clean clone:
+
+```toml
+[[agent]]
+name = "qa"
+role = "quality-analyst"
+harness = "codex"
+reports_to = "lead"
+status = "active"
+[agent.capabilities]
+network = "on"
+write = ["/tmp/qa-check"]          # passed to Codex as --add-dir /tmp/qa-check
+```
+
+Codex enforces `network` (its sandbox); its other capabilities show `advisory` in the row.
 
 **Running the suite in the clean clone.** Network alone isn't enough for `uv run`: Codex's sandbox
 keeps uv's default cache under the home directory read-only. Point the cache into the clone:

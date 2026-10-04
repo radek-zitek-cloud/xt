@@ -50,8 +50,9 @@ def test_an_agent_with_the_option_starts_with_the_matching_override(ctx, monkeyp
     assert args[i - 1] == "-c"
     assert any(f"liaison: Codex options {NET} (network on: it can reach any host)" == n for n in _notes(ctx, "liaison"))
     out = _status(ctx, monkeypatch, capsys)
-    assert f"codex options: {NET} (network on: it can reach any host)" in out
-    assert f"codex options: {NET}" in brief.build(ctx, "lead")
+    # since 0.23.0 (#186) status and the brief fold the option into the caps row; the detail keeps it
+    assert "    caps: write, deny, skills, creds advisory; deprecated codex network on" in out.splitlines()
+    assert "  caps: write, deny, skills, creds advisory; deprecated codex network on" in brief.build(ctx, "lead")
     team = {r.data["name"]: r for r in build(ctx).panels["Team"]}
     assert f"codex options: {NET}" in team["liaison"].detail().plain
 

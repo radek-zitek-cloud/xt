@@ -296,6 +296,11 @@ def build(ctx: Ctx) -> Snapshot:
             opts = codex_options_line(ctx, a, la is not None)  # card #169
             if opts:
                 out.append(opts + "\n", style="yellow" if "network on" in opts else "")
+            from .. import capstart
+
+            caps = capstart.status_row(ctx, a, load_adapters(ctx.paths).get(a.harness))  # card #186
+            if caps:
+                out.append(caps + "\n")
             from ..lifecycle import queued, queued_text, suggestion
 
             entry = queued(ctx).get(a.name)

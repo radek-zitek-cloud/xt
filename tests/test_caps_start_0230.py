@@ -269,9 +269,9 @@ def test_186_a_claude_agent_without_any_file_shows_its_rules_as_advisory_and_a_l
     _start(ctx, "ben")
     assert c(ctx, ctx.team.agent("carol"), ad) == "caps: write, deny, network, credential_clis advisory"
     # the full form (72 columns) doesn't fit, so shorter words; the start note keeps the full one
-    assert c(ctx, ctx.team.agent("ben"), ad) == "caps: net advisory; legacy permissions, deprecated"
+    assert c(ctx, ctx.team.agent("ben"), ad) == "caps: net advisory; legacy settings/ben.json, deprecated"
     note = [m for m in ctx.ledger.messages() if m["body"].startswith("started ben")][-1]["body"]
-    assert note.endswith("capabilities: network advisory; legacy permissions (deprecated: xt capabilities ben)")
+    assert note.endswith("capabilities: network advisory; legacy settings/ben.json (deprecated: xt capabilities ben)")
 
 
 def test_186_rows_fit_80_columns_with_4_spare_and_the_sentence_two_rows(paths):
@@ -351,6 +351,53 @@ def test_186_xt_harnesses_lists_the_support_table(ctx, monkeypatch, capsys):
     out = capsys.readouterr().out
     assert ("   capabilities: connectors, skills enforced; write, deny, commands, network, credential_clis "
             "advisory (checked: pi 1.0.2 (operator check 2026-10-04: --help))") in out.splitlines()
+
+
+def test_186_status_brief_and_the_tui_show_the_same_row(ctx, monkeypatch, capsys):
+    from xt import brief
+    from xt.tui.model import build
+
+    _team(ctx, carol="claude")
+    _edit(ctx, carol={"capabilities": {"write": ["/tmp/c"], "commands": ["git"], "require": ["write"]}})
+    _start(ctx, "carol")
+    row = "caps: require write; commands enforced; network advisory"
+    assert _row(_status(ctx, monkeypatch, capsys), "carol") == "    " + row
+    lines = brief.build(ctx, "lead").splitlines()
+    assert lines[lines.index(next(x for x in lines if x.startswith("- carol "))) + 1] == "  " + row
+    team = {r.data["name"]: r for r in build(ctx).panels["Team"] if r.data and r.data.get("name")}
+    assert row in team["carol"].detail().plain.splitlines()
+    note = [m for m in ctx.ledger.messages() if m["body"].startswith("started carol")][-1]["body"]
+    assert note.splitlines()[1].startswith("capabilities: require write; commands enforced; network advisory")
+
+
+def test_186_the_guide_section_has_the_vocabulary_a_require_example_and_the_conversion():
+    guide = " ".join((REPO / "docs" / "user-guide.md").read_text().split())
+    for phrase in ("**Capabilities: one model for every harness** (from 0.23.0)", "[defaults.capabilities]",
+                   "`erin can't start: commands is marked require, and pi can only keep it advisory (role text "
+                   "only). Drop require on commands, or hire erin under claude`",
+                   "`xt capabilities <name>` prints the block equivalent",
+                   "That was always true; it is now visible.",
+                   "An agent with only these lines, or none, gets two changes from 0.23.0 and nothing else",
+                   "`caps: require write, cmds; deny, creds enforced; net advisory`"):
+        assert phrase in guide, phrase
+    for name in NAMES:
+        assert f"{name} = " in guide or f"`{name}`" in guide, name
+
+
+def test_186_the_examples_conversion_is_what_xt_prints(ctx, monkeypatch, capsys):
+    from .test_batch_0150 import _blocks
+
+    examples = (REPO / "docs/examples.md").read_text()
+    (settings,) = [b for b in _blocks(examples, "json") if '"defaultMode"' in b]
+    _extras(ctx, "researcher", {})
+    (ctx.paths.root / "settings" / "researcher.json").write_text(settings)
+    _team(ctx, researcher="claude")
+    _edit(ctx, researcher={"permissions": "settings/researcher.json"})
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    args = cli.build_parser().parse_args(["capabilities", "researcher"])
+    args.func(args)
+    (doc,) = [b for b in _blocks(examples, "text") if "xt capabilities researcher" in b]
+    assert capsys.readouterr().out.strip() == doc.strip()
 
 
 def test_186_the_harness_files_parse_and_keep_their_other_keys(paths):

@@ -17,12 +17,13 @@ unstamped-pane-text-not-proof-of-human, notes-budget-and-shape); **rc3** makes #
 run on a tree from before the shared layer, name the import cycle and its two-way pairs before it
 says which modules are missing (QA on rc1); **rc4** adds #185 (spec
 follow-up-tasks-under-closed-goal); **rc5** adds the first part of #186 (spec one-capability-model):
-the model, the three harness adapters, `require`, the status row and the spawn sentence (rc6 brings
-the brief and TUI rows, `xt capabilities` and the guide section).
+the model, the three harness adapters, `require`, `xt capabilities`, the status row and the spawn
+sentence; **rc6** completes #186: the same row in the brief and the TUI's detail, the old `settings:`
+and `codex options:` status lines folded into it, and the guide section.
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc5`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc6`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
   follow-ups). Nothing to
@@ -76,10 +77,15 @@ the brief and TUI rows, `xt capabilities` and the guide section).
   passed back. A capability marked `require` that the harness can't enforce refuses the start (and
   a hire request, before any approval) naming the capability, the harness and the nearest
   alternative, storing nothing. A legacy settings file on top of a team default block may only
-  restrict: a rule that would loosen it is refused, naming both. `xt status` shows one `caps:` row
-  per started agent (what deviates from the defaults, `require`, `enforced`, `advisory`, within 80
-  columns), the start note the same, and a hire's approval one sentence: `Approve its start: …
-  enforced; … advisory (role text only).`
+  restrict: a rule that would loosen it is refused, naming both. `xt status`, the brief and the
+  TUI's agent detail show one `caps:` row per started agent (what deviates from the defaults,
+  `require`, `enforced`, `advisory`, within 80 columns, shorter names before anything is cut), into
+  which the old `settings:` and `codex options:` status lines fold (`deprecated codex network on`;
+  a Codex option changed since the start still gets its own line); the start note shows the same in
+  full words, and a hire's approval one sentence: `Approve its start: … enforced; … advisory (role
+  text only).` `xt capabilities NAME` prints the block equivalent to an agent's old lines and file,
+  marking what it can't say as "kept in extras", and changes nothing; `xt harnesses` lists each
+  harness's table. The guide has a section on it (Memory and recovery).
 
 ### Changed
 

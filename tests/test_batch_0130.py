@@ -136,7 +136,7 @@ def test_an_agent_settings_file_is_passed_checked_and_shown(ctx, capsys, monkeyp
     assert "WARNING" not in note and "Bash(" not in note  # the path and hash, never the contents
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     cli.cmd_status(cli.build_parser().parse_args(["status"]))
-    assert "settings: settings/carol.json" in capsys.readouterr().out
+    assert "legacy settings/carol.json" in capsys.readouterr().out  # in the caps row since 0.23.0 (#186)
     row = next(r for r in build(ctx).panels["Team"] if r.data and r.data.get("name") == "carol")
     assert "settings file: settings/carol.json" in row.detail().plain
 

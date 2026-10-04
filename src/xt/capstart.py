@@ -40,10 +40,22 @@ class Plan:
     generated: bool = False  # xt wrote the harness settings from the block
     was_loaded: bool = False  # pi had the operator's personal skills before this start (Q3)
     source: str = "none"  # where a settings-file harness gets its rules (see `shown`)
+    legacy: list[str] = field(default_factory=list)  # what old lines set (legacy_items)
 
 
-def legacy_lines(a) -> list[str]:
-    return [k for k in cap.LEGACY if getattr(a, k, None)]
+def legacy_items(ctx, a, adapter) -> list[str]:
+    """What the old lines set, for the row (today's `settings:` and `codex options:` lines fold into
+    it): the settings file (the agent's own or the team default), Codex's network, the connectors."""
+    out = []
+    rel = permissions.shown(ctx.team, a, adapter)
+    if rel:
+        out.append(rel)
+    net = _legacy_network(getattr(a, "codex_options", []) or [])
+    if net:
+        out.append(f"codex network {net}")
+    if getattr(a, "connectors", None):
+        out.append(f"connectors {', '.join(a.connectors)}")
+    return out
 
 
 SETTINGS_RULES = ("write", "deny", "commands", "credential_clis")  # what only a settings file enforces
@@ -103,10 +115,11 @@ def row(caps: Caps, adapter, legacy: list[str], name: str, width: int = ROW_WIDT
             parts.append("skills: none, was loaded")
         if legacy:
             parts.append((f"legacy {', '.join(legacy)} (deprecated: xt capabilities {name})",
-                          f"legacy {', '.join(legacy)}, deprecated", "legacy, deprecated")[level])
+                          f"legacy {', '.join(legacy)}, deprecated", f"deprecated {', '.join(legacy)}",
+                          "legacy, deprecated")[level])
         return "; ".join(parts) or "defaults"
 
-    for level in (0, 1, 2):  # full words, then shorter names, then the shortest notes, then `…`
+    for level in (0, 1, 2, 3):  # full words, then shorter names, then shorter notes, then `…`
         t = text(level)
         if len(t) <= width:
             return t
@@ -173,7 +186,8 @@ def status_row(ctx, a, adapter) -> str | None:
     if rec is not None and rec.get("row"):
         return f"caps: {rec['row']}"
     caps = cap.effective(ctx.team, a)
-    return f"caps: {row(caps, adapter, legacy_lines(a), a.name, STATUS_WIDTH, source=source_of(ctx, a, adapter, caps))}"
+    return (f"caps: {row(caps, adapter, legacy_items(ctx, a, adapter), a.name, STATUS_WIDTH,
+                         source=source_of(ctx, a, adapter, caps))}")
 
 
 def skills_were_loaded(ctx, a, adapter) -> bool:
@@ -195,7 +209,6 @@ def plan(ctx, a, adapter, adapters: dict) -> Plan:
     """What the agent starts with; refuses (XtError) before anything runs or is stored."""
     caps = cap.effective(ctx.team, a)
     name = a.name
-    legacy = legacy_lines(a)
     p = Plan(caps, connectors=list(a.connectors))
     if caps.configured:
         refused = cap.refusal(name, caps, adapter, adapters)
@@ -237,5 +250,6 @@ def plan(ctx, a, adapter, adapters: dict) -> Plan:
         p.settings_file = str(out)
     p.was_loaded = skills_were_loaded(ctx, a, adapter)
     p.source = "generated" if p.generated else "legacy" if p.settings else "none"
-    p.row = row(caps, adapter, legacy, name, STATUS_WIDTH, p.was_loaded, p.source)
+    p.legacy = legacy_items(ctx, a, adapter)
+    p.row = row(caps, adapter, p.legacy, name, STATUS_WIDTH, p.was_loaded, p.source)
     return p
