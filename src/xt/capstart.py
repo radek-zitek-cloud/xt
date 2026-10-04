@@ -230,6 +230,12 @@ def plan(ctx, a, adapter, adapters: dict) -> Plan:
                 raise XtError(f"{name}: `codex_options = [\"sandbox_workspace_write.network_access=true\"]` would "
                               f"loosen the [capabilities] block (network = \"off\"); a legacy line may only restrict")
             p.options = cap.codex_args(Caps(**{**caps.__dict__, "network": net or caps.network}), ctx.paths.root)
+        if caps.extras:  # the block's own extras file wins over a team default settings file
+            if not adapter.settings_flag:
+                raise XtError(f"{name}: extras = {caps.extras!r} is a Claude Code settings file, and {adapter.name} "
+                              f"takes none; remove extras or hire {name} under claude")
+            rel = caps.extras
+            p.settings = permissions.preflight(ctx.paths.root, rel)  # refuses a bad file
         if adapter.name == "claude":
             if caps.skills:
                 raise XtError(f"{name}: claude can't load single personal skills (it starts with all slash "

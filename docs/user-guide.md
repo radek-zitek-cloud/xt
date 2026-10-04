@@ -763,6 +763,7 @@ connectors = []                    # named account connectors (Claude Code only)
 skills = "none"                    # your personal skills: "none" (default) or names
 credential_clis = { allow = ["gh"] }   # named exceptions to the denied list (gh, aws, gcloud, op, fizzy, …)
 require = ["write", "commands"]    # these must be enforced, or the agent doesn't start
+extras = "settings/builder.json"   # optional, Claude Code: a settings file on top, restricting only
 ```
 
 An unknown name or a bad value is refused when xt loads `team.toml`, naming it. Each harness says
@@ -803,8 +804,13 @@ off (a pi agent starts with `--no-skills`, the team's own skills passed back; it
 settings file still applies on top as **extras**, which may only add restrictions: a rule that would
 loosen the block is refused at start, naming the rule and the file. An agent's own block beside its
 own old line is refused at load. `xt capabilities <name>` prints the block equivalent to an
-agent's old lines and file, marks what the block can't say as "kept in extras", and changes
-nothing: paste it under the agent and remove the old lines.
+agent's old lines and file, and changes nothing: paste it under the agent and remove the old lines.
+What the block can't say (a `deny` rule like `Bash(rm *)`, other settings keys) is listed as "kept in
+extras", and the block then has `extras = "settings/<name>.json"`: the file stays, applied on top of
+the block, where it may only restrict (a Claude Code setting; it isn't an old line, so it isn't
+mixing). A file with nothing left over gets no `extras` line. Anything in the file that would loosen
+the block (a `defaultMode` other than `dontAsk`, an unnamed connector's tools) is listed too: the
+start refuses it until you remove it from the file.
 
 **Permission settings for Claude Code agents** (the old way; deprecated in 0.23.0, use the
 capabilities above). A Claude Code agent starts in Claude's default

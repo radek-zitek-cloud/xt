@@ -299,7 +299,8 @@ give every Claude agent the same file, set it once under `[defaults]`: `permissi
 # Under its [[agent]] entry (name = "researcher"), replacing `permissions`:
 [agent.capabilities]
 commands = ["rg", "cat", "git status", "git log"]
-# kept in extras (settings/researcher.json: the block can't say these; they keep restricting on top):
+extras = "settings/researcher.json"
+# kept in extras (settings/researcher.json: the block can't say these, so `extras` keeps the file on top, where it may only restrict):
 #   deny Bash(git push *)
 #   deny Bash(curl *)
 #   deny Bash(rm *)
@@ -307,9 +308,9 @@ commands = ["rg", "cat", "git status", "git log"]
 ```
 
 Its own notes, `team.toml`, `settings/`, network off and the credential CLIs need no line: they are
-the defaults. Put the block under the agent and remove the `permissions` line; the three `deny`
-rules are already covered here, since `commands` lets it run only those four (keep a trimmed file
-on a team default block if you want them said anyway: it may only restrict). The start then
+the defaults. Put the block under the agent and remove the `permissions` line. `extras` keeps the
+file on top of the block for what the block can't say (the three `deny` rules and `statusLine`),
+where it may only restrict; a file with nothing left over gets no `extras` line. The start then
 generates the settings file, and `xt status` shows the agent's `caps:` row.
 
 ## 5. A decision question with options

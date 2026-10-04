@@ -20,11 +20,12 @@ follow-up-tasks-under-closed-goal); **rc5** adds the first part of #186 (spec on
 the model, the three harness adapters, `require`, `xt capabilities`, the status row and the spawn
 sentence; **rc6** completes #186: the same row in the brief and the TUI's detail, the old `settings:`
 and `codex options:` status lines folded into it, and the guide section; **rc7** keeps a #185
-follow-up row in the Work outline within 76 columns at any pane width (QA on rc4).
+follow-up row in the Work outline within 76 columns at any pane width (QA on rc4); **rc8** makes the
+#186 conversion round-trip with an `extras` key (QA on rc6).
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc7`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc8`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
   follow-ups). Nothing to
@@ -85,7 +86,9 @@ follow-up row in the Work outline within 76 columns at any pane width (QA on rc4
   a Codex option changed since the start still gets its own line); the start note shows the same in
   full words, and a hire's approval one sentence: `Approve its start: … enforced; … advisory (role
   text only).` `xt capabilities NAME` prints the block equivalent to an agent's old lines and file,
-  marking what it can't say as "kept in extras", and changes nothing; `xt harnesses` lists each
+  and changes nothing; what the block can't say is "kept in extras", through the block's own
+  `extras = "settings/NAME.json"` (a Claude Code file on top, restricting only; not mixing), so the
+  printed block, pasted in place of the old lines, starts the agent with the same rules; `xt harnesses` lists each
   harness's table. The guide has a section on it (Memory and recovery).
 
 ### Changed

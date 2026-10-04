@@ -400,6 +400,130 @@ def test_186_the_examples_conversion_is_what_xt_prints(ctx, monkeypatch, capsys)
     assert capsys.readouterr().out.strip() == doc.strip()
 
 
+# --- the conversion round-trips (QA on rc6, #3610) ----------------------------------------------------
+
+
+def _convert(ctx, monkeypatch, capsys, name) -> str:
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    args = cli.build_parser().parse_args(["capabilities", name])
+    args.func(args)
+    return capsys.readouterr().out
+
+
+def _apply(ctx, name, out: str):
+    """Do what the output says: its block under the agent, the legacy lines removed."""
+    parsed = tomlkit.parse("\n".join(x for x in out.splitlines() if not x.startswith("#")
+                                     and x != "[agent.capabilities]") + "\n")
+    block = tomlkit.table()
+    for k, v in parsed.items():
+        block[k] = v
+    for a in ctx.team.doc["agent"]:
+        if a["name"] == name:
+            for k in ("permissions", "codex_options", "connectors"):
+                if k in a:
+                    del a[k]
+            a["capabilities"] = block
+    ctx.paths.team_toml.write_text(tomlkit.dumps(ctx.team.doc))
+    ctx.reload_team()  # loads: not mixing
+
+
+def test_186_qas_case_the_unrepresentable_deny_survives_the_conversion(ctx, monkeypatch, capsys):
+    _team(ctx, carol="claude")
+    _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)"], "deny": ["Bash(rm *)"]})
+    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    out = _convert(ctx, monkeypatch, capsys, "carol")
+    assert 'extras = "settings/carol.json"' in out and 'commands = ["git"]' in out
+    _apply(ctx, "carol", out)
+    s = _settings(_start(ctx, "carol"))["permissions"]
+    assert "Bash(rm *)" in s["deny"] and "Bash(git *)" in s["allow"] and "Bash" not in s["allow"]
+
+
+def test_186_the_printed_text_pasted_as_is_under_the_agent_loads_and_starts(ctx, monkeypatch, capsys):
+    _team(ctx, carol="claude")  # carol is the last [[agent]] entry
+    _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)"], "deny": ["Bash(rm *)"]})
+    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    out = _convert(ctx, monkeypatch, capsys, "carol")
+    text = ctx.paths.team_toml.read_text().replace('permissions = "settings/carol.json"\n', "")
+    ctx.paths.team_toml.write_text(text.rstrip("\n") + "\n" + out)  # comments, header and all
+    ctx.reload_team()
+    s = _settings(_start(ctx, "carol"))["permissions"]
+    assert "Bash(rm *)" in s["deny"] and "Bash(git *)" in s["allow"]
+
+
+def test_186_where_nothing_is_lost_there_are_no_extras(ctx, monkeypatch, capsys):
+    _team(ctx, carol="claude")
+    _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)", "Edit(//tmp/carol/**)", "Read"],
+                           "deny": ["Edit(team.toml)", "WebFetch", "Bash(gh *)"]})
+    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    out = _convert(ctx, monkeypatch, capsys, "carol")
+    assert "extras" not in out and "kept in extras" not in out
+    _apply(ctx, "carol", out)
+    s = _settings(_start(ctx, "carol"))["permissions"]
+    assert "Edit(//tmp/carol/**)" in s["allow"] and "Bash(gh *)" in s["deny"]
+
+
+def test_186_a_realistic_settings_file_round_trips_and_starts(ctx, monkeypatch, capsys):
+    """Shaped like this team's builder file: xt in three spellings, :* and space forms, absolute and
+    relative paths, a denied skill folder, web tools denied, other tools allowed."""
+    _team(ctx, builder="claude")
+    xt = str(ctx.paths.xt_bin)
+    _extras(ctx, "builder", {
+        "defaultMode": "dontAsk",
+        "allow": [f"Bash({xt} *)", "Bash(./bin/xt *)", "Bash(bin/xt *)", "Bash(rg *)", "Bash(sed -n *)",
+                  "Bash(git:*)", "Bash(uv run *)", "Edit(//home/me/work/**)", "Edit(members/builder/**)",
+                  "Edit(//tmp/xt-**)", "Read(//home/me/**)", "Read", "Glob", "Grep", "TodoWrite", "Task"],
+        "deny": ["Bash(rm *)", "Bash(git push *)", "Edit(settings/**)", "Edit(team.toml)", "Edit(roles/**)",
+                 "Edit(//home/me/Work/**)", "Read(//home/me/.agents/skills/fizzy/**)", "WebFetch", "WebSearch"]})
+    _edit(ctx, builder={"permissions": "settings/builder.json"})
+    out = _convert(ctx, monkeypatch, capsys, "builder")
+    assert "would loosen" not in out
+    _apply(ctx, "builder", out)
+    s = _settings(_start(ctx, "builder"))["permissions"]
+    for rule in ("Bash(rg *)", "Bash(sed -n *)", "Bash(git *)", "Bash(uv run *)", "Edit(//home/me/work/**)",
+                 "Task", f"Bash({xt} *)"):
+        assert rule in s["allow"], rule
+    for rule in ("Bash(rm *)", "Bash(git push *)", "Edit(roles/**)", "Edit(//home/me/Work/**)",
+                 "Read(//home/me/.agents/skills/fizzy/**)", "WebFetch"):
+        assert rule in s["deny"], rule
+
+
+def test_186_what_would_loosen_is_named_and_the_start_says_so(ctx, monkeypatch, capsys):
+    _team(ctx, carol="claude")
+    _extras(ctx, "carol", {"defaultMode": "acceptEdits", "allow": ["Bash(git *)"]})
+    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    out = _convert(ctx, monkeypatch, capsys, "carol")
+    assert "# would loosen the block, so the start refuses them until they are removed from settings/carol.json:" in out
+    assert "#   defaultMode acceptEdits (the block's settings use dontAsk)" in out
+    _apply(ctx, "carol", out)
+    with pytest.raises(XtError, match="permissions.defaultMode 'acceptEdits' would loosen"):
+        _start(ctx, "carol")
+
+
+def test_186_codex_network_and_claude_connectors_round_trip(ctx, monkeypatch, capsys):
+    from xt import adapters
+
+    monkeypatch.setattr(adapters, "claude_mcp_servers", lambda *a, **k: ["claude.ai Gmail", "claude.ai Drive"])
+    _team(ctx, carol="claude", dana="codex")
+    _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["mcp__claude_ai_Gmail__search"]})
+    _edit(ctx, carol={"permissions": "settings/carol.json", "connectors": ["claude.ai Gmail"]},
+          dana={"codex_options": ["sandbox_workspace_write.network_access=true"]})
+    for name in ("carol", "dana"):
+        _apply(ctx, name, _convert(ctx, monkeypatch, capsys, name))
+    s = _settings(_start(ctx, "carol"))["permissions"]
+    assert "mcp__claude_ai_Gmail" in s["allow"] and "mcp__claude_ai_Gmail__search" in s["allow"]
+    assert "sandbox_workspace_write.network_access=true" in _start(ctx, "dana")
+
+
+def test_186_extras_is_claude_only_and_not_mixing(ctx):
+    _team(ctx, carol="claude", dana="codex")
+    _extras(ctx, "carol", {"deny": ["Bash(rm *)"]})
+    _edit(ctx, carol={"capabilities": {"extras": "settings/carol.json"}},
+          dana={"capabilities": {"extras": "settings/carol.json"}})  # loads: extras isn't a legacy line
+    assert "Bash(rm *)" in _settings(_start(ctx, "carol"))["permissions"]["deny"]
+    with pytest.raises(XtError, match="dana: extras = 'settings/carol.json' is a Claude Code settings file, and codex takes none"):
+        _start(ctx, "dana")
+
+
 def test_186_the_harness_files_parse_and_keep_their_other_keys(paths):
     ad = load_adapters(paths)
     assert ad["claude"].settings_flag == "--settings" and ad["claude"].context_windows
