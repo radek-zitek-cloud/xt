@@ -51,9 +51,9 @@ its pane line (`unknown`) before it stops when the Herdr server can't be reached
 - **#201** The pane-input signal says `pane input: liaison isn't running` when the liaison is
   stopped or retired (it said "recorded"), and `pane input: unknown (herdr server not reachable)`
   when the Herdr server can't be reached (chat showed nothing; `xt status` prints that line, then
-  stops with Herdr's error as before). When the supervisor has saved live state, xt reads that
-  instead (from any shell, as before), so the line follows that state; `unknown` shows only
-  without it.
+  stops with Herdr's error as before). In any shell that can't reach Herdr, the line goes by the
+  supervisor's saved live state only while it is at most 30 seconds old, so a server that is
+  down reads `unknown` within half a minute; other commands read the saved state as before.
 - **#202** The chat header is one row at 80 columns in all five states, without the repeated
   liaison name or a `harness:` prefix; above 96 columns it adds the reason. `xt status` keeps the
   full wording.

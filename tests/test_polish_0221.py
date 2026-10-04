@@ -168,7 +168,7 @@ def _variant(ctx, home, monkeypatch, variant):
     if variant == "not running":
         ctx.herdr.live.pop("liaison")
     if variant == "unknown":
-        def down():
+        def down(max_snapshot_age=None):
             raise XtError("herdr: server_unreachable: no server")
         monkeypatch.setattr(ctx.herdr, "agents", down)
     if variant == "not recorded":
@@ -743,9 +743,12 @@ def test_211_readme_examples_carry_no_release_placeholders_and_the_caption_names
     assert "](docs/screen-v0180.png)" in readme
 
 
-def test_201_a_sandboxed_shell_reads_the_supervisors_snapshot_when_herdr_cant_be_reached(ctx, fake_home, monkeypatch):
-    # QA #3373: any shell that can't reach Herdr (Ctx.load gives every caller the snapshot) reads
-    # the supervisor's saved live state instead and reports what that says; unknown only without it.
+def test_201_with_herdr_unreachable_a_fresh_snapshot_counts_a_stale_one_or_none_is_unknown(ctx, fake_home, monkeypatch):
+    # QA #3373, lead #3384: any shell that can't reach Herdr (Ctx.load gives every caller the
+    # snapshot) reads the supervisor's saved live state for the pane line only while it is at most
+    # 30 s old; older, or none, the line says unknown with its reason.
+    import datetime as dt
+
     from xt import herdr
     from xt.herdr import Herdr, LiveAgent
 
@@ -755,13 +758,21 @@ def test_201_a_sandboxed_shell_reads_the_supervisors_snapshot_when_herdr_cant_be
         raise XtError("herdr: server_unreachable: no server")
 
     monkeypatch.setattr(herdr, "_exec", unreachable)
-    snapshot = ctx.paths.state / "live.json"
-    monkeypatch.setattr(ctx, "herdr", Herdr("test", snapshot=snapshot))
-    assert paneinput.signal(ctx) == STATUS["unknown"]  # no snapshot: unknown
-    ctx.herdr.save_snapshot({"liaison": LiveAgent("liaison", "idle", "w1:p1", "w1")}, "2026-09-26T12:00:00+00:00")
-    assert paneinput.signal(ctx) == STATUS["recorded"]  # the snapshot says it runs
-    ctx.herdr.save_snapshot({}, "2026-09-26T12:00:00+00:00")
-    assert paneinput.signal(ctx) == STATUS["not running"]  # the snapshot says it doesn't
+    monkeypatch.setattr(ctx, "herdr", Herdr("test", snapshot=ctx.paths.state / "live.json"))
+    assert paneinput.signal(ctx) == STATUS["unknown"]  # no snapshot
+
+    def saved(agents, seconds_ago):
+        ts = dt.datetime.now(dt.timezone.utc) - dt.timedelta(seconds=seconds_ago)
+        ctx.herdr.save_snapshot(agents, ts.isoformat(timespec="seconds"))
+
+    liaison = {"liaison": LiveAgent("liaison", "idle", "w1:p1", "w1")}
+    saved(liaison, 5)
+    assert paneinput.signal(ctx) == STATUS["recorded"]  # fresh: it runs
+    saved({}, 5)
+    assert paneinput.signal(ctx) == STATUS["not running"]  # fresh: it doesn't
+    saved(liaison, 60)
+    assert paneinput.signal(ctx) == STATUS["unknown"]  # stale: the server is down, not the liaison
+    assert ctx.herdr.agents() == liaison  # every other caller still reads the snapshot, as before
 
 
 def test_201_a_retired_liaison_isnt_running(ctx, fake_home):

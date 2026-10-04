@@ -39,7 +39,7 @@ class FakeHerdr:
     def check_session(self):
         pass
 
-    def agents(self):
+    def agents(self, max_snapshot_age=None):
         return dict(self.live)
 
     def status(self, name):

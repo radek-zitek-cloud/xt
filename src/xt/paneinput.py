@@ -129,6 +129,7 @@ RECORDED, LOG_ONLY, NOT_RUNNING, UNKNOWN, NOT_RECORDED = "recorded", "log only",
 HERDR_DOWN = "herdr server not reachable"
 NO_LOG, NO_FORMAT = "no session log", "not on this harness"
 WIDE_HEADER = 96  # the chat header adds the reason only above this width (card #202)
+SNAPSHOT_FRESH = 30  # seconds the supervisor's saved live state stands in for Herdr (card #201, xt #3384)
 
 
 def state(ctx: Ctx) -> tuple[str, str, str, str] | None:
@@ -145,8 +146,8 @@ def state(ctx: Ctx) -> tuple[str, str, str, str] | None:
     if adapter is None or not adapter.session_format:
         return name, harness, NOT_RECORDED, NO_FORMAT
     try:
-        running = name in ctx.herdr.agents()
-    except XtError:
+        running = name in ctx.herdr.agents(max_snapshot_age=SNAPSHOT_FRESH)
+    except XtError:  # Herdr down: unknown, unless the supervisor saved its live state just now
         return name, harness, UNKNOWN, HERDR_DOWN
     if not running:
         return name, harness, NOT_RUNNING, ""

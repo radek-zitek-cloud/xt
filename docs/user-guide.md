@@ -1226,9 +1226,10 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   | its session log isn't found | `liaison (claude): pane input NOT recorded (no session log): talk in xt chat` |
 
   When xt can't reach the Herdr server, from any shell (yours, or an agent's sandboxed one such as
-  Codex's), it reads the supervisor's last saved live state instead, so the line says what that
-  state says (`recorded`, `isn't running`, …). It says `unknown (herdr server not reachable)` only
-  when no live state was saved (`xt status` prints that line, then stops with Herdr's error).
+  Codex's), this line goes by the live state the supervisor saved, if that is at most 30 seconds
+  old (`recorded`, `isn't running`, …). Older, or none, it says `unknown (herdr server not
+  reachable)`: a server that is down stops the supervisor saving, so within half a minute every
+  shell says `unknown` (`xt status` prints that line, then stops with Herdr's error).
 
   The chat header says the same in one row: at 80 to 96 columns `xt chat with liaison (claude) ·
   pane input recorded`, `· pane input: session log only`, `· pane input: liaison isn't running`,

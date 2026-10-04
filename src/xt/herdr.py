@@ -4,6 +4,7 @@ Every call is pinned to the team's session with `herdr --session <name>`, so xt 
 depends on inherited HERDR_* environment variables (which proved unreliable in v1).
 """
 
+import datetime as dt
 import json
 import subprocess
 from dataclasses import dataclass
@@ -58,6 +59,14 @@ def _exec(argv: list[str], timeout: float = 120) -> dict:
     return data
 
 
+def _recent(ts: str | None, seconds: float) -> bool:
+    try:
+        saved = dt.datetime.fromisoformat(ts)
+    except (TypeError, ValueError):
+        return False
+    return (dt.datetime.now(dt.timezone.utc) - saved).total_seconds() <= seconds
+
+
 class Herdr:
     def __init__(self, session: str, snapshot=None):
         self.session = session
@@ -76,12 +85,17 @@ class Herdr:
                 f"`herdr session attach {self.session}` (or `herdr --session {self.session}`) first"
             )
 
-    def agents(self) -> dict[str, LiveAgent]:
+    def agents(self, max_snapshot_age: float | None = None) -> dict[str, LiveAgent]:
+        """The live agents. When Herdr can't be reached, the supervisor's saved snapshot, if any;
+        with `max_snapshot_age` (seconds) only a snapshot that recent (card #201: a server that is
+        down reads as unknown once the supervisor can no longer save one)."""
         try:
             data = self._run("agent", "list")
         except XtError:
             if self.snapshot is not None and self.snapshot.exists():
                 snap = json.loads(self.snapshot.read_text())
+                if max_snapshot_age is not None and not _recent(snap.get("ts"), max_snapshot_age):
+                    raise
                 return {n: LiveAgent(n, *v) for n, v in snap.get("agents", {}).items()}
             raise
         out = {}
