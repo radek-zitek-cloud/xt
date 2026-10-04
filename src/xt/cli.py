@@ -464,7 +464,15 @@ def cmd_log(args) -> None:
 
 def cmd_status(args) -> None:
     ctx = Ctx.load()
-    live = ctx.herdr.agents()
+    try:
+        live = ctx.herdr.agents()
+    except XtError:
+        from .paneinput import signal
+
+        pane = signal(ctx)  # card #201: `… pane input: unknown (herdr server not reachable)`
+        if pane:
+            print(pane)
+        raise
     items = ctx.ledger.open_items()
     print(f"team {ctx.team.name} · session {ctx.team.session}")
     from . import turns, usage, versions

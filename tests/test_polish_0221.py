@@ -191,7 +191,11 @@ def test_201_202_status_and_the_header_in_all_five_variants_at_80_100_117(ctx, f
 
     _variant(ctx, fake_home, monkeypatch, variant)
     assert paneinput.signal(ctx) == STATUS[variant]
-    if variant != "unknown":  # with Herdr down, `xt status` stops before its pane line
+    if variant == "unknown":  # Herdr down: status says so on its pane line, then fails as before
+        with pytest.raises(XtError, match="server_unreachable"):
+            _status_out(ctx, monkeypatch, capsys)
+        assert STATUS[variant] in capsys.readouterr().out.splitlines()
+    else:
         assert STATUS[variant] in _status_out(ctx, monkeypatch, capsys).splitlines()
     for width in (80, 100, 117):
         async def steps(app, pilot):

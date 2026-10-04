@@ -12,7 +12,8 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.22.1] — not released yet
 
 Polish for chat, the log and the pane-input signal, and one new alert (Space
-specs/polish-for-0-22-1). **0.22.1-rc1** has all ten cards.
+specs/polish-for-0-22-1). **0.22.1-rc1** has all ten cards; **rc2** makes `xt status` print
+its pane line (`unknown`) before it stops when the Herdr server can't be reached (#201).
 
 ### Upgrading
 
@@ -49,7 +50,8 @@ specs/polish-for-0-22-1). **0.22.1-rc1** has all ten cards.
   recorded advice (`— type here`, no longer "talk in xt chat").
 - **#201** The pane-input signal says `pane input: liaison isn't running` when the liaison is
   stopped or retired (it said "recorded"), and `pane input: unknown (herdr server not reachable)`
-  when the Herdr server can't be reached (chat showed nothing).
+  when the Herdr server can't be reached (chat showed nothing; `xt status` prints that line, then
+  stops with Herdr's error as before).
 - **#202** The chat header is one row at 80 columns in all five states, without the repeated
   liaison name or a `harness:` prefix; above 96 columns it adds the reason. `xt status` keeps the
   full wording.
