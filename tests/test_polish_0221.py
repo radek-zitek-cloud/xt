@@ -744,8 +744,8 @@ def test_211_readme_examples_carry_no_release_placeholders_and_the_caption_names
 
 
 def test_201_a_sandboxed_shell_reads_the_supervisors_snapshot_when_herdr_cant_be_reached(ctx, fake_home, monkeypatch):
-    # QA #3373: xt querying Herdr itself says unknown; a shell that can't reach Herdr (an agent's
-    # sandbox) reads the supervisor's saved live state instead, so it reports what that says.
+    # QA #3373: any shell that can't reach Herdr (Ctx.load gives every caller the snapshot) reads
+    # the supervisor's saved live state instead and reports what that says; unknown only without it.
     from xt import herdr
     from xt.herdr import Herdr, LiveAgent
 
