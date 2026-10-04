@@ -34,6 +34,10 @@ specs/polish-for-0-22-1).
 - **#202** The chat header is one row at 80 columns in all five states, without the repeated
   liaison name or a `harness:` prefix; above 96 columns it adds the reason. `xt status` keeps the
   full wording.
+- **#208** A TUI thread row keeps "unverified" and part of a pane message at every width: the label
+  shortens to `(pane, unverified)`, then `(unverified)`, so the row keeps at least 12 characters of
+  the message; in a very narrow pane the row drops the date, the name padding and the type first.
+  Chat, log, brief and detail keep the full label; the guide lists every rendering.
 
 ## [0.22.0] — 2026-10-03
 

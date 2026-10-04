@@ -22,6 +22,9 @@ from rich.text import Text
 from ..ledger import PANE_LABEL, is_pane
 
 HERE = "  ◀ you are here"
+# Card #208: a thread row's pane label, longest first; "unverified" stays at every width
+PANE_FORMS = (PANE_LABEL, "pane, unverified", "unverified")
+BODY_FLOOR = 12  # characters of a pane message a row keeps before any ellipsis
 MIN_ROWS = 3  # thread rows Detail always shows, however long the head
 
 
@@ -78,20 +81,42 @@ class ThreadDetail:
         today = (self.now or dt.datetime.now().astimezone()).isoformat()[:10]
         return m["ts"][5:16].replace("T", " ") if days - {today} else m["ts"][11:16]
 
+    def _head(self, m: dict, names: int, here: bool, compact: bool) -> Text:
+        """A row up to its text: time, sender → receiver, type, id. `compact` (a narrow pane-input
+        row, card #208): the time without its date, the names unpadded, no type (always `ask`)."""
+        out = Text(no_wrap=True, overflow="ellipsis", style="bold" if here else "")
+        if compact:
+            out.append(f"{m['ts'][11:16]} ", style="bright_black")
+            out.append(f"{m['from'][:names]}→{m['to'][:names]} ")
+        else:
+            out.append(f"{self.when(m)}  ", style="bright_black")
+            out.append(f"{m['from'][:names]:<{names}} → {m['to'][:names]:<{names}} ")
+            out.append(f"{m['type']:<8} ", style=self.type_style.get(m["type"], ""))
+        out.append(f"#{m['id']} ", style="bright_black")
+        return out
+
     def row(self, m: dict, width: int) -> Text:
         names = max((len(x["from"]) for x in self.thread), default=4)
         names = min(12, max(names, max((len(x["to"]) for x in self.thread), default=4)))
         here = m["id"] == self.selected
-        out = Text(no_wrap=True, overflow="ellipsis", style="bold" if here else "")
-        out.append(f"{self.when(m)}  ", style="bright_black")
-        out.append(f"{m['from'][:names]:<{names}} → {m['to'][:names]:<{names}} ")
-        out.append(f"{m['type']:<8} ", style=self.type_style.get(m["type"], ""))
-        out.append(f"#{m['id']} ", style="bright_black")
-        if is_pane(m):  # card #193
-            out.append(f"({PANE_LABEL}) ", style="yellow")
         body = m.get("body") or ""
         first = body.strip().splitlines()[0] if body.strip() else ""
-        room = width - out.cell_len - (len(HERE) if here else 0)
+        mark = len(HERE) if here else 0
+        out = self._head(m, names, here, compact=False)
+        room = width - out.cell_len - mark
+        if is_pane(m):  # card #193; #208: a shorter label rather than no message at all
+            def keeps(left: int) -> bool:  # the whole line, or BODY_FLOOR characters before the "…"
+                return left >= len(first) or left - 1 >= BODY_FLOOR
+
+            # longest label first; if none keeps the floor, the row's own columns give way (never
+            # "unverified"), and in the end the shortest of both
+            tries = [(c, f) for c in (False, True) for f in PANE_FORMS]
+            compact, label = next(((c, f) for c, f in tries
+                                   if keeps(width - self._head(m, names, here, c).cell_len - mark - len(f) - 3)),
+                                  tries[-1])
+            out = self._head(m, names, here, compact)
+            out.append(f"({label}) ", style="yellow")
+            room = width - out.cell_len - mark
         line = Text(first)
         if line.cell_len > room:
             line.truncate(max(room, 1), overflow="ellipsis")

@@ -203,6 +203,51 @@ def test_201_202_status_and_the_header_in_all_five_variants_at_80_100_117(ctx, f
         _run(ctx, steps, size=(width, 24), refresh_s=60)
 
 
+def _pane_row(ctx, fake_home, width, body="Please ship the release today, after QA's run"):
+    from rich.console import Console
+
+    from xt.tui.thread import ThreadDetail
+
+    log = _liaison(ctx, fake_home)
+    paneinput.scan(ctx)
+    _type(log, "codex", body)
+    paneinput.scan(ctx)
+    (m,) = _from_human(ctx)
+    td = ThreadDetail.__new__(ThreadDetail)
+    import datetime as dt
+
+    later = dt.datetime(2026, 10, 4, 12, 0, tzinfo=dt.timezone.utc)  # another day: rows show the date
+    td.thread, td.selected, td.now, td.type_style = [m], None, later, {}
+    out = Console(width=width + 10, record=True)
+    out.print(td.row(m, width))
+    return out.export_text().rstrip("\n"), body
+
+
+@pytest.mark.parametrize("width, head, label", [
+    (120, "09-26 12:00  human   → liaison ask      #2 ", "(typed in the pane, unverified)"),
+    (80, "09-26 12:00  human   → liaison ask      #2 ", "(pane, unverified)"),  # the full one leaves 1
+    (60, "12:00 human→liaison #2 ", "(pane, unverified)"),  # no form keeps 12 in the full columns
+    (40, "12:00 human→liaison #2 ", "(unverified)"),  # nothing keeps 12: the shortest of both
+])
+def test_208_a_thread_row_keeps_unverified_and_part_of_the_message(ctx, fake_home, width, head, label):
+    row, body = _pane_row(ctx, fake_home, width)
+    assert row.startswith(head + label + " ") and len(row) <= width, row
+    kept = row[len(head + label) + 1:].rstrip("…")
+    assert body.startswith(kept) and kept
+    if width >= 60:  # 12 characters of the message before any ellipsis
+        assert kept == body or len(kept) >= 12, row
+
+
+def test_208_chat_log_brief_and_detail_keep_the_full_label(ctx, fake_home, monkeypatch, capsys):
+    from xt.tui.model import _msg_block
+
+    row, _ = _pane_row(ctx, fake_home, 80)
+    (m,) = _from_human(ctx)
+    full = "human (typed in the pane, unverified)"
+    assert full in _msg_block(m).plain and full in brief.build(ctx, "liaison")
+    assert full in _log(ctx, monkeypatch, capsys)
+
+
 def test_201_a_retired_liaison_isnt_running(ctx, fake_home):
     from xt.spawn import retire
 

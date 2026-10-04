@@ -1161,8 +1161,17 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   names the keys and the current mode. A line that arrives while you've scrolled up to read
   doesn't move the view; at the end, the view follows.
 - **What you type in the liaison's pane** (from 0.22.0) is recorded too, as a message to the
-  liaison labelled **`you (typed in the pane, unverified)`** (in `xt log`, the TUI and briefs:
-  `human (typed in the pane, unverified)`), so chat shows the whole conversation. The supervisor
+  liaison labelled **`you (typed in the pane, unverified)`**, so chat shows the whole
+  conversation. Every place that shows such a message says "unverified":
+
+  | Where | How |
+  |---|---|
+  | chat | `you (typed in the pane, unverified)` |
+  | `xt log` (`--full`, `--member`) and briefs | `human (typed in the pane, unverified) →liaison` |
+  | the TUI's detail | `human (typed in the pane, unverified) → liaison` |
+  | a TUI thread row | `(typed in the pane, unverified)`, or where the row is narrow `(pane, unverified)`, then `(unverified)`: the row keeps at least 12 characters of the message when it can, and in a very narrow pane drops the date, the name padding and the type (always `ask`) before it would drop the word |
+
+  The supervisor
   reads it from the liaison's own session log, where the harness writes what was typed in the pane
   (an agent's own tool calls can't put a line there), and records each line once, as submitted; a
   multi-line paste is one message. **The label means "typed in the pane", not "proven to be you":**
