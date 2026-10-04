@@ -6,8 +6,17 @@ import re
 import shlex
 import time
 
-from . import __version__, brief, paneinput, permissions, skills, usage, versions
-from .adapters import codex_option_args, codex_options_text, get_adapter, load_adapters
+from . import (
+    __version__,
+    brief,
+    capstart,
+    paneinput,
+    permissions,
+    skills,
+    usage,
+    versions,
+)
+from .adapters import codex_options_text, get_adapter, load_adapters
 from .alerts import Alerts
 from .approvals import Approvals
 from .context import Ctx
@@ -85,14 +94,12 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         raise XtError(f"{name} is already running: spawn starts an agent that isn't running "
                       f"(`xt restart {name}` restarts a running one)")
     adapter = get_adapter(ctx.paths, a.harness)
-    rel, skipped = permissions.effective(ctx.team, a, adapter)  # may refuse a `permissions` line
-    settings = permissions.preflight(ctx.paths.root, rel) if rel else None  # refuses a bad file
-    options = codex_option_args(name, a.harness, a.codex_options)  # refuses one off the allowlist (#169)
-    settings_file = str(settings.path) if settings else None
-    if a.role == "liaison" and adapter.name in paneinput.HOOKED:  # card #193: its own file plus the prompt hook
-        settings_file = paneinput.hook_settings(ctx, name, rel if settings else None)
-    args = adapter.start_args(a.model, a.connectors, str(ctx.paths.root),
-                              settings_file, options)  # may refuse an opt-in
+    # card #186: refuses a `require` the harness can't enforce, or a legacy line that would loosen
+    # the block, before anything runs; generates the harness's settings from [capabilities]
+    plan = capstart.plan(ctx, a, adapter, load_adapters(ctx.paths))
+    settings, skipped = plan.settings, plan.skipped
+    args = adapter.start_args(a.model, plan.connectors, str(ctx.paths.root),
+                              plan.settings_file, plan.options) + plan.args  # may refuse an opt-in
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
     # Before the harness starts, so it and every shell it opens inherit it (card #103).
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
@@ -125,9 +132,12 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     if landed and adapter.check_prompt_in_log:
         note = check_prompt_in_log(ctx, name, adapter, began, settled)
-    versions.record_agent_start(ctx, name, ctx.ledger.clock(), a.codex_options)
+    versions.record_agent_start(ctx, name, ctx.ledger.clock(), a.codex_options, capstart.record(plan))
+    caps_line = (f"capabilities: {capstart.row(plan.caps, adapter, capstart.legacy_lines(a), name, 200, plan.was_loaded, plan.source)}"
+                 + (f" (settings generated: .xt/state/settings/{name}.json)" if plan.generated else ""))
     ctx.ledger.append(SYSTEM, HUMAN, "system",
-                      f"started {name} ({a.role}, {a.harness}) in workspace {workspace} with xt {versions.display(__version__)}{note}")
+                      f"started {name} ({a.role}, {a.harness}) in workspace {workspace} with xt "
+                      f"{versions.display(__version__)}{note}\n{caps_line}")  # card #186: one start, one note
     if a.codex_options:
         ctx.ledger.append(SYSTEM, HUMAN, "system", f"{name}: Codex options {codex_options_text(a.codex_options)}")
     if a.connectors:
@@ -445,8 +455,10 @@ def request_spawn(
 
     own = permissions_file or (existing.permissions if existing else None)
     note = spawn_settings(ctx, name, harness, own)  # refuses a bad file before anything else
+    # card #186: refuses a `require` the harness can't enforce before an approval is asked for
+    caps_note = capstart.request_sentence(ctx, name, get_adapter(ctx.paths, harness), load_adapters(ctx.paths), own)
     req = {"requester": requester, "name": name, "harness": harness, "model": model,
-           "role": role, "reports_to": reports_to}
+           "role": role, "reports_to": reports_to, "caps_note": caps_note}
     if permissions_file:
         req["permissions"] = permissions_file
     if note:

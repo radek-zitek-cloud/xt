@@ -1,13 +1,14 @@
 import argparse
 import contextlib
 import datetime as dt
+import json
 import os
 import sys
 import time
 
 from . import __version__
 from . import brief as brief_mod
-from . import goals, notes, operators, permissions
+from . import capabilities, capstart, goals, notes, operators, permissions
 from .adapters import CODEX, allowed_codex_options, load_adapters
 from .alerts import Alerts, repeats
 from .context import Ctx
@@ -522,6 +523,9 @@ def cmd_status(args) -> None:
         notes_line = notes.status_text(ctx, a)  # card #198: only when over budget
         if notes_line:
             print(f"  {'':<12} {notes_line}")
+        caps_line = capstart.status_row(ctx, a, adapters.get(a.harness))  # card #186
+        if caps_line:
+            print(capstart.INDENT + caps_line)
         if a.name in resets:
             print(f"  {'':<12} {queued_text(resets[a.name])}")
         state_launch, why = launched.get(a.name, (None, ""))
@@ -862,6 +866,23 @@ def cmd_stop(args) -> None:
     print(stop(Ctx.load(), args.name))
 
 
+def cmd_capabilities(args) -> None:
+    """Card #186: print the [capabilities] block equivalent to an agent's legacy lines and settings
+    file, for review. Reads only: team.toml, the settings file and xt's state stay as they are."""
+    ctx = Ctx.load()
+    a = ctx.team.agent(args.name)
+    if a is None or a.kind == HUMAN:
+        raise XtError(f"no agent named {args.name!r}")
+    rel = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness or ""))
+    data = None
+    if rel:
+        try:
+            data = json.loads((ctx.paths.root / rel).read_text())
+        except (OSError, ValueError) as e:
+            raise XtError(f"can't read {rel}: {e}") from None
+    print(capabilities.convert(a, data, rel))
+
+
 def cmd_harnesses(args) -> None:
     paths = Paths(find_root())
     for a in load_adapters(paths).values():
@@ -875,6 +896,11 @@ def cmd_harnesses(args) -> None:
               + (f" ({a.desktop_tools_note})" if a.desktop_tools_note else ""))
         print(f"   account connectors for agents: {a.connectors or 'not restricted'}"
               + (f" ({a.connectors_note})" if a.connectors_note else ""))
+        if a.capabilities:  # card #186
+            groups = {label: [n for n in capabilities.NAMES if capabilities.support(a, n) == label]
+                      for label in (capabilities.ENFORCED, capabilities.ADVISORY)}
+            print("   capabilities: " + "; ".join(f"{', '.join(ns)} {label}" for label, ns in groups.items() if ns)
+                  + (f" (checked: {a.capabilities_checked})" if a.capabilities_checked else ""))
         print(f"   per-agent settings file (`permissions` in team.toml): "
               + (f"yes, passed with {a.settings_flag}" if a.settings_flag else "not supported"))
         print("   per-agent options (`codex_options` in team.toml, Codex only): "
@@ -1096,6 +1122,10 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--hook", action="store_true", help="read Claude Code's hook input on stdin")
 
     add("harnesses", cmd_harnesses, "which harnesses xt can use here")
+    sp = add("capabilities", cmd_capabilities,
+             "print the [capabilities] block equivalent to an agent's old permissions, codex_options and "
+             "connectors lines (changes nothing)")
+    sp.add_argument("name")
 
     sp = add("goal", cmd_goal, "goals: new draft, dispatch to the lead, list")
     gsub = sp.add_subparsers(dest="goal_cmd")

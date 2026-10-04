@@ -16,17 +16,28 @@ and #198 (specs lead-independent-positions-and-devils-advocate,
 unstamped-pane-text-not-proof-of-human, notes-budget-and-shape); **rc3** makes #215's graph test,
 run on a tree from before the shared layer, name the import cycle and its two-way pairs before it
 says which modules are missing (QA on rc1); **rc4** adds #185 (spec
-follow-up-tasks-under-closed-goal).
+follow-up-tasks-under-closed-goal); **rc5** adds the first part of #186 (spec one-capability-model):
+the model, the three harness adapters, `require`, the status row and the spawn sentence (rc6 brings
+the brief and TUI rows, `xt capabilities` and the guide section).
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc4`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc5`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
   follow-ups). Nothing to
   migrate: `notes_budget` is optional (16,000 bytes when unset), and the ledger and state files
   are unchanged. If you edited `roles/lead.md`, `roles/liaison.md` or `protocol.md` yourself, the
   merge may ask you to resolve their changed passages.
+- Capabilities (#186): an agent with only the old lines (`permissions`, `codex_options`,
+  `connectors`) or none gets exactly two changes, nothing else: **personal skills are off** (a pi
+  agent now starts with `--no-skills` and the team's own skills passed back one by one, so a pi
+  agent that used your personal skills from `~/.agents/skills` or `~/.pi/agent/skills` no longer
+  has them; its first start says `skills: none, was loaded`; Claude agents already had them off
+  since 0.21.1; Codex's can't be switched off yet and show `advisory`), and **the display**:
+  `xt status` and the start note show a `caps:` row with what its harness can't enforce
+  (`advisory`), which was always true and is now visible. The old lines keep working in 0.23.0 and
+  are marked deprecated; they are removed in 0.24.0.
 
 ### Added
 
@@ -52,6 +63,23 @@ follow-up-tasks-under-closed-goal).
   goal's own tasks as `↳ follow-up` with its age; the goal row keeps its place, count and closed
   mark, while the `done` fold says `· 1 follow-up open` and starts unfolded. The shipped lead
   role says when to use one.
+- **#186** One capability model across harnesses (with #126, the credential-CLI boundary). A
+  `[capabilities]` block per agent, or as the team's default under `[defaults.capabilities]`, says
+  in one vocabulary what an agent may do: `write`, `deny`, `commands`, `network` (`off`/`on`),
+  `connectors`, `skills` (`none` or names) and `credential_clis` (tools holding your credentials,
+  denied by name), and which of them it `require`s. Unknown names and bad values are refused when
+  xt loads `team.toml`. Each harness turns the block into its own mechanism and says per capability
+  whether it is `enforced` or `advisory` (role text only), from checks on Claude Code 2.1.289,
+  codex-cli 0.160.0 and pi 1.0.2: Claude gets a generated `dontAsk` settings file (file edits by
+  path, shell commands and credential CLIs by name; network stays advisory), Codex its sandbox's
+  network switch and `--add-dir` for the write paths, pi `--no-skills` with the team's skills
+  passed back. A capability marked `require` that the harness can't enforce refuses the start (and
+  a hire request, before any approval) naming the capability, the harness and the nearest
+  alternative, storing nothing. A legacy settings file on top of a team default block may only
+  restrict: a rule that would loosen it is refused, naming both. `xt status` shows one `caps:` row
+  per started agent (what deviates from the defaults, `require`, `enforced`, `advisory`, within 80
+  columns), the start note the same, and a hire's approval one sentence: `Approve its start: …
+  enforced; … advisory (role text only).`
 
 ### Changed
 

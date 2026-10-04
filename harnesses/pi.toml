@@ -10,6 +10,9 @@ connectors = "none"
 connectors_note = "pi has no account connectors (extensions could add some); CLIs holding your credentials aren't covered"
 model_flag = "--model"
 summary = "pi: lightweight, many model providers; reads repo skills via .agents/skills"
+# Card #186: pi has no permission system or sandbox. It enforces skills (`--no-skills`, then the
+# team's skills and named ones with `--skill`) and has no account connectors; the rest is role text.
+capabilities_checked = "pi 1.0.2 (operator check 2026-10-04: --help)"
 limits = [
   "-a also trusts project .pi settings and extensions for the run: don't keep a .pi/ dir you don't mean",
 ]
@@ -34,3 +37,13 @@ first_prompt_prefix = "(xt: this line only guards your first prompt against lost
 # Codex agents complied). The first prompt carries this line just before its last one, far from
 # the guard line and the opening the log check reads.
 first_prompt_note = "Reminder (protocol §4): add a `Friction:` line to a report or `done` only when something got in the way; otherwise write nothing about it, never \"no issues\" or \"no friction\"."
+
+# Card #186: each capability on this harness (see capabilities_checked above).
+[capabilities]
+write = "advisory"
+deny = "advisory"
+commands = "advisory"
+network = "advisory"
+connectors = "enforced"
+skills = "enforced"
+credential_clis = "advisory"

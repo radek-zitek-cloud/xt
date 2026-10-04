@@ -4,6 +4,7 @@ from pathlib import Path
 
 import tomlkit
 
+from . import capabilities
 from .paths import XtError
 
 HUMAN = "human"
@@ -72,9 +73,14 @@ class Team:
         for a in self.doc.get("agent", []):
             if "notes_budget" in a:
                 problems.append(_notes_budget_problem(a["notes_budget"], f"agent {a.get('name')}'s"))
-        problems = [p for p in problems if p]
+        problems = [p for p in problems if p] + capabilities.check(self.doc)  # card #186
         if problems:
             raise XtError("; ".join(problems))
+
+    def capabilities_block(self, name: str):
+        """The agent's own `[agent.capabilities]` table, or None (card #186)."""
+        t = self._table(name)
+        return t.get("capabilities") if t is not None else None
 
     def notes_budget(self, agent: "Agent | None") -> int:
         """The notes budget in bytes for `agent`: its own `notes_budget`, else `[defaults]`, else 16,000."""

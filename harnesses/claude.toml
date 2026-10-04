@@ -20,6 +20,11 @@ connector_style = "claude-mcp"
 settings_flag = "--settings"
 model_flag = "--model"
 summary = "Claude Code: careful multi-step work and writing; reads repo skills via .claude/skills"
+# Card #186: what xt's generated settings file (dontAsk) enforces. write and deny: Claude's file
+# tools by path rule; commands: shell commands by name; credential_clis: denied by name (a command
+# that is allowed can still use credentials or the network: no isolation). network stays advisory:
+# WebFetch and WebSearch are denied by name, but no settings key limits the shell's network.
+capabilities_checked = "Claude Code 2.1.289 (operator check 2026-10-04: --help; settings rule syntax)"
 limits = [
   "Its pooled background command daemon can hand out stale HERDR_* env vars; xt never relies on them",
   "Permission prompts block the agent until answered (xt watch alerts); use your own allowlist/settings",
@@ -55,3 +60,13 @@ keys = ["down", "enter"]
 "claude-sonnet-4-6" = 1000000
 "claude-haiku-4-5" = 200000
 "claude-haiku-4-5-20251001" = 200000
+
+# Card #186: each capability on this harness (see capabilities_checked above).
+[capabilities]
+write = "enforced"
+deny = "enforced"
+commands = "enforced"
+network = "advisory"
+connectors = "enforced"
+skills = "enforced"
+credential_clis = "enforced"

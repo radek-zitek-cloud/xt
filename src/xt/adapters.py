@@ -38,6 +38,10 @@ class Adapter:
     connector_style: str | None = None  # "claude-mcp" (named opt-in possible) or None (no opt-in)
     # The flag that passes a settings file (per-agent permissions, card #117); None = not supported.
     settings_flag: str | None = None
+    # Card #186: each capability as "enforced" or "advisory" on this harness, and on which harness
+    # version (and how) that was checked; a capability missing here is advisory.
+    capabilities: dict[str, str] = field(default_factory=dict)
+    capabilities_checked: str = ""
     # Readiness before the first prompt (card #167): Herdr can report the harness started before it
     # takes input. With `ready_settle = N`, xt waits until the screen stays unchanged for N checks a
     # second apart; with `check_prompt_in_log`, it checks the session log for the prompt's opening.
@@ -172,6 +176,8 @@ def load_adapters(paths: Paths) -> dict[str, Adapter]:
             connector_block_args=list(d.get("connector_block_args", [])),
             connector_style=d.get("connector_style"),
             settings_flag=d.get("settings_flag"),
+            capabilities={str(k): str(v) for k, v in d.get("capabilities", {}).items()},
+            capabilities_checked=str(d.get("capabilities_checked", "")),
             ready_settle=int(d.get("ready_settle", 0)),
             check_prompt_in_log=bool(d.get("check_prompt_in_log", False)),
             first_prompt_prefix=d.get("first_prompt_prefix") or None,

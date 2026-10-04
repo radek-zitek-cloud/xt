@@ -20,6 +20,11 @@ connectors_note = "apps (ChatGPT connectors) off; no per-agent opt-in, because C
 connector_block_args = ["-c", "features.apps=false"]
 model_flag = "--model"
 summary = "OpenAI Codex CLI: recommended for the liaison and lead; reads repo skills via .agents/skills"
+# Card #186: Codex's OS sandbox enforces network (on or off). It lets the agent write the whole team
+# repo and /tmp, so write and deny stay advisory (`write` paths are added with --add-dir so the agent
+# can write there); no per-command rules; no verified switch for personal skills (codex-cli 0.160.0
+# has `features.skip_host_skill_discovery`, under development, untried).
+capabilities_checked = "codex-cli 0.160.0 (operator check 2026-10-04: --help, features list)"
 limits = [
   "Shell commands run through one shared machine-wide app-server daemon: per-pane env never reaches them",
   "Its sandbox makes ~/.cache read-only; bin/xt keeps uv's cache inside the repo",
@@ -38,3 +43,13 @@ session_format = "codex"
 name = "folder trust"
 match = "Trust this folder?"
 keys = ["enter"]
+
+# Card #186: each capability on this harness (see capabilities_checked above).
+[capabilities]
+write = "advisory"
+deny = "advisory"
+commands = "advisory"
+network = "enforced"
+connectors = "enforced"
+skills = "advisory"
+credential_clis = "advisory"

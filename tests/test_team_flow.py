@@ -121,7 +121,7 @@ def test_spawn_needs_human_approval_by_default(ctx):
     rid = int(next(iter(Approvals(ctx).pending())))
     decide(ctx, rid, approve=True)
     assert "carol" in ctx.herdr.live
-    assert ctx.herdr.started[-1] == ("carol", "pi", ["-a"])
+    assert ctx.herdr.started[-1] == ("carol", "pi", ["-a", "--no-skills"])  # no personal skills (#186 Q3)
     assert ctx.team.agent("carol").reports_to == "lead"
     assert "approved" in ctx.herdr.last_prompt("lead")
 

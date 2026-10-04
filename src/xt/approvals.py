@@ -41,7 +41,8 @@ class Approvals:
             what = (f"{req['requester']} asks to spawn {req['name']} as {req['role']} on {req['harness']}"
                     + (f" ({req['model']})" if req.get("model") else "")
                     + f", reporting to {req['reports_to']}."
-                    + (f" {req['settings_note']}" if req.get("settings_note") else ""))
+                    + (f" {req['settings_note']}" if req.get("settings_note") else "")
+                    + (f"\n{req['caps_note']}" if req.get("caps_note") else ""))  # card #186, its own rows
         # a closed question with the request as its narrative (card #183): yes approves, no denies
         msg = self.ctx.ledger.append(
             SYSTEM,
