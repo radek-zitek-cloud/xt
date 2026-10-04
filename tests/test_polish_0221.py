@@ -691,6 +691,54 @@ def test_187_the_guide_has_the_row_and_the_amended_sentences():
     assert guide.count("a message queued for it still alerts") == 2
 
 
+# --- #211: the chat example and README versions -------------------------------------------------------
+
+
+def test_211_example_11_matches_what_chat_shows(ctx, fake_home):
+    from xt.dispatch import send
+    from xt.spawn import request_spawn
+
+    from .conftest import REPO
+    from .test_chat_0210 import _bodies, _run, _status, _text
+    from .test_chat_0210 import _type as _keys_typed
+
+    example = (REPO / "docs" / "examples.md").read_text().split("## 11.", 1)[1]
+    log = _liaison(ctx, fake_home, "claude")
+    request_spawn(ctx, "human", "lead", None, None, None, None)
+    paneinput.scan(ctx)
+    send(ctx, "human", "liaison", "ask", "Where is the digest?")
+    ctx.ledger.append("op", "liaison", "report",
+                      "Staging check passed: steps 1-9.\n(sent by op, an operator, on the human's behalf)")
+    _type(log, "claude", "Ship the digest after QA's run")
+    paneinput.scan(ctx)
+    send(ctx, "liaison", "human", "ask", "QA passed the digest. Publish it now?\n\nAnswer yes or no.",
+         data={"question": {"kind": "closed"}})
+
+    async def steps(app, pilot):
+        assert _text(app.query_one("#header")) in example
+        for body in _bodies(app):
+            assert body.replace("\n\n", "\n") in example.replace("\n\n", "\n"), body
+        assert _status(app) in example
+        await pilot.press("tab")
+        assert f"`{_text(app.query_one('#target'))}`" in example and _status(app) in example.replace(" ·\n  ", " · ")
+        await _keys_typed(pilot, "yes")
+        await pilot.press("enter")
+        await pilot.pause()
+        assert _status(app).startswith("#8 answer to #7 → liaison: ") and "✓ answered #8: yes" in _bodies(app)[-2]
+
+    _run(ctx, steps, size=(80, 30), refresh_s=60)
+
+
+def test_211_readme_examples_carry_no_release_placeholders_and_the_caption_names_the_image():
+    from .conftest import REPO
+
+    readme = (REPO / "README.md").read_text()
+    guide = (REPO / "docs" / "user-guide.md").read_text()
+    assert "version use v0." not in readme + guide and "git merge v0." not in readme
+    assert "*The 0.18.0 TUI screenshot (`docs/screen-v0180.png`), taken on xt 0.18.0" in readme
+    assert "](docs/screen-v0180.png)" in readme
+
+
 def test_201_a_retired_liaison_isnt_running(ctx, fake_home):
     from xt.spawn import retire
 

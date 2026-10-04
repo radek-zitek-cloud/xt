@@ -554,9 +554,69 @@ XT_END
 
 Each lands under `helper`, never `human`, ending in `(helper, delegated by human until 15:30: an
 operator acting on the human's behalf)`, and shows in your Inbox. Back at the keyboard, answering
-#1290 yourself shows what was decided: `answered by helper (operator, delegated by you until
-15:30): Option 2: …`. At 15:30 the log says `drive grant for helper ended 15:30`, and the
-operator's next answer is refused; `xt delegate --revoke` ends it sooner.
+#1290 yourself shows what was decided: `#1290 already answered by helper (operator, delegated by
+you until 15:30): "Option 2: …" — nothing sent.` At 15:30 the log says `drive grant for helper
+ended 15:30`, and the operator's next answer is refused; `xt delegate --revoke` ends it sooner.
 
 - A drive grant doesn't run `restart` or `spawn`; grant those separately when you need them (the new
   grant replaces drive).
+
+## 11. A chat session: an operator, the pane and a question
+
+**Context.** You talk to the liaison in `xt chat` (from 0.21.0). Three kinds of line surprise
+newcomers most: one from an operator, one you typed into the liaison's own pane, and a question
+answered in place (from 0.22.0; ids and times below are from a fresh team). Chat needs 80
+columns. In **your own terminal**:
+
+```sh
+xt chat
+```
+
+Type `Where is the digest?` and press `enter`. Meanwhile an operator registered as `op` (as
+`helper` is in section 9) reports to the liaison:
+
+```sh
+XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/op.token) \
+  /path/to/team/bin/xt send liaison --as op --type report <<'XT_END'
+Staging check passed: steps 1-9.
+XT_END
+```
+
+and you type `Ship the digest after QA's run` into the liaison's pane in Herdr instead of chat.
+Chat shows, at 80 columns:
+
+```text
+xt chat with liaison (claude) · pane input recorded
+
+12:00 you  #4
+Where is the digest?
+
+12:00 » op (operator)  #5
+Staging check passed: steps 1-9.
+(sent by op, an operator, on the human's behalf)
+
+12:00 you (typed in the pane, unverified)  #6
+Ship the digest after QA's run
+
+12:00 liaison  #7  ⚑ yes/no
+QA passed the digest. Publish it now?
+
+Answer yes or no.
+⚑ waits for your answer: tab picks it
+
+liaison › 
+enter send · tab answer (1) · ctrl+t goals · pgup/pgdn scroll · ctrl+d leave
+```
+
+- **The operator's line** is marked `» op (operator)` (magenta) and ends with its `(sent by op, …)`
+  mark: it is the operator's report, never yours.
+- **The pane line** is yours as far as xt can tell: the supervisor read it from the liaison's
+  session log, which is why the header says `pane input recorded`. The label says
+  `unverified` because anything that can type into that pane is recorded the same way, so such a
+  line never answers, approves or closes anything.
+- **The question:** press `tab`. Its text shows above the input line, which now reads
+  `answer #7 › `, and the line under it `enter send #7 · esc back · ctrl+t goals · pgup/pgdn scroll ·
+  ctrl+d leave`. Type `yes` and press `enter`: chat says `#8 answer to #7 → liaison: …`, the
+  question shows `✓ answered #8: yes`, and the answer is recorded exactly as `xt answer 7 yes`
+  would record it. `esc` instead goes back to messaging the liaison.
+- `PageUp`, `PageDown`, `Home` and `End` scroll the conversation without leaving your draft.

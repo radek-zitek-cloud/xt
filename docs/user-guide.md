@@ -517,7 +517,7 @@ a release on purpose, and to be able to undo it (from 0.14.0 on):
 ```sh
 xt down
 git commit -am "team changes"          # xt refuses while tracked files have uncommitted changes
-xt version use v0.14.0                 # a candidate: xt version use v0.15.0-rc1 --candidate
+xt version use vX.Y.Z                  # the release's tag; a candidate: xt version use vX.Y.Z-rc1 --candidate
 xt restart --all
 # if it misbehaves:
 xt down && xt version rollback && xt restart --all

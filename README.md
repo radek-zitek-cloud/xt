@@ -24,7 +24,8 @@ for five minutes, I'd love to hear how it went, what you used it for or where it
 
 ![The xt-team in Herdr on xt 0.18.0: on the left the liaison's pane, telling the human what the v0.19.0-rc5 release candidate needs next; on the right the xt TUI in three bands: the Team pane grouped by harness and the Inbox's notifications on top, the Flow lane chart of messages between the human, xt and five agents in the middle, and the liaison's report in Detail at the bottom](docs/screen-v0180.png)
 
-*The xt-team building xt, live on 0.18.0. On the left the liaison's pane: it has just forwarded the
+*The 0.18.0 TUI screenshot (`docs/screen-v0180.png`), taken on xt 0.18.0: the xt-team building
+xt. Later releases differ in detail, and `xt chat` (from 0.21.0) isn't in it. On the left the liaison's pane: it has just forwarded the
 lead's status on the v0.19.0 goal and lists, in plain words, the checks only the human can run
 next. On the right the TUI in three bands. On top, the Team pane grouped by harness (Claude with
 its five-hour and weekly windows for the liaison, lead, product manager and builder; Codex for the
@@ -320,7 +321,7 @@ To pick a release on purpose and be able to go back (from 0.14.0 on):
 ```sh
 xt down
 git commit -am "team changes"  # xt refuses while tracked files have uncommitted changes
-xt version use v0.19.0         # a candidate needs --candidate
+xt version use vX.Y.Z          # the release's tag; a candidate needs --candidate
 xt restart --all
 # if it misbehaves: xt down && xt version rollback && xt restart --all
 ```
@@ -360,13 +361,15 @@ fix raises the patch version (0.1.0 → 0.1.1). `1.0.0` comes once `team.toml` a
 stable.
 
 **Following releases instead of `main`:** to stay on a release, switch to its tag instead of
-pulling: `xt version use v0.19.0` (from 0.14.0 on; it merges the tag after its checks, see
+pulling: `xt version use vX.Y.Z` (from 0.14.0 on; it merges the tag after its checks, see
 [Updating a team](#updating-a-team)). On an older xt, merge the tag by hand:
 
 ```sh
 git fetch upstream --tags
-git merge v0.19.0
+git merge vX.Y.Z
 ```
+
+`vX.Y.Z` stands for the release you want: `xt version` shows the newest published one.
 
 ## Releasing
 

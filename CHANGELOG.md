@@ -61,6 +61,11 @@ specs/polish-for-0-22-1).
   then `scroll` and `send` drop, never a key. While you answer it names `enter send #N` and `esc
   back` (`tab` still moves to the next question); with a line picked, `esc back` puts it back
   (new). The guide quotes the strings.
+- **#211** `docs/examples.md` example 11: a chat session with an operator's line, a pane line with
+  its unverified label and a question answered with `tab`, checked against chat in the tests. The
+  README's and guide's `xt version use` and `git merge` examples say `vX.Y.Z` instead of an old
+  release, and the screenshot caption names the image (`docs/screen-v0180.png`) and the release it
+  shows (0.18.0).
 
 ## [0.22.0] — 2026-10-03
 
