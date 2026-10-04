@@ -12,10 +12,15 @@ from .adapters import CODEX, allowed_codex_options, load_adapters
 from .alerts import Alerts, repeats
 from .context import Ctx
 from .dispatch import Queue, done_recipient, send
-from .ledger import AGENT_TYPES, sender
+from .ledger import AGENT_TYPES, pair
 from .paths import Paths, XtError, find_root
 from .spawn import AGENT_ENV, Approvals, approval_what, decide, request_spawn, retire, stop
 from .team import ALWAYS, HUMAN, harness_model, parse_window, schedule_text
+
+
+class AlreadyAnswered(XtError):
+    """The human's later answer to a question an operator answered: its text is the whole line,
+    which `xt chat` shows without its "not sent:" prefix (card #203)."""
 
 
 def _who(args, operator: bool = False) -> str:
@@ -215,7 +220,12 @@ def cmd_schedule(args) -> None:
 
 
 def cmd_down(args) -> None:
-    if _who(args) != HUMAN:
+    who = _who(args, operator=True)
+    if who != HUMAN and operators.is_operator(Paths(find_root()), who):  # card #203: says it plainly
+        g = operators.active_grant(Ctx.load(), who)
+        then = (f"{who}'s grant covers {operators.scope_text(g)} only. The human" if g else "the human")
+        raise XtError(f"xt down is never delegated: {then} runs xt down in their own terminal.")
+    if who != HUMAN:
         raise XtError("only the human takes the team down")
     from .up import down
 
@@ -339,8 +349,8 @@ def answer(ctx: Ctx, who: str, qid: int, text: str) -> str:
         return f"#{qid}: {_decide(ctx, who, grant, qid, word == 'yes')}"
     item = ctx.ledger.item(qid)
     if item is None or item["type"] != "ask":
-        if by := operators.answered_by(ctx, qid):
-            raise XtError(f"#{qid}: {by}; nothing was sent")
+        if refusal := operators.already_answered(ctx, qid):
+            raise AlreadyAnswered(refusal)  # card #203: the whole line, read once
         raise XtError(f"#{qid} is not an open question (see `xt inbox`)")
     if who != item["owner"] and not (grant and item["owner"] == HUMAN):
         raise XtError(f"#{qid} is a question for {item['owner']}, not {who}")
@@ -432,7 +442,7 @@ def cmd_log(args) -> None:
               f"`--limit N` for more, `--full` for all)")
     for m in shown:
         ref = f" ref:#{m['ref']}" if m.get("ref") is not None else ""
-        print(f"#{m['id']} {m['ts']} {m['type']} {sender(m)}→{m['to']}{ref}")  # pane input: unverified (#193)
+        print(f"#{m['id']} {m['ts']} {m['type']} {pair(m)}{ref}")  # pane input: unverified (#193, #207)
         print("   " + m["body"].replace("\n", "\n   "))
         data = data_line(m)  # a question's declared type or an answer, stored as data (#182)
         if data:
@@ -600,11 +610,12 @@ def _questions(box, by_id: dict) -> list[str]:
     for q in box.questions:
         m = by_id.get(q["id"]) or {"body": q["title"]}
         qd = question_of(m)
+        kind = f"{len(qd['options'])} options" if qd["kind"] == "options" else summary(qd) or "open"  # Other: in the hint (#203)
         out += [f"#{q['id']} {q['opened'][5:16]} question from {q['opener']} — "
-                f"{summary(qd) or 'open'}: {hint(qd)}", *(f"  {ln}" for ln in m["body"].splitlines()),
+                f"{kind} · {hint(qd)}", *(f"  {ln}" for ln in m["body"].splitlines()),
                 f"  answer: xt answer {q['id']} \"...\"", ""]
     for rid, r in box.approvals:
-        out += [f"#{rid} approval requested by {r['requester']} — yes/no: answer yes or no",
+        out += [f"#{rid} approval requested by {r['requester']} — yes/no · answer yes or no",
                 f"  {approval_what(r)}", f"  answer: xt answer {rid} yes|no", ""]
     return out[:-1] or ["Nothing waits for an answer."]
 

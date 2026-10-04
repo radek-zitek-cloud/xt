@@ -1699,10 +1699,10 @@ class LiveActions:
 
         item = self.ctx.ledger.item(qid)
         if item is None or item["type"] != "ask":
-            from ..operators import answered_by
+            from ..operators import already_answered
 
-            by = answered_by(self.ctx, qid)  # card #200: an operator under a drive grant answered it
-            raise RuntimeError(f"#{qid}: {by}" if by else f"#{qid} is no longer an open question")
+            # card #200: an operator under a drive grant answered it; the line reads once (#203)
+            raise RuntimeError(already_answered(self.ctx, qid) or f"#{qid} is no longer an open question")
         msg, status, _ = answer_question(self.ctx, HUMAN, item, text)  # checked against its type (#182)
         return f"#{msg['id']} answer to #{qid} → {item['opener']}: {status}"
 

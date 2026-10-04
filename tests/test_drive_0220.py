@@ -126,7 +126,9 @@ def test_2_a_goal_reaches_the_liaison_from_the_operator(team, monkeypatch, capsy
 
 def test_5_8_non_delegable_commands_stay_refused_under_drive(team, monkeypatch):
     _drive(team, monkeypatch)
-    for argv, why in ((["down"], "is an operator"), (["restart", "--all"], "with --all"),
+    for argv, why in ((["down"], r"^xt down is never delegated: op's grant covers drive only\. The human runs "
+                                 r"xt down in their own terminal\.$"),  # card #203
+                      (["restart", "--all"], "with --all"),
                       (["version", "use", "v0.18.0"], "is an operator"), (["version", "rollback"], "is an operator"),
                       (["operator", "add", "op2", "--pid", "1"], "is an operator"),
                       (["delegate", "op", "--for", "60m"], "is an operator"),
@@ -198,7 +200,7 @@ def test_10_the_operator_reads_the_pending_questions_whole(team, monkeypatch, ca
     capsys.readouterr()
     agent(monkeypatch, "inbox", "--questions")
     out = capsys.readouterr().out
-    assert f"#{q['id']} " in out and "question from liaison — 4 options: answer 1 to 4" in out
+    assert f"#{q['id']} " in out and "question from liaison — 4 options · answer 1 to 4" in out
     assert "  2. Approve with a change — I adjust the spec first" in out and "  Recommended: 2" in out
     assert f"answer: xt answer {q['id']}" in out
     assert f"#{rid} approval requested by lead — yes/no" in out and "spawn carol (worker, claude/default)" in out
@@ -208,8 +210,8 @@ def test_10_the_humans_later_answer_names_the_operator_and_quotes_the_answer(tea
     until = _drive(team, monkeypatch)
     q = _ask(team, monkeypatch, *FOUR)
     agent(monkeypatch, "answer", str(q["id"]), "3", "--as", "op")
-    expected = (f"#{q['id']}: answered by op (operator, delegated by you until {until}): "
-                "Option 3: Defer — it moves to the next release and nothing is built now")
+    expected = (f"#{q['id']} already answered by op (operator, delegated by you until {until}): "  # #203
+                "\"Option 3: Defer — it moves to the next release and nothing is built now\" — nothing sent.")
     with pytest.raises(XtError, match="^" + expected.replace("(", r"\(").replace(")", r"\)")):
         human(monkeypatch, "answer", str(q["id"]), "1")
     from xt import cli

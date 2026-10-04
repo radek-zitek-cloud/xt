@@ -33,6 +33,12 @@ def is_pane(m: dict) -> bool:
 def sender(m: dict) -> str:
     """Who a message is from, as shown: a pane-input message says it is unverified."""
     return f"{m['from']} ({PANE_LABEL})" if is_pane(m) else m["from"]
+
+
+def pair(m: dict) -> str:
+    """`from→to` as `xt log` and the brief print it; after the pane label, a space before the arrow
+    (card #207), and none added for anyone else."""
+    return f"{sender(m)} →{m['to']}" if is_pane(m) else f"{m['from']}→{m['to']}"
 HUMAN = "human"  # same as team.HUMAN (not imported, to keep the ledger free of team logic)
 
 

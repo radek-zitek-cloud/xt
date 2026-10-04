@@ -470,15 +470,28 @@ def act(ctx: Ctx, name: str, g: dict, to: str, mtype: str, text: str, ref: int |
     return msg, deliver_or_queue(ctx, msg)
 
 
-def answered_by(ctx: Ctx, qid: int) -> str | None:
-    """`answered by NAME (operator, delegated by you until HH:MM): ANSWER` when an operator's drive
-    action answered question or approval `qid` (card #200); else None."""
+def _drive_answer(ctx: Ctx, qid: int) -> tuple[str, str] | None:
+    """(`NAME (operator, delegated by you until HH:MM)`, the answer) when an operator's drive action
+    answered question or approval `qid` (card #200); else None."""
     for m in ctx.ledger.messages():
         d = m.get("delegated")
         if m.get("ref") == qid and isinstance(d, dict) and isinstance(m.get("answer"), dict):
-            answer = m["body"].rsplit("\n", 1)[0]
-            return f"answered by {m['from']} (operator, delegated by you until {_local(d['until']):%H:%M}): {answer}"
+            who = f"{m['from']} (operator, delegated by you until {_local(d['until']):%H:%M})"
+            return who, m["body"].rsplit("\n", 1)[0]
     return None
+
+
+def answered_by(ctx: Ctx, qid: int) -> str | None:
+    """`answered by NAME (operator, delegated by you until HH:MM): ANSWER`, or None (card #200)."""
+    found = _drive_answer(ctx, qid)
+    return f"answered by {found[0]}: {found[1]}" if found else None
+
+
+def already_answered(ctx: Ctx, qid: int) -> str | None:
+    """The refusal of the human's later answer to a question an operator answered, read once
+    (card #203): `#5 already answered by op (operator, …): "yes" — nothing sent.`; or None."""
+    found = _drive_answer(ctx, qid)
+    return f'#{qid} already answered by {found[0]}: "{found[1]}" — nothing sent.' if found else None
 
 
 def record(ctx: Ctx, name: str, g: dict, what: str, failed: str | None = None) -> None:

@@ -966,21 +966,27 @@ Build the weekly digest
 XT_END
 ```
 
+`xt inbox --questions` heads each question with its asker, type and what it takes, once:
+`#1290 10-04T14:02 question from liaison — 4 options · answer 1 to 4, or in your own words
+(Other)`, then the question's text and the command that answers it.
+
 Each is one message under the operator's own name, never `human`, ending in `(helper, delegated by
 human until 14:45: an operator acting on the human's behalf)`: an answer goes to the asker and
 closes the question; an approval decision goes to your Inbox, and the requester hears `Operator
 helper, delegated by human until 14:45, approved approval #1291: …`; a goal goes to the liaison,
 which shapes and dispatches it as it would yours. A goal dispatch read-back is a yes/no question,
 so the operator answers it like any other. If you answer a question the operator already answered
-(`xt answer`, `xt chat`, the TUI), xt refuses and shows what was decided: `answered by helper
-(operator, delegated by you until 14:45): Option 2: …`. When a drive grant ends, expired or
+(`xt answer`, `xt chat`, the TUI), xt refuses and shows what was decided: `#5 already answered by
+helper (operator, delegated by you until 14:45): "Option 2: …" — nothing sent.` When a drive grant ends, expired or
 revoked, one line says so in the log (`drive grant for helper ended 14:45`), and `xt status` and
 the TUI header show it for an hour; the operator's next answer is refused with "drive grant ended".
 
 **Never delegated:** `xt down` and `xt restart --all` (only you stop the team),
 `xt version use`/`rollback`, registering operators and granting or revoking delegation, drive or
 not; answers and approvals only under a drive grant. Without a grant, after it expires or after a
-revoke, the operator's commands are refused as before.
+revoke, the operator's commands are refused as before. The operator's `xt down` says so in one
+line: `xt down is never delegated: helper's grant covers drive only. The human runs xt down in
+their own terminal.`
 
 Limits: the process check needs to see the operator's process tree. A command run inside Codex's
 sandbox (its own PID namespace) can't be matched, so use an operator whose commands run in your
@@ -1172,10 +1178,24 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   the pane shows `xt: this line is NOT recorded in the team's log (…)`; a line the hook passed on
   that the log doesn't show within a minute is refused with an Inbox alert and a line in chat (that
   is also what an agent trying to record words as yours gets). pi and Codex have no prompt hook:
-  their lines are recorded from the session log alone, without the warning in the pane. The chat
-  header and `xt status` say which applies: `pane input is recorded (prompt hook and session
-  log)`, `… (from its session log; no warning in the pane)`, or `pane input is NOT recorded …: talk
-  in xt chat`. When it says NOT recorded, the liaison records your words by hand as before.
+  their lines are recorded from the session log alone, without the warning in the pane. `xt status`
+  says which applies, in full:
+
+  | State | `xt status` |
+  |---|---|
+  | prompt hook and log | `liaison (claude): pane input recorded (prompt hook and session log)` |
+  | log only (pi, Codex) | `liaison (pi): pane input recorded (session log only; no warning in the pane)` |
+  | the liaison is stopped or retired | `liaison (claude): pane input: liaison isn't running` |
+  | the Herdr server can't be reached | `liaison (claude): pane input: unknown (herdr server not reachable)` |
+  | its session log isn't found | `liaison (claude): pane input NOT recorded (no session log): talk in xt chat` |
+
+  The chat header says the same in one row: at 80 to 96 columns `xt chat with liaison (claude) ·
+  pane input recorded`, `· pane input: session log only`, `· pane input: liaison isn't running`,
+  `· pane input: unknown (herdr unreachable)` or `· pane input NOT recorded — type here`; wider, it
+  adds the reason: `· pane input recorded (prompt hook and session log)`, `· pane input: session
+  log only (no warning in the pane)`, `· pane input: unknown (herdr server not reachable)`, `· pane
+  input NOT recorded (no session log) — type here in chat`. When it says NOT recorded, the liaison
+  records your words by hand as before.
 - **Leaving:** `ctrl+d` (or `ctrl+q`, `ctrl+c`) on an empty line, or type `/exit` (`/quit`). What you
   have typed but not sent is a **draft**: it lives only in the input line and is never written
   anywhere, so leaving with one asks first (`ctrl+d` again leaves and discards it).

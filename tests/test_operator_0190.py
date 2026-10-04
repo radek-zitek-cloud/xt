@@ -253,7 +253,8 @@ def test_without_a_grant_after_expiry_or_revoke_commands_are_refused_as_today(te
 def test_non_delegable_commands_are_refused_even_under_a_grant(team, monkeypatch):
     register(team, monkeypatch)
     human(monkeypatch, "delegate", "op", "--for", "60m")
-    for argv, why in ((["down"], "is an operator"), (["restart", "--all"], "with --all"),
+    for argv, why in ((["down"], "^xt down is never delegated: op's grant covers restart, reset, spawn, up only"),  # #203
+                      (["restart", "--all"], "with --all"),
                       (["version", "use", "v0.18.0"], "is an operator"),
                       (["approve"], "answers, approvals and goals not included"),  # v0.22.0: drive only (#200)
                       (["operator", "add", "op2", "--pid", "1"], "is an operator"),

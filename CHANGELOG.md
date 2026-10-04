@@ -9,6 +9,32 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.22.1] — not released yet
+
+Polish for chat, the log and the pane-input signal, and one new alert (Space
+specs/polish-for-0-22-1).
+
+### Changed
+
+- **#207** `xt log` (also `--full`, `--member`) and the brief put a space between the pane label and
+  the arrow: `human (typed in the pane, unverified) →liaison`. Other senders are unchanged
+  (`human→liaison`).
+- **#204** In hidden mode chat's hint no longer offers `↑↓ pick`; in goals and all modes it offers
+  it only when a one-liner is shown to pick. `ctrl+t hidden` stays named.
+- **#203** Five texts read once: the refusal of your later answer to a question an operator
+  answered (`#5 already answered by op (operator, delegated by you until 14:30): "yes" — nothing
+  sent.`, in chat without "not sent:"); the `xt inbox --questions` header (`4 options · answer 1 to
+  4, or in your own words (Other)`); an operator's `xt down` (`xt down is never delegated: op's
+  grant covers drive only. The human runs xt down in their own terminal.`); the `xt status` pane
+  line (`liaison (claude): pane input recorded (prompt hook and session log)`); and chat's NOT
+  recorded advice (`— type here`, no longer "talk in xt chat").
+- **#201** The pane-input signal says `pane input: liaison isn't running` when the liaison is
+  stopped or retired (it said "recorded"), and `pane input: unknown (herdr server not reachable)`
+  when the Herdr server can't be reached (chat showed nothing).
+- **#202** The chat header is one row at 80 columns in all five states, without the repeated
+  liaison name or a `harness:` prefix; above 96 columns it adds the reason. `xt status` keeps the
+  full wording.
+
 ## [0.22.0] — 2026-10-03
 
 The release: the same code and docs as 0.22.0-rc9 (only the version, this changelog and the site's

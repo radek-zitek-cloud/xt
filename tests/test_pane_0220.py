@@ -229,20 +229,20 @@ def test_3_a_message_typed_in_chat_reaches_the_log_as_a_delivery_and_is_not_reco
 
 def test_7_status_and_the_chat_header_say_whether_pane_input_is_recorded(ctx, fake_home, monkeypatch, capsys):
     _liaison(ctx, fake_home, "pi")
-    assert paneinput.signal(ctx) == "liaison (pi): pane input is recorded (from its session log; no warning in the pane)"
+    assert paneinput.signal(ctx) == "liaison (pi): pane input recorded (session log only; no warning in the pane)"  # #203
     monkeypatch.setattr(paneinput, "session_log", lambda c, a: None)
-    assert paneinput.signal(ctx).endswith("pane input is NOT recorded now (its session log isn't found): talk in xt chat")
+    assert paneinput.signal(ctx).endswith("pane input NOT recorded (no session log): talk in xt chat")
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     monkeypatch.setattr(cli, "human_terminal", lambda: True)
     args = cli.build_parser().parse_args(["status"])
     args.func(args)
     out = capsys.readouterr().out
-    assert "\nliaison (pi): pane input is NOT recorded now" in out and out.count("pane input") == 1  # rc7, ux note 2
+    assert "\nliaison (pi): pane input NOT recorded" in out and out.count("pane input") == 1  # rc7, ux note 2
 
     from .test_chat_0210 import _run, _text
 
     async def steps(app, pilot):
-        assert "pane input is NOT recorded now" in _text(app.query_one("#header"))
+        assert _text(app.query_one("#header")) == "xt chat with liaison (pi) · pane input NOT recorded — type here"  # #202
 
     _run(ctx, steps)
 
@@ -314,9 +314,9 @@ def test_rc8_pane_input_is_labelled_unverified_in_chat_log_tui_and_brief(ctx, fa
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     args = cli.build_parser().parse_args(["log", "--id", str(m["id"])])
     args.func(args)
-    assert f"{label}→liaison" in capsys.readouterr().out
+    assert f"{label} →liaison" in capsys.readouterr().out  # #207: a space after the label
     assert f"{label} → liaison" in _msg_block(m).plain
-    assert f"{label}→liaison" in brief.build(ctx, "liaison")
+    assert f"{label} →liaison" in brief.build(ctx, "liaison")
     sent = cli.send(ctx, "human", "liaison", "ask", "From chat")[0]  # an ordinary message has no label
     assert "unverified" not in _msg_block(sent).plain
     td = ThreadDetail.__new__(ThreadDetail)
@@ -328,6 +328,6 @@ def test_rc8_pane_input_is_labelled_unverified_in_chat_log_tui_and_brief(ctx, fa
 
 def test_5_the_user_guide_says_so():
     guide = (REPO / "docs" / "user-guide.md").read_text()
-    assert "pane input is recorded" in guide and "NOT recorded" in guide and "prompt hook" in guide
+    assert "pane input recorded" in guide and "NOT recorded" in guide and "prompt hook" in guide
     assert 'The label means "typed in the pane", not "proven to be you":' in guide  # rc8
     assert "**An operator with Herdr access can type into the liaison's pane.**" in guide

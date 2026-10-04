@@ -124,20 +124,74 @@ def session_log(ctx: Ctx, a) -> str | None:
     return usage.session_for(ctx, adapter, a.name, usage.last_starts(ctx).get(a.name))
 
 
-def signal(ctx: Ctx) -> str | None:
-    """One line for `xt status` and the chat header: whether the liaison's pane input is recorded
-    on its harness (card #193); None without a liaison."""
-    a = liaison(ctx)
+# The five states of the signal (card #193; #201 adds "isn't running" and "unknown").
+RECORDED, LOG_ONLY, NOT_RUNNING, UNKNOWN, NOT_RECORDED = "recorded", "log only", "not running", "unknown", "not recorded"
+HERDR_DOWN = "herdr server not reachable"
+NO_LOG, NO_FORMAT = "no session log", "not on this harness"
+WIDE_HEADER = 96  # the chat header adds the reason only above this width (card #202)
+
+
+def state(ctx: Ctx) -> tuple[str, str, str, str] | None:
+    """(liaison name, harness, state, reason) for the liaison's pane input (cards #193, #201); None
+    without any liaison. A stopped or retired liaison isn't running; a Herdr server that can't be
+    reached leaves it unknown."""
+    a = liaison(ctx) or next((x for x in ctx.team.agents() if x.role == "liaison"), None)
     if a is None:
         return None
+    name, harness = a.name, a.harness or "?"
+    if not a.active:
+        return name, harness, NOT_RUNNING, "retired"
     adapter = _adapter(ctx, a)
-    harness = a.harness or "?"
     if adapter is None or not adapter.session_format:
-        return f"{a.name} ({harness}): pane input is NOT recorded on this harness: talk in xt chat"
-    if a.name in ctx.herdr.agents() and session_log(ctx, a) is None:
-        return f"{a.name} ({harness}): pane input is NOT recorded now (its session log isn't found): talk in xt chat"
-    how = "prompt hook and session log" if harness in HOOKED else "from its session log; no warning in the pane"
-    return f"{a.name} ({harness}): pane input is recorded ({how})"
+        return name, harness, NOT_RECORDED, NO_FORMAT
+    try:
+        running = name in ctx.herdr.agents()
+    except XtError:
+        return name, harness, UNKNOWN, HERDR_DOWN
+    if not running:
+        return name, harness, NOT_RUNNING, ""
+    if session_log(ctx, a) is None:
+        return name, harness, NOT_RECORDED, NO_LOG
+    if harness in HOOKED:
+        return name, harness, RECORDED, "prompt hook and session log"
+    return name, harness, LOG_ONLY, "no warning in the pane"
+
+
+def signal(ctx: Ctx) -> str | None:
+    """One line for `xt status`: whether the liaison's pane input is recorded on its harness, in
+    full (card #193; wording #203, states #201); None without a liaison."""
+    s = state(ctx)
+    if s is None:
+        return None
+    name, harness, kind, reason = s
+    said = {RECORDED: f"pane input recorded ({reason})",
+            LOG_ONLY: f"pane input recorded (session log only; {reason})",
+            NOT_RUNNING: f"pane input: {name} isn't running",
+            UNKNOWN: f"pane input: unknown ({reason})",
+            NOT_RECORDED: f"pane input NOT recorded ({reason}): talk in xt chat"}[kind]
+    return f"{name} ({harness}): {said}"
+
+
+def header(s: tuple[str, str, str, str] | None, liaison_name: str, width: int) -> str:
+    """The chat header for `state` `s` in `width` columns (cards #193, #202): one row. At most
+    WIDE_HEADER columns the short form, above it with the reason, if it fits with 4 to spare."""
+    if s is None:
+        return f"xt chat with {liaison_name}"
+    name, harness, kind, reason = s
+    short = {RECORDED: "pane input recorded",
+             LOG_ONLY: "pane input: session log only",
+             NOT_RUNNING: f"pane input: {name} isn't running",
+             UNKNOWN: "pane input: unknown (herdr unreachable)",
+             NOT_RECORDED: "pane input NOT recorded — type here"}[kind]
+    wide = {RECORDED: f"pane input recorded ({reason})",
+            LOG_ONLY: f"pane input: session log only ({reason})",
+            NOT_RUNNING: short,
+            UNKNOWN: f"pane input: unknown ({reason})",
+            NOT_RECORDED: f"pane input NOT recorded ({reason}) — type here in chat"}[kind]
+    head = f"xt chat with {name} ({harness}) · "
+    if width > WIDE_HEADER and len(head + wide) <= width - 4:
+        return head + wide
+    return head + short
 
 
 # --- the hook (Claude Code: UserPromptSubmit) -------------------------------------------------------

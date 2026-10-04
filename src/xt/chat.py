@@ -117,10 +117,12 @@ def _time(ts: str) -> str:
         return "--:--"
 
 
-def hint_line(width: int, waiting: int, answering: bool, picked: str | None, mode: str) -> str:
+def hint_line(width: int, waiting: int, answering: bool, picked: str | None, mode: str,
+              pickable: bool = True) -> str:
     """The keys under the input line, in one row of `width` (card #199): shorter words below 100
     columns; if it is still too long, `↑↓ pick` goes, then the end is cut with an ellipsis.
-    `picked`: None, "picked" or "expanded" (a one-liner chosen with ↑/↓)."""
+    `picked`: None, "picked" or "expanded" (a one-liner chosen with ↑/↓). `pickable`: whether a
+    one-liner is shown to pick; never in hidden mode (card #204)."""
     narrow = width < 100
     first = {"picked": "enter expand", "expanded": "enter collapse"}.get(picked, "enter send")
     keys = [first]
@@ -130,7 +132,8 @@ def hint_line(width: int, waiting: int, answering: bool, picked: str | None, mod
         else:
             keys.append(f"tab answer ({waiting})" if narrow else f"tab answer ({waiting} waiting)")
     keys.append(f"ctrl+t team: {mode}" if narrow else f"ctrl+t team activity ({mode})")
-    keys.append("↑↓ pick" if narrow else "↑/↓ enter: expand")
+    if pickable and mode != "hidden":
+        keys.append("↑↓ pick" if narrow else "↑/↓ enter: expand")
     keys.append("ctrl+d leave")
     line = " · ".join(keys)
     if len(line) > width:
@@ -234,6 +237,7 @@ class ChatApp(App):
         self.mode = DEFAULT_MODE
         self.selected: int | None = None  # the one-liner ↑/↓ picked
         self.expanded: set[int] = set()
+        self.pane: tuple[str, str, str, str] | None = None  # the pane-input state (paneinput), read every HEADER_S
 
     def compose(self) -> ComposeResult:
         yield Static(id="header")
@@ -255,14 +259,24 @@ class ChatApp(App):
         self.set_interval(HEADER_S, self.update_header)
 
     def update_header(self) -> None:
-        """Who you talk to, and whether what you type in the liaison's pane is recorded (card #193)."""
-        from .paneinput import signal
+        """Who you talk to, and whether what you type in the liaison's pane is recorded (card #193),
+        read again every HEADER_S; drawn to the width by `paint_header` (cards #201, #202)."""
+        from .paneinput import state
 
         try:
-            pane = signal(self.ctx)
+            self.pane = state(self.ctx)
         except Exception:  # a header line must never stop the chat
-            pane = None
-        self.query_one("#header", Static).update(f"xt chat with {self.liaison}" + (f" · {pane}" if pane else ""))
+            self.pane = None
+        self.paint_header()
+
+    def paint_header(self) -> None:
+        from .paneinput import header
+
+        self.query_one("#header", Static).update(header(self.pane, self.liaison, self.size.width))
+
+    def on_resize(self, event) -> None:
+        self.paint_header()
+        self.update_line()
 
     # --- the conversation ------------------------------------------------------------------------
 
@@ -373,7 +387,8 @@ class ChatApp(App):
         self.query_one("#target", Static).update(label)
         if status is None:
             picked = None if self.selected is None else "expanded" if self.selected in self.expanded else "picked"
-            status = hint_line(self.size.width, len(self.waiting), bool(self.target), picked, self.mode)
+            status = hint_line(self.size.width, len(self.waiting), bool(self.target), picked, self.mode,
+                               bool(self._visible()))
         self.query_one("#status", Static).update(status)
 
     def action_next_target(self) -> None:
@@ -411,7 +426,9 @@ class ChatApp(App):
         try:
             result = self.answer(text) if self.target else self.send(text)
         except XtError as e:  # the draft stays in the box: fix it and press enter again
-            self.update_line(f"not sent: {e}")
+            from .cli import AlreadyAnswered
+
+            self.update_line(str(e) if isinstance(e, AlreadyAnswered) else f"not sent: {e}")  # #203
             return
         event.input.value = ""
         self.target = None
