@@ -9,9 +9,12 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.23.0] — not released yet
+## [0.23.0] — 2026-10-04
 
-**0.23.0-rc1** has #215 (Space specs/untangle-agent-lifecycle-modules); **rc2** adds #196, #209
+The release: the same code as 0.23.0-rc10 (the version, this changelog and the site's version and
+bounds lines changed). "Fewer concepts": one capability model across harnesses, opinion rounds and
+follow-up tasks for the lead, a notes budget, pane text that is never authority, and the agent
+lifecycle untangled (Space releases/v0-23-0). **0.23.0-rc1** has #215 (Space specs/untangle-agent-lifecycle-modules); **rc2** adds #196, #209
 and #198 (specs lead-independent-positions-and-devils-advocate,
 unstamped-pane-text-not-proof-of-human, notes-budget-and-shape); **rc3** makes #215's graph test,
 run on a tree from before the shared layer, name the import cycle and its two-way pairs before it
@@ -33,7 +36,7 @@ connectors are checked statically, not live (Radek's decision; the guide says so
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc10`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
   follow-ups). Nothing to

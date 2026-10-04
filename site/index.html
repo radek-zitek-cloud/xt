@@ -33,7 +33,7 @@
 <header class="hero">
   <div class="grid-bg"></div>
   <div class="wrap">
-    <div class="eyebrow">open source · MIT · v0.22.1</div>
+    <div class="eyebrow">open source · MIT · v0.23.0</div>
     <h1>AI agent teams<br><span class="soft">you can hold to account</span></h1>
     <p class="lead">xt runs persistent, named Claude Code, Codex and pi agents as a hierarchical team. They work on their own for days. You talk to one of them in a chat: approve, decide and correct, and every step is on record.</p>
     <div class="cta">
@@ -165,7 +165,7 @@
         <p class="sub">Know what each agent holds and costs. Keep it inside the lines.</p>
         <ul>
           <li><b>Context per agent</b> (<code class="mono">~211k/258k</code>, yellow at 70%, red at 85%), tokens and estimated cost per turn and per goal, and the subscription allowance: Codex's week, Claude's five-hour and weekly windows.</li>
-          <li><b>No desktop or browser control</b> for agents, and none of your account connectors (mail, files, calendar) unless you opt one in. Claude Code agents get a checked permissions file each.</li>
+          <li><b>No desktop or browser control</b> for agents, and none of your account connectors (mail, files, calendar) unless you opt one in. One capability block per agent says what it may write, run and reach, the same on every harness, and each line shows as enforced or advisory.</li>
           <li><b>Upgrades you can undo:</b> <code class="mono">xt version use</code> switches to a release after checks and a verified snapshot; <code class="mono">xt version rollback</code> goes back.</li>
           <li><b>Survives restarts:</b> <code class="mono">xt down</code> and <code class="mono">xt restart --all</code> bring back the team that was running; agents recover from files and a brief, not from memory. An agent resumed outside xt, without its settings (say, by the terminal multiplexer after a power cycle), is flagged with <code class="mono">xt restart</code> as the fix.</li>
         </ul>
@@ -189,7 +189,7 @@
           <li><b>Approvals are questions too:</b> a hire, a schedule or a goal ready to dispatch is a yes/no question, answered in the same place.</li>
           <li><b>Answered once, by you:</b> <code class="mono">tab</code> picks the waiting question; xt checks the answer against its type and accepts it only from your own terminal, or from your own agent while you've handed it the wheel.</li>
           <li><b>The whole picture:</b> your operator's messages, labelled as its own, and the goals the liaison gives the team, as quiet one-line notes (<code class="mono">ctrl+t</code> shows more or none).</li>
-          <li><b>The liaison's pane counts too:</b> what is typed there shows in the chat, labelled <i>typed in the pane, unverified</i>: it is on record, but it never answers or approves anything.</li>
+          <li><b>The liaison's pane counts too:</b> what is typed there shows in the chat, labelled <i>typed in the pane, unverified</i>: it is on record, but it never answers or approves anything, and no agent takes it as your answer.</li>
           <li><b>Scroll from the keyboard:</b> <code class="mono">pgup</code>/<code class="mono">pgdn</code>, <code class="mono">home</code> and <code class="mono">end</code> move through the history while your draft stays put, and a <i>↓ N new</i> marker says what arrived while you were scrolled up.</li>
         </ul>
         <div class="pills">
@@ -253,7 +253,7 @@ The lead wants to hire a writer for the digest. Which model should it run on?
       <div class="cell"><div class="k">operations</div><h4>Restarts without loss</h4><p>The team that was running comes back, and each agent picks up from its brief, not from memory.</p></div>
       <div class="cell"><div class="k">operations</div><h4>A fresh context, safely</h4><p><code class="mono">xt reset</code> waits until the agent has saved its notes and has no open work, or queues until it's idle.</p></div>
       <div class="cell"><div class="k">visibility</div><h4>Context and cost you can see</h4><p>Per agent, per turn and per goal, with Codex's week and Claude's five-hour and weekly windows.</p></div>
-      <div class="cell"><div class="k">bounds</div><h4>Agents in bounds</h4><p>No desktop, browser or account connectors by default, a checked permissions file per Claude agent, and no posing as the human.</p></div>
+      <div class="cell"><div class="k">bounds</div><h4>Agents in bounds</h4><p>No desktop, browser or account connectors by default, one capability model across harnesses (enforced or advisory, <code class="mono">require</code> refuses), and no posing as the human.</p></div>
       <div class="cell"><div class="k">bounds</div><h4>Your own agent as operator</h4><p>A coding agent of yours can report to the liaison under its own name and, for a time you set, run restarts and resets, or drive: answer, approve and give goals for you. Logged under its name.</p></div>
       <div class="cell"><div class="k">product</div><h4>Independent acceptance</h4><p>A quality analyst checks every card against its spec in a clean copy. A final PASS closes it; anything else waits for you.</p></div>
       <div class="cell"><div class="k">product</div><h4>Release candidates first</h4><p>A release starts as <code class="mono">-rc1</code>; the team stays on the accepted version until every card passes.</p></div>
@@ -274,7 +274,7 @@ The lead wants to hire a writer for the digest. Which model should it run on?
         <h4>Develops xt itself</h4>
         <p>A liaison, a lead, a product manager, a builder, a quality analyst and a UX researcher. They plan from the backlog, build release candidates, accept or reject each card, and walk every candidate as a new user would; the human owns the approvals and every publication.</p>
         <div class="stats">
-          <div class="stat"><div class="n">26</div><div class="l">releases from 26 Sep to 2 Oct</div></div>
+          <div class="stat"><div class="n">30</div><div class="l">releases from 27 Sep to 4 Oct</div></div>
           <div class="stat"><div class="n">3</div><div class="l">harnesses: Claude Code, Codex, pi</div></div>
           <div class="stat"><div class="n">2</div><div class="l">real bugs caught in its first candidate</div></div>
         </div>
@@ -303,7 +303,7 @@ The lead wants to hire a writer for the digest. Which model should it run on?
       <li>Tested on Linux only, with Herdr. Daily use so far is one team, mostly on Claude Code, with one Codex and one pi agent; other setups have seen little real use.</li>
       <li>The hierarchy is enforced by xt, not by a sandbox. A determined agent could still reach around it through its shell.</li>
       <li>Costs are estimates from public list prices, not bills. No budgets yet.</li>
-      <li>Command-line tools that hold your credentials are ordinary programs to a harness; xt can't switch them off. A Claude agent's permissions file can refuse them; a Codex agent is bounded only by its sandbox's review.</li>
+      <li>Command-line tools that hold your credentials are ordinary programs to a harness; xt can't switch them off. A Claude agent's capabilities deny them by name (not isolation); on Codex and pi that is advisory.</li>
     </ul>
   </div>
 </section>
