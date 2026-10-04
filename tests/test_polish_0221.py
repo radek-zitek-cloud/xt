@@ -482,6 +482,215 @@ def test_206_esc_puts_a_picked_line_back(ctx):
     _run(ctx, steps, refresh_s=60)
 
 
+# --- #187: one alert when a message waits for a member that isn't running -----------------------------
+
+
+def _crew(ctx):
+    """A running liaison and lead, and builder (reports to lead) in the roster, never started."""
+    from xt.spawn import request_spawn
+
+    from .conftest import add_member
+
+    for n in ("liaison", "lead"):
+        request_spawn(ctx, "human", n, None, None, None, None)
+    add_member(ctx, "builder", reports_to="lead")
+
+
+def _tick(ctx):
+    from xt.watch import Supervisor
+
+    sup = Supervisor(ctx, out=lambda line: None)
+    live = ctx.herdr.agents()
+    sup.check_agents(live)
+    sup.check_queued(live)
+
+
+def _task(ctx, text="Build v0.22.1", to="builder", sender="lead"):
+    from xt.dispatch import send
+
+    return send(ctx, sender, to, "task", text)[0]
+
+
+def _alerts(ctx):
+    from xt.alerts import Alerts
+
+    return Alerts(ctx).active()
+
+
+def _since(m):
+    import datetime as dt
+
+    return dt.datetime.fromisoformat(m["ts"]).astimezone().strftime("%H:%M")
+
+
+def test_187_nothing_at_119_seconds_one_alert_at_120_in_status_and_inbox(ctx, clock, monkeypatch, capsys):
+    from xt import inbox
+
+    _crew(ctx)
+    m = _task(ctx)
+    clock.advance(seconds=119)
+    _tick(ctx)
+    assert "queued:builder" not in _alerts(ctx)
+    clock.advance(seconds=1)
+    _tick(ctx)
+    text = (f"builder isn't running: 1 message waiting 2m (task #{m['id']} from lead, since {_since(m)}). "
+            "Start it: u (or xt spawn builder).")
+    assert _alerts(ctx)["queued:builder"]["text"] == text
+    box = inbox.build(ctx, list(ctx.ledger.messages()))
+    assert ("queued:builder", text) in [(k, a["text"]) for k, a in box.alerts]
+    assert f"⚠ {text}  (xt clear queued:builder)" in _status_out(ctx, monkeypatch, capsys).splitlines()
+    clock.advance(minutes=15)
+    _tick(ctx)  # the age moves on, on the same alert: one alert message, notified once
+    assert "waiting 17m" in _alerts(ctx)["queued:builder"]["text"]
+    assert len([x for x in ctx.ledger.messages() if x["type"] == "alert"]) == 1
+
+
+def test_187_two_messages_give_one_alert_with_the_count_and_the_oldest(ctx, clock):
+    _crew(ctx)
+    first = _task(ctx)
+    clock.advance(minutes=1)
+    _task(ctx, "And the docs")
+    clock.advance(minutes=2)
+    _tick(ctx)
+    assert [k for k in _alerts(ctx) if k.startswith("queued:")] == ["queued:builder"]
+    assert _alerts(ctx)["queued:builder"]["text"] == (
+        f"builder isn't running: 2 messages waiting, oldest 3m (task #{first['id']} from lead). "
+        "Start it: u (or xt spawn builder).")
+
+
+def test_187_a_running_member_with_a_queue_raises_nothing_and_running_clears_it(ctx, clock):
+    _crew(ctx)
+    _task(ctx)
+    clock.advance(minutes=3)
+    _tick(ctx)
+    assert "queued:builder" in _alerts(ctx)
+    ctx.herdr.add("builder", status="working")  # it runs (busy: the queue waits, as normal)
+    _tick(ctx)
+    assert "queued:builder" not in _alerts(ctx)
+    clock.advance(hours=1)
+    _tick(ctx)
+    assert "queued:builder" not in _alerts(ctx)
+
+
+def test_187_an_open_missing_alert_gets_the_queue_line_and_no_second_alert(ctx, clock):
+    from xt.watch import set_expected
+
+    _crew(ctx)
+    set_expected(ctx, "builder", True)  # xt started it and it vanished: missing:builder
+    _task(ctx)
+    clock.advance(minutes=17)
+    _tick(ctx)
+    alerts = _alerts(ctx)
+    assert "queued:builder" not in alerts
+    assert alerts["missing:builder"]["text"].endswith("to start it again.\n1 message waiting 17m")
+    _tick(ctx)  # a second pass adds nothing
+    assert _alerts(ctx)["missing:builder"]["text"].count("waiting") == 1
+
+
+def test_187_after_a_clear_it_returns_only_on_a_new_message_or_a_new_stop(ctx, clock, monkeypatch, capsys):
+    _crew(ctx)
+    _task(ctx)
+    clock.advance(minutes=3)
+    _tick(ctx)
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    args = cli.build_parser().parse_args(["clear", "queued:builder"])
+    args.func(args)
+    assert capsys.readouterr().out.strip() == "cleared"
+    clock.advance(hours=5)
+    _tick(ctx)
+    assert "queued:builder" not in _alerts(ctx)  # time alone doesn't bring it back
+    _task(ctx, "One more")
+    clock.advance(minutes=3)
+    _tick(ctx)
+    assert "queued:builder" in _alerts(ctx)  # a new message queued
+    args.func(args)
+    ctx.herdr.add("builder", status="working")  # it ran ...
+    _tick(ctx)
+    ctx.herdr.live.pop("builder")  # ... and stopped again with the queue still waiting
+    _tick(ctx)
+    assert "queued:builder" in _alerts(ctx)
+
+
+def test_187_messages_to_the_human_or_a_retired_member_raise_nothing(ctx, clock):
+    from xt.dispatch import Queue
+
+    from xt.dispatch import send
+
+    _crew(ctx)
+    send(ctx, "liaison", "human", "report", "to the human")
+    m = _task(ctx)
+    ctx.team.set_status("builder", "retired")
+    ctx.team.save()
+    ctx.reload_team()
+    Queue(ctx).add(m["id"], "builder", "not running")  # left in the queue from before
+    clock.advance(minutes=30)
+    _tick(ctx)
+    assert not [k for k in _alerts(ctx) if k.startswith("queued:")]
+
+
+def test_187_the_start_command_matches_the_state(ctx, clock):
+    from xt.dispatch import send
+    from xt.spawn import Approvals
+    from xt.watch import set_expected, set_stopped
+
+    _crew(ctx)
+    ctx.herdr.live.pop("liaison")
+    set_expected(ctx, "liaison", False)  # not started this run (a vanished one is `missing:`)
+    send(ctx, "human", "liaison", "ask", "Are you there?")
+    _task(ctx)
+    clock.advance(minutes=3)
+    _tick(ctx)
+    assert _alerts(ctx)["queued:liaison"]["text"].endswith("Start it: xt up.")
+    assert _alerts(ctx)["queued:builder"]["text"].endswith("Start it: u (or xt spawn builder).")
+    rid = Approvals(ctx).add({"requester": "lead", "name": "builder", "harness": "claude", "model": None,
+                              "role": "worker", "reports_to": "lead"})
+    set_stopped(ctx, "builder", True)
+    _tick(ctx)
+    assert _alerts(ctx)["queued:builder"]["text"].startswith("builder isn't running (you stopped it): 1 message")
+    assert _alerts(ctx)["queued:builder"]["text"].endswith(f"Start it: xt approve {rid}.")
+
+
+def test_187_ages_over_a_day():
+    from xt.watch import age_text
+
+    assert [age_text(s) for s in (119, 120, 17 * 60, 3 * 3600 + 12 * 60, 27 * 3600, 48 * 3600)] == \
+        ["1m", "2m", "17m", "3h12m", "1d3h", "2d"]
+
+
+def test_187_the_sender_line_at_xt_send(team, monkeypatch, capsys):
+    from .conftest import add_member
+    from .test_operator_0190 import agent
+
+    add_member(team, "builder", reports_to="lead")
+    capsys.readouterr()
+    agent(monkeypatch, "send", "builder", "--as", "lead", "--type", "task", "Build it")
+    out = capsys.readouterr()
+    assert out.err == ("queued: builder isn't running; the human is alerted if it is still not running "
+                       "in 2 minutes.\n")
+    assert out.out.startswith("#") and out.out.count("\n") == 1  # stdout as before
+    agent(monkeypatch, "send", "lead", "--as", "liaison", "--type", "report", "Hi")  # running: no line
+    assert capsys.readouterr().err == ""
+
+    def unreadable():
+        raise XtError("herdr: server_unreachable")
+
+    monkeypatch.setattr(team.herdr, "agents", unreadable)
+    before = len(list(team.ledger.messages()))
+    agent(monkeypatch, "send", "builder", "--as", "lead", "--type", "task", "Still queued")  # no exception
+    out = capsys.readouterr()
+    assert out.err == "" and "queued" in out.out and len(list(team.ledger.messages())) == before + 1
+
+
+def test_187_the_guide_has_the_row_and_the_amended_sentences():
+    from .conftest import REPO
+
+    guide = (REPO / "docs" / "user-guide.md").read_text()
+    assert "| `queued:<name>` |" in guide
+    assert "queued: builder isn't running; the human is alerted if it is still not running in 2 minutes." in guide
+    assert "nothing alerts about an agent you stopped" not in guide
+    assert guide.count("a message queued for it still alerts") == 2
+
+
 def test_201_a_retired_liaison_isnt_running(ctx, fake_home):
     from xt.spawn import retire
 

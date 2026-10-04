@@ -59,7 +59,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/paths.py` | Where everything lives in a team repo (`.xt/state`, `.xt/log`, …), finding the root (`XT_ROOT`, else the enclosing xt checkout), and `XtError`, the user-facing error. |
 | `src/xt/team.py` | `team.toml`: the roster, policy, notify, log and default settings, schedules and their windows (`next_due`), and the new-team template. |
 | `src/xt/ledger.py` | The message log (append-only daily JSONL, a message optionally carrying structured `question` or `answer` data) and the ledger of open goals, tasks and questions derived from it; rotation and archiving. Card #193: `is_pane` and `sender` mark a pane-input message (`source: pane`) as `typed in the pane, unverified` wherever a sender is shown, and `_apply` skips it, so it never opens, answers or closes an item. |
-| `src/xt/dispatch.py` | `xt send`: the reporting-chain policy, the envelope and reply hint, delivery now or through the queue, and what's waiting on the human. |
+| `src/xt/dispatch.py` | `xt send`: the reporting-chain policy, the envelope and reply hint, delivery now or through the queue, and what's waiting on the human. `not_running_note` (card #187): the sender's line when the recipient isn't running. |
 | `src/xt/goals.py` | Goal drafts and dispatch (`xt goal new`, `dispatch`, `list`). |
 | `src/xt/goaldone.py` | One notification per goal the human dispatched, and the Inbox's done marker (`state/inbox_seen.json`). |
 | `src/xt/inbox.py` | The human's Inbox in three groups (Needs you, New, Friction; the TUI calls New Notifications) for the TUI and `xt inbox`, and friction's read marker. |
@@ -73,8 +73,8 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`, `first_prompt_prefix`), `first_prompt_note`, limits. |
 | `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |
 | `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor. |
-| `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. |
-| `src/xt/alerts.py` | Alerts for the human, raised and cleared by key. |
+| `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. Card #187: `check_queued` (after `check_agents`, every tick) raises `queued:NAME` for messages waiting `QUEUED_GRACE` or more for a member that isn't running (`queued_text`, `start_command`, `age_text`), or folds the queue line into an open `missing:NAME`; `state/queued_alerts.json` keeps the newest message alerted per member, so a cleared alert returns only for a newer message or after the member ran. |
+| `src/xt/alerts.py` | Alerts for the human, raised and cleared by key. `update_text` and `fold` (card #187) change an open alert's text without a new message or notification. |
 | `src/xt/boardwatch.py` | Card #135: the board watch. Runs the `[board_watch]` command from `team.toml` in the background (no shell, no input, a timeout, at most 64 KB of output), reads its JSON array of cards, tells the lead about each number new since the last success (the first success after a supervisor start is only the baseline), one `boardwatch` alert per outage, and the status line (`state/board_watch.json`). |
 | `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |

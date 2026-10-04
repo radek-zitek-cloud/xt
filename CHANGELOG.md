@@ -14,6 +14,19 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 Polish for chat, the log and the pane-input signal, and one new alert (Space
 specs/polish-for-0-22-1).
 
+### Added
+
+- **#187** One Inbox alert when a message has waited 2 minutes or more for a team member that isn't
+  running (one xt didn't start this run, or one you stopped): `queued:NAME`, with the count, the
+  oldest message's age and the command that starts it (`u (or xt spawn NAME)`, `xt up` for the
+  liaison, `xt approve N` when its start waits on your approval), also listed in `xt status`. A
+  running member's queue never alerts, nor do messages to you or a retired member; an open
+  `missing:NAME` alert takes the queue as one line instead. It clears when the member runs; after
+  `xt clear queued:NAME` it returns only for a newer message or a new stop. `xt send` to a member
+  that isn't running adds one line on standard error: `queued: builder isn't running; the human is
+  alerted if it is still not running in 2 minutes.` The guide's stop sentences no longer say that
+  nothing alerts about a stopped agent.
+
 ### Changed
 
 - **#207** `xt log` (also `--full`, `--member`) and the brief put a space between the pane label and

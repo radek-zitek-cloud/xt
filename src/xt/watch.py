@@ -169,6 +169,7 @@ class Supervisor:
         for line in drain(self.ctx):
             self.say(line)
         self.check_agents(live)
+        self.check_queued(live)  # card #187: after check_agents, so a new `missing:` alert takes the queue
         self.run_resets()
         self.check_volume()
         if now - self.last_heartbeat >= 60 * int(self.ctx.team.policy("heartbeat_minutes")):
@@ -254,6 +255,49 @@ class Supervisor:
         # Resolve only after every check has had its say, so an alert raised above isn't
         # cleared in the same pass and raised again on the next one (it spammed every 3 s).
         self.alerts.resolve_prefix("missing:", keep)
+
+    def check_queued(self, live: dict) -> None:
+        """Card #187: messages waiting QUEUED_GRACE or more for a member that isn't running raise one
+        alert per member (`queued:NAME`), or join its open `missing:NAME` alert as one line. Never
+        for the human, a retired member or a running one (a busy agent's queue is normal). The alert
+        clears once the member runs; cleared by the human, it comes back only when a newer message
+        is queued or the member has run and stopped again."""
+        team, now = self.ctx.team, self.ctx.ledger.clock()
+        waiting: dict[str, list[dict]] = {}
+        for item in Queue(self.ctx).pending():
+            a = team.agent(item["to"])
+            if a is None or a.kind == HUMAN or not a.active or a.name in live:
+                continue
+            m = self.ctx.ledger.message(item["id"])
+            if m:
+                waiting.setdefault(a.name, []).append(m)
+        path = self.ctx.paths.state / "queued_alerts.json"
+        seen = json.loads(path.read_text()) if path.exists() else {}  # name -> newest id alerted
+        active = self.alerts.active()
+        keep: set[str] = set()
+        for key in [k for k, al in active.items() if k.startswith("missing:") and "base" in al]:
+            if key[len("missing:"):] not in waiting:
+                self.alerts.fold(key, None)  # its queue is gone: the alert says only its own text
+        for name, msgs in waiting.items():
+            msgs.sort(key=lambda m: m["id"])
+            if (now - dt.datetime.fromisoformat(msgs[0]["ts"])).total_seconds() < QUEUED_GRACE:
+                continue
+            text, line = queued_text(self.ctx, name, msgs, now)
+            if f"missing:{name}" in active:  # one alert per member: the queue joins it
+                self.alerts.fold(f"missing:{name}", line)
+                continue
+            key, newest = f"queued:{name}", msgs[-1]["id"]
+            if key in active:
+                keep.add(key)
+                self.alerts.update_text(key, text)  # the count and age, without a new notification
+            elif newest > seen.get(name, 0):  # not alerted yet, or a newer message since a clear
+                keep.add(key)
+                self.alerts.raise_(key, text)
+                self.say(f"alert: {name} isn't running, {line}")
+            seen[name] = newest
+        self.alerts.resolve_prefix("queued:", keep)
+        seen = {n: i for n, i in seen.items() if n in waiting}  # it ran, or its queue went: forgotten
+        path.write_text(json.dumps(seen))
 
     def run_resets(self) -> None:
         """Queued resets (card #134): one non-blocking step each. Live state is read again, after
@@ -509,6 +553,48 @@ class Supervisor:
                 self.say(f"nudge to {owner} failed: {e}")
         nudges = {k: v for k, v in nudges.items() if k in open_ids}
         self.nudges_path.write_text(json.dumps(nudges))
+
+
+QUEUED_GRACE = 120  # seconds a message waits for a member that isn't running before it alerts (#187)
+
+
+def age_text(seconds: float) -> str:
+    """`17m`, `3h12m`, `1d3h`: how long a message has waited (card #187)."""
+    m = int(seconds // 60)
+    if m < 60:
+        return f"{m}m"
+    if m < 24 * 60:
+        return f"{m // 60}h{m % 60}m" if m % 60 else f"{m // 60}h"
+    return f"{m // 1440}d{(m % 1440) // 60}h" if (m % 1440) // 60 else f"{m // 1440}d"
+
+
+def start_command(ctx: Ctx, name: str) -> str:
+    """What starts this member now: `xt up` for the liaison, `xt approve N` when its start waits
+    on the human's approval, else the TUI's `u` or `xt spawn NAME` (card #187)."""
+    from .spawn import Approvals
+
+    a = ctx.team.agent(name)
+    if a is not None and a.role == "liaison":
+        return "xt up"
+    for rid, r in Approvals(ctx).pending().items():
+        if r.get("kind", "spawn") == "spawn" and r.get("name") == name:
+            return f"xt approve {rid}"
+    return f"u (or xt spawn {name})"
+
+
+def queued_text(ctx: Ctx, name: str, msgs: list[dict], now: dt.datetime) -> tuple[str, str]:
+    """(the alert's text, its queue line) for `msgs` (oldest first) waiting for `name` (card #187):
+    `builder isn't running: 1 message waiting 17m (task #42 from lead, since 22:05). Start it: u (or
+    xt spawn builder).` The queue line is the part a `missing:` alert gets: `1 message waiting 17m`."""
+    first = msgs[0]
+    age = age_text((now - dt.datetime.fromisoformat(first["ts"])).total_seconds())
+    if len(msgs) == 1:
+        since = dt.datetime.fromisoformat(first["ts"]).astimezone().strftime("%H:%M")
+        line, about = f"1 message waiting {age}", f"{first['type']} #{first['id']} from {first['from']}, since {since}"
+    else:
+        line, about = f"{len(msgs)} messages waiting, oldest {age}", f"{first['type']} #{first['id']} from {first['from']}"
+    who = f"{name} isn't running" + (" (you stopped it)" if name in stopped(ctx) else "")
+    return f"{who}: {line} ({about}). Start it: {start_command(ctx, name)}.", line
 
 
 def run(ctx: Ctx) -> None:

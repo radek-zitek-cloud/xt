@@ -260,6 +260,21 @@ def close_leftover_tasks(ctx: Ctx, goal_id: int) -> list[int]:
     return closed
 
 
+def not_running_note(ctx: Ctx, to: str) -> str | None:
+    """The line `xt send` gives the sender when it queues a message for a team member that isn't
+    running (card #187); None for the human, a retired or unknown member, a running one, or when
+    the running state can't be read (the send itself is never affected)."""
+    a = ctx.team.agent(to)
+    if to == HUMAN or a is None or a.kind == HUMAN or not a.active:
+        return None
+    try:
+        if to in ctx.herdr.agents():
+            return None
+    except Exception:  # noqa: BLE001 - no answer is no line, never a failed send
+        return None
+    return f"queued: {to} isn't running; the human is alerted if it is still not running in 2 minutes."
+
+
 def drain(ctx: Ctx) -> list[str]:
     """Deliver everything queued for each target that has gone idle, as one batch per target."""
     out = []

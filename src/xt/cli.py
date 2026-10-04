@@ -289,10 +289,21 @@ def cmd_send(args) -> None:
                           f"`xt answer {args.ref}` ({hint(question_of(ctx.ledger.message(args.ref)))})") from None
         print(f"#{msg['id']} answer to #{args.ref} → {item['opener']}: {status}"
               + (f" (recorded as: {msg['body']})" if data.get("option") else ""))
+        _not_running(ctx, msg["to"])
         return
     else:
         msg, status = send(ctx, who, args.to, mtype, body, args.ref, data=data)
     print(f"#{msg['id']} {msg['type']} → {msg['to']}: {status}")
+    _not_running(ctx, msg["to"])
+
+
+def _not_running(ctx: Ctx, to: str) -> None:
+    """Card #187: one line on standard error when the recipient isn't running."""
+    from .dispatch import not_running_note
+
+    note = not_running_note(ctx, to)
+    if note:
+        print(note, file=sys.stderr)
 
 
 def cmd_done(args) -> None:
@@ -519,6 +530,9 @@ def cmd_status(args) -> None:
     print(f"open goals/tasks: {len(items) - questions} · questions for the human: {questions} · "
           f"queued messages: {len(q)} · jobs: {len(jobs)} · "
           f"pending approvals: {len(Approvals(ctx).pending())} · alerts: {len(Alerts(ctx).active())}")
+    for key, al in sorted(Alerts(ctx).active().items()):
+        if key.startswith("queued:"):  # card #187: a message waits for a member that isn't running
+            print(f"⚠ {al['text']}  (xt clear {key})")
     print(f"team usage today: {turns.fmt(spend.team_today)}")
     for line in turns.allowance_lines(ctx):
         print(f"allowance: {line}")

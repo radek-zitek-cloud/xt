@@ -66,6 +66,27 @@ class Alerts:
             self._save(d)
         return msg
 
+    def update_text(self, key: str, text: str) -> None:
+        """New text for an open alert, without a new message or notification (card #187)."""
+        with self.ctx.ledger.lock():
+            d = self._load()
+            if key in d and d[key]["text"] != text:
+                d[key]["text"] = text
+                self._save(d)
+
+    def fold(self, key: str, line: str | None) -> None:
+        """Add `line` under an open alert's own text, replacing an earlier one (None: take it off)
+        (card #187: the queue for a member that isn't running joins its `missing:` alert)."""
+        with self.ctx.ledger.lock():
+            d = self._load()
+            if key not in d:
+                return
+            base = d[key].get("base", d[key]["text"])
+            text = f"{base}\n{line}" if line else base
+            if d[key]["text"] != text:
+                d[key].update(text=text, base=base)
+                self._save(d)
+
     def resolve(self, key: str) -> bool:
         with self.ctx.ledger.lock():
             d = self._load()
