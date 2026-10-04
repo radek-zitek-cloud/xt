@@ -299,7 +299,7 @@ def test_start_note_and_detail_show_an_opt_in(ctx, monkeypatch):
     notes = [m["body"] for m in ctx.ledger.messages() if m["type"] == "system"]
     assert any("carol: account connectors opted in: claude.ai Context7" in b for b in notes)
     row = next(r for r in build(ctx).panels["Team"] if r.data and r.data.get("name") == "carol")
-    assert "account connectors (opted in): claude.ai Context7" in row.detail().plain
+    assert "legacy connectors claude.ai Context7 (deprecated" in row.detail().plain  # its caps row (#186)
     # removing the opt-in restores the default at the next start
     del ctx.team._table("carol")["connectors"]
     ctx.team.save()

@@ -100,7 +100,7 @@ def parse(block, where: str) -> dict:
     return out
 
 
-def check(doc) -> list[str]:
+def check(doc, allow_mixing: bool = False) -> list[str]:
     """Problems with every capability block and with mixing, for `Team.check`."""
     problems = []
     defaults = doc.get("defaults", {}).get("capabilities")
@@ -119,7 +119,7 @@ def check(doc) -> list[str]:
             problems.append(str(e))
             continue
         legacy = [k for k in LEGACY if a.get(k)]
-        if legacy:
+        if legacy and not allow_mixing:
             problems.append(mixing_text(str(a.get("name")), legacy))
     return problems
 
@@ -382,10 +382,10 @@ def convert(agent, settings: dict | None, rel: str | None) -> str:
         block["extras"] = rel  # the file stays, on top of the block, for what the block can't say
     import tomlkit
 
+    old = " and ".join(f"`{k}`" for k in LEGACY if getattr(agent, k, None))
     lines = [f"# xt capabilities {agent.name}: the block equivalent to its legacy lines"
              + (f" and {rel}" if rel else "") + " (nothing was changed).",
-             f"# Under its [[agent]] entry (name = \"{agent.name}\"), replacing "
-             + " and ".join(f"`{k}`" for k in LEGACY if getattr(agent, k, None)) + ":",
+             f"# Under its [[agent]] entry (name = \"{agent.name}\")" + (f", replacing {old}:" if old else ":"),
              "[agent.capabilities]"]
     lines += tomlkit.dumps(block).strip().splitlines() if block else ["# (the defaults: nothing to set)"]
     if kept:

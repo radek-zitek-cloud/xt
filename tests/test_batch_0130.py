@@ -138,7 +138,7 @@ def test_an_agent_settings_file_is_passed_checked_and_shown(ctx, capsys, monkeyp
     cli.cmd_status(cli.build_parser().parse_args(["status"]))
     assert "legacy settings/carol.json" in capsys.readouterr().out  # in the caps row since 0.23.0 (#186)
     row = next(r for r in build(ctx).panels["Team"] if r.data and r.data.get("name") == "carol")
-    assert "settings file: settings/carol.json" in row.detail().plain
+    assert "legacy settings/carol.json (deprecated: xt capabilities carol)" in row.detail().plain  # #186
 
 
 def test_a_changed_file_gets_a_new_hash_at_the_next_start(ctx):

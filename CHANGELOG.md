@@ -25,11 +25,15 @@ follow-up row in the Work outline within 76 columns at any pane width (QA on rc4
 live round on rc8: a Codex agent with a block starts in the workspace-write sandbox (with `write`
 it exited at start before), a Claude agent with `commands` may run xt in every spelling and
 `cd … && xt …`, and status, the start note and the guide say that Claude Code's own read-only
-commands (such as `date`) run anyway.
+commands (such as `date`) run anyway; **rc10** adds ux's rc6 findings: the TUI's approval detail
+and its `s` dialog show the "Approve its start:" sentence, `xt capabilities` runs while the mixing
+refusal stands (it names it), the TUI agent detail folds the old settings, Codex and connector
+lines into its caps row as status does, and `xt capabilities` loses a dangling "replacing";
+connectors are checked statically, not live (Radek's decision; the guide says so).
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc9`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc10`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
   follow-ups). Nothing to

@@ -219,8 +219,9 @@ def approval_data(rid: str, r: dict, ts: str | None) -> dict:
     """An approval row's data: a closed question with the request as its narrative (card #183)."""
     from ..approvals import approval_what
 
+    caps = f"\n{r['caps_note']}" if r.get("caps_note") else ""  # card #186: the `s` dialog shows it too
     return {"id": int(rid), "ts": ts, "question": {"kind": "closed"},
-            "text": f"{r['requester']} asks to {approval_what(r)}.\n\nAnswer yes (approve) or no (deny)."}
+            "text": f"{r['requester']} asks to {approval_what(r)}.{caps}\n\nAnswer yes (approve) or no (deny)."}
 
 
 def build(ctx: Ctx) -> Snapshot:
@@ -286,21 +287,25 @@ def build(ctx: Ctx) -> Snapshot:
                 out.append(f"next wake-up: {dt.datetime.fromtimestamp(nxt):%a %d %b %H:%M}\n")
             mine_today = spend.agents_today.get(a.name)
             out.append(f"usage today: {turns.fmt(mine_today) if mine_today else 'none recorded'}\n")
-            if a.connectors:
-                out.append(f"account connectors (opted in): {', '.join(a.connectors)}\n", style="yellow")
-            settings_path = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness))
-            if settings_path:
-                out.append(f"settings file: {settings_path}\n")
+            from .. import capstart
             from ..launch import codex_options_line
 
+            # card #186: a started agent's caps row, in full words, holds the old settings, Codex and
+            # connector lines (ux on rc6); one never started has no row, so it keeps them
+            caps = capstart.detail_row(ctx, a, load_adapters(ctx.paths).get(a.harness))
             opts = codex_options_line(ctx, a, la is not None)  # card #169
-            if opts:
-                out.append(opts + "\n", style="yellow" if "network on" in opts else "")
-            from .. import capstart
-
-            caps = capstart.status_row(ctx, a, load_adapters(ctx.paths).get(a.harness))  # card #186
             if caps:
                 out.append(caps + "\n")
+                if "(running with" in opts:  # a changed option still says what the agent runs with
+                    out.append(opts + "\n", style="yellow")
+            else:
+                if a.connectors:
+                    out.append(f"account connectors (opted in): {', '.join(a.connectors)}\n", style="yellow")
+                settings_path = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness))
+                if settings_path:
+                    out.append(f"settings file: {settings_path}\n")
+                if opts:
+                    out.append(opts + "\n", style="yellow" if "network on" in opts else "")
             from ..lifecycle import queued, queued_text, suggestion
 
             entry = queued(ctx).get(a.name)
@@ -406,6 +411,8 @@ def build(ctx: Ctx) -> Snapshot:
             if r.get("settings_note"):
                 out.append(r["settings_note"] + "\n",
                            style="bold red" if r["settings_note"].startswith("WARNING") else "")
+            if r.get("caps_note"):  # card #186: what will be enforced, at decision time (ux on rc6)
+                out.append(r["caps_note"] + "\n", style="bold")
             out.append("s: answer yes or no · a approve · d deny\n", style="bright_black")
             out.append(_heading(f"role brief: roles/{r['role']}.md"))
             out.append_text(_file_text(ctx, f"roles/{r['role']}.md"))

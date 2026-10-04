@@ -17,7 +17,7 @@ from .ledger import AGENT_TYPES, pair
 from .paths import Paths, XtError, find_root
 from .approvals import Approvals, approval_what
 from .spawn import AGENT_ENV, decide, request_spawn, retire, stop
-from .team import ALWAYS, HUMAN, harness_model, parse_window, schedule_text
+from .team import ALWAYS, HUMAN, Team, harness_model, parse_window, schedule_text
 
 
 class AlreadyAnswered(XtError):
@@ -872,16 +872,18 @@ def cmd_stop(args) -> None:
 
 def cmd_capabilities(args) -> None:
     """Card #186: print the [capabilities] block equivalent to an agent's legacy lines and settings
-    file, for review. Reads only: team.toml, the settings file and xt's state stay as they are."""
-    ctx = Ctx.load()
-    a = ctx.team.agent(args.name)
+    file, for review. Reads only: team.toml, the settings file and xt's state stay as they are. It
+    runs while an agent has both a block and an old line (the refusal for that names it)."""
+    paths = Paths(find_root())
+    team = Team.load(paths.team_toml, allow_mixing=True)
+    a = team.agent(args.name)
     if a is None or a.kind == HUMAN:
         raise XtError(f"no agent named {args.name!r}")
-    rel = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness or ""))
+    rel = permissions.shown(team, a, load_adapters(paths).get(a.harness or ""))
     data = None
     if rel:
         try:
-            data = json.loads((ctx.paths.root / rel).read_text())
+            data = json.loads((paths.root / rel).read_text())
         except (OSError, ValueError) as e:
             raise XtError(f"can't read {rel}: {e}") from None
     print(capabilities.convert(a, data, rel))

@@ -200,6 +200,19 @@ def status_row(ctx, a, adapter) -> str | None:
                          source=source_of(ctx, a, adapter, caps))}")
 
 
+def detail_row(ctx, a, adapter) -> str | None:
+    """The TUI agent detail's row, in full words (the pane has room): the old settings and Codex
+    lines fold into it, as in status (ux on rc6); nothing for an agent never started."""
+    from . import versions
+
+    if not versions.ever_started(ctx, a.name):
+        return None
+    rec = versions.started_capabilities(ctx, a.name) or {}
+    caps = cap.effective(ctx.team, a)
+    return "caps: " + row(caps, adapter, legacy_items(ctx, a, adapter), a.name, 200,
+                          bool(rec.get("skills_were_loaded")), source_of(ctx, a, adapter, caps))
+
+
 def skills_were_loaded(ctx, a, adapter) -> bool:
     """Card #186 Q3: a pi agent last started by an xt that let it load the operator's personal skills
     (its start record has no capabilities), so this start changes what it has: said once."""

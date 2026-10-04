@@ -54,7 +54,7 @@ def test_an_agent_with_the_option_starts_with_the_matching_override(ctx, monkeyp
     assert "    caps: write, deny, skills, creds advisory; deprecated codex network on" in out.splitlines()
     assert "  caps: write, deny, skills, creds advisory; deprecated codex network on" in brief.build(ctx, "lead")
     team = {r.data["name"]: r for r in build(ctx).panels["Team"]}
-    assert f"codex options: {NET}" in team["liaison"].detail().plain
+    assert "legacy codex network on (deprecated: xt capabilities liaison)" in team["liaison"].detail().plain
 
 
 def test_network_off_is_accepted_too(ctx):

@@ -57,14 +57,16 @@ class Team:
         self.doc = doc
 
     @classmethod
-    def load(cls, path: Path) -> "Team":
+    def load(cls, path: Path, allow_mixing: bool = False) -> "Team":
+        """`allow_mixing`: only for `xt capabilities`, which prints the way out of a block beside an
+        old line (card #186, ux on rc6), so the refusal it names doesn't refuse it."""
         if not path.exists():
             raise XtError(f"no team.toml at {path} — run `xt init` first")
         team = cls(path, tomlkit.parse(path.read_text()))
-        team.check()
+        team.check(allow_mixing)
         return team
 
-    def check(self) -> None:
+    def check(self, allow_mixing: bool = False) -> None:
         """Refuse settings xt can't use, at load (card #198: `notes_budget`)."""
         defaults = self.doc.get("defaults", {})
         problems = []
@@ -73,7 +75,7 @@ class Team:
         for a in self.doc.get("agent", []):
             if "notes_budget" in a:
                 problems.append(_notes_budget_problem(a["notes_budget"], f"agent {a.get('name')}'s"))
-        problems = [p for p in problems if p] + capabilities.check(self.doc)  # card #186
+        problems = [p for p in problems if p] + capabilities.check(self.doc, allow_mixing)  # card #186
         if problems:
             raise XtError("; ".join(problems))
 

@@ -326,7 +326,7 @@ def test_186_xt_capabilities_prints_the_equivalent_block_and_changes_nothing(ctx
         "ask": ["Bash(git push *)"]})
     _edit(ctx, carol={"permissions": "settings/carol.json", "connectors": ["claude.ai Gmail"]})
     before = _snapshot(ctx.paths.root)
-    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    monkeypatch.setattr(cli, "find_root", lambda: ctx.paths.root)
     args = cli.build_parser().parse_args(["capabilities", "carol"])
     args.func(args)
     out = capsys.readouterr().out
@@ -393,7 +393,7 @@ def test_186_the_examples_conversion_is_what_xt_prints(ctx, monkeypatch, capsys)
     (ctx.paths.root / "settings" / "researcher.json").write_text(settings)
     _team(ctx, researcher="claude")
     _edit(ctx, researcher={"permissions": "settings/researcher.json"})
-    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    monkeypatch.setattr(cli, "find_root", lambda: ctx.paths.root)
     args = cli.build_parser().parse_args(["capabilities", "researcher"])
     args.func(args)
     (doc,) = [b for b in _blocks(examples, "text") if "xt capabilities researcher" in b]
@@ -404,7 +404,7 @@ def test_186_the_examples_conversion_is_what_xt_prints(ctx, monkeypatch, capsys)
 
 
 def _convert(ctx, monkeypatch, capsys, name) -> str:
-    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    monkeypatch.setattr(cli, "find_root", lambda: ctx.paths.root)  # xt capabilities loads team.toml itself
     args = cli.build_parser().parse_args(["capabilities", name])
     args.func(args)
     return capsys.readouterr().out
@@ -589,6 +589,107 @@ def test_186_a_status_and_the_start_note_say_claudes_built_in_commands_run_anywa
     assert note.endswith(capstart.BUILTIN_NOTE)
     guide = " ".join((REPO / "docs" / "user-guide.md").read_text().split())
     assert "beyond Claude Code's own built-in read-only commands" in guide
+
+
+# --- ux's walk of rc6 (members/ux/walk-v0230-rc6.md) -------------------------------------------------
+
+
+def test_186_the_tuis_approval_detail_and_s_dialog_show_the_capability_sentence(ctx):
+    import asyncio
+
+    from xt.tui.app import DetailBody, LiveActions, XtTui, YesNo
+    from xt.tui.model import build
+
+    _team(ctx)
+    request_spawn(ctx, "lead", "zoe", "codex", None, "worker", None)
+    sentence = "Approve its start: write, deny, skills, credential_clis advisory (role text only)."
+    seen = {}
+
+    async def run():
+        app = XtTui(lambda: build(ctx), LiveActions(ctx))
+        async with app.run_test(size=(140, 45)) as pilot:
+            await pilot.press("1")
+            await pilot.pause()
+            assert app.panel(1).current.data["id"] == next(int(k) for k in Approvals(ctx).pending())
+            await pilot.press("enter")
+            await pilot.pause()
+            seen["detail"] = app.query_one(DetailBody).content.plain
+            app.panel(1).focus()
+            await pilot.press("s")
+            await pilot.pause()
+            seen["dialog"] = app.screen.question if isinstance(app.screen, YesNo) else None
+
+    asyncio.run(run())
+    assert sentence in seen["detail"].splitlines()  # beside the settings note, before a / d
+    assert seen["dialog"] is not None and sentence in seen["dialog"].splitlines()
+
+
+def test_186_xt_capabilities_runs_while_mixing_is_refused(ctx, monkeypatch, capsys):
+    _team(ctx, carol="claude")
+    _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)"]})
+    for a in ctx.team.doc["agent"]:
+        if a["name"] == "carol":
+            a["permissions"] = "settings/carol.json"
+            a["capabilities"] = {"network": "on"}
+    ctx.paths.team_toml.write_text(tomlkit.dumps(ctx.team.doc))
+    with pytest.raises(XtError, match="`xt capabilities carol` prints the block"):
+        ctx.reload_team()  # every other command refuses
+    out = _convert(ctx, monkeypatch, capsys, "carol")  # the way out it names works
+    assert 'commands = ["git"]' in out and "replacing `permissions`:" in out
+
+
+def test_186_an_agent_without_old_lines_gets_no_dangling_replacing(ctx, monkeypatch, capsys):
+    _team(ctx, carol="claude")
+    out = _convert(ctx, monkeypatch, capsys, "carol")
+    assert out.splitlines()[1] == '# Under its [[agent]] entry (name = "carol"):'
+    assert "# (the defaults: nothing to set)" in out
+
+
+def test_186_the_tui_detail_folds_the_old_lines_into_the_full_row(ctx):
+    from xt.tui.model import build
+
+    _team(ctx, carol="claude")
+    _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Read"]})
+    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    team = lambda: {r.data["name"]: r for r in build(ctx).panels["Team"] if r.data and r.data.get("name")}
+    assert "settings file: settings/carol.json" in team()["carol"].detail().plain  # never started: as before
+    _start(ctx, "carol")
+    detail = team()["carol"].detail().plain
+    assert "caps: network advisory; legacy settings/carol.json (deprecated: xt capabilities carol)" in detail
+    assert "settings file:" not in detail  # said once, in the row
+
+
+def test_186_connectors_per_harness_are_pinned_statically(ctx, monkeypatch):
+    """Radek's decision (#3674): connectors are checked statically, not by a live probe. Claude: the
+    named connectors allowed, every other server refused; Codex: apps off as a whole, a named list
+    refused; pi: nothing to switch off, a named list refused."""
+    from xt import adapters
+    from xt.spawn import stop
+
+    monkeypatch.setattr(adapters, "claude_mcp_servers", lambda *a, **k: ["claude.ai Gmail", "claude.ai Drive"])
+    _team(ctx, carol="claude", dana="codex", erin="pi")
+    _edit(ctx, {"network": "off"})
+    args = _start(ctx, "carol")
+    assert "--strict-mcp-config" in args and not any(a.startswith("mcp__") for a in _settings(args)["permissions"]["allow"])
+    stop(ctx, "carol")
+    _edit(ctx, carol={"capabilities": {"connectors": ["claude.ai Gmail"]}})
+    args = _start(ctx, "carol")
+    assert "--strict-mcp-config" not in args
+    assert args[args.index("--disallowedTools") + 1:].count("mcp__claude_ai_Drive") == 1  # the unlisted one refused
+    allow = _settings(args)["permissions"]["allow"]
+    assert "mcp__claude_ai_Gmail" in allow and "mcp__claude_ai_Drive" not in allow
+    dargs = _start(ctx, "dana")
+    assert dargs[dargs.index("features.apps=false") - 1] == "-c"  # all or nothing: off
+    stop(ctx, "dana")
+    _edit(ctx, dana={"capabilities": {"connectors": ["claude.ai Gmail"]}})
+    with pytest.raises(XtError, match="harness codex can't expose single account connectors"):
+        _start(ctx, "dana")
+    eargs = _start(ctx, "erin")
+    assert not any("mcp" in a or "apps" in a for a in eargs)  # pi has none to switch off
+    stop(ctx, "erin")
+    _edit(ctx, erin={"capabilities": {"connectors": ["claude.ai Gmail"]}})
+    with pytest.raises(XtError, match="harness pi can't expose single account connectors"):
+        _start(ctx, "erin")
 
 
 def test_186_the_harness_files_parse_and_keep_their_other_keys(paths):

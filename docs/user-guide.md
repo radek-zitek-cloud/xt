@@ -775,6 +775,11 @@ harnesses` lists the table and the harness versions it was checked on:
 | enforced | write, deny, commands, connectors, skills, credential_clis | network, connectors | connectors, skills |
 | advisory | network | write, deny, commands, skills, credential_clis | write, deny, commands, network, credential_clis |
 
+`connectors` was checked statically, not live: xt's tests pin what each harness is started with
+(Claude Code: the named connectors' tools allowed and every other server's refused; Codex: apps off
+as a whole, a named list refused; pi: none to switch off), and no live agent probed a real
+connector.
+
 What that means: for Claude Code xt writes a settings file (`dontAsk`): file edits only under
 `write`, nothing under `deny`, shell commands only from `commands` **beyond Claude Code's own
 built-in read-only commands** (such as `date`, `echo` or `ls`, which it runs anyway; `xt status`
