@@ -20,6 +20,7 @@ GLYPH_STYLE = {OPEN: "yellow", DONE: "green", FAILED: "red"}
 DONE_FOLD, NO_GOAL = "fold:done", "nogoal"
 INDENT = "    "
 INDENT_LEN = len(INDENT)
+FOLLOW_UP_CAP = 76  # card #185: a follow-up row's text and age end here (80 columns with 4 spare)
 MIN_TEXT = 16  # cells a goal's first line keeps before its owner column gives way
 # a task closed with a failed or blocked result: its `done` starts with the verdict word
 FAILED_DONE = re.compile(r"^\W*(FAIL|FAILED|BLOCKED)\b")
@@ -129,8 +130,13 @@ def line(text: Text, data: dict, age: str, width: int, expanded: bool) -> Text:
     first), then the age (#132's helper)."""
     head = Text(no_wrap=True)
     short = data.get("short")  # card #185: the same row in shorter words, before any `…`
-    if short is not None and INDENT_LEN + text.cell_len + (len(age) + 1 if age else 0) > width:
-        text = short
+    if short is not None:  # a follow-up row keeps 4 columns spare at 80: text and age within 76
+        cap = min(width, FOLLOW_UP_CAP)
+        if INDENT_LEN + text.cell_len + (len(age) + 1 if age else 0) > cap:
+            text = short
+        row = fit(Text(INDENT, no_wrap=True) + text, age, cap)
+        row.append(" " * (width - row.cell_len))
+        return row
     if data.get("level") == 2:
         head.append(INDENT)
     elif data.get("foldable"):

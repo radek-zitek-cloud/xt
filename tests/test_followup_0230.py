@@ -210,10 +210,9 @@ def test_185_the_work_row_fits_80_columns_and_shortens_its_label_before_cutting(
     f, _ = send(ctx, "lead", "release-mgr1", "task", "Retry the site check after it", ref=goal["id"])
     clock.advance(hours=22)
     row = _rows(ctx)[0][f"task:{f['id']}"]
-    line = work.line(row.text, row.data, row.age, 80, False)
-    content = line.plain.rstrip(row.age).rstrip()
-    assert "↳ follow-up" in content and "…" not in content and row.age == "22h"
-    assert len(content) + 1 + len(row.age) <= 76  # the longest realistic row keeps 4 columns spare
+    line = work.line(row.text, row.data, row.age, 80, False).plain
+    assert "↳ follow-up" in line and "…" not in line and row.age == "22h" and len(line) == 80
+    assert len(line.rstrip()) <= 76 and line.rstrip().endswith(" 22h")  # text and age end by column 76
     narrow = work.line(row.text, row.data, row.age, 64, False).plain  # 68 with the full label, 62 short
     assert "↳ f/u #" in narrow and "Retry the site check after it" in narrow  # shorter words, no cut yet
     assert "…" in work.line(row.text, row.data, row.age, 50, False).plain
@@ -231,9 +230,13 @@ def test_185_in_the_tui_at_80_columns_the_row_keeps_4_columns_spare(ctx, clock):
     t, _ = send(ctx, "lead", "release-mgr1", "task", "Publish it", ref=goal["id"])
     send(ctx, "release-mgr1", "lead", "done", "Published", ref=t["id"])
     send(ctx, "lead", "liaison", "done", "Shipped", ref=goal["id"])
+    snap = ctx.ledger.snapshot_path
+    snap.write_text(json.dumps({**json.loads(snap.read_text()), "seq": 12344}))  # a five-digit id next
     clock.advance(hours=1)
-    f, _ = send(ctx, "lead", "release-mgr1", "task", "Retry the site check", ref=goal["id"])
-    clock.advance(hours=22)
+    f, _ = send(ctx, "lead", "release-mgr1", "task", "Retry the site check with the renewed certificate",
+                ref=goal["id"])
+    assert f["id"] == 12345
+    clock.advance(hours=23, minutes=30)
     seen = {}
 
     async def run():
@@ -252,10 +255,11 @@ def test_185_in_the_tui_at_80_columns_the_row_keeps_4_columns_spare(ctx, clock):
     line = seen["line"]
     assert seen["visible"]  # in view without unfolding anything
     assert seen["width"] <= 80 and len(line) <= seen["width"]
-    assert "↳ follow-up" in line and "Retry the site check" in line and "…" not in line
-    assert line.endswith(" 22h")
-    used = len(line[: -len(" 22h")].rstrip()) + len(" 22h")
-    assert used <= 76, line  # text and age within 80 columns less 4
+    used = len(line.rstrip())
+    assert used <= 76, (used, line)  # text and age within 80 columns less 4 (QA on rc4)
+    # shorter words first, then the title is cut: the label, id, owner and age all stay
+    assert line.rstrip().endswith(" 23h") and "↳ f/u #12345 release-mgr1  Retry the site check" in line
+    assert "…" in line and "follow-up" not in line
 
 
 def test_185_the_guide_and_the_lead_role_mention_follow_ups():

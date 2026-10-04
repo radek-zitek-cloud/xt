@@ -19,11 +19,12 @@ says which modules are missing (QA on rc1); **rc4** adds #185 (spec
 follow-up-tasks-under-closed-goal); **rc5** adds the first part of #186 (spec one-capability-model):
 the model, the three harness adapters, `require`, `xt capabilities`, the status row and the spawn
 sentence; **rc6** completes #186: the same row in the brief and the TUI's detail, the old `settings:`
-and `codex options:` status lines folded into it, and the guide section.
+and `codex options:` status lines folded into it, and the guide section; **rc7** keeps a #185
+follow-up row in the Work outline within 76 columns at any pane width (QA on rc4).
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc6`), then `xt restart --all`:
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc7`), then `xt restart --all`:
   the supervisor runs the new code, and every agent gets the new protocol and roles in its first
   prompt (pane text is never authority, the notes shape, the lead's opinion rounds and
   follow-ups). Nothing to
