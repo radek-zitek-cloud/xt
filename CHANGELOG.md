@@ -1,8 +1,8 @@
 # Changelog
 
 All notable changes to xt. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)
-and xt uses [semantic versioning](https://semver.org/) as described in the README's
-[Versioning](README.md#versioning) section.
+and xt uses [semantic versioning](https://semver.org/) as described in
+[docs/development.md](docs/development.md#versioning).
 
 Every release has an **Upgrading** note: what a team that already runs xt has to do after
 `git pull upstream main` (or after merging the release tag).
@@ -12,7 +12,10 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.24.0] — not released yet
 
 Documentation for the capability model, and the end of the old permission lines (Space
-releases/v0-24-0). **0.24.0-rc1** has #218 (Space specs/remove-legacy-permission-lines).
+releases/v0-24-0). **0.24.0-rc1** has #218 (Space specs/remove-legacy-permission-lines); **rc2**
+adds the documentation rework, #214, #219, #220, #221 and #222 (spec
+documentation-rework-for-0-24-0), and fixes where the conversion's block goes (#218, from the
+operator's live check of rc1).
 
 ### Upgrading
 
@@ -29,6 +32,40 @@ releases/v0-24-0). **0.24.0-rc1** has #218 (Space specs/remove-legacy-permission
   the steps.
 - `xt spawn --permissions FILE` is gone with the line it wrote: a hire gets what it may do from
   its capability block (the agent's own, or `[defaults.capabilities]`).
+- Links into the documentation changed with the rework (#219, #220): the guide's sections are
+  renumbered and the examples' too, and the README's TUI, command, configuration and versioning
+  sections moved to the guide and to `docs/development.md`.
+
+### Added
+
+- **#214** Three GitHub issue forms in `.github/ISSUE_TEMPLATE`: "Bug", "Question" and "I tried it,
+  here's what happened", each asking only what a maintainer needs (xt version, harness and OS, what
+  you ran and what happened) and warning not to paste secrets or private team data; the README and
+  the site link to them. `docs/development.md` holds what was the README's contributor material:
+  running the tests, the repo layout, versioning and releasing.
+
+### Changed
+
+- **#214** The README is short and for a newcomer: what xt is, a capture of `xt chat`
+  (`docs/chat.svg`, rendered from xt's own chat), the quick start, a "First 10 minutes" section
+  (what you need, where a first start usually stops, what success looks like), what xt can do in
+  chat terms, status and limits, links onward, and Say hello. The command table, the TUI's key
+  table and the configuration reference moved to the user guide.
+- **#219** The user guide is reorganised around how you work: chat first (starting a team,
+  talking with the liaison, goals, questions, hires), then the TUI, running the team (schedules,
+  pausing and resetting, problems, memory and cost, capabilities, updating), and an operator; then
+  `team.toml` and the command reference, now with `xt capabilities`, `xt checkpoint`,
+  `xt pane-input`, `xt reset` and every flag of every command. The version-history notes ("from
+  0.x") left the instructions; what older teams carry over is in its Upgrading notes, with the
+  0.24 conversion.
+- **#220** The examples: part one keeps the three real goals as records; part two has a goal read
+  back in chat, a question with options, a hire waiting for your yes, a drive grant, and a
+  `team.toml` with a capability block (runnable: its expected output is shown and tested), then
+  the earlier examples that are still true. Each is labelled runnable or illustrative.
+- **#221** The story keeps its founding text unchanged, marks its date, and ends with a short
+  "Since then" epilogue: one team, a week of releases, direction B.
+- **#222** The site: the version, the chat illustration in chat's real layout (numbered options,
+  `Recommended:`, `Answer yes or no.`), and "Report a problem" leading to the issue forms.
 
 ### Removed
 
@@ -48,6 +85,15 @@ releases/v0-24-0). **0.24.0-rc1** has #218 (Space specs/remove-legacy-permission
   because `extras` refuses any mode but `dontAsk`. The spawn approval's warning now says a Claude
   agent without a block would start with the operator's own defaults. The user guide, README,
   examples, `roles/lead.md` and `protocol.md` describe only the capability block.
+- **#218, where the block goes** (the operator's live check of rc1). `xt capabilities` printed an
+  agent's credential CLI exceptions as a bare `[credential_clis]` table after the block and said to
+  paste it in place of the old line: pasted that way, the agent's `reports_to` and `status` fell
+  into that table, and xt didn't say so. It now prints `credential_clis = {allow = [...]}` inside
+  the block and says to put the block at the end of the agent's entry. At load, an agent's own keys
+  inside its `[agent.capabilities]` block (or its `credential_clis` table) are refused, naming them
+  and the fix, and so is a top-level table or key xt doesn't read (`team`, `policy`, `log`,
+  `notify`, `defaults`, `agent` and `board_watch` are the ones it does); while other agents still
+  have old lines, the removal message names such a table too.
 
 ## [0.23.0] — 2026-10-04
 
@@ -668,7 +714,7 @@ Codex's sandbox by its PID 1. No protocol or ledger format change; one new state
   `"off"` exempts it. The ledger says why (context and threshold in tokens, the policy). A cancelled
   or abandoned automatic reset also waits for the cool-down. A bad setting is said once in the
   supervisor's log and resets nobody. A copyable configuration is in
-  [docs/examples.md](docs/examples.md#6-reset-heavy-agents-automatically).
+  [docs/examples.md](docs/examples.md#10-reset-heavy-agents-automatically).
 - **A warning when an agent runs without xt's launch settings (#165).** After a power cycle the
   terminal multiplexer can resume every agent in its old conversation without the identity,
   model, settings file and connector and tool blocks xt starts it with. The supervisor (about once

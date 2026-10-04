@@ -1,0 +1,28 @@
+name: I tried it, here's what happened
+description: How a first try of xt went, what worked as well as what didn't.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for trying xt and writing it down: an account of a first try is the most useful
+        thing a newcomer can give. Please don't paste secrets, tokens, or your team's private files
+        or messages.
+  - type: textarea
+    id: account
+    attributes:
+      label: What happened
+      description: "In your own words: what you set out to do, what you ran, what worked, what didn't, and where you stopped."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: xt version
+      description: What `xt --version` prints.
+      placeholder: xt 0.24.0
+  - type: input
+    id: environment
+    attributes:
+      label: Harness and OS
+      description: Which harnesses you used (claude, codex, pi) and your OS.
+      placeholder: claude and codex on Fedora 42

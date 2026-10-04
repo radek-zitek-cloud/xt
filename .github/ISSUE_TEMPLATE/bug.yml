@@ -1,0 +1,46 @@
+name: Bug
+description: xt did something wrong, or refused something it should do.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Please don't paste secrets, tokens, or your team's private files or
+        messages: describe them instead, or shorten them to what shows the problem.
+  - type: input
+    id: version
+    attributes:
+      label: xt version
+      description: What `xt --version` prints.
+      placeholder: xt 0.24.0
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Harness and OS
+      description: Which harness the agents involved run on (claude, codex, pi) and its version, and your OS.
+      placeholder: claude 2.1.289 on Arch Linux
+    validations:
+      required: true
+  - type: textarea
+    id: ran
+    attributes:
+      label: What you ran
+      description: The commands or keys, in order.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: textarea
+    id: happened
+    attributes:
+      label: What happened
+      description: The output or error as printed, and what `xt status` or the Inbox showed, if it helps.
+    validations:
+      required: true

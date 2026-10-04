@@ -1,19 +1,26 @@
 # xt user guide
 
-How to run an xt team day to day: the typical lifecycles first, then every command with its TUI
-equivalent and when you'd use it. For how xt works inside, see [architecture.md](architecture.md);
-for installing, the [README](../README.md).
+How to work with an xt team: talking with it in `xt chat` first, then seeing how the work flows in
+the TUI, running the team, and letting an operator act for you; then `team.toml` and every command
+with its TUI equivalent and when you'd use it. For installing, see the [README](../README.md); for
+how xt works inside, [architecture.md](architecture.md).
 
 - [Who's who](#whos-who)
-- [Lifecycles](#lifecycles): [a new team](#1-starting-a-new-team) ·
-  [the first goal](#2-giving-the-team-its-first-goal) · [hiring](#3-hiring-approvals) ·
-  [day to day](#4-day-to-day-questions-approvals-alerts-friction) ·
-  [periodic work](#5-periodic-work-schedules-quiet-hours-standing-rules) ·
-  [changing course](#6-changing-or-stopping-a-goal) · [updating xt](#7-updating-xt) ·
-  [pausing and resuming](#8-pausing-and-resuming-the-team) ·
-  [when something goes wrong](#9-when-something-goes-wrong) ·
-  [shrinking the team](#10-shrinking-the-team) · [memory and recovery](#11-memory-and-recovery) ·
-  [ending a team](#12-ending-a-team) · [an operator acting for you](#13-an-operator-acting-for-you)
+- [Working in chat](#working-in-chat): [starting a team](#1-starting-a-team) ·
+  [talking with the liaison](#2-talking-with-the-liaison) · [a goal](#3-giving-the-team-a-goal) ·
+  [questions and answers](#4-questions-and-answers) · [hiring and schedules](#5-hiring-and-schedules) ·
+  [changing course](#6-changing-or-stopping-a-goal)
+- [Seeing how work flows](#seeing-how-work-flows): [the TUI](#7-the-tui)
+- [Running the team](#running-the-team):
+  [periodic work](#8-periodic-work-schedules-standing-rules-the-board-watch) ·
+  [pausing and resetting](#9-pausing-resuming-and-resetting) ·
+  [when something goes wrong](#10-when-something-goes-wrong) ·
+  [memory, context and cost](#11-memory-context-and-cost) ·
+  [shrinking and ending](#12-shrinking-and-ending-a-team) ·
+  [what agents may do](#13-what-agents-may-do-capabilities) · [updating xt](#14-updating-xt)
+- [Working through an operator](#working-through-an-operator): [an operator acting for
+  you](#15-an-operator-acting-for-you)
+- [Configuration: team.toml](#configuration-teamtoml)
 - [Command reference](#command-reference)
 
 ## Who's who
@@ -23,7 +30,7 @@ for installing, the [README](../README.md).
   as you, unless it runs inside an agent's session. Every agent xt starts carries `XT_AGENT` in its
   environment, and most agents' shells have no terminal at all, so agents can't act as you. This
   is enforced by xt, not a sandbox: it closes the easy paths. A process working for you outside
-  the team (an **operator**) gets its own name instead, and only what you delegate to it (see 13).
+  the team (an **operator**) gets its own name instead, and only what you delegate to it (see 15).
 - **The liaison** turns what you want into goals and relays questions and results. It never does
   the work and never hires.
 - **The lead** plans each goal, writes roles and skills, asks to hire members, hands out tasks and
@@ -38,112 +45,238 @@ for installing, the [README](../README.md).
 Agents run the same `xt` commands with `--as <their name>`; the commands marked *agents* below are
 mostly theirs, but you can use them too.
 
-## Lifecycles
+## Working in chat
 
-### 1. Starting a new team
+### 1. Starting a team
 
 ```sh
 curl -fsSLO https://raw.githubusercontent.com/radek-zitek-cloud/xt/main/bin/xt-clone.sh
 sh xt-clone.sh my-team
 ```
 
-`xt-clone.sh` clones xt into `./my-team`, runs `xt init` (it asks for the liaison's and lead's
-harness and model, codex recommended, and whether hires need your approval; say yes), starts the
+`xt-clone.sh` clones xt into `./my-team`, runs `mise trust` and `xt init` (it asks for the
+liaison's and lead's harness and model, and whether hires need your approval; say yes), starts the
 team's Herdr session and `xt up`, and attaches you. What you get: the supervisor and the liaison
-running, the TUI open, the lead not started yet (it starts with the first goal).
+running, the TUI open, the lead not started yet (it starts with the first goal). The same by hand:
 
-Worth doing once: add your own `origin` remote if you want to push the team's repo somewhere, and
-set `[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notifications at night.
+```sh
+git clone https://github.com/radek-zitek-cloud/xt.git my-team && cd my-team
+mise trust
+herdr --session my-team        # open (or attach) the team's Herdr session
+xt                             # first run asks a few questions (xt init), then starts the team
+```
 
-### 2. Giving the team its first goal
+Worth doing once: add your own `origin` remote if you want to push the team's repo somewhere, set
+`[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notifications at night, and give
+the team a capability block (see 13) so a Claude Code agent never waits at a permission prompt.
 
-1. Switch to the liaison's workspace (in the TUI: select it in Team, press `f`) and say what you
-   want: the outcome, constraints, what "done" looks like.
-2. The liaison drafts the goal in `goals/drafts/<slug>.md` as you talk (the TUI's Work panel
-   shows it as `✎ … draft`), reads it back, and dispatches it when you say so. From 0.21.0 the
-   read-back is a yes/no question in your Inbox (`⚑ … yes/no`): answer `yes` and the liaison
+**If the first start fails.** Where it usually stops:
+
+- `xt-clone.sh` says `missing prerequisite: herdr` (or `git`, `mise`), or `xt init` says `missing
+  essentials: …`: install it and run again. `no supported harness is installed (claude, codex or
+  pi)`: install and log in to one of them; `xt harnesses` shows what xt finds.
+- `xt: command not found`: mise isn't active in this shell, or hasn't trusted the clone. mise puts
+  the clone's `bin/` on `PATH`; run `mise trust` in the clone, or call `./bin/xt`.
+- `xt init` ends with `next: start the Herdr session with herdr --session my-team, then run xt
+  inside it`: agents run inside that session, so open it, then run `xt`.
+- The Inbox shows `blocked:liaison` (or another agent): it is stuck at a prompt in its pane,
+  usually a Claude Code agent asking for permission because the team has no capability block yet.
+  `f` on it in the TUI switches to its workspace; answer the prompt, then add a block (see 13).
+- The Inbox shows `noprompt:liaison`: the agent started but its first prompt never showed on its
+  screen, so it doesn't know who it is. `xt restart liaison`.
+
+It works when the liaison answers you in `xt chat` (next section) and `xt status` shows the
+supervisor and the liaison running.
+
+### 2. Talking with the liaison
+
+`xt chat`, in any terminal of yours, is the everyday way to talk with the team: one conversation
+with the liaison. It opens with the last 30 messages between you, shows new ones as they arrive,
+and lets you answer the liaison's questions and the hire and schedule requests in place: `tab`
+picks the oldest one waiting, and the line under the input names every key that applies. What you
+type goes to the liaison, recorded in the ledger like any message. What the liaison sends the team
+shows too, as dimmed one-liners (`ctrl+t` cycles them through goals only, all, and hidden). Leave
+with `ctrl+d`. Everything about it is under [`xt chat`](#xt-chat).
+
+Chat keeps nothing of its own: it is a view over the ledger, the same messages the TUI shows. The
+TUI is where you see how the work flows (see 7); in it, `S` messages the liaison too.
+
+**Typing in the liaison's pane.** You can also talk to the liaison in its own Herdr pane. What you
+type there is recorded as a message labelled `typed in the pane, unverified`, because anything able
+to type into that pane looks the same. So a pane line never answers, approves or closes anything:
+answer in chat, the Inbox or with `xt answer`. Details under [`xt chat`](#xt-chat).
+
+### 3. Giving the team a goal
+
+1. In chat, say what you want: the outcome, constraints, what "done" looks like.
+2. The liaison drafts the goal in `goals/drafts/<slug>.md` as you talk (the TUI's Work pane shows
+   it as `✎ … draft`) and reads it back as a yes/no question: answer `yes` and the liaison
    dispatches the goal, `no` and it asks what to change. Your yes doesn't dispatch the goal by
-   itself: dispatching stays the liaison's step (a deliberate limit of 0.21.0).
-3. The supervisor starts the lead, with the goal in its first prompt. From here the Work panel
-   shows the goal with its tasks under it, and the Flow pane every message as a lane chart.
+   itself: dispatching stays the liaison's step.
+3. The supervisor starts the lead, with the goal in its first prompt. From here the TUI's Work
+   pane shows the goal with its tasks under it, and the Flow pane every message as a lane chart.
 
-The answer and message dialog takes about two-thirds of the screen (up to 160 columns wide), with
-the question above the text box. It's an ordinary editor: arrows, home/end, ctrl+←/→ by word,
-shift+arrows to select, ctrl+z / ctrl+y to undo and redo, ctrl+c / ctrl+x / ctrl+v to copy, cut and
-paste through the system clipboard (wl-copy/wl-paste on Wayland, xclip or xsel on X11, pbcopy on
-macOS; if none is available the dialog says so, and your terminal's own paste still works). Enter
-starts a new line, ctrl+s sends, esc cancels.
+**When a goal is done.** A goal you dispatched (one the liaison opened) gets exactly one desktop
+notification when it closes, "goal #210 done". Normally it's the liaison's report to you about it
+(its first line is the text); the liaison sends it with `--ref` to the goal. If no such report
+arrives within 5 minutes of the closure, the supervisor sends "goal #210 done" with the first line
+of the lead's closing summary instead. That is the goal's only notification: the liaison's progress
+reports about a goal that's still open, and anything it sends about the goal afterwards, wait in
+the Inbox without one. Other reports the liaison sends you (not about a goal) notify, once per
+`--ref`. Tasks, goals the lead opens for sub-teams, and friction never notify, and quiet hours
+apply as for questions (what closes at night isn't sent later).
 
-From 0.21.0, `xt chat` in any terminal of yours is the same conversation without the TUI: the
-last 30 messages with the liaison, new ones as they arrive, and questions answered in place (see
-[`xt chat`](#xt-chat)).
+For a day after a goal closes, the lead can still send a follow-up task under it, to carry a late
+answer or decision, without a new goal (see [`xt send`](#xt-send)).
 
-You can also message the liaison from the TUI without switching workspaces: `S` always opens a
-message to the liaison. `s` does too, except when a question is selected in the Inbox: then it
-answers that question. The key line at the bottom of the TUI says `s answer #288` while it will do
-that (from 0.17.0, among the Inbox's keys, before `S message liaison`).
+### 4. Questions and answers
 
-### 3. Hiring (approvals)
+A message from the liaison is a narrative that may end in one question, and the question says what
+kind of answer it takes. The type is stored with the question in the ledger, and your answer is
+checked against it:
+
+| Type | The question ends with | Your answer |
+|---|---|---|
+| **closed** | `Answer yes or no.` | `yes` or `no` (`y`, `n` too); the log records `yes` or `no` |
+| **options** | two to four numbered options, each with what it leads to, and one `Recommended:` | the option's number; your own words only when the question offers **Other** |
+| **open** | (nothing extra) | your own words |
+
+```text
+When do we ship 0.14.0?
+
+Options:
+1. Ship on Friday — the release waits two days
+2. Ship today — no staging check
+Recommended: 1
+Other: answer in your own words.
+```
+
+Answer with the number (`xt answer 1261 2`), and xt records the option's full text ("Option 2: Ship
+today — no staging check"), so the log says what you chose, not just "2"; a number that isn't an
+option is refused. Without the `Other:` line the question ends with `Answer with the option's
+number.` and words are refused (message the liaison instead if none of the options fits).
+
+Where you answer: in chat (`tab`), in the TUI (`s` on the question in the Inbox), or with
+[`xt answer`](#xt-answer). A message with no question at all (a report) needs no answer and never
+waits in Needs you. While a question waits for you, the work that depends on it isn't nudged. If
+you don't answer, nothing breaks: the team waits, or follows a standing rule you gave it (see 8).
+
+### 5. Hiring and schedules
 
 The lead writes a role (`roles/<role>.md`) and asks to hire someone for it. The request waits for
-you as a yes/no question (from 0.21.0): the TUI's Inbox shows `⚑ #12 spawn carol (researcher,
-codex/default)  yes/no`, the detail pane shows the role the lead wrote, and you get a desktop
-notification. A schedule the lead asks for (`⚑ #13 wake scout every 30m  yes/no`) waits the same way.
+you as a yes/no question: chat lists it, the TUI's Inbox shows `⚑ #12 spawn carol (researcher,
+codex/default)  yes/no`, the detail pane shows the role the lead wrote and the capability sentence
+(`Approve its start: …`, see 13), and you get a desktop notification. A schedule the lead asks for
+(`⚑ #13 wake scout every 30m  yes/no`) waits the same way.
 
-- Answer yes to approve, no to deny: `xt answer 12 yes` (or `no`), or in the TUI `s` on it and
-  then `y` or `n`. `a` and `d` still approve and deny.
-- `xt approve 12` and `xt deny 12` still work too, as aliases of the yes and no answer (several
-  at once: `xt approve 12 13 14`; `xt approve` alone lists what's waiting). From 0.21.0 they print
-  a one-line note that `xt answer` is the one way to answer; whether they're removed is decided in
-  0.23.0.
+- Answer yes to approve, no to deny: `tab` in chat, `xt answer 12 yes` (or `no`), or in the TUI
+  `s` on it and then `y` or `n`. `a` and `d` approve and deny too.
+- `xt approve 12` and `xt deny 12` work as aliases of the yes and no answer (several at once:
+  `xt approve 12 13 14`; `xt approve` alone lists what's waiting); they print a one-line note that
+  `xt answer` is the one way to answer.
 - Each request is answered once, whichever way: a second answer, through any route, is refused
-  with `approval #12 was already answered; nothing changed`. Only you, in your own terminal,
-  answer them; an agent can't.
+  with `approval #12 was already answered; nothing changed`. Only you, in your own terminal (or an
+  operator under a drive grant, see 15), answer them; an agent can't.
 - On approval the supervisor starts the agent in its own workspace and tells the lead.
 - `max_agents` in `team.toml` caps the team; beyond it the lead has to ask you first.
 
-### 4. Day to day: questions, approvals, alerts, friction
+### 6. Changing or stopping a goal
 
-Everything that needs you lands in the **Inbox** (TUI panel 1, or `xt inbox`), most with a desktop
-notification. From 0.16.0 it has three groups, each under its heading, and a group with nothing in
-it isn't shown:
+- **Change it:** tell the liaison; it sends the lead the change with a reference to the goal.
+- **Stop it:** tell the liaison the goal is off; the lead closes it with `done` (open tasks under
+  it close with it). If you must, close it yourself: `xt done <goal id> "Cancelled by the human"`.
+- **Pause everything:** see 9.
+
+## Seeing how work flows
+
+### 7. The TUI
+
+`xt` (or `xt tui`) opens a lazygit-style view of the team, refreshed every 2 seconds. Use it to see
+how the work flows and to look into problems; talk with the team in chat. `xt tui --demo` shows it
+on made-up data, with nothing changed and no team needed.
+
+**The layout** has three bands and the key line:
+
+```
+┌─ [0] - Team ─────────────┐┌─ [1] - Inbox - ⚑ 2 · ✉ 1 ──────────────────┐
+│ header, today, harnesses ││ NEEDS YOU / NOTIFICATIONS / FRICTION       │
+│ and agents, one column   ││                                            │
+└──────────────────────────┘└────────────────────────────────────────────┘
+┌─ [2] - Work - 1 open · 0 done │ [3] - Flow ──────────────────────────────┐
+│ Work, or Flow after 3                                                    │
+└──────────────────────────────────────────────────────────────────────────┘
+┌─ [4] - Detail - Inbox ───────────────────────────────────────────────────┐
+│ the selected row and its thread (4 to 8 rows; it scrolls)                │
+└──────────────────────────────────────────────────────────────────────────┘
+ a/d approve/deny · c clear · space fold · S message liaison · / filter · v supervisor
+```
+
+- **Top**: Team on the left, as wide as its agent lines need up to half the terminal, and the
+  Inbox on the right, the same height. The team decides that height (up to 60 % of the
+  terminal), so Work/Flow and Detail keep at least 4 rows each where the terminal allows.
+- **Middle**: Work or Flow, full width, the rest of the height. Both names show in the title like
+  tabs, the one on screen with its counts, the other dim. `2` and `3` switch, and each keeps its
+  selection and scroll while the other is shown.
+- **Bottom**: the detail pane, full width and shorter than the others.
+- Every title reads `[n] - Title - info`: `n` is the pane's key, `info` its counts or filter.
+- **Newest on top** in every pane: Needs you, Notifications, Friction, Work's goals and tasks, and
+  Flow. With the top row selected, the selection stays on the top row as new rows arrive; select
+  another row and it stays there.
+
+The panes' number keys are `0` Team, `1` Inbox, `2` Work, `3` Flow and `4` the detail pane, and `v`
+opens the supervisor's log; the TUI starts in the Inbox, and `tab` goes round the panes. `esc` in
+the detail pane goes back to the pane you came from. The focused pane has a green frame and a
+reversed title.
+
+**The Inbox** (panel 1, or `xt inbox`) holds everything that needs you, most with a desktop
+notification. It has three groups, each under its heading, and a group with nothing in it isn't
+shown:
 
 | In the Inbox | What it is | What you do |
 |---|---|---|
-| **NEEDS YOU** | Stays until you answer, decide or clear it; newest first (from 0.17.0) | |
-| `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options`, `4 options, Other` or `yes/no` says what answer it takes; see [`xt answer`](#xt-answer)) | `s` on it and type the answer (or `xt answer 212 "…"`, or answer in the liaison's pane) |
+| **NEEDS YOU** | Stays until you answer, decide or clear it; newest first | |
+| `⚑ #212 liaison: Which story…  3 options` | A **question** the liaison needs you to decide (`3 options`, `4 options, Other` or `yes/no` says what answer it takes; see 4) | `s` on it and type the answer (or `xt answer 212 "…"`, or `tab` in chat) |
 | `⚑ #12 spawn …` / `⚑ #14 wake …` | An **approval**: a hire or a schedule | `a` / `d` |
-| `⚠ …` | An **alert**: an agent crashed, is blocked or went silent; or (from 0.16.0) the supervisor failed to wake an agent, to send a notification or to record usage (`⚠ ×3 wake-up failed: …`) | Look into it (see [9](#9-when-something-goes-wrong)), then `c` |
-| `(2 answered, last 7 days) ▸` | (from 0.16.1) The questions you answered in the last 7 days, folded: `✓ #2098 v0.16.1 spec → 1: Approve and build`, newest first; the detail pane shows the question with its options, your answer and the thread | `enter` or `space` shows them; again folds them |
-| **NOTIFICATIONS** | (called NEW before 0.17.0) Since you last looked, newest first, in bold; clears once you've looked | |
+| `⚠ …` | An **alert**: an agent crashed, is blocked or went silent; or the supervisor failed to wake an agent, to send a notification or to record usage (`⚠ ×3 wake-up failed: …`) | Look into it (see [10](#10-when-something-goes-wrong)), then `c` |
+| `(2 answered, last 7 days) ▸` | The questions you answered in the last 7 days, folded: `✓ #2098 v0.16.1 spec → 1: Approve and build`, newest first; the detail pane shows the question with its options, your answer and the thread | `enter` or `space` shows them; again folds them |
+| **NOTIFICATIONS** | Since you last looked, newest first, in bold; clears once you've looked | |
 | `✓ #210 done: Write the weekly digest  #260` | A goal you dispatched (through the liaison) closed; the detail shows the lead's closing summary (#260) and the goal's whole thread | Read it |
 | `✉ #47 liaison: …` | A report to you | Read it |
-| `(3 earlier, seen) ▸` | (from 0.16.1) What Notifications showed that you've since seen, from the last 7 days, folded | `enter` or `space` shows it (newest first, dim); again folds it |
+| `(3 earlier, seen) ▸` | What Notifications showed that you've since seen, from the last 7 days, folded | `enter` or `space` shows it (newest first, dim); again folds it |
 | **FRICTION** | Unread friction only, newest first | |
 | `✱ #230 carol: …` | **Friction**: an agent's feedback about xt or its harness | Read it; it's input for improving xt. `c` marks it seen at once |
-| `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` or `space` (from 0.16.1) shows it (newest first); again folds it |
+| `(12 older, seen) ▸` | The friction you've already seen, folded | `enter` or `space` shows it (newest first); again folds it |
 
 The Inbox's title counts what's in the groups: `[1] - Inbox - ⚑ 2 · ✉ 1 · ✱ 3` is two items that
 need you, one unread notification and three unread friction; a zero count is left out. The Team
 pane's header repeats the first two.
 
+**When a notification counts as seen:** in the TUI, everything Notifications held while you had
+the Inbox focused counts as seen at the moment you **leave the Inbox** (another pane's key, `tab`,
+a click elsewhere) **or quit**; merely having it on screen doesn't. With `xt inbox`, at the moment
+it prints in your own terminal (an agent running `xt inbox` doesn't clear them). What you've seen
+folds under Notifications as `(N earlier, seen)` for 7 days, also after you quit and start the TUI
+again (`xt inbox --seen` lists that fold too). The marker is one file
+(`.xt/state/inbox_seen.json`) that every TUI reads on each refresh, so two TUIs open at once can
+differ only while one of them still has the Inbox focused: the other one keeps showing `✉ 2 new`
+until the first leaves its Inbox or exits, and then folds them under `(N earlier, seen)` within
+2 seconds.
+
 **Friction is unread until you've seen it.** In the TUI, friction counts as seen once you leave the
 Inbox panel (or quit) after it was on screen there; friction further down, which you never
 scrolled to, stays unread. `c` on one friction row marks it seen at once. `xt inbox` in your own
 terminal marks the friction it printed as seen; an agent running `xt inbox` changes nothing. Seen
-friction stays in the log (`xt log --type friction`) and under the folded row. It counts from the
-supervisor's first run on 0.16.0, so friction from before the upgrade shows as seen.
+friction stays in the log (`xt log --type friction`) and under the folded row.
 
-**Rows** (from 0.16.0) use the whole width of their panel: a line is cut with `…` only when it
-doesn't fit, and again when you resize the terminal. Each row in the Inbox and Work
-panes ends with its age, dim at the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`,
-`2d`, and whole weeks from 60 days (`8w`). A goal's age is that of its newest message (the goal, its
-tasks and their replies), so a stuck goal looks old; a task's is that of the task itself. Agents in
-the Team pane have no age, and Flow's rows and the supervisor's log (`v`) keep their clock time. The focused pane has a
-green frame and a reversed title.
+**Rows** use the whole width of their panel: a line is cut with `…` only when it doesn't fit, and
+again when you resize the terminal. Each row in the Inbox and Work panes ends with its age, dim at
+the right edge: `now` under 10 seconds, then `45s`, `14m`, `3h`, `2d`, and whole weeks from 60 days
+(`8w`). A goal's age is that of its newest message (the goal, its tasks and their replies), so a
+stuck goal looks old; a task's is that of the task itself. Agents in the Team pane have no age, and
+Flow's rows and the supervisor's log (`v`) keep their clock time.
 
-**Work** (panel 2, from 0.16.0; it replaces the Goals and Tasks panels) shows goals with their
-tasks under them. From 0.17.0 it shares its pane with Flow: `2` shows Work, `3` Flow.
+**Work** (panel 2) shows goals with their tasks under them, and shares its pane with Flow: `2`
+shows Work, `3` Flow.
 
 ```
 ┌[2] - Work - 2 open · 63 done │ [3] - Flow────────────┐
@@ -164,14 +297,14 @@ tasks under them. From 0.17.0 it shares its pane with Flow: `2` shows Work, `3` 
   activity, so a goal nobody has touched for two days reads `2d`.
 - A **task** shows `●` open, `✓` done or `✗` failed or blocked (closed with a `done` that starts
   with FAIL or BLOCKED, or open while its owner is blocked), then its id, owner, first line and age.
-  A goal's tasks are newest first (from 0.17.0).
+  A goal's tasks are newest first.
   A task belongs to the goal at the root of its `--ref` chain, so a task sent with `--ref` to
   another task or to a report still sits under its goal; one that reaches no goal (no `--ref`, or
   a chain that ends outside the last 30 days) sits under **no goal**, the last row.
 - The liaison's **drafts** follow the open goals.
 - **Done goals** are folded under `done (63)`; unfold it to see them newest first, each folded with
   its `n/n ✓`, and unfold any of them to see its tasks.
-- A **follow-up** (from 0.23.0) is a task the lead opened under a goal after the goal closed (see
+- A **follow-up** is a task the lead opened under a goal after the goal closed (see
   [`xt send`](#xt-send)). It sits below that goal's own tasks as `↳ follow-up` (`↳ f/u` where
   the row is short of room), with its owner and age. The goal row stays as it was: closed, in its
   place, with the same `n/n ✓`. While a follow-up is open, the `done` fold says
@@ -185,67 +318,7 @@ tasks under them. From 0.17.0 it shares its pane with Flow: `2` shows Work, `3` 
   folds too.
 - The title counts the goals: `2 open · 63 done`.
 
-While a question waits for you, the work that depends on it isn't nudged. If you don't answer,
-nothing breaks: the team waits, or follows a standing rule you gave it (see 5).
-
-**When a goal is done** (from 0.15.0). A goal you dispatched (one the liaison opened) gets exactly
-one desktop notification when it closes, "goal #210 done". Normally it's the liaison's report to
-you about it (its first line is the text); the liaison sends it with `--ref` to the goal. If no such
-report arrives within 5 minutes of the closure, the supervisor sends "goal #210 done" with the
-first line of the lead's closing summary instead. That is the goal's only notification: the
-liaison's progress reports about a goal that's still open, and anything it sends about the goal
-afterwards, wait in the Inbox without one. Other reports the liaison sends you (not about a goal)
-notify, once per `--ref`. Tasks, goals the lead opens for sub-teams, and friction never notify, and quiet
-hours apply as for questions (what closes at night isn't sent later). The Inbox's Notifications group lists
-closed goals, and from 0.16.0 the reports sent to you, until you've looked: in the TUI, until you
-leave the Inbox panel (or quit) after it showed them; with `xt inbox`, once it has printed them in
-your own terminal (an agent running `xt inbox` doesn't clear them). It counts from the supervisor's
-first run on 0.15.0, so older goals don't appear. From 0.16.1 what you've seen isn't gone from the
-TUI: it folds under Notifications as `(N earlier, seen)` for 7 days, also after you quit and start it again
-(`xt inbox --seen` lists that fold too, from 0.20.0).
-
-**When a notification counts as seen** (written down in 0.20.0): in the TUI, everything
-Notifications held while you had the Inbox focused counts as seen at the moment you **leave the
-Inbox** (another pane's key, `tab`, a click elsewhere) **or quit**; merely having it on screen
-doesn't. With `xt inbox`, at the moment it prints in your own terminal. The marker is one file
-(`.xt/state/inbox_seen.json`) that every TUI reads on each refresh, so two TUIs open at once can
-differ only while one of them still has the Inbox focused: the other one keeps showing `✉ 2 new`
-until the first leaves its Inbox or exits, and then folds them under `(N earlier, seen)` within
-2 seconds.
-
-The **detail pane** (from 0.16.0) shows the selected item with its **thread**: for anything under
-a goal (a goal, a task, a question or report about it), the whole goal in time order: the goal, its
-tasks and every reply; for a message without a goal, the message and the replies to it. `enter` on
-a row in any list shows it there.
-
-```
-#1733 task · lead → pm · opened 14m ago · open
-Read-only site check (curl -LfsS) of the project site for #124
-
-thread (6)
-07:36  liaison → lead    goal     #1729 Site check for #124
-07:36  lead    → qa      task     #1731 Retry read-only curl for #124
-07:37  qa      → lead    done     #1735 BLOCKED: no network in sandbox
-07:37  lead    → pm      task     #1733 Read-only site check (curl -LfsS)  ◀ you are here
-07:38  pm      → lead    report   #1736 curl works from the supervisor's shell
-07:38  lead    → liaison ask      #1737 How should #1729 finish?
-
-usage (goal #1729): 212k tokens, est. $0.21
-space: fold its goal · o: open work only · S: message the liaison
-```
-
-Each thread row shows the time (with the date when the thread spans days), sender → receiver, type,
-id and first line; the selected message is marked `◀ you are here`. Below come the goal's usage and
-the keys that work on the selected item. A thread too long for the pane shows the part around the
-selected message and says how much is hidden (`↑ 24 earlier rows hidden`, `↓ 3 later rows
-hidden`); after `enter`, `j`/`k` bring the hidden rows in. From 0.17.0 the detail pane is the short
-band at the bottom (4 to 8 rows), so it scrolls: `j` first scrolls the thread into view, then
-moves through its hidden rows. A message whose `--ref` points to one the TUI doesn't have shows
-alone with its replies.
-
-**Flow** (pane 3, from 0.16.0; it replaces the Log panel) shares its pane with Work (from 0.17.0:
-`3` shows it, `2` shows Work again) and shows the messages as a swim-lane chart, the newest on top
-(from 0.17.0; time runs upward):
+**Flow** (pane 3) shows the messages as a swim-lane chart, the newest on top (time runs upward):
 
 ```
 ┌[2] - Work │ [3] - Flow - 11 of 18 · system hidden (t)─────────────────────────────────────────────┐
@@ -277,13 +350,13 @@ alone with its replies.
   colour. Flow rows show a time, not an age.
 - **System lines** (xt's starts, stops and settings lines, wake-ups and nudges) are hidden; `t`
   shows or hides them (the title says which). Approval requests and alerts are always shown.
-- `f`, the **focus** (named so from 0.20.0; before, the key line called it a filter too), picks
-  **one agent** (every message it sent or received) or **one goal** (the goal and every message
-  whose `--ref` chain leads to it); the team's lanes stay, only rows are left out, and the title
-  names the focus with `(f)`. The same pick again, `esc` in the picker, or `esc` in Flow clears it.
-  `/`, the **filter**, keeps the messages with that text; both can be on at once.
+- `f`, the **focus**, picks **one agent** (every message it sent or received) or **one goal** (the
+  goal and every message whose `--ref` chain leads to it); the team's lanes stay, only rows are
+  left out, and the title names the focus with `(f)`. The same pick again, `esc` in the picker, or
+  `esc` in Flow clears it. `/`, the **filter**, keeps the messages with that text; both can be on
+  at once.
 - `j`/`k` or the arrows select a row, the page keys scroll, `g`/`G` (or `Home`/`End`) go to the
-  newest (top) or oldest (bottom); a click selects a row and the wheel scrolls (from 0.16.1).
+  newest (top) or oldest (bottom); a click selects a row and the wheel scrolls.
   While the newest row (the top one) is selected, Flow follows new messages; move down and it
   stays where you are. The title says
   `N of M`: rows in view of all that pass the filters. `enter` shows the message with its thread in
@@ -292,18 +365,40 @@ alone with its replies.
   to or from one of those agents starts its text with the agent's name. A narrow terminal (under
   60 columns): one line per message instead, `time sender → receiver glyph #id first line`; widen it
   and the chart comes back. Only the rows in view are drawn, so a long ledger scrolls without a
-  stall. `xt log` is unchanged.
+  stall.
 
-The **supervisor's log** (what xt did: deliveries, wake-ups, nudges, notifications) is a pop-up on
-`v`, newest first; `j`/`k` scroll it and `esc` closes it. Its failures don't wait there: a failed
-wake-up, a failed notification and a failed usage recording each raise an alert in the Inbox (Needs
-you), with the first line of the error. While that alert is open, more failures of the same kind
-count on it instead of adding rows (the row starts `⚠ ×3` and its age is the last failure's;
-`xt inbox` says `×3, last 14:05`); once you clear it with `c`, the next failure
-raises a new one. A failed notification raises only the alert, never another notification.
+**The detail pane** (4) shows the selected item with its **thread**: for anything under a goal (a
+goal, a task, a question or report about it), the whole goal in time order: the goal, its tasks and
+every reply; for a message without a goal, the message and the replies to it. `enter` on a row in
+any list shows it there.
 
-The **Team** pane, top left (from 0.16.0; it replaces the Status pane and the Team panel; one
-column from 0.17.0):
+```
+#1733 task · lead → pm · opened 14m ago · open
+Read-only site check (curl -LfsS) of the project site for #124
+
+thread (6)
+07:36  liaison → lead    goal     #1729 Site check for #124
+07:36  lead    → qa      task     #1731 Retry read-only curl for #124
+07:37  qa      → lead    done     #1735 BLOCKED: no network in sandbox
+07:37  lead    → pm      task     #1733 Read-only site check (curl -LfsS)  ◀ you are here
+07:38  pm      → lead    report   #1736 curl works from the supervisor's shell
+07:38  lead    → liaison ask      #1737 How should #1729 finish?
+
+usage (goal #1729): 212k tokens, est. $0.21
+space: fold its goal · o: open work only · S: message the liaison
+```
+
+Each thread row shows the time (with the date when the thread spans days), sender → receiver, type,
+id and first line; the selected message is marked `◀ you are here`. Below come the goal's usage and
+the keys that work on the selected item. A thread too long for the pane shows the part around the
+selected message and says how much is hidden (`↑ 24 earlier rows hidden`, `↓ 3 later rows
+hidden`). The detail pane is the short band at the bottom (4 to 8 rows), so it scrolls: after
+`enter`, `j` first scrolls the thread into view, then moves through its hidden rows. When its text
+is longer than the pane, the bottom edge counts the lines below, `▾ 5 more (j/k)`; at the end it
+says `▴ 5 above (k)`. A message whose `--ref` points to one the TUI doesn't have shows alone with
+its replies.
+
+**The Team** pane, top left:
 
 ```
 ┌─ [0] - Team ───────────────────────────────────┐
@@ -343,78 +438,86 @@ shown as the model its session log names.)
 - The pane **never scrolls**. When the team doesn't fit its height, it shows what fits and a last
   line `+3 more (widen the terminal)`, counting the agents and harness lines out of view; `j`/`k`
   reach the agents in view. A team that large is better read with `xt status`.
-- The **header and harness lines can be selected** too (from 0.17.0), ahead of the agents.
-  The header's detail, *xt and the team*, shows the published version with when it was checked
-  (or why the check failed), the installed and running versions (the supervisor and each agent),
-  the notes `xt status` prints (restart needed, upgrade available) and today's usage split by
-  agent. A harness line's detail shows each account window: the share used, the reset time, how
-  old the reading is and where it comes from (Claude: the statusLine snapshot; Codex: its session
-  logs), or, for a window with no current reading, why and what brings one back (no Claude agent
-  has the statusLine configured, the window reset with no turn since, the last reading is 3 h 10 m
-  old); then the harness's agents with their model and today's tokens.
+- The **header and harness lines can be selected** too, ahead of the agents. The header's detail,
+  *xt and the team*, shows the published version with when it was checked (or why the check
+  failed), the installed and running versions (the supervisor and each agent), the notes `xt
+  status` prints (restart needed, upgrade available) and today's usage split by agent. A harness
+  line's detail shows each account window: the share used, the reset time, how old the reading is
+  and where it comes from (Claude: the statusLine snapshot; Codex: its session logs), or, for a
+  window with no current reading, why and what brings one back (no Claude agent has the statusLine
+  configured, the window reset with no turn since, the last reading is 3 h 10 m old); then the
+  harness's agents with their model and today's tokens.
+- In the Team pane `j`/`k` or the arrows select the header, a harness line or an agent
+  (`Home`/`End` or `PgUp`/`PgDn`: the first and last row in view), the detail pane shows it, and on
+  an agent `u`, `x`, `R` and `f` act on it (`f` in Flow is its focus).
 
-**The layout** (from 0.17.0) has three bands and the key line:
-
-```
-┌─ [0] - Team ─────────────┐┌─ [1] - Inbox - ⚑ 2 · ✉ 1 ──────────────────┐
-│ header, today, harnesses ││ NEEDS YOU / NOTIFICATIONS / FRICTION       │
-│ and agents, one column   ││                                            │
-└──────────────────────────┘└────────────────────────────────────────────┘
-┌─ [2] - Work - 1 open · 0 done │ [3] - Flow ──────────────────────────────┐
-│ Work, or Flow after 3                                                    │
-└──────────────────────────────────────────────────────────────────────────┘
-┌─ [4] - Detail - Inbox ───────────────────────────────────────────────────┐
-│ the selected row and its thread (4 to 8 rows; it scrolls)                │
-└──────────────────────────────────────────────────────────────────────────┘
- a/d approve/deny · c clear · space fold · S message liaison · / filter · v supervisor
-```
-
-- **Top**: Team on the left, as wide as its agent lines need up to half the terminal, and the
-  Inbox on the right, the same height. The team decides that height (up to 60 % of the
-  terminal), so Work/Flow and Detail keep at least 4 rows each where the terminal allows.
-- **Middle**: Work or Flow, full width, the rest of the height. Both names show in the title like
-  tabs, the one on screen with its counts, the other dim. `2` and `3` switch, and each keeps its
-  selection and scroll while the other is shown.
-- **Bottom**: the detail pane, full width and shorter than the others.
-- Every title reads `[n] - Title - info`: `n` is the pane's key, `info` its counts or filter.
-- **Newest on top** in every pane (from 0.17.0): Needs you, Notifications, Friction, Work's goals
-  and tasks, and Flow. With the top row selected, the selection stays on the top row as new rows
-  arrive; select another row and it stays there.
-
-The panes' number keys (from 0.16.1) are `0` Team, `1` Inbox, `2` Work, `3` Flow and `4` the
-detail pane, and `v` opens the supervisor's log; the TUI starts in the Inbox, and `tab` goes round
-the panes. `esc` in the detail pane goes back to the pane you came from. In the Team pane `j`/`k`
-or the arrows select the header, a harness line or an agent (`Home`/`End` or `PgUp`/`PgDn`: the
-first and last row in view), the detail pane shows it, and on an agent `u`, `x`, `R` and `f` act
-on it (`f` in Flow is its focus).
-
-**The key line** (from 0.17.0) shows the focused pane's own keys first, then `S`, `/` and `v`,
-which work everywhere; a narrow terminal keeps the keys and drops their words. Inbox: `a/d`,
-`s answer #N` (only while a question is selected: otherwise `s`, like `S`, messages the liaison),
-`c`, `space`. Team: `u/U`, `x/X`, `R`, `f jump`. Work: `space`, `o`. Flow: `t`, `f focus`, `g/G`;
-`/ filter` is among the keys that work everywhere. The detail pane: `j/k scroll` (from 0.20.0),
-then the keys that work everywhere. Other keys for moving around (`0`-`4`, `j/k` elsewhere, `tab`,
-`enter`, `esc`), `h` and `q` are left to the help screen (`h`), which lists every key. From 0.20.0
-the help fits the terminal's width (each entry wraps under itself; at 80 columns or less it takes
-the whole width) and scrolls with `j`/`k` or the page keys; its bottom edge says so.
-
-**What the detail pane hides** (from 0.20.0): when its text is longer than the pane, the bottom
-edge counts the lines below, `▾ 5 more (j/k)`; at the end it says `▴ 5 above (k)`. A thread's own
-hidden rows show inside the pane as before (`↓ 3 later rows hidden`).
-
-**The mouse** (from 0.16.1): a click selects a row in any pane (an agent in Team, a row in the
-Inbox, Work or Flow) and focuses that pane; the detail pane shows it but doesn't take focus, so the
-arrows keep moving in the pane you clicked. `enter` or `4` goes to the detail pane. The wheel
-scrolls Flow (the selection stays in view) and the detail pane (a long thread's hidden rows first),
-wherever focus is. The result of your last action
-(`alert cleared`, `starting carol…`) shows for about ten seconds in a one-line toast at the bottom,
-then goes away on its own.
-
-An agent's detail (select it in the Team pane) ends with the last lines of its screen, laid out like the
-terminal: each line starts on its own line, a line too long for the pane continues on indented
+An agent's detail (select it in the Team pane) ends with the last lines of its screen, laid out like
+the terminal: each line starts on its own line, a line too long for the pane continues on indented
 lines marked `↳`, blank lines are dropped, and a line repeated in a row is shown once with `(×3)`.
 
-### 5. Periodic work: schedules, quiet hours, standing rules
+**The supervisor's log** (what xt did: deliveries, wake-ups, nudges, notifications) is a pop-up on
+`v`, newest first; `j`/`k` scroll it and `esc` closes it. Its failures don't wait there: a failed
+wake-up, a failed notification and a failed usage recording each raise an alert in the Inbox (Needs
+you), with the first line of the error. While that alert is open, more failures of the same kind
+count on it instead of adding rows (the row starts `⚠ ×3` and its age is the last failure's;
+`xt inbox` says `×3, last 14:05`); once you clear it with `c`, the next failure
+raises a new one. A failed notification raises only the alert, never another notification.
+
+**The mouse:** a click selects a row in any pane (an agent in Team, a row in the Inbox, Work or
+Flow) and focuses that pane; the detail pane shows it but doesn't take focus, so the arrows keep
+moving in the pane you clicked. `enter` or `4` goes to the detail pane. The wheel scrolls Flow (the
+selection stays in view) and the detail pane (a long thread's hidden rows first), wherever focus
+is. The result of your last action (`alert cleared`, `starting carol…`) shows for about ten seconds
+in a one-line toast at the bottom, then goes away on its own.
+
+**The key line** shows the focused pane's own keys first, then `S`, `/` and `v`, which work
+everywhere; a narrow terminal keeps the keys and drops their words. Inbox: `a/d`, `s answer #N`
+(only while a question is selected: otherwise `s`, like `S`, messages the liaison), `c`, `space`.
+Team: `u/U`, `x/X`, `R`, `f jump`. Work: `space`, `o`. Flow: `t`, `f focus`, `g/G`; `/ filter` is
+among the keys that work everywhere. The detail pane: `j/k scroll`, then the keys that work
+everywhere. `h` opens the help, which lists every key; it fits the terminal's width (each entry
+wraps under itself; at 80 columns or less it takes the whole width) and scrolls with `j`/`k` or the
+page keys.
+
+**The message dialog** (`s`, `S`) takes about two-thirds of the screen (up to 160 columns wide),
+with the question above the text box. It's an ordinary editor: arrows, home/end, ctrl+←/→ by word,
+shift+arrows to select, ctrl+z / ctrl+y to undo and redo, ctrl+c / ctrl+x / ctrl+v to copy, cut and
+paste through the system clipboard (wl-copy/wl-paste on Wayland, xclip or xsel on X11, pbcopy on
+macOS; if none is available the dialog says so, and your terminal's own paste still works). Enter
+starts a new line, ctrl+s sends, esc cancels. In the answer dialog every option is shown in full,
+wrapped to the dialog's width (also at 80 columns); pressing 1 to 4 while the answer is empty fills
+in that option's text, which you can still edit before ctrl+s; once there's text, digits are just
+digits. On a closed question `s` opens a short dialog that takes `y` or `n`.
+
+All keys:
+
+| Key | What it does |
+|---|---|
+| `0`–`4`, `tab`, `j`/`k`, `enter`, `esc` | Switch panes: 0 Team, 1 Inbox, 2 Work, 3 Flow (2 and 3 swap the middle pane), 4 the detail pane (`tab` goes round them); move (the arrows too); read the detail (`j`/`k` there bring a long thread's hidden rows in, then scroll; its bottom edge says `▾ N more (j/k)` while lines are below); `esc` from the detail pane back to the pane you came from |
+| Mouse | A click selects a row in any pane and focuses that pane (the detail pane follows without taking focus); the wheel scrolls Flow and the detail pane |
+| `Home` / `End`, page keys (Team) | The first / last agent in view |
+| `v` | The supervisor's log, newest first, in a pop-up (`esc` closes it) |
+| `/` | Filter the focused pane by text (empty clears it) |
+| `t` | Show or hide system lines (starts, stops, settings, wake-ups, nudges) in Flow |
+| `f` (Flow) | Focus: show only one agent's messages or one goal's thread (`/` is the text filter); the same pick again, or `esc`, clears it |
+| `g` / `G`, page keys (Flow) | The newest (top) / oldest message, a page up or down; with the newest selected, Flow follows new messages |
+| `space` / `o` | Fold or unfold the selected goal, `done (N)` or `no goal` row / show open work only (Work) |
+| `a` / `d` | Approve / deny the selected hire or schedule (Inbox) |
+| `s` | Answer the selected question or approval (Inbox; a yes/no one takes `y` or `n`); anywhere else, message the liaison. The key line at the bottom says `s answer #288` while it answers. In the dialog (about two-thirds of the screen), enter starts a new line, ctrl+s sends, esc cancels; ctrl+c / ctrl+v copy and paste through the system clipboard |
+| `S` | Always message the liaison, even with a question selected |
+| `c` | Clear the selected alert, or mark the selected friction seen (Inbox) |
+| `enter` or `space` on `(N older, seen) ▸` | Show or hide the friction you've already seen (Inbox) |
+| `enter` or `space` on `(N earlier, seen) ▸` | Show or hide what Notifications showed you in the last 7 days (Inbox) |
+| `enter` or `space` on `(N answered, last 7 days) ▸` | Show or hide the questions you answered in the last 7 days, each with your answer (Inbox, under Needs you) |
+| `f` (Team) | Switch Herdr to the selected agent's workspace |
+| `u` / `U` | Start the selected stopped agent / every stopped agent |
+| `x` / `X` | Stop the selected agent / every agent (they stay in the roster) |
+| `R` | Retire the selected member (not the liaison or lead) |
+| `h` or `?`, `q` | All keys (a pop-up that fits the terminal's width; `j`/`k` scroll it), quit |
+
+## Running the team
+
+### 8. Periodic work: schedules, standing rules, the board watch
 
 Agents only act when prompted, so a periodic duty (a monitor, a scout reading feeds every hour)
 needs a **schedule**: the supervisor sends the agent a `wake` message whenever the interval has
@@ -430,10 +533,9 @@ passed and it's idle.
   asking you (naming the rule) and tells you afterwards.
 - A decision like "pass" (none of these) is a decision: a standing auto-pick won't override it.
 
-**The board watch** (from 0.19.0). When you move a card into a Board column that means "go" (Ready
-to build, say), the team can learn it without a message from you. xt knows no board tool: you name
-a command in `team.toml` that lists the cards in that column, and the supervisor runs it on a
-schedule.
+**The board watch.** When you move a card into a Board column that means "go" (Ready to build,
+say), the team can learn it without a message from you. xt knows no board tool: you name a command
+in `team.toml` that lists the cards in that column, and the supervisor runs it on a schedule.
 
 ```toml
 [board_watch]
@@ -471,127 +573,14 @@ column = "Ready to build"   # optional: the column's name, used in the message
   then compare the count in `xt status`.
 - `xt status` shows `board watch: last success Wed 10:05 (3 card(s) in the column)`, or `board
   watch: FAILING since …` with the cause. One watched column per team. Without the section nothing
-  runs. See [examples](examples.md#8-tell-the-lead-when-a-card-is-ready-to-build).
+  runs. See [examples](examples.md#11-tell-the-lead-when-a-card-is-ready-to-build).
 
-### 6. Changing or stopping a goal
-
-- **Change it:** tell the liaison; it sends the lead the change with a reference to the goal.
-- **Stop it:** tell the liaison the goal is off; the lead closes it with `done` (open tasks under
-  it close with it). If you must, close it yourself: `xt done <goal id> "Cancelled by the human"`.
-- **Pause everything:** see 8.
-
-### 7. Updating xt
-
-```sh
-git pull upstream main
-xt restart --all
-```
-
-or, if you like to stop the team first (to commit its files, say): `xt down`, pull, `xt restart
---all`. Either way `xt restart --all` restarts the supervisor (new code) and every agent that was
-running (new protocol and roles in their first prompt), and brings the team back as it was: after
-an `xt down` it restores the agents that were running just before it (agents you had stopped on
-purpose stay stopped) and ends with one summary:
-
-```text
-restored: liaison, lead, carol (running before xt down)
-left stopped: dora (not running before; `xt spawn <name>` starts one)
-supervisor: running
-```
-
-If nothing was running and nothing was recorded, it says `restored: nobody` and why. Read the release's **Upgrading**
-note in [CHANGELOG.md](../CHANGELOG.md) first.
-
-**Which version is the team on?** Three different things, shown in the TUI's Status title, `xt
-status` and every agent's brief:
-
-| Label | What it is | Where it comes from |
-|---|---|---|
-| **published** | the newest final release (candidates don't count) | the supervisor checks the upstream's tags when it starts and then every 6 hours, and `xt version use`, `xt version rollback` and `xt version check` check them too (from 0.17.0); if the check fails you see the last known one and why. It is never shown older than the installed final release: then you see `published ≥ installed, check pending` and the supervisor tries again every 15 minutes |
-| **installed** | the xt in the team's repo: what the next command or start runs | the repo's `pyproject.toml`, read every time |
-| **running** | the supervisor's version and, per agent, the xt that started it (its first prompt, protocol and reply hints) | recorded when each starts; `mixed` when they differ |
-
-After `git pull` the team is *installed* on the new version but still *running* the old one until
-`xt restart --all`; the status line says which processes haven't picked it up yet. A newer
-*published* release only produces a notice: nothing upgrades on its own. Processes started by xt
-older than 0.12.0 show as `unknown` until their next restart. An agent whose start is still under
-way (its own first brief is written before xt records the start) shows `not recorded yet (first
-turn running)` instead, from 0.20.0. To verify an upgrade finished: all
-three read the same version and no note follows the line. (Teams on xt
-0.6.0 or older don't have `restart` yet: `xt down`, pull, `xt`, then `U` in the TUI.)
-
-**Choosing a version, and going back.** `git pull upstream main` takes whatever is newest. To pick
-a release on purpose, and to be able to undo it (from 0.14.0 on):
-
-```sh
-xt down
-git commit -am "team changes"          # xt refuses while tracked files have uncommitted changes
-xt version use vX.Y.Z                  # the release's tag; a candidate: xt version use vX.Y.Z-rc1 --candidate
-xt restart --all
-# if it misbehaves:
-xt down && xt version rollback && xt restart --all
-```
-
-- The team must be fully down (no supervisor, no agent) and no other xt command writing; xt checks.
-- `use` fetches the upstream tags and merges the tag into your repo with a merge commit, so your own
-  commits and files stay. A conflict (say you edited `roles/lead.md` and the release changed it too)
-  stops the switch: xt aborts the merge, names the files and leaves the previous version in place.
-  To resolve by hand: `git merge --no-ff <tag>`, fix the files, `git commit`, then run `xt version use
-  <tag>` again to finish the checks.
-- The team's state (`.xt/state/`) has a **format** number (`.xt/state/format.json`, written by `xt
-  up`). xt switches only to a version that says it reads that format, and never converts state; a
-  release that needs a new format will say so in its Upgrading note. Every version from 0.12.0 reads
-  format 1.
-- Before merging, xt takes a verified snapshot of `.xt/state/` (under `.xt/snapshots/`) and records
-  a fingerprint of the ledger. The ledger (`.xt/log/`) is never copied back or rewritten: it only
-  grows.
-- `rollback` reverts the last switch's merge commit (your later commits stay), checks the version
-  and that the ledger still starts with the recorded messages, and keeps the current state when
-  the format is the same (it matches the ledger). It refuses, and changes nothing, when the snapshot
-  is missing, the ledger was altered, the old version can't read the state, or files changed since
-  the switch conflict (then: `git revert -m 1 <merge commit>` by hand).
-- Neither command starts the team: `xt restart --all` (or `xt up`) does. `xt version` alone shows the
-  three versions, the state format and the last switches.
-
-#### Upgrading to 0.24: convert the old permission lines
-
-xt 0.24.0 removed the `permissions`, `codex_options` and `connectors` lines (directly under an
-`[[agent]]` or under `[defaults]`); the [capability block](#11-memory-and-recovery) replaces them.
-**Convert before you upgrade:** a `team.toml` that still has one of them doesn't load in 0.24, so
-`xt status`, `xt up`, `xt down`, `xt brief`, `xt send` and the TUI all refuse until it's converted.
-For each agent that has one of the lines:
-
-```sh
-xt capabilities carol      # prints the block to paste; changes nothing
-```
-
-Paste the printed block under the agent's `[[agent]]` entry and remove its old lines. What the
-block can't say stays in the old settings file, which the block then names as `extras` (see the
-extras file under [11. Memory and recovery](#11-memory-and-recovery)). A `permissions` line under
-`[defaults]` has no agent name of its own: run `xt capabilities` for any Claude Code agent of the
-team (its block includes what it inherits from `[defaults]`), move the shared part into
-`[defaults.capabilities]` by hand and remove the line. When `xt status` loads again, the file is
-converted. An agent with both a block and an old line has nothing to convert: `xt capabilities`
-refuses it, and you remove one of the two by hand.
-
-If you upgraded first, every command except `xt capabilities` refuses and names each line, for
-example:
-
-```text
-team.toml still has permission lines that xt removed in 0.24 (nothing was started or changed):
-  agent carol: permissions, connectors
-Replace them with a [capabilities] block. `xt capabilities carol` prints the block to paste in place of the old lines (it changes nothing).
-Then remove the old lines; the user guide's Upgrading section has the steps.
-```
-
-`xt capabilities <name>` still works then: convert as above, then `xt restart --all`.
-
-### 8. Pausing and resuming the team
+### 9. Pausing, resuming and resetting
 
 | You want to | Do |
 |---|---|
 | Stop everything (end of day, reboot, before editing `team.toml` by hand) | `xt down` |
-| Start again | `xt` (supervisor, liaison, and the lead if goals are open), then `U` in the TUI for the members |
+| Start again | `xt restart --all` (brings back the agents that were running before `xt down`), or `xt` (supervisor, liaison, and the lead if goals are open), then `U` in the TUI for the members |
 | Stop the agents but keep the supervisor | `X` in the TUI, or `xt down --keep-supervisor` |
 | Restart everything with fresh instructions | `xt restart --all` |
 | Stop / start one agent | `x` / `u` on it in the TUI (`xt stop <name>` / `xt spawn <name>`) |
@@ -600,9 +589,9 @@ Then remove the old lines; the user guide's Upgrading section has the steps.
 | Give one agent a fresh session right now | `xt restart <name>` |
 
 Stopping keeps an agent in the roster, its notes and its open work. Its not running doesn't alert,
-but a message queued for it still alerts (from 0.22.1): when one has waited 2 minutes, the Inbox
-says `builder isn't running (you stopped it): 1 message waiting 2m (…). Start it: u (or xt spawn
-builder).` A schedule's rhythm survives restarts.
+but a message queued for it still alerts: when one has waited 2 minutes, the Inbox says `builder
+isn't running (you stopped it): 1 message waiting 2m (…). Start it: u (or xt spawn builder).` A
+schedule's rhythm survives restarts.
 
 **Resetting a heavy agent.** An agent's context grows with every turn, and a big context costs
 more per turn and carries stale detail. `xt reset <name>` gives it a fresh one without losing its
@@ -654,34 +643,36 @@ abandoned automatic reset also waits for the cool-down. **The trade-off:** a fre
 turn re-reading the first prompt, the brief and the agent's notes, and anything not in the notes is
 gone; keep the threshold well above what an agent needs for one piece of work, and exempt an agent
 in the middle of long, delicate work (`auto_reset_tokens = "off"`). A complete example is in
-[Examples](examples.md#6-reset-heavy-agents-automatically).
+[Examples](examples.md#10-reset-heavy-agents-automatically).
 
-### 9. When something goes wrong
+### 10. When something goes wrong
 
 xt alerts, it never repairs. Alerts appear in the Inbox (red `⚠`) and as notifications:
 
 | Alert | Means | Usually |
 |---|---|---|
-| `blocked:<name>` | The agent is stuck on something in its pane, usually its harness asking for permission | `f` to its workspace, answer it; clears by itself |
+| `blocked:<name>` | The agent is stuck on something in its pane, usually its harness asking for permission | `f` to its workspace, answer it; clears by itself. For a Claude Code agent, a capability block (see 13) stops the prompts |
 | `missing:<name>` | An agent xt started isn't running any more (crashed, or its workspace was closed outside xt) | Find out why (its pane, `xt log --member <name>`), then `u` / `xt spawn <name>` |
 | `missing:lead` with goals open | The lead isn't running though there's work | `xt up` |
-| `queued:<name>` | (from 0.22.1) A message has waited 2 minutes or more for a member that isn't running although xt has started it before, or one you stopped (`(you stopped it)`). A member xt hasn't started yet, such as a new team's lead before its first goal is dispatched, isn't running by design: a message waiting for it raises no alert, and `xt status` says so quietly (`lead not started yet (starts when the first goal is dispatched): 1 message waits for it`). One alert per member, with the count and the oldest message: `builder isn't running: 1 message waiting 17m (task #42 from lead, since 22:05). Start it: u (or xt spawn builder).` (`3 messages waiting, oldest 17m (task #42 from lead)` for several; ages over a day read `1d3h`). The start command fits the case: `Start it: xt up.` for the liaison, `Approve its start: xt approve 7.` when its start waits on your approval. A running member's queue (a busy agent) never alerts, nor do messages to you or to a retired member; when `missing:<name>` is already open, the queue joins it as one line (`1 message waiting 17m`) instead | Start it. Clears when it runs; once you clear it, it comes back only when a newer message is queued or the member runs and stops again. The supervisor checks every few seconds, so it shows about 2 minutes after the message |
+| `queued:<name>` | A message has waited 2 minutes or more for a member that isn't running although xt has started it before, or one you stopped (`(you stopped it)`). A member xt hasn't started yet, such as a new team's lead before its first goal is dispatched, isn't running by design: a message waiting for it raises no alert, and `xt status` says so quietly (`lead not started yet (starts when the first goal is dispatched): 1 message waits for it`). One alert per member, with the count and the oldest message: `builder isn't running: 1 message waiting 17m (task #42 from lead, since 22:05). Start it: u (or xt spawn builder).` (`3 messages waiting, oldest 17m (task #42 from lead)` for several; ages over a day read `1d3h`). The start command fits the case: `Start it: xt up.` for the liaison, `Approve its start: xt approve 7.` when its start waits on your approval. A running member's queue (a busy agent) never alerts, nor do messages to you or to a retired member; when `missing:<name>` is already open, the queue joins it as one line (`1 message waiting 17m`) instead | Start it. Clears when it runs; once you clear it, it comes back only when a newer message is queued or the member runs and stops again. The supervisor checks every few seconds, so it shows about 2 minutes after the message |
 | `noprompt:<name>` | An agent started but its first prompt never showed up on its screen, so it doesn't know who it is | Stop and start it again (`xt restart <name>`) |
-| `partprompt:<name>` | (from 0.19.0, pi) The agent's first prompt reached it without its opening, and so did xt's one resend of it. It has its identity and protocol, but it worked from a prompt without its opening | Stop and start it again (`xt restart <name>`); clears at its next start |
-| `context:<name>` | (from 0.20.0) The agent's context still can't be read 10 minutes after its start; the alert says why and whether today's usage is recorded. Raised once per start. The agent may be working normally | Look at its pane; `xt status` says what xt can read. See "How full is an agent's context?" in [Memory and recovery](#11-memory-and-recovery); clears when the context becomes readable or the agent stops |
+| `partprompt:<name>` | (pi) The agent's first prompt reached it without its opening, and so did xt's one resend of it. It has its identity and protocol, but it worked from a prompt without its opening | Stop and start it again (`xt restart <name>`); clears at its next start |
+| `context:<name>` | The agent's context still can't be read 10 minutes after its start; the alert says why and whether today's usage is recorded. Raised once per start. The agent may be working normally | Look at its pane; `xt status` says what xt can read. See "How full is an agent's context?" in [11](#11-memory-context-and-cost); clears when the context becomes readable or the agent stops |
 | `silent:<id>` | The owner of an open item ignored two nudges | Look at its pane; ask the liaison or restart the agent |
 | `volume:<date>` | Today's message log is unusually big: probably two agents in a loop | `xt log` to see who; stop them |
 | `launch:<name>` | The agent runs without xt's launch settings: something other than xt started it, typically the terminal multiplexer restoring its session after a reboot or power cycle and resuming the agent's old conversation | `xt restart <name>`, or `xt restart --all` for the whole team; clears by itself |
+| `notes:<name>` | The agent's notes have been over their budget for more than 24 hours (see 11) | The agent prunes them; it sees the alert in its brief |
+| `boardwatch` | The board watch's command failed (see 8) | Fix the command; the next success clears it |
 
 `c` (or `xt clear <key>`) dismisses an alert once dealt with. `xt status` also says whenever the
 supervisor isn't running (then nothing is delivered, no alert is raised and nobody is woken: `xt up`).
 
 **An agent running without xt's launch settings.** xt starts every agent with its identity
-(`XT_AGENT`), its model, its settings file and its connector and browser-tool blocks. A process
-resumed some other way has none of them, so it may run the wrong model without the permissions and
-limits the team relies on. The supervisor (about once a minute), `xt status` and `xt up` look at
-the harness processes working in the team repo. An agent with one carrying `XT_AGENT=<name>` is
-fine. A warning needs evidence: harness processes of the agent's kind (claude, codex or pi) without
+(`XT_AGENT`), its model, its generated settings and its connector and browser-tool blocks. A
+process resumed some other way has none of them, so it may run the wrong model without the limits
+the team relies on. The supervisor (about once a minute), `xt status` and `xt up` look at the
+harness processes working in the team repo. An agent with one carrying `XT_AGENT=<name>` is fine. A
+warning needs evidence: harness processes of the agent's kind (claude, codex or pi) without
 `XT_AGENT`, at least as many as the running agents of that kind left without a match. Then they
 say `<name> is running without xt's launch settings (restored by the multiplexer?) … Run xt restart
 <name> (or --all)`, raise one `launch:<name>` alert under Needs you,
@@ -693,34 +684,26 @@ visible (from a sandbox, which may show only its own agent's process), when ther
 processes than agents left without a match (xt can't tell which is whose), and from a sandboxed
 shell (its own PID namespace, or a `/proc` whose PID 1 isn't the system's init, as in Codex's
 sandbox). Only the harness programs themselves count, never helpers such as `codex-linux-sandbox`.
-From such
-a shell `xt status` also says `the supervisor: not checked` rather than "isn't running", unless
-the supervisor saved Herdr's agent list in the last 30 seconds (then it's running). Run `xt status`
-in your own terminal for the real answer.
+From such a shell `xt status` also says `the supervisor: not checked` rather than "isn't running",
+unless the supervisor saved Herdr's agent list in the last 30 seconds (then it's running). Run `xt
+status` in your own terminal for the real answer.
 
-### 10. Shrinking the team
-
-- **Stop** an agent you'll want again (`x`, `xt stop`): it stays in the roster.
-- **Retire** one that's no longer needed (`R` in the TUI, `xt retire <name>`): its workspace closes
-  and it's marked retired in `team.toml`. Its files stay. The lead can also retire its own reports,
-  and asks you if it wants to hire again.
-
-### 11. Memory and recovery
+### 11. Memory, context and cost
 
 Agents lose their memory on restart and when their harness compacts the conversation. xt is built
 for that: the ledger, the goal briefs, the roles, skills and each agent's
 `members/<name>/notes.md` hold everything that matters, and `xt brief` rebuilds an agent's picture
-from them (every first prompt includes it). From 0.22.0 the first prompt (on spawn, restart and
-reset) also carries the agent's `notes.md` whole, byte for byte (trailing blank lines and spaces
-too), after the brief, between `===== your notes … =====` and `===== end of your notes =====`, so no
-agent cuts it short or spends a step reading it. A file over the notes budget still goes in
-whole, with one line saying it is over; an agent without a notes file gets no such section. If an
-agent seems confused or its context is heavy, `xt restart <name>` gives it a clean session that
-starts from its brief.
+from them (every first prompt includes it). The first prompt (on spawn, restart and reset) also
+carries the agent's `notes.md` whole, byte for byte (trailing blank lines and spaces too), after
+the brief, between `===== your notes … =====` and `===== end of your notes =====`, so no agent cuts
+it short or spends a step reading it. A file over the notes budget still goes in whole, with one
+line saying it is over; an agent without a notes file gets no such section. If an agent seems
+confused or its context is heavy, `xt restart <name>` gives it a clean session that starts from its
+brief.
 
-**The notes budget** (from 0.23.0). Every start carries the whole notes file, so its size costs
-context on every restart. The budget is in bytes on disk (a multibyte character counts as more
-than one), 16,000 unless `team.toml` says otherwise, for the team and per agent:
+**The notes budget.** Every start carries the whole notes file, so its size costs context on every
+restart. The budget is in bytes on disk (a multibyte character counts as more than one), 16,000
+unless `team.toml` says otherwise, for the team and per agent:
 
 ```toml
 [defaults]
@@ -745,42 +728,118 @@ on top, rewritten in place; then "Where things are"; then a dated log it prunes,
 to `members/<name>/notes-archive.md`, which is never loaded into a prompt and doesn't count toward
 the budget.
 
-**No desktop or browser control.** xt starts Codex agents with its computer-use and browser tools
-switched off and Claude Code agents with Claude in Chrome refused (their own settings for your
-sessions stay as they are); `xt harnesses` shows what each harness blocks, and a start note says
-when a harness can't block everything. Agents are told to ask you for anything only a UI can do.
+**How full is an agent's context?** The Team pane shows it per agent (`~211k ▕████▎ ▏ 82%`:
+tokens in the conversation after its latest turn, a bar and the share of the model's window),
+yellow from 70% and red from 85%; the agent's detail (`~211k/258k`), `xt status` and the lead's and
+liaison's briefs show it too. xt reads it
+from the harness's own session log (only the counters, never the conversation) and links each
+agent to its log by its first prompt, so a restarted agent starts again from its new session. A
+`~` means approximate (Codex reports the latest turn's usage, not a live figure); tokens with no
+bar and no share mean the window isn't known for that model (`?` in the detail); `—` means nothing
+is recorded yet, or the agent isn't running
+(its detail then shows the last session's figure, labelled as such). When a running agent's context
+can't be read, `xt status` says under its row which of context and today's usage xt can read, and
+why:
 
-**No personal skills.** Claude Code agents start with `--disable-slash-commands` (in
-`harnesses/claude.toml`'s `args`), so your own and your plugins' skills aren't listed in their
-sessions: that listing cost about 9k tokens at every start. The team's skills are files under
-`skills/` that the protocol points to, so they keep working. Your own sessions keep your skills.
-The flag also disables built-in slash commands such as `/context`, `/compact`, `/model` and `/cost`
-in team Claude agents' panes (xt sends none, so nothing breaks); use `xt status` for context.
-
-**No account connectors.** Harnesses can reach your accounts through connectors: Claude Code's
-claude.ai connectors (Gmail, Drive, Calendar…) and MCP servers, Codex's apps. xt starts agents
-without them: Claude Code with `--strict-mcp-config` (no MCP server loads), Codex with its apps
-switched off. Your own sessions keep them. When an agent needs one, opt it in by name in its
-capability block (below) and restart the agent:
-
-```toml
-[[agent]]
-name = "researcher"
-[agent.capabilities]
-connectors = ["claude.ai Context7"]   # Claude Code: MCP server names as the harness lists them
+```text
+writer: today's usage recorded; context can't be read (no pi session log written since writer started (the newest is from 02 Oct 09:12))
+writer: nothing can be read: no context and no usage recorded today (no pi session logs at ~/.pi/agent/sessions/*/*.jsonl, or xt can't read there)
 ```
 
-A Claude Code agent then gets exactly those servers (xt lists the others at start and refuses
-their tools). A Codex agent takes no opt-in: Codex can switch its apps back on only all at once,
-so xt refuses to start a Codex agent whose block names `connectors` (use Claude Code for that
-agent). The start note, the agent's detail and `xt harnesses` show what's opted in and what each
-harness covers. Removing the line restores the default at the next start. **Not covered:** command-line
-tools that hold your credentials (a mail CLI, for example) are ordinary programs to the harness;
-keep such skills out of an agent's reach if it shouldn't use them.
+The reason names what xt found: no session logs where the harness keeps them (or none it may
+read), none written since the agent started, or some written since then but none carrying the
+agent's first prompt; the agent's detail in the TUI shows the same reason. An unreadable context is
+expected in an agent's first turns (a harness may write its log or its first usage only after its
+first reply), so status says nothing then unless no log is found at all. It is also expected for a harness xt can't read
+(none of the supported three) and when xt runs where it may not read the harness's folder (for
+example inside a sandboxed agent's shell, where an agent's own `xt status` sees less than yours).
+It is not expected 10 minutes after a start: then the supervisor raises one `context:<name>` alert
+for that start, which clears when the context becomes readable; the agent may well be working
+normally, so look at its pane before restarting it. A log whose first prompt lost its opening
+still counts as the agent's, by two later parts of the prompt (the team repo's path and
+`Always pass --as <name>`). pi has lost the first few characters of a
+first prompt on some first starts, which hid its log from xt. So for pi xt waits until
+its screen has stopped changing, and types one guard line before the prompt: `(xt: this line only
+guards your first prompt against lost characters; ignore it. The prompt follows.)`. A lost start
+eats that line, not the prompt. xt then checks pi's session log for the prompt's opening. If it's
+still missing, the start record says so, and the supervisor resends the whole prompt once the agent
+is idle, behind a note that it replaces the damaged one (a second reading of the prompt: about 25k
+tokens for a lead, only when this happens). If the resend arrives damaged too, `partprompt:<name>`
+is raised. Claude Code and Codex agents get no guard line. Supported: Codex, Claude
+Code, pi. The window comes from where it's reliable: Codex writes the usable window of the session
+into its log (258,400 tokens for the current models, well below an API model's published maximum,
+such as gpt-6-astra's 1.05M); Claude Code doesn't, so xt uses the table in
+`harnesses/claude.toml` (1M for the current models, 200k for Haiku 4.5). A Codex log without a
+window leaves it unknown rather than borrowing an API figure.
 
-**Capabilities: one model for every harness** (from 0.23.0). Say what an agent may do once, in
-`team.toml`, and xt turns it into each harness's own mechanism. A team default and each agent's
-own block (the agent's settings win, key by key; `require` adds up):
+**What does the team cost?** The supervisor records every model call from the agents' session
+logs (once a minute; counters only) and attributes it to the goal the agent was working on. You
+see tokens and an estimate in dollars: today's team total in the Team pane's header and `xt status`,
+each agent's day in its detail, each goal's total in its detail, and the team's day in the lead's
+and liaison's briefs. The estimate uses public list prices from `prices.toml` (or pi's own cost)
+and is always labelled "est.": on a subscription you don't pay per token, and nothing here is a
+bill. Tokens of a model with no listed price are shown as unpriced, never as zero; calls made on
+an agent's behalf (Codex's automatic reviewer, Claude subagents) are counted and shown as
+auxiliary. Where a harness reports your account's allowance (Codex: percent of its window and
+when it resets), the Team pane (as bars in that harness's block) and `xt status` show it once per
+harness. `prices.toml` lists the current Codex and Claude models at the providers' **Standard** API
+rates, each row with its source page and the date it was checked; xt can't see which tier or plan
+you're actually billed on, which is one more reason the figure is an estimate. For Codex models xt
+uses OpenAI's short-context rates: right while a session stays below OpenAI's long-context
+threshold (272K for gpt-5.5; the Codex sessions checked on 2026-09-29 logged a usable window of
+258,400), an underestimate beyond it. To price another model, add it to `prices.toml` with its
+source, tier and checked date.
+
+**Claude plan usage in status.** Claude Code doesn't write its plan's rate limits to its session
+logs; it hands them only to a status-line command. xt ships one, `bin/xt-statusline`. To use it, add
+a `statusLine` entry to a Claude agent's extras file (see 13; one agent is enough, the reading is
+account-wide):
+
+```json
+{"statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}}
+```
+
+After each of that agent's replies, Claude Code passes its status to the script, which keeps the
+five-hour and seven-day windows (percent used and reset time, nothing else from the status: no
+session ids, paths or costs) in `.xt/state/claude_plan.json` and prints the model and both
+percentages as the agent's status line (`Sonnet 5.5 · 5h 5% · 7d 7%`). `xt status` then shows
+
+```text
+allowance: claude 5% of 5h, resets Tue 21:30; 7% of 7d, resets Mon 08:00; read 2m ago (account-wide)
+```
+
+and the TUI's Team pane shows each window as a bar in the Claude block (a window without a current
+reading isn't drawn). The plan is shared with you and anyone else on the account, so the numbers
+include your own use; they are not one agent's share.
+
+- **Which team.** The script writes under `XT_ROOT` when that's set, otherwise under the xt checkout
+  it's in (`bin/..`), and only into an existing `.xt/state` directory. Point `command` at your team
+  repo's own `bin/xt-statusline`. It's one of xt's own files, which agents never edit.
+- **When there's no number.** A session's first status call (before any reply) carries no limits;
+  the last reading stays and status shows its age. A window whose reset time has passed shows
+  `5h window reset, no reading since` rather than the old percentage. A reading older than 3 hours,
+  one timestamped later than now (the script and xt run on the same machine, so there's no
+  tolerance), a value out of range (a percentage outside 0–100, a time outside 2000–2100) or a
+  missing or unreadable file shows `unknown`; the rest of status is unaffected. Status shows the
+  Claude line when the team has a Claude agent or a reading exists.
+- **Never in the way.** The file is replaced in one step (never half-written), and bad input from
+  Claude Code only prints `xt` as the status line.
+- Seen on Claude Code 2.1.284; another version that changes the fields shows `unknown`.
+
+### 12. Shrinking and ending a team
+
+- **Stop** an agent you'll want again (`x`, `xt stop`): it stays in the roster.
+- **Retire** one that's no longer needed (`R` in the TUI, `xt retire <name>`): its workspace closes
+  and it's marked retired in `team.toml`. Its files stay. The lead can also retire its own reports,
+  and asks you if it wants to hire again.
+- **End the team:** `xt down`, then remove the team's Herdr session (`herdr session stop <team>`;
+  only after `xt down`) and, if you're done with it, the folder. The repo holds the whole history
+  (`.xt/log/`), so keep it if you might want to look back.
+
+### 13. What agents may do: capabilities
+
+Say what an agent may do once, in `team.toml`, and xt turns it into each harness's own mechanism. A
+team default and each agent's own block (the agent's settings win, key by key; `require` adds up):
 
 ```toml
 [defaults.capabilities]
@@ -821,10 +880,12 @@ says so under the agents), credential CLIs denied **by name**. xt itself is alwa
 every spelling (the reply hint's absolute path, `bin/xt`, `./bin/xt`, `xt`), and so is `cd`, so
 `cd <team repo> && xt …` passes. One thing no rule opens: Claude Code refuses a command whose
 quoted heredoc text holds backticks or `<`, `>` characters, as if they were part of the command; an
-agent rewords such a message (the protocol's heredoc otherwise works as written). A command it may run can still use the network or a credential another way: that's a
-limit by name, not isolation, so `network` stays advisory there. Codex's sandbox enforces the
-network; `write` paths are added with `--add-dir` so the agent can write there, but it can also
-write the whole team repo, so `write` and `deny` stay advisory. pi enforces skills only.
+agent rewords such a message (the protocol's heredoc otherwise works as written). A command it may
+run can still use the network or a credential another way: that's a limit by name, not isolation,
+so `network` stays advisory there. Codex runs every agent with a block in its workspace-write
+sandbox, which enforces the network; `write` paths are added with `--add-dir` so the agent can
+write there, but it can also write the whole team repo, so `write` and `deny` stay advisory. Codex
+has no per-host limit: with network on, the agent can reach any host. pi enforces skills only.
 
 **`require` refuses rather than pretends.** With `commands` set and `require = ["commands"]` on a
 pi agent, `xt spawn erin` (and a hire request, before any approval) refuses:
@@ -837,17 +898,16 @@ enforced; net advisory` (within 80 columns the names shorten: `cmds`, `conn`, `n
 anything is cut). The brief, the agent's detail in the TUI and the start note show the same row
 (the start note in full words), and a hire's approval one sentence, in at most two rows:
 `Approve its start: require write, commands; deny, credential_clis enforced; network advisory (role
-text only).` **Codex and pi
-agents now show `advisory` for what they can't enforce. That was always true; it is now visible.**
+text only).` Codex and pi agents show `advisory` for what they can't enforce.
 
 **An agent without a block.** With no block of its own and no `[defaults.capabilities]`, an agent
 starts with its harness's own defaults and without your personal skills (a pi agent starts with
-`--no-skills`, the team's own skills passed back). A Claude Code agent then starts in Claude's
-default permission mode: its first command outside Claude's built-in safe set waits at a
-permission prompt, and an unattended agent sits blocked (`blocked:<name>`) until you answer it.
-A hire's approval warns about that. Give every Claude Code agent a block, or the team a default
-one: the settings xt generates use `dontAsk`, so anything not allowed is refused at once instead
-of waiting.
+`--no-skills`, the team's own skills passed back; Codex's can't be switched off). A Claude Code
+agent then starts in Claude's default permission mode: its first command outside Claude's built-in
+safe set waits at a permission prompt, and an unattended agent sits blocked (`blocked:<name>`)
+until you answer it. A hire's approval warns about that. Give every Claude Code agent a block, or
+the team a default one: the settings xt generates use `dontAsk`, so anything not allowed is refused
+at once instead of waiting.
 
 **The extras file** (Claude Code). What the block can't say (a `deny` rule like `Bash(rm *)`, an
 `ask` rule, other settings keys such as `statusLine`) goes in a Claude Code settings file that the
@@ -866,126 +926,210 @@ start, naming the rule and the file. Rules:
 - `extras` is for Claude Code only: a Codex or pi agent whose block names one is refused at start.
 - The start note shows the file, a short hash of its content (a changed file shows a new hash at
   the next start) and the mode.
+- Don't put the same rules in a project `.claude/settings.json` instead: in a folder Claude Code
+  hasn't trusted yet, a project settings file applies its `deny` rules but ignores its `allow`
+  rules (seen 2026-09-29).
 - Your own `~/.claude/settings.json` still applies to every Claude agent on top: its hooks, and its
   `allow` and `deny` rules. A user-level `allow` rule widens every agent.
 
-The lines that came before the block (`permissions`, `codex_options` and `connectors` directly
-under an agent or `[defaults]`) were removed in 0.24.0: a `team.toml` that still has one doesn't
-load. See [Upgrading to 0.24: convert the old permission lines](#upgrading-to-024-convert-the-old-permission-lines).
+**No desktop or browser control.** xt starts Codex agents with its computer-use and browser tools
+switched off and Claude Code agents with Claude in Chrome refused (their own settings for your
+sessions stay as they are); `xt harnesses` shows what each harness blocks, and a start note says
+when a harness can't block everything. Agents are told to ask you for anything only a UI can do.
 
-**Claude plan usage in status** (from 0.15.0). Claude Code doesn't write its plan's rate limits to
-its session logs; it hands them only to a status-line command. xt ships one, `bin/xt-statusline`.
-To use it, add a `statusLine` entry to a Claude agent's extras file (one agent is enough; the
-reading is account-wide):
+**No personal skills.** Claude Code agents start with `--disable-slash-commands` (in
+`harnesses/claude.toml`'s `args`), so your own and your plugins' skills aren't listed in their
+sessions: that listing cost about 9k tokens at every start. The team's skills are files under
+`skills/` that the protocol points to, so they keep working. Your own sessions keep your skills.
+The flag also disables built-in slash commands such as `/context`, `/compact`, `/model` and `/cost`
+in team Claude agents' panes (xt sends none, so nothing breaks); use `xt status` for context.
 
-```json
-{"statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}}
+**No account connectors.** Harnesses can reach your accounts through connectors: Claude Code's
+claude.ai connectors (Gmail, Drive, Calendar…) and MCP servers, Codex's apps. xt starts agents
+without them: Claude Code with `--strict-mcp-config` (no MCP server loads), Codex with its apps
+switched off. Your own sessions keep them. When an agent needs one, opt it in by name in its
+capability block and restart the agent:
+
+```toml
+[[agent]]
+name = "researcher"
+[agent.capabilities]
+connectors = ["claude.ai Context7"]   # Claude Code: MCP server names as the harness lists them
 ```
 
-After each of that agent's replies, Claude Code passes its status to the script, which keeps the
-five-hour and seven-day windows (percent used and reset time, nothing else from the status: no
-session ids, paths or costs) in `.xt/state/claude_plan.json` and prints the model and both
-percentages as the agent's status line (`Sonnet 5.5 · 5h 5% · 7d 7%`). `xt status` then shows
+A Claude Code agent then gets exactly those servers (xt lists the others at start and refuses
+their tools). A Codex agent takes no opt-in: Codex can switch its apps back on only all at once,
+so xt refuses to start a Codex agent whose block names `connectors` (use Claude Code for that
+agent). The start note, the agent's detail and `xt harnesses` show what's opted in and what each
+harness covers. Removing the line restores the default at the next start. **Not covered:**
+command-line tools that hold your credentials (a mail CLI, for example) are ordinary programs to
+the harness; `credential_clis` denies the known ones by name where the harness enforces it.
+
+### 14. Updating xt
+
+```sh
+git pull upstream main
+xt restart --all
+```
+
+or, if you like to stop the team first (to commit its files, say): `xt down`, pull, `xt restart
+--all`. Either way `xt restart --all` restarts the supervisor (new code) and every agent that was
+running (new protocol and roles in their first prompt), and brings the team back as it was: after
+an `xt down` it restores the agents that were running just before it (agents you had stopped on
+purpose stay stopped) and ends with one summary:
 
 ```text
-allowance: claude 5% of 5h, resets Tue 21:30; 7% of 7d, resets Mon 08:00; read 2m ago (account-wide)
+restored: liaison, lead, carol (running before xt down)
+left stopped: dora (not running before; `xt spawn <name>` starts one)
+supervisor: running
 ```
 
-and the TUI's Team pane shows each window as a bar in the Claude block (from 0.16.0; a window
-without a current reading isn't drawn). The plan is shared with you
-and anyone else on the account, so the numbers include your own use; they are not one agent's
-share.
+If nothing was running and nothing was recorded, it says `restored: nobody` and why. Running agents
+keep the instructions they started with, so restart after every update. Read the release's
+**Upgrading** note in [CHANGELOG.md](../CHANGELOG.md) first.
 
-- **Which team.** The script writes under `XT_ROOT` when that's set, otherwise under the xt checkout
-  it's in (`bin/..`), and only into an existing `.xt/state` directory. Point `command` at your team
-  repo's own `bin/xt-statusline`. It's one of xt's own files, which agents never edit.
-- **When there's no number.** A session's first status call (before any reply) carries no limits;
-  the last reading stays and status shows its age. A window whose reset time has passed shows
-  `5h window reset, no reading since` rather than the old percentage. A reading older than 3 hours,
-  one timestamped later than now (the script and xt run on the same machine, so there's no
-  tolerance), a value out of range (a percentage outside 0–100, a time outside 2000–2100) or a
-  missing or unreadable file shows `unknown`; the rest of status is unaffected. Status shows the
-  Claude line when the team has a Claude agent or a reading exists.
-- **Never in the way.** The file is replaced in one step (never half-written), and bad input from
-  Claude Code only prints `xt` as the status line.
-- Seen on Claude Code 2.1.284; another version that changes the fields shows `unknown`.
+**Which version is the team on?** Three different things, shown in the TUI's Team header, `xt
+status` and every agent's brief:
 
-**How full is an agent's context?** The Team pane shows it per agent (`~211k ▕████▎ ▏ 82%`:
-tokens in the conversation after its latest turn, a bar and the share of the model's window),
-yellow from 70% and red from 85%; the agent's detail (`~211k/258k`), `xt status` and the lead's and
-liaison's briefs show it too. xt reads it
-from the harness's own session log (only the counters, never the conversation) and links each
-agent to its log by its first prompt, so a restarted agent starts again from its new session. A
-`~` means approximate (Codex reports the latest turn's usage, not a live figure); tokens with no
-bar and no share mean the window isn't known for that model (`?` in the detail); `—` means nothing
-is recorded yet, or the agent isn't running
-(its detail then shows the last session's figure, labelled as such). When a running agent's context
-can't be read, `xt status` says under its row which of context and today's usage xt can read, and
-why (from 0.20.0):
+| Label | What it is | Where it comes from |
+|---|---|---|
+| **published** | the newest final release (candidates don't count) | the supervisor checks the upstream's tags when it starts and then every 6 hours, and `xt version use`, `xt version rollback` and `xt version check` check them too; if the check fails you see the last known one and why. It is never shown older than the installed final release: then you see `published ≥ installed, check pending` and the supervisor tries again every 15 minutes |
+| **installed** | the xt in the team's repo: what the next command or start runs | the repo's `pyproject.toml`, read every time |
+| **running** | the supervisor's version and, per agent, the xt that started it (its first prompt, protocol and reply hints) | recorded when each starts; `mixed` when they differ |
+
+After `git pull` the team is *installed* on the new version but still *running* the old one until
+`xt restart --all`; the status line says which processes haven't picked it up yet. A newer
+*published* release only produces a notice: nothing upgrades on its own. An agent whose start is
+still under way (its own first brief is written before xt records the start) shows `not recorded
+yet (first turn running)` instead. To verify an upgrade finished: all three read the same version
+and no note follows the line.
+
+**Choosing a version, and going back.** `git pull upstream main` takes whatever is newest. To pick
+a release on purpose, and to be able to undo it:
+
+```sh
+xt down
+git commit -am "team changes"          # xt refuses while tracked files have uncommitted changes
+xt version use vX.Y.Z                  # the release's tag; a candidate: xt version use vX.Y.Z-rc1 --candidate
+xt restart --all
+# if it misbehaves:
+xt down && xt version rollback && xt restart --all
+```
+
+- The team must be fully down (no supervisor, no agent) and no other xt command writing; xt checks.
+- `use` fetches the upstream tags and merges the tag into your repo with a merge commit, so your own
+  commits and files stay. A conflict (say you edited `roles/lead.md` and the release changed it too)
+  stops the switch: xt aborts the merge, names the files and leaves the previous version in place.
+  To resolve by hand: `git merge --no-ff <tag>`, fix the files, `git commit`, then run `xt version use
+  <tag>` again to finish the checks.
+- The team's state (`.xt/state/`) has a **format** number (`.xt/state/format.json`, written by `xt
+  up`). xt switches only to a version that says it reads that format, and never converts state; a
+  release that needs a new format will say so in its Upgrading note.
+- Before merging, xt takes a verified snapshot of `.xt/state/` (under `.xt/snapshots/`) and records
+  a fingerprint of the ledger. The ledger (`.xt/log/`) is never copied back or rewritten: it only
+  grows.
+- `rollback` reverts the last switch's merge commit (your later commits stay), checks the version
+  and that the ledger still starts with the recorded messages, and keeps the current state when
+  the format is the same (it matches the ledger). It refuses, and changes nothing, when the snapshot
+  is missing, the ledger was altered, the old version can't read the state, or files changed since
+  the switch conflict (then: `git revert -m 1 <merge commit>` by hand).
+- Neither command starts the team: `xt restart --all` (or `xt up`) does. `xt version` alone shows the
+  three versions, the state format and the last switches.
+
+**Versioning.** xt uses semantic versioning. While it is `0.x`, a breaking change (to the CLI, the
+`team.toml` format, the protocol, the ledger and state formats, the harness adapter format or the
+shipped lead and liaison roles) or a notable feature raises the minor version, and a fix raises the
+patch version. To stay on releases rather than `main`, switch with `xt version use` instead of
+pulling.
+
+#### Upgrading notes
+
+What carries over from older versions, beyond each release's Upgrading note:
+
+- Versions 0.12.0 and later read state format 1.
+- Processes started by an xt older than 0.12.0 show their version as `unknown` until their next
+  restart, and an `xt down` older than 0.10.0 recorded nothing, so after it start the agents with
+  `xt` and `U` in the TUI.
+- Questions asked before 0.21.0 still read and answer as they did: one with 0.14.0's options takes
+  a number or your own words, any other is an open question; a `--ref` reply to such an ask is sent
+  as before.
+- Friction from before a team's first supervisor run on 0.16.0 shows as seen, and goals closed
+  before its first run on 0.15.0 don't appear in Notifications.
+
+#### Upgrading to 0.24: convert the old permission lines
+
+xt 0.24.0 removed the `permissions`, `codex_options` and `connectors` lines (directly under an
+`[[agent]]` or under `[defaults]`); the [capability block](#13-what-agents-may-do-capabilities)
+replaces them. **Convert before you upgrade:** a `team.toml` that still has one of them doesn't
+load in 0.24, so `xt status`, `xt up`, `xt down`, `xt brief`, `xt send` and the TUI all refuse until
+it's converted. For each agent that has one of the lines:
+
+```sh
+xt capabilities carol      # prints the block that replaces them; changes nothing
+```
+
+Put the printed block **at the end of the agent's `[[agent]]` entry**, after all its other keys,
+and remove its old lines. Where it goes matters: in TOML every key after a `[table]` line belongs to
+that table, so a block pasted where the old line was would take the agent's `reports_to` and
+`status` into it; xt refuses such a file at load and says so. What the block can't say stays in the
+old settings file, which the block then names as `extras` (see the extras file under
+[13](#13-what-agents-may-do-capabilities)). For example, `xt capabilities pm` might print:
 
 ```text
-writer: today's usage recorded; context can't be read (no pi session log written since writer started (the newest is from 02 Oct 09:12))
-writer: nothing can be read: no context and no usage recorded today (no pi session logs at ~/.pi/agent/sessions/*/*.jsonl, or xt can't read there)
+# xt capabilities pm: the block equivalent to its old permission lines and settings/pm.json (nothing was changed).
+# Put it at the end of its [[agent]] entry (name = "pm"), after the entry's other keys, and remove `permissions`:
+[agent.capabilities]
+write = ["goals/drafts"]
+commands = ["rg", "git log"]
+credential_clis = {allow = ["fizzy"]}
+extras = "settings/pm.json"
+# kept in extras (settings/pm.json: the block can't say these, so `extras` keeps the file on top, where it may only restrict):
+#   deny Bash(rm *)
 ```
 
-The reason names what xt found: no session logs where the harness keeps them (or none it may
-read), none written since the agent started, or some written since then but none carrying the
-agent's first prompt; the agent's detail in the TUI shows the same reason. An unreadable context is
-expected in an agent's first turns (a harness may write its log or its first usage only after its
-first reply), so status says nothing then unless no log is found at all. It is also expected for a harness xt can't read
-(none of the supported three) and when xt runs where it may not read the harness's folder (for
-example inside a sandboxed agent's shell, where an agent's own `xt status` sees less than yours).
-It is not expected 10 minutes after a start: then the supervisor raises one `context:<name>` alert
-for that start, which clears when the context becomes readable; the agent may well be working
-normally, so look at its pane before restarting it. A log whose first prompt lost its opening
-still counts as the agent's, by two later parts of the prompt (the team repo's path and
-`Always pass --as <name>`). pi has lost the first few characters of a
-first prompt on some first starts, which hid its log from xt. So for pi (from 0.19.0) xt waits until
-its screen has stopped changing, and types one guard line before the prompt: `(xt: this line only
-guards your first prompt against lost characters; ignore it. The prompt follows.)`. A lost start
-eats that line, not the prompt. xt then checks pi's session log for the prompt's opening. If it's
-still missing, the start record says so, and the supervisor resends the whole prompt once the agent
-is idle, behind a note that it replaces the damaged one (a second reading of the prompt: about 25k
-tokens for a lead, only when this happens). If the resend arrives damaged too, `partprompt:<name>`
-is raised. Claude Code and Codex agents get no guard line. Supported: Codex, Claude
-Code, pi. The window comes from where it's reliable: Codex writes the usable window of the session
-into its log (258,400 tokens for the current models, well below an API model's published maximum,
-such as gpt-6-astra's 1.05M); Claude Code doesn't, so xt uses the table in
-`harnesses/claude.toml` (1M for the current models, 200k for Haiku 4.5). A Codex log without a
-window leaves it unknown rather than borrowing an API figure.
+and the entry then ends with it:
 
-**What does the team cost?** The supervisor records every model call from the agents' session
-logs (once a minute; counters only) and attributes it to the goal the agent was working on. You
-see tokens and an estimate in dollars: today's team total in the Team pane's header and `xt status`,
-each agent's day in its detail, each goal's total in its detail, and the team's day in the lead's
-and liaison's briefs. The estimate uses public list prices from `prices.toml` (or pi's own cost)
-and is always labelled "est.": on a subscription you don't pay per token, and nothing here is a
-bill. Tokens of a model with no listed price are shown as unpriced, never as zero; calls made on
-an agent's behalf (Codex's automatic reviewer, Claude subagents) are counted and shown as
-auxiliary. Where a harness reports your account's allowance (Codex: percent of its window and
-when it resets), the Team pane (as bars in that harness's block) and `xt status` show it once per
-harness. `prices.toml` lists
-the current Codex and Claude models at the providers' **Standard** API rates, each row with its
-source page and the date it was checked
-(2026-09-29 for the table shipped with 0.13.0); xt can't see which tier or plan you're actually
-billed on, which is one more reason the figure is an estimate. For Codex models xt uses OpenAI's
-short-context rates: right while a session stays below OpenAI's long-context threshold (272K for
-gpt-5.5; the Codex sessions checked on 2026-09-29 logged a usable window of 258,400), an
-underestimate beyond it. To price another model, add it to
-`prices.toml` with its source, tier and checked date.
+```toml
+[[agent]]
+name = "pm"
+role = "product-manager"
+harness = "claude"
+reports_to = "lead"
+status = "active"
+[agent.capabilities]
+write = ["goals/drafts"]
+commands = ["rg", "git log"]
+credential_clis = {allow = ["fizzy"]}
+extras = "settings/pm.json"
+```
 
-### 12. Ending a team
+A `permissions` line under
+`[defaults]` has no agent name of its own: run `xt capabilities` for any Claude Code agent of the
+team (its block includes what it inherits from `[defaults]`), move the shared part into
+`[defaults.capabilities]` by hand and remove the line. When `xt status` loads again, the file is
+converted. An agent with both a block and an old line has nothing to convert: `xt capabilities`
+refuses it, and you remove one of the two by hand.
 
-`xt down`, then remove the team's Herdr session (`herdr session stop <team>`; only after `xt down`)
-and, if you're done with it, the folder. The repo holds the whole history (`.xt/log/`), so keep it
-if you might want to look back.
+If you upgraded first, every command except `xt capabilities` refuses and names each line, for
+example:
 
-### 13. An operator acting for you
+```text
+team.toml still has permission lines that xt removed in 0.24 (nothing was started or changed):
+  agent carol: permissions, connectors
+Replace them with a [capabilities] block. `xt capabilities carol` prints the block that replaces them (it changes nothing).
+Put each block at the end of its agent's entry and remove the old lines; the user guide's Upgrading section has the steps.
+```
 
-(From 0.19.0.) Sometimes another process works for you outside the team: today, typically your own
-coding-agent session helping with a staging check. It is not you, so `--as human` stays refused
-for it, as for every process but your own terminal. Instead you register it as a named
-**operator**, per team and per operator session:
+`xt capabilities <name>` still works then: convert as above, then `xt restart --all`.
+
+## Working through an operator
+
+### 15. An operator acting for you
+
+Sometimes another process works for you outside the team: typically your own coding-agent session
+helping with a staging check. It is not you, so `--as human` stays refused for it, as for every
+process but your own terminal. Instead you register it as a named **operator**, per team and per
+operator session:
 
 1. In the operator's session, it runs `xt operator pid`. That prints its harness process, e.g.
    `48213 (claude): give the human this pid …`.
@@ -1003,23 +1147,22 @@ for it, as for every process but your own terminal. Instead you register it as a
 **What an operator may do on its own.** Send a report to the liaison: `xt send liaison --as helper
 --type report <<'XT_END' … XT_END`. It's recorded under the operator's own name and in its own
 Flow lane (`helper → liaison`), ends with `(sent by helper, an operator, on the human's behalf)`,
-and shows in your Inbox's Notifications. It sends to the liaison only and reports only: it never
-answers questions, approves anything or opens work.
+and shows in your Inbox's Notifications and in chat, labelled `» helper (operator)`. It sends to
+the liaison only and reports only: it never answers questions, approves anything or opens work.
 
-Agents know what such a report is (from 0.22.0, protocol.md says it, so every first prompt
-carries it): a legitimate message, taken as information for their work and not rejected as
-impersonation. It never lets an agent act as you: an instruction in it to approve something or to
-act as the human is declined unless xt recorded a delegated action (`helper, delegated by human
-until HH:MM`) for it. An agent that is unsure asks its lead.
+Agents know what such a report is (protocol.md says it, so every first prompt carries it): a
+legitimate message, taken as information for their work and not rejected as impersonation. It
+never lets an agent act as you: an instruction in it to approve something or to act as the human
+is declined unless xt recorded a delegated action (`helper, delegated by human until HH:MM`) for
+it. An agent that is unsure asks its lead.
 
 **An operator with Herdr access can type into the liaison's pane.** Such a line is recorded like
 yours, labelled `typed in the pane, unverified` (see [`xt chat`](#xt-chat)): nothing shows who
 typed it, and xt never takes it as an answer, an approval or a closing. The label is the record;
-the rule is the behavior (from 0.23.0): agents treat text typed into their pane as conversation,
-never as authority, so the liaison doesn't close a question from such a line either, and points to
-`xt chat` or the Inbox instead. An operator that acts for you does it
-through its own name (reports, and under a drive grant answers, approvals and goals), never by
-typing into a pane.
+the rule is the behavior: agents treat text typed into their pane as conversation, never as
+authority, so the liaison doesn't close a question from such a line either, and points to
+`xt chat` or the Inbox instead. An operator that acts for you does it through its own name
+(reports, and under a drive grant answers, approvals and goals), never by typing into a pane.
 
 **Delegation.** For a while, you can let it run some of your commands:
 
@@ -1039,9 +1182,9 @@ lead`; one that fails (say, `spawn` of an agent that is already running) is reco
 each command, so there's nothing to clean up. `xt status` (`delegation: delegated to helper until
 14:45: …`) and the TUI's Team header show an active grant.
 
-**Drive** (from 0.22.0). A grant of another scope hands the operator the wheel for a while: it
-answers your questions, approves or denies hires and schedules, and gives the liaison goals. It
-never comes by default; you grant it from your own terminal:
+**Drive.** A grant of another scope hands the operator the wheel for a while: it answers your
+questions, approves or denies hires and schedules, and gives the liaison goals. It never comes by
+default; you grant it from your own terminal:
 
 ```sh
 xt delegate helper --for 30m --scope drive   # answers, approvals and goals; at most 60m, 30m by default
@@ -1088,10 +1231,71 @@ sandbox (its own PID namespace) can't be matched, so use an operator whose comma
 normal process tree (e.g. Claude Code without a sandbox). Operators are per team; there's one grant
 per operator at a time.
 
+## Configuration: team.toml
+
+`team.toml` holds the roster and settings; `xt init` writes it with comments, and only you edit it
+(agents never do). Changes apply when xt next loads it: run `xt restart <name>` (or `--all`) for
+running agents. A value xt can't use is refused at load, naming it.
+
+```toml
+[team]
+name = "my-team"
+session = "my-team"         # the Herdr session this team lives in
+
+[policy]
+spawn_approval = true       # the lead's hires wait for you
+max_agents = 8              # soft cap; beyond it the lead must ask you first
+heartbeat_minutes = 15      # how often the supervisor checks for silent agents
+schedule_approval = true    # agent-set schedules wait for you
+min_wake_minutes = 15       # shortest schedule an agent may request
+auto_reset = false          # true: reset idle agents without open work above auto_reset_tokens (see 9)
+auto_reset_tokens = 150000
+auto_reset_cooldown_hours = 6
+
+[notify]                    # questions, approvals, alerts, done goals and the liaison's reports for you
+enabled = true
+command = "notify-send --app-name=xt {title} {body}"   # or e.g. "curl -s -d {body} ntfy.sh/<topic>"
+quiet = ""                  # e.g. "21:00-07:00": no notifications then
+
+[log]
+raw_days = 30               # then gzipped
+delete_after_days = 0       # 0 keeps them forever
+daily_alert_mb = 5          # alert above this (probably a message loop)
+message_max_kb = 4          # bigger messages go in files, sent by path
+
+[defaults]
+liaison = { harness = "claude", model = "claude-sonnet-5-5" }   # used when xt starts these
+lead = { harness = "codex" }
+notes_budget = 16000        # bytes (see 11)
+
+[defaults.capabilities]     # every agent's capabilities, unless its own block says otherwise (see 13)
+network = "off"
+
+[[agent]]
+name = "carol"
+role = "researcher"         # roles/researcher.md
+harness = "claude"          # claude, codex or pi
+model = "claude-sonnet-5-5" # optional: the harness's own default otherwise
+reports_to = "lead"
+status = "active"           # or "retired"
+wake_every = "1d"           # optional schedule (set with xt schedule): wake_message, wake_between, wake_at
+auto_reset_tokens = 250000  # optional: this agent's threshold, or "off"
+notes_budget = 24000        # optional: this agent's budget
+[agent.capabilities]        # optional: what it may do (see 13)
+write = ["/home/me/research"]
+```
+
+- `reports_to` is the communication chain: an agent may message only the agent it reports to and
+  its own reports.
+- `[board_watch]` names a command that lists a Board column's cards (see 8).
+- Runtime facts such as pane ids never go in `team.toml`.
+- Copyable examples are in [examples](examples.md).
+
 ## Command reference
 
 Who: **human** = your terminal only; **both** = you or agents (agents pass `--as <name>`);
-**agents** = mostly used by agents. Every command accepts `--as NAME` and `-h`.
+**agents** = mostly used by agents. Every command accepts `--as NAME` and `-h`; `xt --version`
+prints the version.
 
 | Command | Who | TUI equivalent |
 |---|---|---|
@@ -1100,10 +1304,12 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt up`](#xt-up) | human | none (bare `xt` runs it) |
 | [`xt down`](#xt-down) | human | `X` stops agents only |
 | [`xt restart`](#xt-restart) | human | `x` then `u` for one agent |
+| [`xt reset`](#xt-reset) | human | none |
+| [`xt checkpoint`](#xt-checkpoint) | agents | none |
 | [`xt version`](#xt-version) | show, check: both; use/rollback: human | none |
 | [`xt status`](#xt-status) | both | Team pane (on top) |
-| [`xt inbox`](#xt-inbox) | human | Inbox panel (`1`) |
 | [`xt chat`](#xt-chat) | human | `S` and `s` (the same conversation, in the Inbox and Flow) |
+| [`xt inbox`](#xt-inbox) | human | Inbox panel (`1`) |
 | [`xt answer`](#xt-answer) | human | `s` on a question or approval |
 | [`xt approve`, `xt deny`](#xt-approve-xt-deny) | human | `a` / `d` on an approval (or `s`, then `y` / `n`) |
 | [`xt clear`](#xt-clear) | human | `c` on an alert |
@@ -1119,8 +1325,10 @@ Who: **human** = your terminal only; **both** = you or agents (agents pass `--as
 | [`xt brief`](#xt-brief) | both | Team detail (partly) |
 | [`xt log`](#xt-log) | both | Flow pane (`3`), the thread in the detail pane, and the supervisor's log (`v`) |
 | [`xt harnesses`](#xt-harnesses) | human | none |
+| [`xt capabilities`](#xt-capabilities) | human | none |
 | [`xt operator`](#xt-operator) | add/remove: human; pid: the operator; list: both | none |
 | [`xt delegate`](#xt-delegate) | human | Team header shows an active grant |
+| [`xt pane-input`](#xt-pane-input) | (the liaison's prompt hook) | none |
 | [`xt watch`](#xt-watch) | (xt) | `v` shows its events |
 | [`xt tui`](#xt-tui) | human | is the TUI |
 
@@ -1133,14 +1341,15 @@ the TUI. **Use it** as the one command to start working with a team, any time.
 
 `xt init [--name NAME] [--session SESSION] [--liaison HARNESS[:MODEL]] [--lead HARNESS[:MODEL]]
 [--approval on|off] [--yes] [--no-commit]` — turns a fresh clone of xt into a team's repo: checks
-prerequisites, asks for the team name, the Herdr session, the liaison's and lead's harness and model
+prerequisites (`herdr` and `git` are needed; it also lists `uv`, `mise` and the installed
+harnesses), asks for the team name, the Herdr session, the liaison's and lead's harness and model
 and whether hires need approval, renames `origin` to `upstream`, writes `team.toml` and the team
-folders, and commits. **Use it** once per team; `xt-clone.sh` and bare `xt` run it for you.
-`--yes` takes the recommended defaults without questions (e.g. for scripts). Without a terminal
-(in a script or a pipe) it can't ask either, so it uses the same defaults for every question not
-given as an option and, from 0.20.0, says so in one line: ``no terminal: used the defaults for the
-questions not given as options (`--yes` does the same on purpose; `xt init --help` lists the
-options)``. The written `team.toml` and the exit code are the same as before.
+folders, and commits (`--no-commit` leaves that to you). The harness it offers by default is codex
+when it is installed. **Use it** once per team; `xt-clone.sh` and bare `xt` run it for you.
+`--yes` takes the defaults without questions (e.g. for scripts). Without a terminal (in a script or
+a pipe) it can't ask either, so it uses the same defaults for every question not given as an option
+and says so in one line: ``no terminal: used the defaults for the questions not given as options
+(`--yes` does the same on purpose; `xt init --help` lists the options)``.
 
 ### `xt up`
 
@@ -1154,81 +1363,56 @@ liaison, and the lead if goals are open; lists members that aren't running. **Us
 alerts afterwards). **Use it** at the end of a day, before a reboot, or before editing `team.toml`
 by hand. `--keep-supervisor` stops only the agents (same as `X` in the TUI).
 
-### `xt reset`
-
-`xt reset <name> [--timeout S]` — a fresh context for one agent, after it saved a checkpoint to its
-notes; refused while it owns open work or is busy (see 8). Human only. Agents answer the request with
-`xt checkpoint --as <name>` (text on stdin: what the next session should read first).
-
-`xt reset <name> --when-idle` queues the same reset and returns at once; the supervisor runs it the
-next time the agent is idle with no open work (see 8). `xt reset <name> --cancel` removes a queued
-reset. Both human only.
-
 ### `xt restart`
 
 `xt restart <name>…` | `xt restart --all` — stops and starts agents so they get fresh
 instructions; `--all` does the whole team and the supervisor, and brings back every agent that was
-running (right after an `xt down`: the agents that were running before it). **Use it** after updating xt (`git pull upstream main`), after changing a role, or to give
-a confused or heavy agent a clean session.
+running (right after an `xt down`: the agents that were running before it). **Use it** after
+updating xt (`git pull upstream main`), after changing a role or `team.toml`, or to give a confused
+or heavy agent a clean session.
 
-### `xt operator`
+### `xt reset`
 
-`xt operator add NAME --pid PID` | `xt operator remove NAME` | `xt operator list` | `xt operator
-pid` — registers an outside process acting for you (from 0.19.0; see 13). `add` and `remove` are
-yours, in your own terminal. `add` takes the operator's harness process, which the operator's own
-`xt operator pid` prints, and writes the token to `.xt/operators/NAME.token`. Run it again after
-each operator session. `list` shows the registrations and any active grant.
+`xt reset <name> [--timeout S]` — a fresh context for one agent, after it saved a checkpoint to its
+notes; refused while it owns open work or is busy (see 9). `--timeout` is how long to wait for the
+checkpoint, in seconds (default 300). `xt reset <name> --when-idle` queues the same reset and
+returns at once; the supervisor runs it the next time the agent is idle with no open work.
+`xt reset <name> --cancel` removes a queued reset. Human only.
 
-### `xt delegate`
+### `xt checkpoint`
 
-`xt delegate NAME [--for 30m] [--only restart,reset,spawn,up]` | `xt delegate [NAME] --revoke` —
-lets a registered operator run `restart`, `reset`, `spawn` of an existing agent and `up` for at
-most 60 minutes (default 30), recorded in the log; `--revoke` ends it early. Human only. `down`,
-answers, approvals, version switches, registering and granting are never delegated. See 13.
+`xt checkpoint --as <name>` (text on stdin: what the next session should read first) — an agent's
+answer to `xt reset`: it confirms that its notes hold what a fresh session needs. **Agents** use it
+only when xt asks for a checkpoint.
 
 ### `xt version`
 
-`xt version` | `xt version check` | `xt version use <tag> [--candidate]` | `xt version rollback` —
-shows the team's versions, state format and recent switches; `check` asks the upstream for the
-newest release now and prints the result (from 0.17.0; it needs network access, and any member
-may run it); `use` merges an upstream release tag into the team repo
-(team down, tracked files committed, state format supported, verified snapshot first); `rollback`
-reverts the last switch. **Use it** to upgrade to a chosen release, or to go back one. See
-[Updating xt](#7-updating-xt).
+`xt version [show]` | `xt version check` | `xt version use <tag> [--candidate]` | `xt version
+rollback` — shows the team's versions, state format and recent switches; `check` asks the upstream
+for the newest release now and prints the result (it needs network access, and any member may run
+it); `use` merges an upstream release tag into the team repo (team down, tracked files committed,
+state format supported, verified snapshot first; `--candidate` allows a `vX.Y.Z-rcN` tag);
+`rollback` reverts the last switch. **Use it** to upgrade to a chosen release, or to go back one.
+See [Updating xt](#14-updating-xt).
 
 ### `xt status`
 
-`xt status` — one screen: the published, installed and running xt versions (see 7); every agent with its role, `harness/model`, live state, open work and
-context (e.g. `~211k/258k`) and today's usage; today's team total and, where reported, the
-account allowance (Codex from its logs; Claude's five-hour and weekly windows through the status
-line, see **Claude plan usage in status**);
-counts of open goals and tasks, questions for you, queued messages, jobs, approvals and alerts (an
-open follow-up counts as an open task, its closed goal never as an open goal), then one line per
-open follow-up, as in the brief (`- #12 task → carol [follow-up to closed goal #3], open 2h: …`); the
-board watch (from 0.19.0, see 5) and an active delegation to an operator (see 13); a
-warning if the supervisor isn't running. **Use it** for a quick look without the TUI (e.g. over
-ssh), or in scripts.
-
-### `xt inbox`
-
-`xt inbox [--days N] [--limit N] [--seen]` — the Inbox's three groups, as in the TUI (see 4), each
-row with the command to act on it: **Needs you** (questions, approvals, alerts `⚠`), **New since you
-last looked** (goals done and reports to you) and **Friction** (unread only, then `(12 older, seen;
-…)`). A group with nothing in it is left out; with nothing at all it prints `Nothing for you.`
-In your own terminal it clears New and marks the friction it printed as seen; run by an agent it
-changes nothing. `--limit` caps each group (default 20; what it leaves out, such as older unread
-friction, stays unread), `--days` is how far back it looks (default 30, as the TUI). `--seen` also
-lists what the TUI keeps folded, under the TUI's labels (from 0.20.0; before, only the friction):
-`(N answered, last 7 days)` under Needs you, each `✓ #question first line → your answer`;
-`(N earlier, seen)` under New, the notifications you've seen in the last 7 days; and
-`(N older, seen)` under Friction. Plain `xt inbox` is unchanged.
-**Use it** when you're not in the TUI; the Inbox panel shows the same (with `--seen`, its folds
-opened).
+`xt status` — one screen: the published, installed and running xt versions (see 14); every agent
+with its role, `harness/model`, live state, open work and context (e.g. `~211k/258k`) and today's
+usage, and the `caps:` row of an agent that has started (see 13); today's team total and, where
+reported, the account allowance (Codex from its logs; Claude's five-hour and weekly windows through
+the status line, see **Claude plan usage in status** in 11); counts of open goals and tasks,
+questions for you, queued messages, jobs, approvals and alerts (an open follow-up counts as an open
+task, its closed goal never as an open goal), then one line per open follow-up, as in the brief
+(`- #12 task → carol [follow-up to closed goal #3], open 2h: …`); the board watch (see 8), whether
+the liaison's pane input is recorded (see [`xt chat`](#xt-chat)) and an active delegation to an
+operator (see 15); a warning if the supervisor isn't running. **Use it** for a quick look without
+the TUI (e.g. over ssh), or in scripts.
 
 ### `xt chat`
 
-`xt chat` (from 0.21.0) — your conversation with the liaison, in this terminal. **Use it** as the
-everyday way to talk with the team; the TUI stays the view for understanding and debugging.
+`xt chat` — your conversation with the liaison, in this terminal. **Use it** as the everyday way to
+talk with the team; the TUI stays the view for understanding and debugging.
 
 - It opens with **the last 30 messages** between you and the liaison (fewer if there are fewer),
   oldest first, and the hire and schedule requests waiting for you. Each shows its time, who wrote
@@ -1245,25 +1429,25 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   number for options (your own words only when it offers Other), or text for an open question,
   and press enter. The answer is checked and recorded exactly as `xt answer` records it; a refused
   answer stays in the input line with the reason below it.
-- **The operator and the team** (from 0.22.0). A registered operator's messages to the liaison,
-  and its drive actions (answers, approvals, goals; see [Drive](#13-an-operator-acting-for-you)),
-  are part of the conversation, labelled `» NAME (operator)` (magenta, and the words alone tell
-  them from yours without colour) with their `NAME, delegated by human until HH:MM` text; a question
-  the operator answered shows `✓ answered by NAME (operator)`. xt's lines that a drive grant
-  started or ended show too. What the liaison sends the team shows as dimmed one-liners, each
-  cut to one row: `12:04 to lead: goal #3020 Patch release v0.21.1`. `ctrl+t` cycles them
-  through **goals only** (the default), all of them (forwards and questions to the lead too) and
-  hidden (a plain `t` would go into your message, so it's `ctrl+t`); `↑`/`↓` pick one and `enter`
-  on an empty input line expands it to its full text (again: collapses); `esc` puts it back.
-- **Scrolling** (from 0.22.1). Your draft keeps the focus while you scroll the conversation:
-  `PageUp` and `PageDown` move it by a page (two rows of the page before stay in view), `Home`
-  goes to the oldest message shown and `End` to the latest, as in Flow. In the input line,
-  `ctrl+a` and `ctrl+e` still move the cursor to the start and end of your draft. When a question
-  is open above the input line, the page keys still scroll the conversation, not the question. `g`
-  and `G` are not chat keys: chat has the oldest message at the top and Flow the newest, so the
-  same letters would mean the opposite. A line that arrives while you've scrolled up doesn't move
-  the view; one line under the conversation says how many wait below, `↓ 2 new (End)`, until you
-  are back at the end. At the end, arrivals and what you send keep the view at the end.
+- **The operator and the team.** A registered operator's messages to the liaison, and its drive
+  actions (answers, approvals, goals; see [Drive](#15-an-operator-acting-for-you)), are part of the
+  conversation, labelled `» NAME (operator)` (magenta, and the words alone tell them from yours
+  without colour) with their `NAME, delegated by human until HH:MM` text; a question the operator
+  answered shows `✓ answered by NAME (operator)`. xt's lines that a drive grant started or ended
+  show too. What the liaison sends the team shows as dimmed one-liners, each cut to one row:
+  `12:04 to lead: goal #3020 Patch release v0.21.1`. `ctrl+t` cycles them through **goals only**
+  (the default), all of them (forwards and questions to the lead too) and hidden (a plain `t`
+  would go into your message, so it's `ctrl+t`); `↑`/`↓` pick one and `enter` on an empty input
+  line expands it to its full text (again: collapses); `esc` puts it back.
+- **Scrolling.** Your draft keeps the focus while you scroll the conversation: `PageUp` and
+  `PageDown` move it by a page (two rows of the page before stay in view), `Home` goes to the
+  oldest message shown and `End` to the latest, as in Flow. In the input line, `ctrl+a` and
+  `ctrl+e` still move the cursor to the start and end of your draft. When a question is open above
+  the input line, the page keys still scroll the conversation, not the question. `g` and `G` are
+  not chat keys: chat has the oldest message at the top and Flow the newest, so the same letters
+  would mean the opposite. A line that arrives while you've scrolled up doesn't move the view; one
+  line under the conversation says how many wait below, `↓ 2 new (End)`, until you are back at the
+  end. At the end, arrivals and what you send keep the view at the end.
 - **The line under the input** names every key that applies now, in one row. Chat needs **80
   columns**: from 80 to 100 it uses short words, above 100 the full ones, and where a line is still
   too long it drops `scroll`, then shortens `tab answer (2)` to `tab (2)`, never a key, and never
@@ -1281,9 +1465,9 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   or while answering `enter send #812 · esc message the liaison · ctrl+t team activity (goals) · pgup/pgdn scroll · ctrl+d leave`.
   Between 100 and 120 columns the full words come in where they fit. In hidden mode the line never
   offers `↑↓ pick`; while you answer, `tab` still moves to the next question.
-- **What you type in the liaison's pane** (from 0.22.0) is recorded too, as a message to the
-  liaison labelled **`you (typed in the pane, unverified)`**, so chat shows the whole
-  conversation. Every place that shows such a message says "unverified":
+- **What you type in the liaison's pane** is recorded too, as a message to the liaison labelled
+  **`you (typed in the pane, unverified)`**, so chat shows the whole conversation. Every place that
+  shows such a message says "unverified":
 
   | Where | How |
   |---|---|
@@ -1300,20 +1484,19 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   operator or another session with Herdr access) is recorded the same way. So a pane line never
   answers a question, approves anything or closes anything, even if it says `yes` or names a
   question: answer with `xt answer`, `s` in the TUI, or tab in chat. The label is the record; the
-  rule is the behavior (from 0.23.0): every agent treats text typed into its pane as conversation,
-  never as authority. So the liaison doesn't close a question or dispatch a goal from a `yes` typed
-  in its pane: it replies once with the question's id and text, why pane text can't close it and
-  where to answer (`xt chat` or the Inbox), repeats only that pointer if the pane answer comes
-  again, and leaves the question open. Questions about status typed in the pane are answered as
-  before. Slash commands
-  (`/compact`), `!` shell lines and what xt itself typed there aren't recorded, and a message you
-  sent from chat isn't recorded a second time. On Claude Code, a prompt hook also checks each line
-  as you press enter: if it can't be recorded (the supervisor isn't running, the log isn't found),
-  the pane shows `xt: this line is NOT recorded in the team's log (…)`; a line the hook passed on
-  that the log doesn't show within a minute is refused with an Inbox alert and a line in chat (that
-  is also what an agent trying to record words as yours gets). pi and Codex have no prompt hook:
-  their lines are recorded from the session log alone, without the warning in the pane. `xt status`
-  says which applies, in full:
+  rule is the behavior: every agent treats text typed into its pane as conversation, never as
+  authority. So the liaison doesn't close a question or dispatch a goal from a `yes` typed in its
+  pane: it replies once with the question's id and text, why pane text can't close it and where to
+  answer (`xt chat` or the Inbox), repeats only that pointer if the pane answer comes again, and
+  leaves the question open. Questions about status typed in the pane are answered as before. Slash
+  commands (`/compact`), `!` shell lines and what xt itself typed there aren't recorded, and a
+  message you sent from chat isn't recorded a second time. On Claude Code, a prompt hook also
+  checks each line as you press enter: if it can't be recorded (the supervisor isn't running, the
+  log isn't found), the pane shows `xt: this line is NOT recorded in the team's log (…)`; a line
+  the hook passed on that the log doesn't show within a minute is refused with an Inbox alert and a
+  line in chat (that is also what an agent trying to record words as yours gets). pi and Codex have
+  no prompt hook: their lines are recorded from the session log alone, without the warning in the
+  pane. `xt status` says which applies, in full:
 
   | State | `xt status` |
   |---|---|
@@ -1335,7 +1518,7 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   adds the reason: `· pane input recorded (prompt hook and session log)`, `· pane input: session
   log only (no warning in the pane)`, `· pane input: unknown (herdr server not reachable)`, `· pane
   input NOT recorded (no session log) — type here in chat`. When it says NOT recorded, the liaison
-  records your words by hand as before.
+  records your words by hand.
 - **Leaving:** `ctrl+d` (or `ctrl+q`, `ctrl+c`) on an empty line, or type `/exit` (`/quit`). What you
   have typed but not sent is a **draft**: it lives only in the input line and is never written
   anywhere, so leaving with one asks first (`ctrl+d` again leaves and discards it).
@@ -1345,56 +1528,38 @@ everyday way to talk with the team; the TUI stays the view for understanding and
 - It runs only in your own terminal: an agent's session can't use it to speak as you (it is
   refused like `--as human`).
 
+### `xt inbox`
+
+`xt inbox [--days N] [--limit N] [--seen] [--questions]` — the Inbox's three groups, as in the TUI
+(see 7), each row with the command to act on it: **Needs you** (questions, approvals, alerts `⚠`),
+**New since you last looked** (goals done and reports to you) and **Friction** (unread only, then
+`(12 older, seen; …)`). A group with nothing in it is left out; with nothing at all it prints
+`Nothing for you.` In your own terminal it clears New and marks the friction it printed as seen;
+run by an agent it changes nothing. `--limit` caps each group (default 20; what it leaves out, such
+as older unread friction, stays unread), `--days` is how far back it looks (default 30, as the TUI).
+`--seen` also lists what the TUI keeps folded, under the TUI's labels: `(N answered, last 7 days)`
+under Needs you, each `✓ #question first line → your answer`; `(N earlier, seen)` under New, the
+notifications you've seen in the last 7 days; and `(N older, seen)` under Friction. `--questions`
+prints only what waits for an answer, each in full: its text, answer type, options and
+recommendation (what an operator under a drive grant reads, see 15). **Use it** when you're not in
+the TUI; the Inbox panel shows the same (with `--seen`, its folds opened).
+
 ### `xt answer`
 
-`xt answer <id> "your answer"` — answers a question the liaison asked you; the liaison gets it as
-a report and the question closes. **Use it** from a terminal; in the TUI press `s` on the question.
-Answering in the liaison's pane works too (it closes the question itself). A longer answer can come
-from a heredoc (see `xt send`).
-
-**Questions and their answer types** (from 0.21.0; options from 0.14.0). A message from the
-liaison is a narrative that may end in one question, and the question says what kind of answer it
-takes. The type is stored with the question in the ledger, and your answer is checked against it:
-
-| Type | The question ends with | Your answer |
-|---|---|---|
-| **closed** | `Answer yes or no.` | `yes` or `no` (`y`, `n` too); the log records `yes` or `no` |
-| **options** | two to four numbered options, each with what it leads to, and one `Recommended:` | the option's number; your own words only when the question offers **Other** |
-| **open** | (nothing extra) | your own words |
-
-A message with no question at all (a report) needs no answer and never waits in Needs you. Hire
-and schedule approvals are closed questions too: `xt answer 12 yes` approves, `no` denies (see
-[`xt approve`](#xt-approve-xt-deny)).
+`xt answer <id> "your answer"` — answers a question the liaison asked you, or a hire or schedule
+request; the asker gets it as a report and the question closes. **Use it** from a terminal; in chat
+press `tab`, in the TUI `s` on the question. A longer answer can come from a heredoc (see
+`xt send`). The answer is checked against the question's type (see 4): `yes` or `no` for a closed
+question and for approvals, an option's number (or your own words where it offers Other), or your
+words for an open question; a refused answer changes nothing and says what the question takes.
+`xt inbox` and the Inbox row show the type: `yes/no`, `3 options`, `4 options, Other`. `xt log`
+adds a line with the stored type or answer, e.g. `[question: options 1-3, recommended 1, Other
+allowed]` and `[answer: option 2]`.
 
 A reply you send with `xt send <to> --ref <id>` to a closed or options question also closes it, so
-from 0.22.0 it is checked like `xt answer`: an answer the type doesn't allow is refused (nothing
-is sent, and the message names the valid answers), and a valid one is recorded exactly as
-`xt answer` records it, as a report to the asker. A `--ref` reply to an open question or to an ask
-from before 0.21.0 is sent as before.
-
-```text
-When do we ship 0.14.0?
-
-Options:
-1. Ship on Friday — the release waits two days
-2. Ship today — no staging check
-Recommended: 1
-Other: answer in your own words.
-```
-
-Answer with the number (`xt answer 1261 2`), and xt records the option's full text ("Option 2: Ship
-today — no staging check"), so the log says what you chose, not just "2"; a number that isn't an
-option is refused. Without the `Other:` line the question ends with `Answer with the option's
-number.` and words are refused (message the liaison instead if none of the options fits). In the
-TUI answer dialog every option is shown in full, wrapped to the dialog's width (also at 80
-columns); pressing 1 to 4 while the answer is empty fills in that option's text, which you can
-still edit before ctrl+s; once there's text, digits are just digits. On a closed question `s`
-opens a short dialog that takes `y` or `n`. `xt inbox` and the Inbox row show the type: `yes/no`,
-`3 options`, `4 options, Other`. `xt log` adds a line with the stored type or answer, e.g.
-`[question: options 1-3, recommended 1, Other allowed]` and `[answer: option 2]`.
-
-Questions asked before 0.21.0 still read and answer as they did: one with 0.14.0's options takes a
-number or your own words, any other is an open question.
+it is checked like `xt answer`: an answer the type doesn't allow is refused (nothing is sent, and
+the message names the valid answers), and a valid one is recorded exactly as `xt answer` records
+it, as a report to the asker. A `--ref` reply to an open question is sent as is.
 
 Agents ask with flags on `xt send … --type ask`: `--closed` for yes/no, or `--option "<option> ::
 <consequence>"` two to four times with `--recommend <n>` (and `--other` to allow your own words);
@@ -1408,11 +1573,10 @@ lost.
 `xt approve [<id>…]`, `xt deny <id>…` — decide hires and schedules the lead asked for. Without ids,
 `xt approve` lists what's waiting and the command to approve them all. **Use it** when a
 notification says something waits for you; in the TUI, `a` / `d` on the Inbox row (the detail
-shows the role or schedule first). From 0.21.0 every hire and schedule request is a yes/no
-question, and `xt answer <id> yes` (or `no`) and `s`, then `y` / `n`, in the TUI do the same with
-the same result; `xt approve` and `xt deny` stay as aliases and print a one-line note saying so
-(on standard error; their removal is decided in 0.23.0). A request already answered, through any
-route, is refused with a clear message.
+shows the role or schedule first). Every hire and schedule request is a yes/no question, and
+`xt answer <id> yes` (or `no`), `tab` in chat and `s`, then `y` / `n`, in the TUI do the same with
+the same result; `xt approve` and `xt deny` are aliases and print a one-line note saying so (on
+standard error). A request already answered, through any route, is refused with a clear message.
 
 ### `xt clear`
 
@@ -1433,23 +1597,24 @@ to change a schedule's hours, or to switch one off.
 
 ### `xt spawn`
 
-`xt spawn <name> [--harness H --role R [--model M] [--reports-to NAME]]` —
-starts an agent. For an agent already in the roster (stopped), it starts it again with its role and
-harness; a running one is refused (`xt restart <name>` restarts it). For a new one, `--harness` and `--role` are needed and `roles/<role>.md` must exist. The
-lead's spawns become approval requests; yours start immediately. **Use it** to bring back a stopped
-agent (`u` in the TUI), or to add an agent yourself.
+`xt spawn <name> [--harness H --role R [--model M] [--reports-to NAME]]` — starts an agent. For an
+agent already in the roster (stopped), it starts it again with its role and harness; a running one
+is refused (`xt restart <name>` restarts it). For a new one, `--harness` and `--role` are needed and
+`roles/<role>.md` must exist. The lead's spawns become approval requests; yours start immediately.
+**Use it** to bring back a stopped agent (`u` in the TUI), or to add an agent yourself.
 
-**Settings.** What the agent may do comes from its capability block in `team.toml` (its own, or
-the team's `[defaults.capabilities]`); the approval shows it in one sentence. When no block applies
-to a Claude Code agent, the approval also says, in red in the TUI: "WARNING: carol would start
-without generated settings, so the operator's own claude defaults apply (a [capabilities] block in
+What the agent may do comes from its capability block in `team.toml` (its own, or the team's
+`[defaults.capabilities]`; see 13); the approval shows it in one sentence, and a `require` the
+harness can't enforce refuses the request before any approval. When no block applies to a Claude
+Code agent, the approval also says, in red in the TUI: "WARNING: carol would start without
+generated settings, so the operator's own claude defaults apply (a [capabilities] block in
 team.toml gives it some)."
 
 ### `xt stop`
 
 `xt stop <name>` — closes the agent's workspace and keeps it in the roster. Its not running doesn't
 alert, but a message queued for it still alerts after 2 minutes (`queued:<name>`, see
-[When something goes wrong](#9-when-something-goes-wrong)).
+[When something goes wrong](#10-when-something-goes-wrong)).
 **Use it** to pause one agent; `x` in the TUI. `xt spawn <name>` or `u` brings it back.
 
 ### `xt retire`
@@ -1464,11 +1629,11 @@ is no longer needed; `R` in the TUI (not for the liaison or lead).
 talk. xt checks the hierarchy (an agent messages only the one it reports to and its own reports),
 logs the message and delivers it when the recipient is idle. **Use it** yourself rarely: to message
 an agent directly (`xt send lead --type ask "…"`); `S` in the TUI messages the liaison. An `ask`
-may declare its answer type with `--closed`, or `--option … --recommend N [--other]` (from 0.21.0;
-see [`xt answer`](#xt-answer)).
+may declare its answer type with `--closed`, or `--option … --recommend N [--other]` (see
+[`xt answer`](#xt-answer)).
 
-When the recipient is a team member that isn't running (from 0.22.1), the message is queued as
-before and xt adds one line on standard error for whoever sent it. An agent reads
+When the recipient is a team member that isn't running, the message is queued as before and xt
+adds one line on standard error for whoever sent it. An agent reads
 `queued: builder isn't running; the human is alerted if it still isn't in 2 minutes.`;
 from your own terminal it reads
 `queued: builder isn't running; you get an alert (queued:builder) if it still isn't in 2 minutes.`
@@ -1492,17 +1657,17 @@ XT_END
 Agents are told to send every message this way (protocol section 2): text in a quoted argument
 goes through the shell first, so backticks and `$(…)` in it would run as commands.
 
-**Follow-ups under a closed goal** (from 0.23.0). A task's `--ref` must be an open goal, with one
-exception: for 24 hours after a goal is closed, the lead that owned it may send a task with
-`--ref` to it, to carry an answer or decision that came after the closing. xt delivers it like any
-task and marks it a follow-up (`follow-up to closed goal #3; …` after the send, `(follow-up to a
-closed goal)` in `xt log`); the goal stays closed and its record unchanged, and the follow-up's
-own `done` closes only the task. The brief and `xt status` list it as `[follow-up to closed goal
-#3]`, in shorter words where the line would pass 76 columns. From 24 hours after the closing
-(the window is a fixed 24 hours, `FOLLOW_UP_HOURS`), the same command is refused: `goal #3 closed
-26h ago; the follow-up window is 24h. New work needs a new goal: ask the liaison to dispatch
-one.` Anyone else, or a goal the lead didn't own, is refused too. Reports and `done` with `--ref`
-to a closed goal work as before.
+**Follow-ups under a closed goal.** A task's `--ref` must be an open goal, with one exception: for
+24 hours after a goal is closed, the lead that owned it may send a task with `--ref` to it, to
+carry an answer or decision that came after the closing. xt delivers it like any task and marks it
+a follow-up (`follow-up to closed goal #3; …` after the send, `(follow-up to a closed goal)` in
+`xt log`); the goal stays closed and its record unchanged, and the follow-up's own `done` closes
+only the task. The brief and `xt status` list it as `[follow-up to closed goal #3]`, in shorter
+words where the line would pass 76 columns. From 24 hours after the closing (the window is a fixed
+24 hours, `FOLLOW_UP_HOURS`), the same command is refused: `goal #3 closed 26h ago; the follow-up
+window is 24h. New work needs a new goal: ask the liaison to dispatch one.` Anyone else, or a goal
+the lead didn't own, is refused too. Reports and `done` with `--ref` to a closed goal work as
+before.
 
 ### `xt done`
 
@@ -1523,12 +1688,12 @@ harness (a command refused something reasonable, a sandbox blocked it). It reach
 the agent's report instead, for the lead.
 
 **How the harnesses keep the rule "no friction, no line"** (protocol §4: never write "no issues").
-Seen so far (one review of 0.19.0, 2026-10-02): Codex agents complied; one pi agent (with a
-non-Anthropic default model) ended a `done` with "No issues."; Claude Code agents weren't checked in
-that review. From 0.20.0 a pi agent's first prompt carries a one-line reminder of the rule just
-before its last line (`first_prompt_note` in `harnesses/pi.toml`, away from pi's guard line); a
-"no issues" line isn't flagged or refused, so if you see one, tell the lead. The evidence is one
-run: whether the reminder changes the habit is still to be seen.
+Seen so far (one review, 2026-10-02): Codex agents complied; one pi agent (with a non-Anthropic
+default model) ended a `done` with "No issues."; Claude Code agents weren't checked in that review.
+A pi agent's first prompt carries a one-line reminder of the rule just before its last line
+(`first_prompt_note` in `harnesses/pi.toml`, away from pi's guard line); a "no issues" line isn't
+flagged or refused, so if you see one, tell the lead. The evidence is one run: whether the reminder
+changes the habit is still to be seen.
 
 ### `xt goal`
 
@@ -1545,22 +1710,55 @@ what it knows (`xt brief lead`).
 
 ### `xt log`
 
-`xt log [--member NAME] [--id ID] [--type TYPE] [--since DAYS] [--limit N | --full]` — the
-message history, filtered. By default it prints the newest 20 messages that match the filters, oldest
-of them first, and a first line saying how many older ones were left out; `--limit N` prints the
-newest N, `--full` all of them. `--id` alone still prints the whole thread (from 0.15.0; before, `xt
-log` always printed everything); an id that no message has says `no such message: #ID` and exits
-with an error, while an existing message filtered away still prints `(no messages)` (from 0.20.0).
-`xt log --events [--limit N]` prints the supervisor's newest events instead (50 by default), once:
-it doesn't follow new ones (run it again, or watch the TUI's supervisor pop-up). `--watch` was its
-name before 0.20.0 and still works. **Use it** to trace a goal (`--id 234` shows the goal and every message
-that refers to it directly) or an agent (`--member carol`); the TUI's Flow pane (`3`) and the
-supervisor's pop-up (`v`) show the recent part.
+`xt log [--member NAME] [--id ID] [--type TYPE] [--since DAYS] [--limit N | --full]` — the message
+history, filtered. By default it prints the newest 20 messages that match the filters, oldest of
+them first, and a first line saying how many older ones were left out; `--limit N` prints the
+newest N, `--full` all of them. `--id` alone prints the whole thread; an id that no message has says
+`no such message: #ID` and exits with an error, while an existing message filtered away still
+prints `(no messages)`. `xt log --events [--limit N]` (or its older name `--watch`) prints the
+supervisor's newest events instead (50 by default), once: it doesn't follow new ones (run it again,
+or watch the TUI's supervisor pop-up). **Use it** to trace a goal (`--id 234` shows the goal and
+every message that refers to it directly) or an agent (`--member carol`); the TUI's Flow pane (`3`)
+and the supervisor's pop-up (`v`) show the recent part.
 
 ### `xt harnesses`
 
-`xt harnesses` — which harnesses are installed here, how their model is chosen, and their known
-limits. **Use it** before choosing a harness for the liaison, lead or a new agent.
+`xt harnesses` — which harnesses are installed here, how their model is chosen, their start
+arguments and known limits, what they block (desktop and browser tools, account connectors), their
+capability support table (see 13) and whether they take a settings file. **Use it** before choosing
+a harness for the liaison, lead or a new agent.
+
+### `xt capabilities`
+
+`xt capabilities <name>` — prints the `[capabilities]` block that replaces an agent's old
+`permissions`, `codex_options` and `connectors` lines (removed in 0.24), to put at the end of the
+agent's entry, with what the block can't say listed as "kept in extras" and anything that would
+loosen it named. It changes nothing, and it
+is the one command that loads a `team.toml` that still has the old lines. **Use it** to convert a
+team before upgrading (see [Upgrading to 0.24](#upgrading-to-024-convert-the-old-permission-lines)).
+
+### `xt operator`
+
+`xt operator add NAME --pid PID` | `xt operator remove NAME` | `xt operator list` | `xt operator
+pid` — registers an outside process acting for you (see 15). `add` and `remove` are yours, in your
+own terminal. `add` takes the operator's harness process, which the operator's own `xt operator
+pid` prints, and writes the token to `.xt/operators/NAME.token`. Run it again after each operator
+session. `list` shows the registrations and any active grant.
+
+### `xt delegate`
+
+`xt delegate NAME [--for 30m] [--only restart,reset,spawn,up]` | `xt delegate NAME [--for 30m]
+--scope drive` | `xt delegate [NAME] --revoke` — lets a registered operator run `restart`, `reset`,
+`spawn` of an existing agent and `up`, or with `--scope drive` answer your questions, decide
+approvals and give the liaison goals, for at most 60 minutes (default 30), recorded in the log;
+`--revoke` ends it early (without a name: every grant). Human only. `down`, `restart --all`,
+version switches, registering and granting are never delegated. See 15.
+
+### `xt pane-input`
+
+`xt pane-input --hook` — run by the liaison's Claude Code prompt hook, not by hand: it queues a line
+you typed in the liaison's pane, which is recorded only once the session log shows it was typed
+(see [`xt chat`](#xt-chat)).
 
 ### `xt watch`
 
@@ -1571,4 +1769,5 @@ notification or usage recording also raises an Inbox alert.
 ### `xt tui`
 
 `xt tui [--demo]` — the TUI without the `xt up` step; `--demo` shows it with made-up example data
-(no team needed, nothing is changed, the same panes and labels as the real TUI). Keys: `h` lists them all; the [README](../README.md#the-tui) has the table.
+(no team needed, nothing is changed, the same panes and labels as the real TUI). Keys: `h` lists
+them all; [7. The TUI](#7-the-tui) has the table.

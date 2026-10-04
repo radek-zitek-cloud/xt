@@ -1,7 +1,8 @@
 # Goals in practice
 
-Part one: three real goals, word for word, as they were sent to xt teams in September 2026. Part
-two: [configurations and questions to copy](#part-two-copy-and-adapt), written for this page.
+Part one: three real goals, word for word, as they were sent to xt teams in September 2026, with
+what the team did. Part two: [flows and configurations to copy](#part-two-copy-and-adapt), written
+for this page and labelled **runnable** or **illustrative**.
 
 Together the three goals
 show what the [story](story.md) means by "write outcomes, not steps": what a goal looks like, how
@@ -10,7 +11,8 @@ a team reads it, and how a plain-language goal fixes a rule the team followed to
 Each goal was typed into the team's **liaison** by Claude on Radek's behalf, which is why they
 start with "From Claude, on Radek's behalf". The liaison turned each into a goal brief for the
 **lead**, which planned the work and ran the team. Two details were redacted: a local file path
-and an internal board id.
+and an internal board id. They are records of what happened then: today you would give the same
+goal in `xt chat` (see 4).
 
 - [1. Hire a scout](#1-hire-a-scout-the-newsroom-finds-its-own-stories): outcomes only; the
   team designed the solution
@@ -18,12 +20,20 @@ and an internal board id.
   fixing a rule the team followed exactly
 - [3. Set up the xt product team](#3-set-up-the-xt-product-team-a-team-with-a-working-method):
   a new team, with a working method passed on as part of the goal
-- [4. A Claude Code agent with a capability block](#4-a-claude-code-agent-with-a-capability-block):
-  settings to copy (part two)
-- [5. A decision question with options](#5-a-decision-question-with-options): what the liaison
-  sends and what you see (part two)
+- Part two: [4. a goal with read-back](#4-a-goal-with-read-back-in-chat) ·
+  [5. a question with options](#5-a-question-with-options) ·
+  [6. a hire waiting for your yes](#6-a-hire-waiting-for-your-yes) ·
+  [7. a drive grant](#7-hand-your-coding-agent-the-wheel-for-half-an-hour) ·
+  [8. a capability block](#8-a-teamtoml-with-a-capability-block) ·
+  [9. network for one Codex agent](#9-network-for-one-codex-agent) ·
+  [10. automatic resets](#10-reset-heavy-agents-automatically) ·
+  [11. the board watch](#11-tell-the-lead-when-a-card-is-ready-to-build) ·
+  [12. an operator's staging check](#12-let-your-own-coding-agent-run-a-staging-check) ·
+  [13. a chat session](#13-a-chat-session-an-operator-the-pane-and-a-question)
 
 ## 1. Hire a scout: the newsroom finds its own stories
+
+*Illustrative: a record of a real run, word for word.*
 
 **Context.** A newsroom team of six agents (a lead, a researcher, an author, an editor and a
 publisher, plus the liaison) had so far written articles on request. This goal asked it to find
@@ -83,6 +93,8 @@ researcher and the hourly schedule each waited for the human's approval.
 
 ## 2. Correct the auto-pick rule: fixing what the team did exactly right
 
+*Illustrative: a record of a real run, word for word.*
+
 **Context.** Goal 1 said: if the human hasn't picked when the next batch arrives, "the lead picks
 the top topic of the new batch". The lead did exactly that, and also sent the same new batch to
 the human to decide, so the human's choice would have come after the writing started, and the
@@ -121,6 +133,8 @@ answered a batch with "none", the lead recorded it as a decision; a one-line fol
 that explicit too: a pass is a decision, never overridden by an auto-pick.
 
 ## 3. Set up the xt product team: a team with a working method
+
+*Illustrative: a record of a real run, word for word.*
 
 **Context.** A new team, whose job is product management for xt itself: the backlog on a Kanban
 board (Fizzy), specs, research, documentation and release notes in a public wiki (SilverBullet).
@@ -223,56 +237,60 @@ twice, so the liaison had to withdraw its first question and ask again with the 
 
 ## Part two: copy and adapt
 
-These are written for this page, not taken from a run. They follow the setup of xt's own
-product team (from 0.15.0); adjust names, paths and rules to your team.
+These are written for this page, not taken from a run; adjust names, paths and rules to your team.
+Each is labelled:
 
-## 4. A Claude Code agent with a capability block
+- **Runnable**: run it yourself as shown, in a throwaway team: a fresh checkout of xt with `herdr`
+  and `git` installed, set up with `./bin/xt init --yes --name example --session example` (it
+  needs no running Herdr session for these). The expected output is shown.
+- **Illustrative**: shown to explain, not to run as is, because it needs a running team or your
+  own authority (an answer, an approval, a grant). The commands and flags are real.
 
-**Context.** A Claude Code agent nobody watches must never stop at a permission prompt, and must
-never do more than its role needs. Give it a capability block in `team.toml`: xt turns it into a
-Claude Code settings file (`dontAsk`: anything not allowed is refused at once instead of waiting).
-`team.toml` and settings files are yours: agents never edit them.
+## 4. A goal with read-back, in chat
 
-In `team.toml`:
+*Illustrative: it needs a running liaison.*
 
-```toml
-[[agent]]
-name = "researcher"
-role = "researcher"
-harness = "claude"
-model = "claude-sonnet-5-5"
-reports_to = "lead"
-status = "active"
-[agent.capabilities]
-commands = ["rg", "cat", "git status", "git log"]
-extras = "settings/researcher.json"
+**Context.** You want something done and talk it through with the liaison in `xt chat`. The
+liaison drafts the goal in `goals/drafts/`, then reads it back to you as a yes/no question before
+it goes to the lead: nothing is dispatched on a misunderstanding.
+
+In **your own terminal**, `xt chat`, then type what you want and press `enter`. A few turns later
+chat shows, at 80 columns:
+
+```text
+xt chat with liaison (claude) · pane input recorded
+12:00 you  #4
+I'd like a short digest of what the team shipped each week, ready on Friday
+morning.
+
+12:00 liaison  #5  ⚑ yes/no
+Here is the goal as I'd send it to the lead:
+Outcome: every Friday by 09:00, digests/<year>-<week>.md lists the week's merged
+work, one line each, with links.
+Done when: the first digest is written and the weekly schedule is approved.
+
+Dispatch it as written?
+
+Answer yes or no.
+⚑ waits for your answer: tab picks it
 ```
 
-`settings/researcher.json`, for what the block can't say:
+Press `tab`: the question opens above the input line, which reads `answer #5 ›`. Type `yes` and
+press `enter`; chat confirms `#6 answer to #5 → liaison: …` and the question shows `✓ answered #6:
+yes`. `no` instead, and the liaison asks what to change. Your yes doesn't dispatch the goal by
+itself: the liaison does, with `xt goal dispatch`, and chat shows it as a dimmed line
+(`12:01 to lead: goal #7 …`). When the goal closes you get one notification.
 
-```json
-{
-  "permissions": {
-    "deny": ["Bash(git push *)", "Bash(curl *)", "Bash(rm *)"]
-  },
-  "statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}
-}
-```
+- What makes a good goal: the outcome, constraints, and when it's done; leave the how to the team.
+  Part one has three real ones.
+- The same question waits in the TUI's Inbox (`s` on it, then `y`), and `xt answer 5 yes` answers
+  it from any terminal of yours. A `yes` typed into the liaison's own pane doesn't: pane text is
+  unverified (see 13).
+- See the [user guide](user-guide.md#3-giving-the-team-a-goal).
 
-- Its own notes, `team.toml`, `settings/`, network off and the credential CLIs need no line: they
-  are the defaults. xt itself is always allowed.
-- `commands` is the shell commands it may run; everything else is refused.
-- `extras` puts the file on top of the generated settings, where it may only restrict: a rule that
-  would loosen the block refuses the start, naming the rule. Without anything left to say, leave
-  `extras` out.
-- `statusLine` is optional: it shows the Claude plan's usage in `xt status` (one agent is enough).
+## 5. A question with options
 
-`xt spawn researcher` starts it (or the lead's `xt spawn researcher --as lead` asks for your
-approval, which shows what it may do in one sentence). The start note names the file and a hash of
-its content, and `xt status` shows the agent's `caps:` row. See the
-[user guide](user-guide.md#11-memory-and-recovery).
-
-## 5. A decision question with options
+*Illustrative: the liaison sends it, and only you answer it.*
 
 **Context.** When the team needs a decision only you can make, the liaison asks it through xt as
 one self-contained sentence with two to four options, each with what follows from it, and one
@@ -289,7 +307,7 @@ Should the weekly digest go out today or tomorrow?
 XT_END
 ```
 
-What you see in the Inbox (TUI and `xt inbox`), with a desktop notification:
+What you see in chat and the Inbox (TUI and `xt inbox`), with a desktop notification:
 
 ```text
 Should the weekly digest go out today or tomorrow?
@@ -301,15 +319,203 @@ Recommended: 2
 Other: answer in your own words.
 ```
 
-Answer with the number (`xt answer 230 2`, or in the TUI `s` on it, `2`, ctrl+s), and the log records
-"Option 2: Publish tomorrow — fully reviewed, one day late", so it says what you chose. Your own
-words work because the question has `--other`; without it, xt accepts only an option's number. A
-yes/no question is `--closed` instead of options (`xt answer 231 yes`, or `s` then `y` in the TUI).
-xt refuses a question with fewer than two or more than four options, an empty option or one
-without ` :: ` and its consequence, no single recommendation, or `--other` on a closed question,
-and shows your text back so nothing is lost. See [`xt answer`](user-guide.md#xt-answer).
+Answer with the number (`tab` in chat, then `2`; `xt answer 230 2`; or in the TUI `s` on it, `2`,
+ctrl+s), and the log records "Option 2: Publish tomorrow — fully reviewed, one day late", so it says
+what you chose. Your own words work because the question has `--other`; without it, xt accepts only
+an option's number. A yes/no question is `--closed` instead of options (`xt answer 231 yes`). xt
+refuses a question with fewer than two or more than four options, an empty option or one without
+` :: ` and its consequence, no single recommendation, or `--other` on a closed question, and shows
+your text back so nothing is lost. See [`xt answer`](user-guide.md#xt-answer).
 
-## 6. Reset heavy agents automatically
+## 6. A hire waiting for your yes
+
+*Illustrative: the lead asks, and only you approve.*
+
+**Context.** The lead decides it needs a writer. It writes `roles/writer.md` and asks to hire one;
+every agent turn costs money, so the hire waits for you.
+
+What the lead runs, and what xt answers it:
+
+```sh
+xt spawn writer --harness claude --role writer --as lead
+# approval #6 requested from the human; you'll get a message when it's decided
+```
+
+What you see in chat at 80 columns (the TUI's Inbox shows `⚑ #6 spawn writer (writer,
+claude/default)  yes/no`, with a desktop notification):
+
+```text
+12:00 xt  #6  ⚑ yes/no
+lead asks to spawn writer as writer on claude, reporting to lead. WARNING:
+writer would start without generated settings, so the operator's own claude
+defaults apply (a [capabilities] block in team.toml gives it some).
+Approve its start: write, deny, network, credential_clis advisory (role text
+only).
+
+Answer yes or no: xt answer 6 yes|no (or s, then y / n on it in the TUI's
+Inbox). xt approve 6 and xt deny 6 (a / d) still work.
+⚑ waits for your answer: tab picks it
+```
+
+The sentence says what the agent may do and which of it its harness can only keep advisory. Here
+the team has no capability block yet, hence the warning: give the team one first (see 8), and the
+same request says what the block enforces instead. Answer `yes` (`tab` in chat, or
+`xt answer 6 yes`): `#6: spawned writer in workspace …`, and the lead hears it. `no` denies it.
+
+## 7. Hand your coding agent the wheel for half an hour
+
+*Illustrative: it needs a registered operator (see 12) and your grant.*
+
+**Context.** You use your own coding-agent session, registered as the operator `helper` (see 12),
+and you're away from the keyboard for half an hour: the team shouldn't wait on you, so the operator
+answers your questions, decides approvals and gives the liaison its next goal. In **your own
+terminal**:
+
+```sh
+xt delegate helper --for 30m --scope drive   # replaces any other grant; at most 60m
+```
+
+The operator finds what waits for you, whole (text, answer type, options, recommendation):
+
+```sh
+XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/helper.token) \
+  /path/to/team/bin/xt inbox --questions
+```
+
+and answers it, approves a hire, and gives a goal, each with the token and `--as helper`:
+
+```sh
+xt answer 1290 2 --as helper            # recorded as "Option 2: …", checked like your answer
+xt answer 1291 yes --as helper          # approves hire #1291
+xt send liaison --as helper --type goal <<'XT_END'
+After the digest: draft next week's reading list from the scout's stories.
+XT_END
+```
+
+Each lands under `helper`, never `human`, ending in `(helper, delegated by human until 15:30: an
+operator acting on the human's behalf)`, and shows in your Inbox and in chat. Back at the
+keyboard, answering #1290 yourself shows what was decided: `#1290 already answered by helper
+(operator, delegated by you until 15:30): "Option 2: …" — nothing sent.` At 15:30 the log says
+`drive grant for helper ended 15:30`, and the operator's next answer is refused; `xt delegate
+--revoke` ends it sooner.
+
+- A drive grant doesn't run `restart` or `spawn`; grant those separately when you need them (the new
+  grant replaces drive).
+- `xt down`, `xt restart --all`, version switches and granting stay yours, grant or no grant. See
+  the [user guide](user-guide.md#15-an-operator-acting-for-you).
+
+## 8. A team.toml with a capability block
+
+*Runnable: in a throwaway team (see above).*
+
+**Context.** A Claude Code agent nobody watches must never stop at a permission prompt, and must
+never do more than its role needs. Give it a capability block in `team.toml`: xt turns it into a
+Claude Code settings file (`dontAsk`: anything not allowed is refused at once instead of waiting).
+`team.toml` and settings files are yours: agents never edit them.
+
+Add this to the end of `team.toml`:
+
+```toml
+[[agent]]
+name = "researcher"
+role = "researcher"
+harness = "claude"
+model = "claude-sonnet-5-5"
+reports_to = "lead"
+status = "active"
+[agent.capabilities]
+commands = ["rg", "cat", "git status", "git log"]
+extras = "settings/researcher.json"
+```
+
+and write `settings/researcher.json`, for what the block can't say:
+
+```json
+{
+  "permissions": {
+    "deny": ["Bash(git push *)", "Bash(curl *)", "Bash(rm *)"]
+  },
+  "statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}
+}
+```
+
+Check that xt reads it: any command that loads the team does, and `./bin/xt goal list` changes
+nothing:
+
+```text
+Drafts:
+  (none)
+Open goals:
+  (none)
+```
+
+A mistake is refused at load, naming it. Write `netwerk = "on"` in the block, and the same command
+prints, on standard error:
+
+```text
+xt: agent researcher's capabilities.netwerk in team.toml isn't a capability (write, deny, commands, network, connectors, skills, credential_clis, and require and extras)
+```
+
+- Its own notes, `team.toml`, `settings/`, network off and the credential CLIs need no line: they
+  are the defaults. xt itself is always allowed.
+- `commands` is the shell commands it may run; everything else is refused.
+- `extras` puts the file on top of the generated settings, where it may only restrict: a rule that
+  would loosen the block refuses the start, naming the rule. Without anything left to say, leave
+  `extras` out.
+- `statusLine` is optional: it shows the Claude plan's usage in `xt status` (one agent is enough).
+
+In a running team, `xt spawn researcher` then starts it (or the lead's request asks for your
+approval, which shows what it may do in one sentence, as in 6). The start note names the file and a
+hash of its content, and `xt status` shows the agent's `caps:` row. See the
+[user guide](user-guide.md#13-what-agents-may-do-capabilities).
+
+## 9. Network for one Codex agent
+
+*Illustrative: it needs a running Codex agent.*
+
+**Context.** Codex agents work in Codex's sandbox without network. A quality analyst that runs the
+project's test suite and `uv run` in its own clean clone needs packages and local sockets that the
+sandbox refuses. Give that one agent network, and nobody else.
+
+In `team.toml` (yours to edit; agents never do), a block that also lets the sandbox write the
+clean clone:
+
+```toml
+[[agent]]
+name = "qa"
+role = "quality-analyst"
+harness = "codex"
+reports_to = "lead"
+status = "active"
+[agent.capabilities]
+network = "on"
+write = ["/tmp/qa-check"]          # passed to Codex as --add-dir /tmp/qa-check
+```
+
+Then `xt restart qa`: the block applies at the next start. Codex enforces `network` (its sandbox);
+its other capabilities show `advisory` in the row.
+
+**Running the suite in the clean clone.** Network alone isn't enough for `uv run`: Codex's sandbox
+keeps uv's default cache under the home directory read-only. Point the cache into the clone:
+
+```sh
+git clone --branch vX.Y.Z-rcN /path/to/the/builders/clone /tmp/qa-check
+cd /tmp/qa-check
+UV_CACHE_DIR=/tmp/qa-check/.uv-cache uv run pytest -q
+```
+
+When the operator first checked this (with the same network switch the block sets), the suite
+passed this way without an escalation; with network on but the default cache, `uv run` failed. xt
+adds no option for the cache path.
+
+- Codex opens the network wholesale: the agent can reach any host, not just a package index.
+  Give it only to an agent whose workspace holds no credentials (here a clean clone). xt doesn't
+  check that; it's your rule.
+- See the [user guide](user-guide.md#13-what-agents-may-do-capabilities).
+
+## 10. Reset heavy agents automatically
+
+*Illustrative: it needs running agents with a context to measure.*
 
 **Context.** Every turn re-reads an agent's whole context, so a long-running agent gets more
 expensive by the hour. The automatic reset policy (off by default) gives an idle agent without open
@@ -357,62 +563,16 @@ tokens; policy auto_reset): the supervisor runs it when builder is idle with no 
 
 `xt reset builder --cancel` removes a queued one (the cool-down then applies). The trade-off: a fresh
 context costs a turn re-reading the first prompt, the brief and the agent's notes, and whatever
-isn't in its notes is gone. See the [user guide](user-guide.md#8-pausing-and-resuming-the-team).
+isn't in its notes is gone. See the [user guide](user-guide.md#9-pausing-resuming-and-resetting).
 
-## 7. Network for one Codex agent
+## 11. Tell the lead when a card is Ready to build
 
-**Context.** Every Codex agent runs in Codex's sandbox without network. A quality analyst that runs
-the project's test suite and `uv run` in its own clean clone needs packages and local sockets that
-the sandbox refuses. Give that one agent network, and nobody else (from 0.19.0).
-
-In `team.toml` (yours to edit; agents never do), a block that also lets the sandbox write the
-clean clone:
-
-```toml
-[[agent]]
-name = "qa"
-role = "quality-analyst"
-harness = "codex"
-reports_to = "lead"
-status = "active"
-[agent.capabilities]
-network = "on"
-write = ["/tmp/qa-check"]          # passed to Codex as --add-dir /tmp/qa-check
-```
-
-Then `xt restart qa`: the block applies at the next start. Codex has no per-host limit: with
-network on, the agent can reach any host, so give it to an agent that works in a clean clone holding
-no credentials.
-
-Codex enforces `network` (its sandbox); its other capabilities show `advisory` in the row.
-
-**Running the suite in the clean clone.** Network alone isn't enough for `uv run`: Codex's sandbox
-keeps uv's default cache under the home directory read-only. Point the cache into the clone:
-
-```sh
-git clone --branch vX.Y.Z-rcN /path/to/the/builders/clone /tmp/qa-check
-cd /tmp/qa-check
-UV_CACHE_DIR=/tmp/qa-check/.uv-cache uv run pytest -q
-```
-
-On the operator's check of 0.19.0-rc1 this passed (532 tests in about 90 s) without an
-escalation; with network on but the default cache, `uv run` failed. xt adds no option for the
-cache path.
-
-- Codex opens the network wholesale: the agent can reach any host, not just a package index.
-  Give it only to an agent whose workspace holds no credentials (here a clean clone). xt doesn't
-  check that; it's your rule.
-- xt accepts only the network switch (`=true` or `=false`). Any other key or value refuses the
-  agent's start and names what is allowed, because Codex may silently accept a key it doesn't know.
-- An agent without the line runs as before, with no network. See the
-  [user guide](user-guide.md#11-memory-and-recovery).
-
-## 8. Tell the lead when a card is Ready to build
+*Illustrative: it needs your board tool and its token.*
 
 **Context.** You approve work by moving its card on the Board into Ready to build, and the lead
 should start on it without a message from you. The board watch runs a command you name and tells
-the lead about each card that enters the column (from 0.19.0). Here the Board is Fizzy, with its
-command-line client `fizzy`.
+the lead about each card that enters the column. Here the Board is Fizzy, with its command-line
+client `fizzy`.
 
 Find the board's and the column's IDs once, in your own terminal:
 
@@ -456,12 +616,14 @@ Card 129 (Work outline) is now in Ready to build (seen by the board watch)
   success; cards that entered meanwhile are reported then.
 - Any other board works the same way: a command, or a small script, that prints the array.
 
-## 9. Let your own coding agent run a staging check
+## 12. Let your own coding agent run a staging check
+
+*Illustrative: it needs a running team and your grant.*
 
 **Context.** You use your own coding-agent session (here Claude Code, in a terminal outside the
 team) to help with a staging check. It should be able to report to the liaison and restart agents
 while you're away from the keyboard, but never act as you, never take the team down and never answer
-or approve anything (from 0.19.0).
+or approve anything.
 
 In the operator's session, ask it to run:
 
@@ -482,7 +644,7 @@ The operator's commands then carry the token and its name. A report to the liais
 ```sh
 XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/helper.token) \
   /path/to/team/bin/xt send liaison --as helper --type report <<'XT_END'
-Staging check of 0.19.0-rc2: steps 1-9 pass; step 10 waits for a lead restart.
+Staging check of the release candidate: steps 1-9 pass; step 10 waits for a lead restart.
 XT_END
 ```
 
@@ -503,62 +665,27 @@ xt delegate --revoke                    # or let it expire
 
 - **Never delegated:** `xt down`, `xt restart --all`, `xt version use` and `rollback`, `xt operator
   add` and `xt delegate`. They stay yours, grant or no grant, and `--as human` keeps working only
-  from your own terminal. Answers and approvals need a drive grant (section 10).
+  from your own terminal. Answers and approvals need a drive grant (see 7).
 - Both the token and the registered process are needed: the token copied into another shell, or the
   operator's process without the token, is refused. A new operator session needs a new `xt
   operator add`.
 - `xt status` and the TUI's Team header show the grant and its end time while it lasts. See the
-  [user guide](user-guide.md#13-an-operator-acting-for-you).
+  [user guide](user-guide.md#15-an-operator-acting-for-you).
 
-## 10. Hand your coding agent the wheel for half an hour
+## 13. A chat session: an operator, the pane and a question
 
-**Context.** The same operator as in section 9, while you're away from the keyboard for half an
-hour: the team shouldn't wait on you, so the operator answers your questions, decides approvals and
-gives the liaison its next goal (from 0.22.0). In **your own terminal**:
+*Illustrative: it needs a running liaison and a registered operator.*
 
-```sh
-xt delegate helper --for 30m --scope drive   # replaces any other grant; at most 60m
-```
-
-The operator finds what waits for you, whole (text, answer type, options, recommendation):
-
-```sh
-XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/helper.token) \
-  /path/to/team/bin/xt inbox --questions
-```
-
-and answers it, approves a hire, and gives a goal, each with the token and `--as helper`:
-
-```sh
-xt answer 1290 2 --as helper            # recorded as "Option 2: …", checked like your answer
-xt answer 1291 yes --as helper          # approves hire #1291
-xt send liaison --as helper --type goal <<'XT_END'
-After the digest: draft next week's reading list from the scout's stories.
-XT_END
-```
-
-Each lands under `helper`, never `human`, ending in `(helper, delegated by human until 15:30: an
-operator acting on the human's behalf)`, and shows in your Inbox. Back at the keyboard, answering
-#1290 yourself shows what was decided: `#1290 already answered by helper (operator, delegated by
-you until 15:30): "Option 2: …" — nothing sent.` At 15:30 the log says `drive grant for helper
-ended 15:30`, and the operator's next answer is refused; `xt delegate --revoke` ends it sooner.
-
-- A drive grant doesn't run `restart` or `spawn`; grant those separately when you need them (the new
-  grant replaces drive).
-
-## 11. A chat session: an operator, the pane and a question
-
-**Context.** You talk to the liaison in `xt chat` (from 0.21.0). Three kinds of line surprise
-newcomers most: one from an operator, one you typed into the liaison's own pane, and a question
-answered in place (from 0.22.0; ids and times below are from a fresh team). Chat needs 80
-columns. In **your own terminal**:
+**Context.** You talk to the liaison in `xt chat`. Three kinds of line surprise newcomers most: one
+from an operator, one you typed into the liaison's own pane, and a question answered in place (ids
+and times below are from a fresh team). Chat needs 80 columns. In **your own terminal**:
 
 ```sh
 xt chat
 ```
 
 Type `Where is the digest?` and press `enter`. Meanwhile an operator registered as `op` (as
-`helper` is in section 9) reports to the liaison:
+`helper` is in 12) reports to the liaison:
 
 ```sh
 XT_OPERATOR_TOKEN=$(cat /path/to/team/.xt/operators/op.token) \

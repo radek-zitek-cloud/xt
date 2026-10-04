@@ -32,8 +32,8 @@ def test_172_the_protocol_and_every_roles_first_prompt_say_what_an_operator_repo
 
 
 def test_172_the_user_guide_mentions_it():
-    guide = (REPO / "docs" / "user-guide.md").read_text()
-    assert "Agents know what such a report is" in guide and "not rejected as\nimpersonation" in guide
+    guide = " ".join((REPO / "docs" / "user-guide.md").read_text().split())
+    assert "Agents know what such a report is" in guide and "not rejected as impersonation" in guide
 
 
 # --- #197 -------------------------------------------------------------------------------------------
@@ -99,5 +99,5 @@ def test_197_the_protocol_says_the_notes_are_below_and_the_guide_mentions_it():
     protocol = (REPO / "protocol.md").read_text()
     assert "**Your notes are below**" in protocol and "**keep it current**" in protocol
     assert "read it first" not in protocol
-    guide = (REPO / "docs" / "user-guide.md").read_text()
+    guide = " ".join((REPO / "docs" / "user-guide.md").read_text().split())
     assert "also carries the agent's `notes.md` whole" in guide

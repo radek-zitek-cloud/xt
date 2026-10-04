@@ -249,7 +249,7 @@ def test_198_every_roles_first_prompt_carries_the_budget_and_the_shape(ctx):
 
 def test_198_the_guide_documents_it():
     guide = flat((REPO / "docs" / "user-guide.md").read_text())
-    for phrase in ("**The notes budget** (from 0.23.0)", "notes_budget = 16000", "notes 17.2 kB / 16 kB",
+    for phrase in ("**The notes budget.**", "notes_budget = 16000", "notes 17.2 kB / 16 kB",
                    "1 kB = 1,000 bytes", "notes-archive.md", "xt never edits a notes file"):
         assert phrase in guide, phrase
 

@@ -436,7 +436,7 @@ def test_the_policy_example_in_the_docs_parses_and_does_what_it_says(tmp_path):
 
     from .conftest import REPO
 
-    text = (REPO / "docs/examples.md").read_text().split("## 6. Reset heavy agents automatically")[1]
+    text = (REPO / "docs/examples.md").read_text().split("## 10. Reset heavy agents automatically")[1].split("## 11.")[0]
     blocks = re.findall(r"```toml\n(.*?)```", text, re.S)
     path = tmp_path / "team.toml"
     path.write_text('[team]\nname = "t"\nsession = "t"\n\n' + "\n".join(blocks))

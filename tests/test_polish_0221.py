@@ -785,7 +785,7 @@ def test_211_example_11_matches_what_chat_shows(ctx, fake_home):
     from .test_chat_0210 import _bodies, _run, _status, _text
     from .test_chat_0210 import _type as _keys_typed
 
-    example = (REPO / "docs" / "examples.md").read_text().split("## 11.", 1)[1]
+    example = (REPO / "docs" / "examples.md").read_text().split("## 13.", 1)[1]
     log = _liaison(ctx, fake_home, "claude")
     request_spawn(ctx, "human", "lead", None, None, None, None)
     paneinput.scan(ctx)
@@ -818,8 +818,8 @@ def test_211_readme_examples_carry_no_release_placeholders_and_the_caption_names
     readme = (REPO / "README.md").read_text()
     guide = (REPO / "docs" / "user-guide.md").read_text()
     assert "version use v0." not in readme + guide and "git merge v0." not in readme
-    assert "*The 0.18.0 TUI screenshot (`docs/screen-v0180.png`), taken on xt 0.18.0" in readme
-    assert "](docs/screen-v0180.png)" in readme
+    assert "*`xt chat`, captured from xt itself (`docs/chat.svg`)" in readme  # #214: the chat image
+    assert "](docs/chat.svg)" in readme and (REPO / "docs" / "chat.svg").exists()
 
 
 def test_201_with_herdr_unreachable_a_fresh_snapshot_counts_a_stale_one_or_none_is_unknown(ctx, fake_home, monkeypatch):

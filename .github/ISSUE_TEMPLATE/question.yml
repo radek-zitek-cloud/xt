@@ -1,0 +1,31 @@
+name: Question
+description: Something about xt isn't clear, or the docs don't answer it.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask away. Please don't paste secrets, tokens, or your team's private files or messages.
+  - type: textarea
+    id: question
+    attributes:
+      label: Your question
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: xt version
+      description: What `xt --version` prints, if you have xt installed.
+      placeholder: xt 0.24.0
+  - type: input
+    id: environment
+    attributes:
+      label: Harness and OS
+      description: If it matters for the question.
+      placeholder: codex on Ubuntu 24.04
+  - type: textarea
+    id: looked
+    attributes:
+      label: Where you looked
+      description: The part of the README, user guide or examples you read, if any.

@@ -16,7 +16,7 @@ effective set: the team default, then the agent's block (key by key), with `requ
 
 Card #218: the older `permissions`, `codex_options` and `connectors` lines were removed in 0.24. A
 team.toml that still has one is refused at load (`removed_refusal`); `convert` is the one reader
-left, for `xt capabilities NAME`, which prints the block to paste in their place.
+left, for `xt capabilities NAME`, which prints the block that replaces them.
 """
 
 import re
@@ -83,6 +83,9 @@ def parse(block, where: str) -> dict:
         elif key == "credential_clis":
             if isinstance(value, dict):
                 unknown = [k for k in value if k not in ("allow", "deny")]
+                misplaced = [k for k in unknown if k in AGENT_KEYS]
+                if misplaced:
+                    raise XtError(_misplaced(where, "capabilities.credential_clis", misplaced))
                 if unknown:
                     raise XtError(f"{where} capabilities.credential_clis takes `allow` and `deny` lists, "
                                   f"not {', '.join(unknown)}")
@@ -96,11 +99,25 @@ def parse(block, where: str) -> dict:
                 raise XtError(f"{where} capabilities.extras = {value!r} in team.toml must be a settings file "
                               f"path in the team repo (e.g. extras = \"settings/carol.json\")")
             out[key] = str(value).strip()
+        elif key in AGENT_KEYS:
+            raise XtError(_misplaced(where, "capabilities", [k for k in block if k in AGENT_KEYS]))
         else:
             raise XtError(f"{where} capabilities.{key} in team.toml isn't a capability "
                           f"({', '.join(NAMES)}, and require and extras)")
     return out
 
+
+# an [[agent]] entry's own keys: found inside its capabilities block, they were written after it
+AGENT_KEYS = ("name", "role", "harness", "model", "reports_to", "status", "kind", "added", "wake_every",
+              "wake_message", "wake_between", "wake_at", "auto_reset_tokens", "notes_budget")
+
+
+def _misplaced(where: str, table: str, keys: list[str]) -> str:
+    """Card #218 (live check of rc1): agent keys that TOML put inside a table written before them."""
+    names = ", ".join(f"`{k}`" for k in keys)
+    return (f"{where} {table} in team.toml holds the agent's own {names}: in TOML every key after a "
+            f"[table] line belongs to that table. Put the [agent.capabilities] block at the end of the "
+            f"agent's entry, after its other keys")
 
 def check(doc) -> list[str]:
     """Problems with every capability block, for `Team.check`."""
@@ -129,7 +146,7 @@ def removed_lines(table) -> list[str]:
 
 def removed_refusal(doc) -> str | None:
     """Card #218: why a team.toml with a removed line doesn't load, naming every offending line (the
-    agent, or the defaults) and `xt capabilities NAME`, the way to the block to paste; None to load."""
+    agent, or the defaults) and `xt capabilities NAME`, the way to the block that replaces it; None to load."""
     found = []  # (agent name or None for [defaults], keys)
     defaults = removed_lines(doc.get("defaults", {}))
     if defaults:
@@ -147,12 +164,13 @@ def removed_refusal(doc) -> str | None:
     out.append("Replace them with a [capabilities] block. " + (
         (cmds[0] if len(cmds) == 1 else f"{', '.join(cmds[:-1])} and {cmds[-1]}")
         + (" prints" if len(cmds) == 1 else " each print")
-        + " the block to paste in place of the old lines (it changes nothing)." if names else ""))
+        + " the block that replaces them (it changes nothing)." if names else ""))
     if defaults:
         out.append("The [defaults] lines have no agent name of their own: run `xt capabilities NAME` for any "
                    "agent of the team (it prints the block including what the agent inherits from "
                    "[defaults]) and move the shared part into [defaults.capabilities] by hand.")
-    out.append("Then remove the old lines; the user guide's Upgrading section has the steps.")
+    out.append("Put each block at the end of its agent's entry and remove the old lines; the user guide's "
+               "Upgrading section has the steps.")
     return "\n".join(out)
 
 
@@ -405,8 +423,11 @@ def convert(name: str, table, settings: dict | None, rel: str | None) -> str:
         block["deny"] = deny
     if commands and not open_shell:
         block["commands"] = commands
-    if clis_allowed:
-        block["credential_clis"] = {"allow": sorted(set(clis_allowed))}
+    import tomlkit
+
+    if clis_allowed:  # inline, so it stays inside the block (a [credential_clis] line would end it)
+        block["credential_clis"] = tomlkit.inline_table()
+        block["credential_clis"]["allow"] = sorted(set(clis_allowed))
     options = table.get("codex_options", None) or []
     for o in [options] if isinstance(options, str) else options:
         if str(o).replace(" ", "") == "sandbox_workspace_write.network_access=true":
@@ -415,12 +436,13 @@ def convert(name: str, table, settings: dict | None, rel: str | None) -> str:
         block["connectors"] = connectors
     if (kept or loosen) and rel:
         block["extras"] = rel  # the file stays, on top of the block, for what the block can't say
-    import tomlkit
 
     old = " and ".join(f"`{k}`" for k in removed_lines(table))
     lines = [f"# xt capabilities {name}: the block equivalent to its old permission lines"
              + (f" and {rel}" if rel else "") + " (nothing was changed).",
-             f"# Under its [[agent]] entry (name = \"{name}\")" + (f", replacing {old}:" if old else ":"),
+             # every key after a [table] line belongs to it: the block goes last (live check of rc1)
+             f"# Put it at the end of its [[agent]] entry (name = \"{name}\"), after the entry's other keys"
+             + (f", and remove {old}:" if old else ":"),
              "[agent.capabilities]"]
     lines += tomlkit.dumps(block).strip().splitlines() if block else ["# (the defaults: nothing to set)"]
     if kept:

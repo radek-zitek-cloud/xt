@@ -164,7 +164,10 @@ upstream and aren't edited by the team, so upstream merges rarely conflict.
 
 The older `permissions`, `codex_options` and `connectors` lines (under `[defaults]` or an agent)
 were removed in 0.24.0 (card #218): `Team.check` refuses a file that still has one, naming each
-(`capabilities.removed_refusal`); only `xt capabilities NAME` loads it, to print the block.
+(`capabilities.removed_refusal`); only `xt capabilities NAME` loads it, to print the block, which
+goes at the end of the agent's entry. `Team.check` also refuses a top-level key or table it doesn't
+read (`team.TOP_LEVEL`) and an agent's own keys found inside its capabilities block
+(`capabilities.AGENT_KEYS`): in TOML every key after a `[table]` line belongs to that table.
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
 Runtime facts such as pane ids never go in `team.toml`. A section left out uses xt's defaults.
@@ -546,7 +549,7 @@ harness goes to the human with `xt friction`.
   Flow's rows carry the agent or row in their style's meta), and the wheel scrolls Flow and Detail.
   The last action's result is a
   one-line toast that goes after about ten seconds; the bottom line is key hints; `h` lists every
-  key (the README has the table). Slow actions (starting agents) run in the background.
+  key (the user guide's TUI section has the table). Slow actions (starting agents) run in the background.
   `xt tui --demo` shows sample data.
 - `xt status`: roster × live state, open items, questions, queue, jobs, approvals, alerts; agents
   running without xt's launch settings (card #165); says whenever the supervisor isn't running.

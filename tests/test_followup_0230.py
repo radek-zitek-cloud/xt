@@ -264,7 +264,7 @@ def test_185_in_the_tui_at_80_columns_the_row_keeps_4_columns_spare(ctx, clock):
 
 def test_185_the_guide_and_the_lead_role_mention_follow_ups():
     guide = (REPO / "docs" / "user-guide.md").read_text()
-    assert "**Follow-ups under a closed goal** (from 0.23.0)" in guide and "↳ follow-up" in guide
+    assert "**Follow-ups under a closed goal.**" in guide and "↳ follow-up" in guide
     role = " ".join((REPO / "roles" / "lead.md").read_text().split())
     assert "**Follow-ups under a closed goal.** For 24 hours after you close a goal" in role
     assert "new scope still needs a new goal from the liaison" in role

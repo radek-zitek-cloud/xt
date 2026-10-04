@@ -19,6 +19,23 @@ POLICY_DEFAULTS = {"spawn_approval": True, "max_agents": 8, "heartbeat_minutes":
 NOTES_BUDGET = 16_000  # bytes of members/<name>/notes.md, when team.toml sets no `notes_budget` (card #198)
 
 
+TOP_LEVEL = ("team", "policy", "log", "notify", "defaults", "agent", "board_watch")  # what xt reads
+
+
+def _stray_problem(key: str, value) -> str:
+    """Card #218 (live check of rc1): a top-level key or table xt doesn't read, typically a table
+    pasted inside an agent's entry (`[credential_clis]`), which ends the entry and takes the keys
+    after it."""
+    if isinstance(value, dict):
+        inside = [k for k in value if k in ("name", "role", "harness", "reports_to", "status")]
+        tail = (f", and it holds {', '.join(f'`{k}`' for k in inside)}, which belong to an [[agent]] entry"
+                if inside else "")
+        return (f"team.toml has a top-level [{key}] table, which xt doesn't read{tail}. In TOML a [table] line "
+                f"ends the entry above it: inside an agent's capabilities write it inline "
+                f"({key} = {{ … }} under [agent.capabilities]), and put the block at the end of the entry")
+    return f"team.toml has `{key}` at the top level, which xt doesn't read"
+
+
 def _notes_budget_problem(value, where: str) -> str | None:
     """Why a `notes_budget` value is refused, or None: a positive whole number of bytes."""
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
@@ -66,12 +83,13 @@ class Team:
     def check(self, allow_removed: bool = False) -> None:
         """Refuse settings xt can't use, at load (card #198: `notes_budget`; card #218: the removed
         permission lines, in a message of their own)."""
+        stray = [_stray_problem(k, self.doc[k]) for k in self.doc if k not in TOP_LEVEL]
         if not allow_removed:
             refused = capabilities.removed_refusal(self.doc)
-            if refused:
-                raise XtError(refused)
+            if refused:  # a half-converted file: say what the pasting broke too (live check of rc1)
+                raise XtError("\n".join([refused] + [f"Also: {s}" for s in stray]))
         defaults = self.doc.get("defaults", {})
-        problems = []
+        problems = list(stray)
         if "notes_budget" in defaults:
             problems.append(_notes_budget_problem(defaults["notes_budget"], "[defaults]"))
         for a in self.doc.get("agent", []):

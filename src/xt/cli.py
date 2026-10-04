@@ -1127,7 +1127,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     add("harnesses", cmd_harnesses, "which harnesses xt can use here")
     sp = add("capabilities", cmd_capabilities,
-             "print the [capabilities] block to paste in place of an agent's old permissions, "
+             "print the [capabilities] block that replaces an agent's old permissions, "
              "codex_options and connectors lines, removed in 0.24 (changes nothing)")
     sp.add_argument("name")
 

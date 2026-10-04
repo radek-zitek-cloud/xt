@@ -457,10 +457,9 @@ def test_175_the_site_shows_the_readmes_quick_start_command():
 def test_175_the_quick_start_comes_before_any_release_notes():
     readme = _readme()
     head = readme.split("## Quick start", 1)[0]
-    assert "Added since" not in readme and "- **0.1" not in head  # no release-by-release list above it
-    highlights = head.split("Highlights of the releases since then", 1)[1].split("What it can't do yet", 1)[0]
-    assert 3 <= highlights.count("\n- **") <= 5 and "[CHANGELOG.md](CHANGELOG.md)" in highlights
-    assert "[Quick start](#quick-start)" in readme.split("## What xt can do", 1)[0]  # reachable from the top
+    assert "Added since" not in readme and "- **0." not in readme  # no release-by-release list (#214)
+    assert "\n## " not in head  # the quick start is the first section
+    assert "[CHANGELOG.md](CHANGELOG.md)" in head
 
 
 # --- #176: TUI help, detail cue and Flow key names (Pilot at four sizes) ------------------------------

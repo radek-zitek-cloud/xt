@@ -1,5 +1,7 @@
 # How xt came to be: the story so far
 
+*Written 28 September 2026 about xt's first days, up to v0.11.0, and kept as it was; what came after is in [Since then](#since-then).*
+
 xt is three days old. It started as a question on a Friday evening in September 2026. By Sunday
 night it ran a small newsroom of AI agents that finds its own stories, fact-checks them and
 publishes them, and a product team that manages xt's own backlog in public. On Monday morning the
@@ -374,6 +376,45 @@ open, where the team works:
   one page per release, from *Planned* to *Accepted*;
 - the **[releases](https://github.com/radek-zitek-cloud/xt/releases)** and the
   [changelog](../CHANGELOG.md).
+
+## Since then
+
+*An epilogue, added with v0.24.0 on 4 October 2026.*
+
+**One team.** The newsroom and the product team gave way to one team that builds xt with xt: a
+liaison, a lead, a product manager, a builder, a quality analyst and a UX researcher, on Claude
+Code, Codex and pi. The product manager keeps the Board and the Space, the builder builds each
+release candidate in its own clone, the quality analyst checks it against its spec criterion by
+criterion, and the UX researcher walks it as a newcomer would. Claude, the operator, runs the
+checks that need a live team and publishes a release, both only on Radek's word. Radek decides what
+gets built and accepts it.
+
+**A week of releases.** Between v0.11.0 on 28 September and v0.23.0 on 4 October, seventeen final
+releases followed, each a candidate first and checked before it became final: choosing and rolling
+back the version a team runs, safe resets of an agent's context, the TUI rebuilt around an Inbox,
+goals with their tasks, and every message as a lane chart, operators acting for Radek under a
+logged grant, a board watch, and context and cost for every agent. The
+[changelog](../CHANGELOG.md) has each one, with what a running team must do to upgrade.
+
+**Direction B.** On 2 October Radek chose a direction: make xt usable by a power user without an
+AI operator. The operator stays, as an official, delegated way of working; Herdr stays; a platform
+(a web UI, cloud agents) waits until there is demand beyond one person. What followed came from
+that decision:
+
+- `xt chat` became the everyday interface: one conversation with the liaison, with questions that
+  say what answer they take and are answered in place. The TUI stays the view for seeing how the
+  work flows.
+- Hires, schedules and a goal's read-back became yes/no questions like any other.
+- A "drive" grant lets an operator answer, approve and give goals for a while, each logged under
+  its own name; text typed into an agent's pane is recorded but never counts as an answer.
+- Fewer concepts: one capability block says what an agent may write, run and reach, the same on
+  every harness, and shows what each harness really enforces; the older permission lines were
+  removed in v0.24.0.
+
+v0.24.0 also rewrote the user documents for the product as it is now: the README, the
+[user guide](user-guide.md), which leads with chat, and the [examples](examples.md). This page
+stays the founding story; the [direction](https://sb.zvikov.zitek.cloud/xt-space/planning/direction-b-roadmap)
+page in the Space says where xt goes next.
 
 ## Read more
 

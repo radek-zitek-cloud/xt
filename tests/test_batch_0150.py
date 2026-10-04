@@ -570,12 +570,13 @@ def test_the_examples_settings_file_passes_the_preflight_and_its_question_render
     from xt import choices
 
     examples = (REPO / "docs/examples.md").read_text()
-    (settings,) = [b for b in _blocks(examples, "json") if '"statusLine"' in b]
+    section = examples.split("## 8. A team.toml with a capability block")[1].split("## 9.")[0]
+    (settings,) = [b for b in _blocks(section, "json") if '"statusLine"' in b]
     f = ctx.paths.root / "settings/researcher.json"
     f.parent.mkdir()
     f.write_text(settings)
     assert permissions.preflight(ctx.paths.root, "settings/researcher.json").mode is None  # #218: the block's extras
-    (toml_block,) = [b for b in _blocks(examples, "toml") if 'name = "researcher"' in b]
+    (toml_block,) = [b for b in _blocks(section, "toml") if 'name = "researcher"' in b]
     assert tomllib.loads(toml_block)["agent"][0]["capabilities"]["extras"] == "settings/researcher.json"
     (shown,) = [b for b in _blocks(examples, "text") if "Options:" in b]
     rendered = choices.render("Should the weekly digest go out today or tomorrow?",
@@ -594,7 +595,7 @@ def test_architecture_names_every_module_and_repo_doc_links_resolve():
         if p.is_file() and p.suffix in (".py", ".tcss"):
             assert f"`{p.relative_to(REPO)}`" in arch, p
     for doc in ["README.md", "docs/architecture.md", "docs/examples.md", "docs/user-guide.md", "docs/story.md",
-                "CHANGELOG.md"]:
+                "docs/development.md", "CHANGELOG.md"]:
         text = (REPO / doc).read_text()
         for target in re.findall(r"\]\(([^)\s]+)\)", text):
             if target.startswith(("http://", "https://", "mailto:")):

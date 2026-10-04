@@ -303,7 +303,8 @@ def test_186_xt_capabilities_prints_the_equivalent_block_and_changes_nothing(ctx
     assert _snapshot(ctx.paths.root) == before  # nothing changed: team files and state
     assert out.splitlines()[:3] == [
         "# xt capabilities carol: the block equivalent to its old permission lines and settings/carol.json (nothing was changed).",
-        '# Under its [[agent]] entry (name = "carol"), replacing `permissions` and `connectors`:',
+        '# Put it at the end of its [[agent]] entry (name = "carol"), after the entry\'s other keys, and remove '
+        '`permissions` and `connectors`:',
         "[agent.capabilities]"]
     body = tomlkit.parse("\n".join(x for x in out.splitlines() if not x.startswith("#") and x != "[agent.capabilities]"))
     assert body["write"] == ["/home/me/work"] and body["commands"] == ["git", "sed -n"]
@@ -342,11 +343,11 @@ def test_186_status_brief_and_the_tui_show_the_same_row(ctx, monkeypatch, capsys
 
 def test_186_the_guide_section_has_the_vocabulary_a_require_example_and_the_conversion():
     guide = " ".join((REPO / "docs" / "user-guide.md").read_text().split())
-    for phrase in ("**Capabilities: one model for every harness** (from 0.23.0)", "[defaults.capabilities]",
+    for phrase in ("### 13. What agents may do: capabilities", "[defaults.capabilities]",
                    "`erin can't start: commands is marked require, and pi can only keep it advisory (role text "
                    "only). Drop require on commands, or hire erin under claude`",
-                   "xt capabilities carol # prints the block to paste; changes nothing",
-                   "That was always true; it is now visible.",
+                   "xt capabilities carol # prints the block that replaces them; changes nothing",
+                   "Codex and pi agents show `advisory` for what they can't enforce.",
                    "**An agent without a block.**", "**The extras file** (Claude Code).",
                    "`caps: require write, cmds; deny, creds enforced; net advisory`"):
         assert phrase in guide, phrase
@@ -358,8 +359,9 @@ def test_218_the_examples_block_and_extras_file_load_and_start_as_described(ctx)
     from .test_batch_0150 import _blocks
 
     examples = (REPO / "docs/examples.md").read_text()
-    (settings,) = [b for b in _blocks(examples, "json") if '"statusLine"' in b]
-    (entry,) = [b for b in _blocks(examples, "toml") if 'name = "researcher"' in b]
+    section = examples.split("## 8. A team.toml with a capability block")[1].split("## 9.")[0]
+    (settings,) = [b for b in _blocks(section, "json") if '"statusLine"' in b]
+    (entry,) = [b for b in _blocks(section, "toml") if 'name = "researcher"' in b]
     (ctx.paths.root / "settings").mkdir(exist_ok=True)
     (ctx.paths.root / "settings" / "researcher.json").write_text(settings)
     (ctx.paths.roles / "researcher.md").write_text("# Role: researcher\n")
@@ -615,7 +617,7 @@ def test_218_xt_capabilities_refuses_an_agent_with_both_a_block_and_an_old_line(
 def test_186_an_agent_without_old_lines_gets_no_dangling_replacing(ctx, monkeypatch, capsys):
     _team(ctx, carol="claude")
     out = _convert(ctx, monkeypatch, capsys, "carol")
-    assert out.splitlines()[1] == '# Under its [[agent]] entry (name = "carol"):'
+    assert out.splitlines()[1] == '# Put it at the end of its [[agent]] entry (name = "carol"), after the entry\'s other keys:'
     assert "# (the defaults: nothing to set)" in out
 
 

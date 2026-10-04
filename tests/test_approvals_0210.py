@@ -81,7 +81,7 @@ def test_1_goal_dispatch_is_a_closed_read_back_question_and_stays_a_liaison_acti
     assert "**as an xt question**, a closed (yes/no) one" in liaison
     assert '--type ask --closed "Ready to dispatch <title>?' in liaison
     assert "Their yes doesn't dispatch anything by itself: dispatching stays your action." in liaison
-    assert "dispatching stays the liaison's step (a deliberate limit of 0.21.0)" in guide
+    assert "Your yes doesn't dispatch the goal by itself: dispatching stays the liaison's step." in guide
 
 
 # --- criterion 2: yes/no has the same effect and ledger result as approve/deny -----------------------
@@ -183,7 +183,7 @@ def test_4_help_and_guide_describe_the_mapping():
     assert "approve / deny the selected spawn or schedule (asks y/n); the same as s, then y / n" in text
     assert "answer the question or approval selected in Inbox" in text
     guide = " ".join((REPO / "docs/user-guide.md").read_text().split())
-    assert "`xt answer 12 yes` (or `no`), or in the TUI `s` on it and then `y` or `n`. `a` and `d` still" in guide
+    assert "`xt answer 12 yes` (or `no`), or in the TUI `s` on it and then `y` or `n`. `a` and `d` approve" in guide
 
 
 # --- criterion 5: answered once, whichever route -------------------------------------------------
