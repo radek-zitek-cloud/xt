@@ -273,6 +273,10 @@ def not_running_note(ctx: Ctx, to: str, sender: str | None = None) -> str | None
             return None
     except Exception:  # noqa: BLE001 - no answer is no line, never a failed send
         return None
+    from .watch import not_started_yet
+
+    if not_started_yet(ctx, to):  # no alert follows for it (rc4, xt #3413), so the line promises none
+        return f"queued: {to} hasn't been started yet; it gets this when it starts."
     if sender == HUMAN:
         return f"queued: {to} isn't running; you get an alert (queued:{to}) if it still isn't in 2 minutes."
     return f"queued: {to} isn't running; the human is alerted if it still isn't in 2 minutes."

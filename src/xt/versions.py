@@ -99,6 +99,11 @@ def record_agent_start(ctx: Ctx, name: str, now: dt.datetime, codex_options: lis
     _save(ctx, data)
 
 
+def ever_started(ctx: Ctx, name: str) -> bool:
+    """Whether xt has started this agent at least once (its start record is never removed)."""
+    return name in load(ctx).get("agents", {})
+
+
 def started_codex_options(ctx: Ctx, name: str) -> list[str] | None:
     """The Codex options the agent's last start ran with ([] for none); None when xt has no record."""
     rec = load(ctx).get("agents", {}).get(name)

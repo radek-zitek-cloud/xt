@@ -541,6 +541,16 @@ def cmd_status(args) -> None:
     for key, al in sorted(Alerts(ctx).active().items()):
         if key.startswith("queued:"):  # card #187: a message waits for a member that isn't running
             print(f"⚠ {al['text']}  (xt clear {key})")
+    from .watch import not_started_yet
+
+    waits: dict[str, int] = {}
+    for item in q:  # rc4 (xt #3413): waiting for a first start is no alert, only a quiet note
+        if item["to"] not in live and not_started_yet(ctx, item["to"]):
+            waits[item["to"]] = waits.get(item["to"], 0) + 1
+    for name, n in sorted(waits.items()):
+        a = ctx.team.agent(name)
+        when = " (starts when the first goal is dispatched)" if a and a.role == "lead" else ""
+        print(f"{name} not started yet{when}: {n} message{'s' if n != 1 else ''} wait{'' if n != 1 else 's'} for it")
     print(f"team usage today: {turns.fmt(spend.team_today)}")
     for line in turns.allowance_lines(ctx):
         print(f"allowance: {line}")
@@ -685,7 +695,8 @@ def cmd_inbox(args) -> None:
         for rid, r in box.approvals:
             print(f"  ⚑ #{rid} {r['requester']} → {approval_what(r)}  yes/no  (xt answer {rid} yes|no)")
         for k, a in box.alerts:
-            print(f"  ⚠ #{a['id']} {a['ts'][5:16]} {a['text']}{repeats(a)}  (clear: xt clear {k})")
+            text = a["text"].replace("\n", "\n    ")  # a folded line (#187) sits under its alert
+            print(f"  ⚠ #{a['id']} {a['ts'][5:16]} {text}{repeats(a)}  (clear: xt clear {k})")
         if answered:
             print(f"  {labels['answered']}")
             for q, a in answered[:args.limit]:

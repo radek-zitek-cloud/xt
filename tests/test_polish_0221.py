@@ -492,7 +492,9 @@ def test_206_esc_puts_a_picked_line_back(ctx):
 
 
 def _crew(ctx):
-    """A running liaison and lead, and builder (reports to lead) in the roster, never started."""
+    """A running liaison and lead, and builder (reports to lead) in the roster: xt started it once
+    (a member never started isn't alerted about, rc4), and it isn't running now."""
+    from xt import versions
     from xt.spawn import request_spawn
 
     from .conftest import add_member
@@ -500,6 +502,7 @@ def _crew(ctx):
     for n in ("liaison", "lead"):
         request_spawn(ctx, "human", n, None, None, None, None)
     add_member(ctx, "builder", reports_to="lead")
+    versions.record_agent_start(ctx, "builder", ctx.ledger.clock())
 
 
 def _tick(ctx):
@@ -667,7 +670,10 @@ def test_187_the_sender_line_at_xt_send(team, monkeypatch, capsys):
     from .conftest import add_member
     from .test_operator_0190 import agent
 
+    from xt import versions
+
     add_member(team, "builder", reports_to="lead")
+    versions.record_agent_start(team, "builder", team.ledger.clock())  # started once, not running now
     capsys.readouterr()
     agent(monkeypatch, "send", "builder", "--as", "lead", "--type", "task", "Build it")
     out = capsys.readouterr()
@@ -690,6 +696,71 @@ def test_187_the_sender_line_at_xt_send(team, monkeypatch, capsys):
     agent(monkeypatch, "send", "builder", "--as", "lead", "--type", "task", "Still queued")  # no exception
     out = capsys.readouterr()
     assert out.err == "" and "queued" in out.out and len(list(team.ledger.messages())) == before + 1
+
+
+def _new_team(ctx):
+    """A new team (the operator's finding, xt #3404): the liaison runs, the lead is in the roster
+    and xt hasn't started it, by design, before the first goal is dispatched."""
+    from xt.spawn import request_spawn
+
+    from .conftest import add_member
+
+    request_spawn(ctx, "human", "liaison", None, None, None, None)
+    add_member(ctx, "lead", role="lead", reports_to="liaison")
+
+
+def test_187_rc4_no_alert_for_a_member_xt_hasnt_started_yet(ctx, clock, monkeypatch, capsys):
+    from xt.dispatch import send
+    from xt.team import SYSTEM
+
+    _new_team(ctx)
+    send(ctx, SYSTEM, "lead", "system", "Human approved approval #12: spawned scout")  # as after a hire
+    clock.advance(minutes=10)
+    _tick(ctx)
+    assert not [k for k in _alerts(ctx) if k.startswith(("queued:", "missing:"))]
+    assert not [m for m in ctx.ledger.messages() if m["type"] == "alert"]
+    out = _status_out(ctx, monkeypatch, capsys)
+    assert "lead not started yet (starts when the first goal is dispatched): 1 message waits for it" in out
+    assert "⚠" not in out
+
+
+def test_187_rc4_a_stopped_member_still_alerts_after_its_first_start(ctx, clock):
+    from xt.dispatch import send
+    from xt.team import SYSTEM
+    from xt.watch import set_stopped
+
+    _new_team(ctx)
+    set_stopped(ctx, "lead", True)  # the human stopped it: no longer "not started yet"
+    send(ctx, SYSTEM, "lead", "system", "a notice")
+    clock.advance(minutes=3)
+    _tick(ctx)
+    assert _alerts(ctx)["queued:lead"]["text"].startswith("lead isn't running (you stopped it): 1 message")
+
+
+def test_187_rc4_the_sender_line_for_a_member_not_started_yet(team, monkeypatch, capsys):
+    from .conftest import add_member
+    from .test_operator_0190 import agent
+
+    add_member(team, "builder", reports_to="lead")  # never started
+    capsys.readouterr()
+    agent(monkeypatch, "send", "builder", "--as", "lead", "--type", "task", "Build it")
+    assert capsys.readouterr().err == "queued: builder hasn't been started yet; it gets this when it starts.\n"
+
+
+def test_187_rc4_xt_inbox_indents_the_folded_queue_line(ctx, clock, monkeypatch, capsys):
+    from xt.watch import set_expected
+
+    _crew(ctx)
+    set_expected(ctx, "builder", True)
+    _task(ctx)
+    clock.advance(minutes=17)
+    _tick(ctx)
+    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
+    monkeypatch.setattr(cli, "human_terminal", lambda: True)
+    capsys.readouterr()
+    args = cli.build_parser().parse_args(["inbox"])
+    args.func(args)
+    assert "to start it again.\n    1 message waiting 17m  (clear: xt clear missing:builder)" in capsys.readouterr().out
 
 
 def test_187_the_guide_has_the_row_and_the_amended_sentences():

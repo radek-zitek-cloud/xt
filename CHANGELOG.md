@@ -17,7 +17,8 @@ its pane line (`unknown`) before it stops when the Herdr server can't be reached
 adds QA's and ux's rc2 findings: a 30-second limit on the saved live state for the pane line,
 `tab (N)` before `enter` loses its verb, the #201 status and header wording, spaces on both sides
 of the labelled arrow, the human's own sender line, `Approve its start`, and the architecture's
-version.
+version; **rc4** fixes #187's false alert for a member xt hasn't started yet (the human's
+correction).
 
 ### Upgrading
 
@@ -28,7 +29,7 @@ version.
 ### Added
 
 - **#187** One Inbox alert when a message has waited 2 minutes or more for a team member that isn't
-  running (one xt didn't start this run, or one you stopped): `queued:NAME`, with the count, the
+  running although xt started it before, or one you stopped: `queued:NAME`, with the count, the
   oldest message's age and the command that starts it (`Start it: u (or xt spawn NAME).`, `Start
   it: xt up.` for the liaison, `Approve its start: xt approve N.` when its start waits on your
   approval), also listed in `xt status`. A
@@ -37,7 +38,12 @@ version.
   `xt clear queued:NAME` it returns only for a newer message or a new stop. `xt send` to a member
   that isn't running adds one line on standard error: `queued: builder isn't running; the human is
   alerted if it still isn't in 2 minutes.`, or from your own terminal `queued: builder isn't
-  running; you get an alert (queued:builder) if it still isn't in 2 minutes.` The guide's stop sentences no longer say that
+  running; you get an alert (queued:builder) if it still isn't in 2 minutes.` A member xt hasn't
+  started yet (a new team's lead before its first goal) isn't running by design: no alert, a quiet
+  `lead not started yet (starts when the first goal is dispatched): 1 message waits for it` in `xt
+  status`, and the sender reads `queued: lead hasn't been started yet; it gets this when it
+  starts.` (rc4). In `xt inbox` the queue line folded into a `missing:` alert is indented under it
+  (rc4). The guide's stop sentences no longer say that
   nothing alerts about a stopped agent.
 
 ### Changed

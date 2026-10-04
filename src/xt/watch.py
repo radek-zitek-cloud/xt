@@ -259,15 +259,16 @@ class Supervisor:
     def check_queued(self, live: dict) -> None:
         """Card #187: messages waiting QUEUED_GRACE or more for a member that isn't running raise one
         alert per member (`queued:NAME`), or join its open `missing:NAME` alert as one line. Never
-        for the human, a retired member or a running one (a busy agent's queue is normal). The alert
+        for the human, a retired member, a running one (a busy agent's queue is normal) or one xt
+        hasn't started yet, such as a new team's lead before its first goal (rc4, xt #3413). The alert
         clears once the member runs; cleared by the human, it comes back only when a newer message
         is queued or the member has run and stopped again."""
         team, now = self.ctx.team, self.ctx.ledger.clock()
         waiting: dict[str, list[dict]] = {}
         for item in Queue(self.ctx).pending():
             a = team.agent(item["to"])
-            if a is None or a.kind == HUMAN or not a.active or a.name in live:
-                continue
+            if a is None or a.kind == HUMAN or not a.active or a.name in live or not_started_yet(self.ctx, a.name):
+                continue  # not_started_yet: waiting for its first start is by design (xt #3413)
             m = self.ctx.ledger.message(item["id"])
             if m:
                 waiting.setdefault(a.name, []).append(m)
@@ -566,6 +567,15 @@ def age_text(seconds: float) -> str:
     if m < 24 * 60:
         return f"{m // 60}h{m % 60}m" if m % 60 else f"{m // 60}h"
     return f"{m // 1440}d{(m % 1440) // 60}h" if (m % 1440) // 60 else f"{m // 1440}d"
+
+
+def not_started_yet(ctx: Ctx, name: str) -> bool:
+    """A member xt has never started and the human hasn't stopped: not running is by design (a new
+    team's lead starts when its first goal is dispatched), so a message waiting for it isn't an
+    alert (rc4, the human's correction, xt #3413)."""
+    from .versions import ever_started
+
+    return name not in stopped(ctx) and not ever_started(ctx, name)
 
 
 def start_command(ctx: Ctx, name: str) -> str:
