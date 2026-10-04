@@ -12,7 +12,13 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 ## [0.22.1] — not released yet
 
 Polish for chat, the log and the pane-input signal, and one new alert (Space
-specs/polish-for-0-22-1).
+specs/polish-for-0-22-1). **0.22.1-rc1** has all ten cards.
+
+### Upgrading
+
+- From 0.22.0: `git pull upstream main` (or `xt version use v0.22.1`), then `xt restart --all` so
+  the supervisor runs the new alert. Nothing to migrate: no change to `team.toml`, the protocol or
+  the ledger. Restart `xt chat` to get its new keys.
 
 ### Added
 
