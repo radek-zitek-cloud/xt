@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 from . import __version__
 from .context import Ctx
+from .lifecycle import stopped, watch_pid
 
 PUBLISHED_EVERY = 6 * 3600  # seconds between the supervisor's checks of the upstream tags
 STALE_RETRY = 15 * 60  # sooner while the cache is older than the installed final (card #133)
@@ -102,6 +103,13 @@ def record_agent_start(ctx: Ctx, name: str, now: dt.datetime, codex_options: lis
 def ever_started(ctx: Ctx, name: str) -> bool:
     """Whether xt has started this agent at least once (its start record is never removed)."""
     return name in load(ctx).get("agents", {})
+
+
+def not_started_yet(ctx: Ctx, name: str) -> bool:
+    """A member xt has never started and the human hasn't stopped: not running is by design (a new
+    team's lead starts when its first goal is dispatched), so a message waiting for it isn't an
+    alert (rc4, the human's correction, xt #3413)."""
+    return name not in stopped(ctx) and not ever_started(ctx, name)
 
 
 def started_codex_options(ctx: Ctx, name: str) -> list[str] | None:
@@ -265,8 +273,6 @@ class Versions:
 def current(ctx: Ctx, live_names: set[str] | None = None, supervisor_running: bool | None = None,
             now: dt.datetime | None = None) -> Versions:
     """The three versions as far as they can be known right now, from local files only."""
-    from .watch import watch_pid
-
     data = load(ctx)
     now = now or dt.datetime.now(dt.timezone.utc).astimezone()
     pub = data.get("published", {})

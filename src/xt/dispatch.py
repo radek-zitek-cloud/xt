@@ -8,6 +8,7 @@ from .herdr import DELIVERABLE
 from .ledger import AGENT_TYPES
 from .paths import XtError
 from .team import HUMAN, SYSTEM, Team
+from .versions import not_started_yet
 
 
 def may_send(team: Team, sender: str, to: str, mtype: str = "report") -> bool:
@@ -273,8 +274,6 @@ def not_running_note(ctx: Ctx, to: str, sender: str | None = None) -> str | None
             return None
     except Exception:  # noqa: BLE001 - no answer is no line, never a failed send
         return None
-    from .watch import not_started_yet
-
     if not_started_yet(ctx, to):  # no alert follows for it (rc4, xt #3413), so the line promises none
         return f"queued: {to} hasn't been started yet; it gets this when it starts."
     if sender == HUMAN:

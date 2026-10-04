@@ -96,7 +96,7 @@ def shows(m: dict, mode: str) -> bool:
 def pending(ctx: Ctx) -> list[dict]:
     """What waits for the human's answer, oldest first: open questions to the human and pending
     approvals, each as {"id", "kind", "question", "text"}."""
-    from .spawn import Approvals
+    from .approvals import Approvals
 
     out = []
     for item in ctx.ledger.open_items():

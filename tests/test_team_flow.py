@@ -507,7 +507,7 @@ def test_no_lead_alert_when_the_human_stopped_the_lead_with_goals_open(ctx):
     sup.tick(now=0)
     assert "missing:lead" not in Alerts(ctx).active()
     # a lead that isn't running for any other reason while goals are open still alerts
-    from xt.watch import set_stopped
+    from xt.lifecycle import set_stopped
 
     set_stopped(ctx, "lead", False)
     sup.tick(now=3)

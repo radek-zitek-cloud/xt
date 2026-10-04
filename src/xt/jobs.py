@@ -2,53 +2,19 @@
 
 Agents never call Herdr themselves: a harness may sandbox the agent's shell (codex does, and its
 sandbox blocks Herdr's socket with "Operation not permitted"). So an agent's request is written
-here, and `xt watch`, which runs unsandboxed in its own pane, executes it on its next tick and
-reports back to the requester.
+to the queue (`lifecycle.Jobs`), and `xt watch`, which runs unsandboxed in its own pane, executes
+it on its next tick and reports back to the requester.
 """
 
-import json
-import time
-import os
-
 from .context import Ctx
+from .dispatch import send
+from .lifecycle import Jobs
 from .paths import XtError
+from .spawn import do_spawn, execute_spawn, retire_now
 from .team import HUMAN, SYSTEM
 
 
-class Jobs:
-    def __init__(self, ctx: Ctx):
-        self.ctx = ctx
-        self.path = ctx.paths.state / "jobs.json"
-
-    def _load(self) -> list[dict]:
-        return json.loads(self.path.read_text()) if self.path.exists() else []
-
-    def _save(self, items: list[dict]) -> None:
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(items, indent=1))
-        os.replace(tmp, self.path)
-
-    def pending(self) -> list[dict]:
-        with self.ctx.ledger.lock():
-            return self._load()
-
-    def add(self, kind: str, args: dict, requester: str) -> int:
-        with self.ctx.ledger.lock():
-            items = self._load()
-            job_id = max((j["id"] for j in items), default=0) + 1
-            items.append({"id": job_id, "kind": kind, "args": args, "requester": requester,
-                          "added": time.time()})
-            self._save(items)
-        return job_id
-
-    def remove(self, job_id: int) -> None:
-        with self.ctx.ledger.lock():
-            self._save([j for j in self._load() if j["id"] != job_id])
-
-
 def _execute(ctx: Ctx, job: dict) -> str:
-    from .spawn import do_spawn, execute_spawn, retire_now
-
     kind, args = job["kind"], job["args"]
     if kind == "spawn":
         return execute_spawn(ctx, args)
@@ -64,8 +30,6 @@ def _execute(ctx: Ctx, job: dict) -> str:
 
 
 def run_pending(ctx: Ctx) -> list[str]:
-    from .dispatch import send
-
     out = []
     for job in Jobs(ctx).pending():
         Jobs(ctx).remove(job["id"])  # at most once, even if it fails half-way

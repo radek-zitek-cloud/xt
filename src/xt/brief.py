@@ -2,8 +2,13 @@
 
 import datetime as dt
 
+from . import turns, usage, versions
+from .alerts import Alerts, repeats
+from .approvals import Approvals, approval_what
 from .context import Ctx
+from .launch import codex_options_line
 from .ledger import pair
+from .lifecycle import checkpoints, suggestion
 from .team import HUMAN, harness_model, schedule_text
 
 MAX_ITEMS = 50
@@ -38,8 +43,6 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     if name:
         out[0] += f" — for {name}"
 
-    from . import versions
-
     try:
         out.append(versions.current(ctx, live_names=set(live)).line())
     except Exception as e:  # a brief must always build
@@ -50,11 +53,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     show_context = name is None or name == HUMAN or (viewer is not None and viewer.role in ("lead", "liaison"))
     contexts = {}
     if show_context:
-        from . import usage
-
         contexts = usage.readings(ctx, [a.name for a in ctx.team.agents() if a.kind != HUMAN and a.active])
-    from .launch import codex_options_line
-
     for a in ctx.team.agents():
         if a.kind == HUMAN or not a.active:
             continue
@@ -67,17 +66,12 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         opts = f", {opts}" if opts else ""
         out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}{opts}): {state}")
     if show_context:
-        from . import turns
-        from .reset import suggestion
-
         out.append(f"Team usage today: {turns.fmt(turns.today(ctx).team_today)}")
         for n, r in contexts.items():
             tip = suggestion(n, r, now) if n in live else None
             if tip:
                 out.append(tip)
     if viewer is not None and viewer.kind != HUMAN:
-        from .reset import checkpoints
-
         out.append(f"Your notes: members/{name}/notes.md (xt puts them, whole, in your first prompt on every start, "
                    f"restart or reset; keep them current).")
         cp = checkpoints(ctx).get(name)
@@ -121,9 +115,6 @@ def build(ctx: Ctx, name: str | None = None) -> str:
 
 def waiting_on_human(ctx: Ctx) -> list[str]:
     """What only the human can resolve, with the exact commands, so the liaison can pass it on."""
-    from .alerts import Alerts, repeats
-    from .spawn import Approvals, approval_what
-
     approvals = Approvals(ctx).pending()
     alerts = Alerts(ctx).active()
     questions = [i for i in ctx.ledger.open_items() if i["type"] == "ask"]

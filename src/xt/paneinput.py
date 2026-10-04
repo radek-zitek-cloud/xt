@@ -23,8 +23,12 @@ State: `.xt/state/pane_input.json` holds the read position per agent and the que
 
 import json
 import os
+import shlex
 import time
 
+from . import lifecycle, usage
+from .adapters import load_adapters
+from .alerts import Alerts
 from .context import Ctx
 from .ledger import PANE
 from .paths import XtError
@@ -110,14 +114,10 @@ def liaison(ctx: Ctx):
 
 
 def _adapter(ctx: Ctx, a):
-    from .adapters import load_adapters
-
     return load_adapters(ctx.paths).get(a.harness or "")
 
 
 def session_log(ctx: Ctx, a) -> str | None:
-    from . import usage
-
     adapter = _adapter(ctx, a)
     if adapter is None or not adapter.session_format:
         return None
@@ -201,8 +201,6 @@ def header(s: tuple[str, str, str, str] | None, liaison_name: str, width: int) -
 def hook_settings(ctx: Ctx, name: str, base: str | None) -> str:
     """A settings file for the liaison's Claude Code: its own permissions file (`base`, unchanged on
     disk) plus the prompt hook. Written under .xt/state/settings/; the path to pass."""
-    import shlex
-
     data = json.loads((ctx.paths.root / base).read_text()) if base else {}
     hook = {"type": "command", "command": f"{shlex.quote(str(ctx.paths.xt_bin))} pane-input --hook"}
     hooks = data.setdefault("hooks", {})
@@ -237,9 +235,7 @@ def hook(ctx: Ctx, name: str | None, text: str | None) -> str | None:
     if a is None or a.role != "liaison" or not typed(text):
         return None  # not the liaison's pane, or a line that isn't recorded anyway
     queue(ctx, a.name, text)
-    from .watch import recently_ticked
-
-    if not recently_ticked(ctx):
+    if not lifecycle.recently_ticked(ctx):
         raise XtError("the supervisor isn't running, so nothing reads the pane input")
     if session_log(ctx, a) is None:
         raise XtError("xt can't find this session's log")
@@ -313,8 +309,6 @@ def scan(ctx: Ctx, now: float | None = None) -> list[str]:
 
 def refuse(ctx: Ctx, q: dict) -> str:
     """A queued line the session log never showed: not recorded. An alert and a line in chat."""
-    from .alerts import Alerts
-
     short = " ".join(q["text"].split())[:80]
     line = (f"pane input to {q['agent']} NOT recorded: the line wasn't found as typed in its session log "
             f"(\"{short}\")")

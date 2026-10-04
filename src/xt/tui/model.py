@@ -17,7 +17,7 @@ from .. import permissions
 from ..adapters import load_adapters
 from ..context import Ctx
 from ..dispatch import Queue
-from ..jobs import Jobs
+from ..lifecycle import Jobs
 from ..paths import XtError
 from ..alerts import FAILURES
 from ..inbox import answer_text, fold_labels  # shared with `xt inbox --seen` (card #179)
@@ -217,7 +217,7 @@ def _heading(s: str) -> Text:
 
 def approval_data(rid: str, r: dict, ts: str | None) -> dict:
     """An approval row's data: a closed question with the request as its narrative (card #183)."""
-    from ..spawn import approval_what
+    from ..approvals import approval_what
 
     return {"id": int(rid), "ts": ts, "question": {"kind": "closed"},
             "text": f"{r['requester']} asks to {approval_what(r)}.\n\nAnswer yes (approve) or no (deny)."}
@@ -296,7 +296,7 @@ def build(ctx: Ctx) -> Snapshot:
             opts = codex_options_line(ctx, a, la is not None)  # card #169
             if opts:
                 out.append(opts + "\n", style="yellow" if "network on" in opts else "")
-            from ..reset import queued, queued_text, suggestion
+            from ..lifecycle import queued, queued_text, suggestion
 
             entry = queued(ctx).get(a.name)
             if entry:  # card #134

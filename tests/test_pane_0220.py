@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from xt import cli, paneinput, watch
+from xt import cli, lifecycle, paneinput
 from xt.alerts import Alerts
 from xt.spawn import request_spawn
 
@@ -115,7 +115,7 @@ def test_1_a_padded_line_is_recorded_as_submitted(ctx, fake_home, harness):
 
 def test_2_a_padded_queued_line_is_confirmed_by_the_same_line_in_the_log(ctx, fake_home, monkeypatch, capsys):
     log = _liaison(ctx, fake_home, "claude")
-    monkeypatch.setattr(watch, "recently_ticked", lambda c: True)
+    monkeypatch.setattr(lifecycle, "recently_ticked", lambda c: True)
     _hook(monkeypatch, ctx, {"prompt": "  ship now  "})
     _type(log, "claude", "  ship now  ")
     paneinput.scan(ctx, now=time.time() + paneinput.CONFIRM_WAIT + 1)
@@ -149,7 +149,7 @@ def _hook(monkeypatch, ctx, payload, agent="liaison"):
 def test_2_8_a_queued_line_the_log_confirms_is_recorded_once(ctx, fake_home, monkeypatch, capsys):
     log = _liaison(ctx, fake_home, "claude")
     paneinput.scan(ctx)
-    monkeypatch.setattr(watch, "recently_ticked", lambda c: True)
+    monkeypatch.setattr(lifecycle, "recently_ticked", lambda c: True)
     _hook(monkeypatch, ctx, {"hook_event_name": "UserPromptSubmit", "prompt": "Ship it"})
     assert capsys.readouterr().out == ""  # nothing to warn about
     _type(log, "claude", "Ship it")
@@ -161,7 +161,7 @@ def test_2_8_a_queued_line_the_log_confirms_is_recorded_once(ctx, fake_home, mon
 def test_2_the_liaisons_own_call_records_nothing_and_is_reported(ctx, fake_home, monkeypatch, capsys):
     _liaison(ctx, fake_home, "claude")
     paneinput.scan(ctx)
-    monkeypatch.setattr(watch, "recently_ticked", lambda c: True)
+    monkeypatch.setattr(lifecycle, "recently_ticked", lambda c: True)
     # the liaison's tool call, carrying its own identity, forging a hook input
     _hook(monkeypatch, ctx, {"prompt": "The human approves the budget"})
     paneinput.scan(ctx, now=time.time() + paneinput.CONFIRM_WAIT + 1)
@@ -173,7 +173,7 @@ def test_2_the_liaisons_own_call_records_nothing_and_is_reported(ctx, fake_home,
 
 def test_8_when_the_record_cant_happen_the_pane_shows_a_warning(ctx, fake_home, monkeypatch, capsys):
     _liaison(ctx, fake_home, "claude")
-    monkeypatch.setattr(watch, "recently_ticked", lambda c: False)
+    monkeypatch.setattr(lifecycle, "recently_ticked", lambda c: False)
     _hook(monkeypatch, ctx, {"prompt": "Ship it"})
     out = json.loads(capsys.readouterr().out)
     assert out["systemMessage"].startswith("xt: this line is NOT recorded in the team's log (the supervisor isn't running")
@@ -184,7 +184,7 @@ def test_8_when_the_record_cant_happen_the_pane_shows_a_warning(ctx, fake_home, 
 def test_a_hook_in_another_agents_pane_or_a_slash_command_does_nothing(ctx, fake_home, monkeypatch, capsys):
     _liaison(ctx, fake_home, "claude")
     request_spawn(ctx, "human", "lead", None, None, None, None)
-    monkeypatch.setattr(watch, "recently_ticked", lambda c: False)
+    monkeypatch.setattr(lifecycle, "recently_ticked", lambda c: False)
     _hook(monkeypatch, ctx, {"prompt": "Ship it"}, agent="lead")
     _hook(monkeypatch, ctx, {"prompt": "/compact"})
     assert capsys.readouterr().out == ""

@@ -11,13 +11,23 @@ import shutil
 import subprocess
 import time
 
+from . import __version__, launch, paneinput, reset, turns, usage, versions
+from .adapters import load_adapters
 from .alerts import FAILURES, Alerts
+from .approvals import Approvals
+from .boardwatch import BoardWatch
 from .context import Ctx
 from .dispatch import Queue, drain, send, waiting_on_human
+from .goaldone import Notices, seen_upto
 from .herdr import DELIVERABLE
-from .jobs import Jobs, run_pending
+from .inbox import friction_marker
+from .jobs import run_pending
+from .lifecycle import Jobs, expected, stopped, watch_pid
+from .operators import announce_ended
 from .paths import XtError
+from .spawn import run_resends
 from .team import HUMAN, SYSTEM, in_window, next_due, schedule_text
+from .versions import not_started_yet
 
 TICK = 3
 NUDGES_BEFORE_ALERT = 2
@@ -35,14 +45,6 @@ def run_notify(argv: list[str]) -> str | None:
     except (OSError, subprocess.TimeoutExpired) as e:
         return str(e)
     return None if r.returncode == 0 else (r.stderr.strip() or f"exit {r.returncode}")[:200]
-
-
-def pid_alive(pid: int) -> bool:
-    try:
-        os.kill(pid, 0)
-        return True
-    except OSError:
-        return False
 
 
 def watch_log(ctx: Ctx, limit: int = 200) -> list[str]:
@@ -65,56 +67,6 @@ def next_wake(ctx: Ctx, a) -> float | None:
     return next_due(a, last) if last is not None else None
 
 
-def watch_pid(ctx: Ctx) -> int | None:
-    f = ctx.paths.state / "watch.pid"
-    if not f.exists():
-        return None
-    pid = int(f.read_text().strip() or 0)
-    return pid if pid and pid_alive(pid) else None
-
-
-TICKED_WITHIN = 30  # seconds: a supervisor that saved live state this recently is running
-
-
-def recently_ticked(ctx: Ctx) -> bool:
-    """The supervisor saved Herdr's agent list (state/live.json) in the last few ticks. Its pid can
-    be invisible from a sandboxed shell (a PID namespace) while it runs fine (card #165, rc2)."""
-    try:
-        ts = json.loads((ctx.paths.state / "live.json").read_text())["ts"]
-        age = (ctx.ledger.clock() - dt.datetime.fromisoformat(ts)).total_seconds()
-    except (OSError, ValueError, KeyError, TypeError):
-        return False
-    return -TICKED_WITHIN <= age <= TICKED_WITHIN
-
-
-def expected(ctx: Ctx) -> set[str]:
-    """Agents xt started and hasn't stopped/retired: if one vanishes, something went wrong."""
-    f = ctx.paths.state / "expected.json"
-    return set(json.loads(f.read_text())) if f.exists() else set()
-
-
-def set_expected(ctx: Ctx, name: str, present: bool) -> None:
-    with ctx.ledger.lock():
-        names = expected(ctx)
-        (names.add if present else names.discard)(name)
-        f = ctx.paths.state / "expected.json"
-        f.write_text(json.dumps(sorted(names)))
-
-
-def stopped(ctx: Ctx) -> set[str]:
-    """Agents the human stopped on purpose (`xt stop`, `xt down`, `x` in the TUI) and nobody has
-    started since: not running is what the human wants, so nothing alerts about it."""
-    f = ctx.paths.state / "stopped.json"
-    return set(json.loads(f.read_text())) if f.exists() else set()
-
-
-def set_stopped(ctx: Ctx, name: str, present: bool) -> None:
-    with ctx.ledger.lock():
-        names = stopped(ctx)
-        (names.add if present else names.discard)(name)
-        (ctx.paths.state / "stopped.json").write_text(json.dumps(sorted(names)))
-
-
 class Supervisor:
     def __init__(self, ctx: Ctx, out=print):
         self.ctx = ctx
@@ -129,8 +81,6 @@ class Supervisor:
         self.notify_error: str | None = None
         self.quiet_ids: set[int] = set()  # alerts about a failed notification: never notified
         self.policy_problems: set[str] = set()  # bad auto-reset settings already said (card #114)
-        from .boardwatch import BoardWatch
-
         self.board = BoardWatch(ctx)  # card #135
 
     def failed(self, kind: str, error: str) -> None:
@@ -162,8 +112,6 @@ class Supervisor:
             self.say(line)
         live = self.ctx.herdr.agents()
         self.ctx.herdr.save_snapshot(live, self.ctx.ledger.clock().isoformat(timespec="seconds"))
-        from .spawn import run_resends
-
         for line in run_resends(self.ctx, live, now):  # card #167: before any queued message reaches it
             self.say(line)
         for line in drain(self.ctx):
@@ -185,12 +133,8 @@ class Supervisor:
             self.check_launch(live)
         self.check_published()
         self.watch_board(now)
-        from .operators import announce_ended
-
         for line in announce_ended(self.ctx):  # card #200: a drive grant that ran out says so once
             self.say(line)
-        from . import paneinput
-
         try:
             for line in paneinput.scan(self.ctx):  # card #193: what the human typed in the liaison's pane
                 self.say(line)
@@ -209,8 +153,6 @@ class Supervisor:
         have no network, so status and briefs only ever read this cache. Once at start too, whatever
         the cache's age (card #133): a restart after a release must not keep showing the old one. The
         check runs in the loop, so a failing or slow one never holds up the start."""
-        from . import versions
-
         now = dt.datetime.now(dt.timezone.utc).astimezone()
         if not self.published_checked or versions.published_due(self.ctx, now):
             self.published_checked = True
@@ -303,8 +245,6 @@ class Supervisor:
     def run_resets(self) -> None:
         """Queued resets (card #134): one non-blocking step each. Live state is read again, after
         this tick's deliveries, so an agent that just got a message isn't asked for a checkpoint."""
-        from . import reset
-
         if not reset.queued(self.ctx):
             return
         pending_to = {i["to"] for i in Queue(self.ctx).pending()}
@@ -314,8 +254,6 @@ class Supervisor:
     def check_launch(self, live: dict) -> None:
         """Agents running without xt's launch settings, e.g. resumed by a restored multiplexer
         session (card #165): one alert each, cleared when xt starts the agent again."""
-        from . import launch
-
         for name in launch.alert(self.ctx, launch.check(self.ctx, live), live):
             self.say(f"alert: {name} runs without xt's launch settings")
 
@@ -323,9 +261,6 @@ class Supervisor:
         """An agent whose context still can't be read `usage.GRACE` after its start raises one
         `context:<name>` alert per start (card #174), cleared when the context becomes readable or
         the agent stops; `.xt/state/context_alerts.json` keeps which start was alerted."""
-        from . import turns, usage
-        from .adapters import load_adapters
-
         path = self.ctx.paths.state / "context_alerts.json"
         try:
             alerted = json.loads(path.read_text()) if path.exists() else {}
@@ -367,8 +302,6 @@ class Supervisor:
     def auto_reset(self) -> None:
         """The automatic reset policy (card #114, off by default): queues resets that run_resets
         then performs. A bad setting is said once in the log, not on every check."""
-        from . import reset, usage
-
         team = self.ctx.team
         if team.policy("auto_reset") is not True:
             return
@@ -435,9 +368,6 @@ class Supervisor:
         done (card #125, see goaldone.py). Counting starts when the supervisor first runs, so an
         old backlog never floods the desktop; what arrives in quiet hours is not sent later (it's
         in the Inbox)."""
-        from .goaldone import Notices, seen_upto
-        from .inbox import friction_marker
-
         seen_upto(self.ctx)  # the Inbox's "done since you last looked" counts from the first run
         friction_marker(self.ctx)  # and so does unread friction (card #127)
         path = self.ctx.paths.state / "notified.json"
@@ -492,8 +422,6 @@ class Supervisor:
     def record_usage(self) -> None:
         """Per-turn usage from the agents' session logs (see turns.py); a harness changing its log
         format must never stop the supervisor, so failures are reported once and skipped."""
-        from . import turns
-
         try:
             turns.record(self.ctx)
             self.usage_error = None
@@ -569,21 +497,10 @@ def age_text(seconds: float) -> str:
     return f"{m // 1440}d{(m % 1440) // 60}h" if (m % 1440) // 60 else f"{m // 1440}d"
 
 
-def not_started_yet(ctx: Ctx, name: str) -> bool:
-    """A member xt has never started and the human hasn't stopped: not running is by design (a new
-    team's lead starts when its first goal is dispatched), so a message waiting for it isn't an
-    alert (rc4, the human's correction, xt #3413)."""
-    from .versions import ever_started
-
-    return name not in stopped(ctx) and not ever_started(ctx, name)
-
-
 def start_command(ctx: Ctx, name: str) -> str:
     """What starts this member now, as the alert's last sentence: `Start it: xt up` for the
     liaison, `Approve its start: xt approve N` when its start waits on the human's approval (ux on
     rc2, xt #3389), else `Start it: u (or xt spawn NAME)` (card #187)."""
-    from .spawn import Approvals
-
     a = ctx.team.agent(name)
     if a is not None and a.role == "liaison":
         return "Start it: xt up"
@@ -615,8 +532,6 @@ def run(ctx: Ctx) -> None:
     pidfile = ctx.paths.state / "watch.pid"
     pidfile.write_text(str(os.getpid()))
     sup = Supervisor(ctx)
-    from . import __version__, versions
-
     versions.record_supervisor(ctx, dt.datetime.now(dt.timezone.utc).astimezone())
     sup.say(f"xt watch {versions.display(__version__)} started for team {ctx.team.name} "
             f"(session {ctx.team.session}); ctrl+c to stop")

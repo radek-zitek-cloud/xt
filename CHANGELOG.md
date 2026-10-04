@@ -9,6 +9,29 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.23.0] — not released yet
+
+**0.23.0-rc1** has #215 (Space specs/untangle-agent-lifecycle-modules).
+
+### Upgrading
+
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc1`), then `xt restart --all`
+  so the supervisor runs the new code. Nothing to migrate: no change to `team.toml`, the protocol,
+  the ledger or the state files, and nothing you see changes.
+
+### Internal
+
+- **#215** The modules around an agent's life (spawn, the supervisor, reset, jobs, sending, pane
+  input, the brief) no longer import each other both ways. Their shared records (the supervisor's
+  pid, expected and stopped agents, the jobs queue, checkpoints, queued resets and the reset
+  suggestion) move to a new `lifecycle` module, and pending approvals to `approvals`; both import
+  none of the seven. `not_started_yet` moves to `versions`, beside the start records it reads. The
+  seven have no import inside a function any more (48 before), xt as a whole 108 (159 before).
+  `tests/test_layers_0230.py` builds the import graph from the source and fails on any cycle
+  through these modules. On a fixture team, `status`, `brief`, `log`, `inbox`, a spawn request,
+  `reset` and the supervisor's records give the same output as 0.22.1. See "The lifecycle modules,
+  in layers" in [docs/architecture.md](docs/architecture.md).
+
 ## [0.22.1] — 2026-10-04
 
 The release: the same code as 0.22.1-rc4 (the version, this changelog, the README's chat bullet,

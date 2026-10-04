@@ -1,6 +1,6 @@
 # xt architecture: how it works
 
-What the code does as of **v0.22.1** (2026-10-04), after real runs with a newsroom team and xt's
+What the code does as of **v0.23.0** (2026-10-04), after real runs with a newsroom team and xt's
 own product team, and the fixes they led to. Release-by-release changes are in
 [CHANGELOG.md](../CHANGELOG.md); how to use xt is in the [user guide](user-guide.md).
 
@@ -68,23 +68,25 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/choices.py` | Questions with a declared answer type (closed, options, open; from 0.21.0): validation, rendering, the `question` data stored on an ask (read from the text for older asks), and checking an answer against it, a numeric answer recorded as the option's text. |
 | `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
 | `src/xt/skills.py` | The team's skills index for first prompts and briefs. |
-| `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and their approvals (each a closed question in the ledger, answered once by `xt answer`, `approve`/`deny` or the TUI), stop and retire. |
+| `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and carrying out their approvals (`decide`), stop and retire. |
+| `src/xt/lifecycle.py` | Card #215: the lifecycle's shared records, imported by spawn, watch, reset, jobs, dispatch, pane input and the brief and importing none of them: the supervisor's pid and `recently_ticked`, expected and stopped agents, the jobs queue (`Jobs`), checkpoints, queued resets (`queued`, `drop`, `state/resets.json`) and when a reset is suggested (`suggestion`). |
+| `src/xt/approvals.py` | Card #215: pending approvals of spawns and schedules (`Approvals`, `state/approvals.json`; each a closed question in the ledger, answered once by `xt answer`, `approve`/`deny` or the TUI) and their one-line summary (`approval_what`). |
 | `src/xt/permissions.py` | Claude Code settings files: which file applies (`effective`), the preflight check, the start note. |
 | `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`, `first_prompt_prefix`), `first_prompt_note`, limits. |
 | `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |
-| `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor. |
-| `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. Card #187: `check_queued` (after `check_agents`, every tick) raises `queued:NAME` for messages waiting `QUEUED_GRACE` or more for a member that isn't running (never for one `not_started_yet`: no start record in `versions` and not stopped by the human, rc4) (`queued_text`, `start_command`, `age_text`), or folds the queue line into an open `missing:NAME`; `state/queued_alerts.json` keeps the newest message alerted per member, so a cleared alert returns only for a newer message or after the member ran. |
+| `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor (`lifecycle.Jobs`) and run by it (`run_pending`). |
+| `src/xt/watch.py` | `xt watch`, the supervisor: its tick (below), alerts, heartbeat, wake-ups, notifications, usage recording. Card #187: `check_queued` (after `check_agents`, every tick) raises `queued:NAME` for messages waiting `QUEUED_GRACE` or more for a member that isn't running (never for one `versions.not_started_yet`: no start record and not stopped by the human, rc4) (`queued_text`, `start_command`, `age_text`), or folds the queue line into an open `missing:NAME`; `state/queued_alerts.json` keeps the newest message alerted per member, so a cleared alert returns only for a newer message or after the member ran. |
 | `src/xt/alerts.py` | Alerts for the human, raised and cleared by key. `update_text` and `fold` (card #187) change an open alert's text without a new message or notification. |
 | `src/xt/boardwatch.py` | Card #135: the board watch. Runs the `[board_watch]` command from `team.toml` in the background (no shell, no input, a timeout, at most 64 KB of output), reads its JSON array of cards, tells the lead about each number new since the last success (the first success after a supervisor start is only the baseline), one `boardwatch` alert per outage, and the status line (`state/board_watch.json`). |
 | `src/xt/up.py` | `xt up`, `xt down` and `xt restart`: bringing the team to its resting state and back. |
 | `src/xt/init.py` | `xt init`: turning a fresh clone into a team repo. |
 | `src/xt/launch.py` | Card #165: whether each running agent is the process xt started, by its `XT_AGENT` in `/proc` (a harness process working in the team repo); the warning and one Inbox alert per agent running without xt's launch settings. |
 | `src/xt/operators.py` | Card #166: named operators acting for the human. Registration (`xt operator add NAME --pid PID`: a harness process that isn't a team agent, its start time, and a token in `.xt/operators/NAME.token`, mode 600), recognition (token in `XT_OPERATOR_TOKEN` *and* the registered process among the command's ancestors), the operator's reports to the liaison, and time-bound grants of `restart`, `reset`, `spawn` (existing agent) and `up` (at most 60 minutes, checked against the stored end time at each command). Card #200: the grant's scope `drive` (`drive`, `act`, `answered_by`, `announce_ended`): the operator's answers, approvals and goals as messages under its own name with a `delegated` field, and one line when a drive grant ends. |
-| `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. The queued reset (`--when-idle`, `state/resets.json`), the supervisor's non-blocking step that runs it, and the opt-in automatic policy that queues one above a token threshold. |
+| `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. The queued reset (`--when-idle`; its records in `lifecycle`), the supervisor's non-blocking step that runs it, and the opt-in automatic policy that queues one above a token threshold. |
 | `src/xt/usage.py` | Live context per agent, from its harness's session log. |
 | `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines and windows. |
 | `src/xt/planusage.py` | Claude plan usage from the status line (standard library only). |
-| `src/xt/versions.py` | Published, installed and running xt versions. |
+| `src/xt/versions.py` | Published, installed and running xt versions; each agent's start record, and `not_started_yet` (a member xt never started and the human didn't stop). |
 | `src/xt/switch.py` | `xt version use` and `rollback`: state format checks, snapshots, merge and revert. |
 | `src/xt/tui/app.py` | The TUI (Textual): the three bands and their heights, pane titles, the Team pane, Work and Flow sharing the middle pane, the Flow pane's filters and scrolling, keys and the per-pane key line, the toast, dialogs, and the actions it takes as the human. |
 | `src/xt/tui/model.py` | What the TUI shows: the team's files and live state turned into pane rows, Flow's messages and roster, agents and the Team header, and the detail for the Team header and harness rows (versions, each window's reading or why it has none). |
@@ -95,6 +97,25 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/tui/clipboard.py` | The system clipboard for the TUI's text boxes. |
 | `src/xt/tui/lazy.tcss` | The TUI's stylesheet. |
 | `src/xt/tui/__init__.py` | The TUI package. |
+
+### The lifecycle modules, in layers (card #215)
+
+The modules around an agent's life import each other in one direction only, so each can be read
+and changed without the others in its head. From the bottom up:
+
+1. **Shared layer:** `lifecycle` (the records: supervisor pid, expected and stopped agents, jobs,
+   checkpoints, queued resets) and `approvals`. They import none of the modules above; `versions`
+   (start records) sits beside them and imports only `lifecycle`.
+2. `dispatch` (sending) and `paneinput` (the liaison's pane input).
+3. `brief`, then `spawn` (starting and stopping; it builds the first prompt from the brief).
+4. `reset` and `jobs`, which start and stop agents through `spawn`.
+5. `watch`, the supervisor, on top: it runs all of them each tick.
+
+Before 0.23.0 these modules imported each other both ways (spawn and watch, spawn and reset, spawn
+and the brief, jobs and spawn, dispatch and watch, pane input and watch), hidden in imports inside
+functions. Now none of the seven has an import inside a function. `tests/test_layers_0230.py` builds
+the import graph from the source (imports inside functions too) and fails on any cycle that
+includes one of them, `lifecycle` or `approvals`.
 
 ## Files in a team repo
 

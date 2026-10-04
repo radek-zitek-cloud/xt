@@ -17,7 +17,8 @@ import pytest
 
 from xt import cli, goaldone, permissions, planusage, turns
 from xt.paths import XtError
-from xt.spawn import Approvals, approval_what, decide, request_spawn, stop
+from xt.approvals import approval_what
+from xt.spawn import Approvals, decide, request_spawn, stop
 from xt.tui.app import LiveActions, XtTui
 from xt.tui.model import build
 from xt.watch import Supervisor

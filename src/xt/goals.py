@@ -76,7 +76,7 @@ def dispatch(ctx: Ctx, sender: str, slug: str) -> str:
         return f"goal #{msg['id']} dispatched to {lead.name}: {status}"
     if sender != HUMAN:
         # The liaison may be sandboxed (codex blocks Herdr): let the supervisor start the lead.
-        from .jobs import Jobs
+        from .lifecycle import Jobs
 
         Jobs(ctx).add("start", {"name": lead.name}, sender)
         return (f"goal #{msg['id']} dispatched; the supervisor starts {lead.name} within seconds "

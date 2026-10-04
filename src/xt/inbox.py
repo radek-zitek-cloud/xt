@@ -20,11 +20,11 @@ import re
 from dataclasses import dataclass, field
 
 from .alerts import Alerts
+from .approvals import Approvals
 from .context import Ctx
 from .goaldone import done_since, liaison_goal, load_seen, save_seen, seen_upto
-from .operators import is_operator_message
-from .spawn import Approvals
 from .ledger import is_pane
+from .operators import is_operator_message
 from .team import HUMAN
 
 KEEP_SEEN = 1000  # friction ids kept one by one; older ones fold into friction_upto

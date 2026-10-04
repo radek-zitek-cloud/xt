@@ -582,7 +582,7 @@ def test_187_a_running_member_with_a_queue_raises_nothing_and_running_clears_it(
 
 
 def test_187_an_open_missing_alert_gets_the_queue_line_and_no_second_alert(ctx, clock):
-    from xt.watch import set_expected
+    from xt.lifecycle import set_expected
 
     _crew(ctx)
     set_expected(ctx, "builder", True)  # xt started it and it vanished: missing:builder
@@ -640,7 +640,7 @@ def test_187_messages_to_the_human_or_a_retired_member_raise_nothing(ctx, clock)
 def test_187_the_start_command_matches_the_state(ctx, clock):
     from xt.dispatch import send
     from xt.spawn import Approvals
-    from xt.watch import set_expected, set_stopped
+    from xt.lifecycle import set_expected, set_stopped
 
     _crew(ctx)
     ctx.herdr.live.pop("liaison")
@@ -727,7 +727,7 @@ def test_187_rc4_no_alert_for_a_member_xt_hasnt_started_yet(ctx, clock, monkeypa
 def test_187_rc4_a_stopped_member_still_alerts_after_its_first_start(ctx, clock):
     from xt.dispatch import send
     from xt.team import SYSTEM
-    from xt.watch import set_stopped
+    from xt.lifecycle import set_stopped
 
     _new_team(ctx)
     set_stopped(ctx, "lead", True)  # the human stopped it: no longer "not started yet"
@@ -748,7 +748,7 @@ def test_187_rc4_the_sender_line_for_a_member_not_started_yet(team, monkeypatch,
 
 
 def test_187_rc4_xt_inbox_indents_the_folded_queue_line(ctx, clock, monkeypatch, capsys):
-    from xt.watch import set_expected
+    from xt.lifecycle import set_expected
 
     _crew(ctx)
     set_expected(ctx, "builder", True)

@@ -14,7 +14,8 @@ from .context import Ctx
 from .dispatch import Queue, done_recipient, send
 from .ledger import AGENT_TYPES, pair
 from .paths import Paths, XtError, find_root
-from .spawn import AGENT_ENV, Approvals, approval_what, decide, request_spawn, retire, stop
+from .approvals import Approvals, approval_what
+from .spawn import AGENT_ENV, decide, request_spawn, retire, stop
 from .team import ALWAYS, HUMAN, harness_model, parse_window, schedule_text
 
 
@@ -184,7 +185,7 @@ def cmd_schedule(args) -> None:
     off = args.every.lower() in ("off", "none", "0")
     if not off and who != HUMAN:
         # Each wake-up is a billed agent turn: agents get a floor and (by default) the human's approval.
-        from .spawn import Approvals
+        from .approvals import Approvals
         from .team import parse_interval
 
         floor = int(ctx.team.policy("min_wake_minutes"))
@@ -483,7 +484,7 @@ def cmd_status(args) -> None:
     starts = usage.last_starts(ctx)
     adapters = load_adapters(ctx.paths)
     spend = turns.today(ctx)
-    from .reset import queued, queued_text
+    from .lifecycle import queued, queued_text
 
     resets = queued(ctx)
     from . import launch
@@ -523,9 +524,7 @@ def cmd_status(args) -> None:
             print(f"  {'':<12} WARNING: {launch.warning(a.name)}")
         elif state_launch == launch.UNCHECKED:
             print(f"  {'':<12} launch settings: not checked ({why})")
-    from .jobs import Jobs
-    from .reset import suggestion
-    from .watch import watch_pid
+    from .lifecycle import Jobs, suggestion, watch_pid
 
     now = dt.datetime.now(dt.timezone.utc).astimezone()
     for name, reading in contexts.items():
@@ -541,7 +540,7 @@ def cmd_status(args) -> None:
     for key, al in sorted(Alerts(ctx).active().items()):
         if key.startswith("queued:"):  # card #187: a message waits for a member that isn't running
             print(f"⚠ {al['text']}  (xt clear {key})")
-    from .watch import not_started_yet
+    from .versions import not_started_yet
 
     waits: dict[str, int] = {}
     for item in q:  # rc4 (xt #3413): waiting for a first start is no alert, only a quiet note
@@ -567,7 +566,7 @@ def cmd_status(args) -> None:
     pane = signal(ctx)  # card #193; the line names "pane input" itself
     if pane:
         print(pane)
-    from .watch import recently_ticked
+    from .lifecycle import recently_ticked
 
     if not watch_pid(ctx) and not recently_ticked(ctx):  # said plainly whenever it's down (card #165)
         if launch.isolated():  # its pid is invisible from a sandbox, so its absence proves nothing
@@ -609,7 +608,7 @@ def cmd_reset(args) -> None:
             print(cancel(ctx, args.name))
             return
         if args.when_idle:  # card #134
-            from .watch import watch_pid
+            from .lifecycle import watch_pid
 
             print(queue(ctx, args.name))
             if not watch_pid(ctx):

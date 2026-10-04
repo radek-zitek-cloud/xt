@@ -105,7 +105,7 @@ def _check_format(ctx: Ctx, commit: str, label: str) -> int:
 
 
 def _require_down(ctx: Ctx) -> None:
-    from .watch import watch_pid
+    from .lifecycle import watch_pid
 
     if watch_pid(ctx):
         raise XtError("the supervisor is running: `xt down` first (a version switch needs the team fully down)")

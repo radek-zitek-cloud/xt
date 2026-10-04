@@ -6,14 +6,16 @@ import re
 import shlex
 import time
 
-from . import brief, paneinput, permissions, skills
+from . import __version__, brief, paneinput, permissions, skills, usage, versions
 from .adapters import codex_option_args, codex_options_text, get_adapter, load_adapters
 from .alerts import Alerts
-from .herdr import HerdrError
+from .approvals import Approvals
 from .context import Ctx
+from .dispatch import send
+from .herdr import DELIVERABLE, HerdrError
+from .lifecycle import Jobs, drop, set_expected, set_stopped
 from .paths import XtError
-from .team import ALWAYS, HUMAN, SYSTEM, harness_model, schedule_text
-from .watch import set_expected, set_stopped
+from .team import HUMAN, SYSTEM, schedule_text
 
 PRECEDENCE = """\
 PRECEDENCE: for everything about this team — who you are, who you talk to, how you send and
@@ -96,8 +98,6 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     ctx.herdr.run_in_fresh_pane(pane, f"export {AGENT_ENV}={shlex.quote(name)}")
     answered: list[str] = []
     began = time.time()
-    from . import versions
-
     versions.mark_starting(ctx, name, ctx.ledger.clock())  # its first brief comes before the record (#177)
     if a.role == "liaison":
         paneinput.mark_start(ctx, name)  # card #193: its new session log is read from the start
@@ -125,8 +125,6 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     if landed and adapter.check_prompt_in_log:
         note = check_prompt_in_log(ctx, name, adapter, began, settled)
-    from . import __version__
-
     versions.record_agent_start(ctx, name, ctx.ledger.clock(), a.codex_options)
     ctx.ledger.append(SYSTEM, HUMAN, "system",
                       f"started {name} ({a.role}, {a.harness}) in workspace {workspace} with xt {versions.display(__version__)}{note}")
@@ -250,8 +248,6 @@ def check_prompt_in_log(ctx: Ctx, name: str, adapter, since: float, settled: boo
     damaged one is resent whole, once, when the agent is next idle: the supervisor does it (see
     `run_resends`), so a start never waits on the agent's first turn. The result is a note for the
     start record."""
-    from . import usage
-
     deadline = time.monotonic() + LANDED_WAIT
     while True:
         found = usage.prompt_in_log(ctx, adapter, name, since)
@@ -323,10 +319,6 @@ def run_resends(ctx: Ctx, live: dict, now: float | None = None) -> list[str]:
     """The supervisor's step for damaged first prompts (card #167 rc5): resend the whole prompt to
     an agent that is idle, once; then read its session log until the whole opening shows up, and
     raise the partprompt alert if it doesn't. Never waits."""
-    from . import usage
-    from .adapters import load_adapters
-    from .herdr import DELIVERABLE
-
     resends = Resends(ctx)
     pending = resends.load()
     if not pending:
@@ -392,76 +384,6 @@ def send_first_prompt(ctx: Ctx, name: str, pane: str, adapter, text: str) -> boo
         f"know?), then `xt stop {name}` and `xt spawn {name}`.",
     )
     return False
-
-
-class Approvals:
-    def __init__(self, ctx: Ctx):
-        self.ctx = ctx
-        self.path = ctx.paths.state / "approvals.json"
-
-    def _load(self) -> dict:
-        return json.loads(self.path.read_text()) if self.path.exists() else {}
-
-    def _save(self, d: dict) -> None:
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(d, indent=1))
-        os.replace(tmp, self.path)
-
-    def pending(self) -> dict:
-        with self.ctx.ledger.lock():
-            return self._load()
-
-    def add(self, req: dict) -> int:
-        if req.get("kind") == "schedule":
-            what = (f"{req['requester']} asks to wake {req['name']} every {req['every']} when idle"
-                    + (f" between {req['between']}" if req.get("between") and req["between"] != ALWAYS else "")
-                    + (f" at {req['at']}" if req.get("at") and req["at"] not in (ALWAYS, "off") else "")
-                    + (f" ({req['message']})" if req.get("message") else "")
-                    + ": each wake-up is a billed agent turn.")
-        else:
-            what = (f"{req['requester']} asks to spawn {req['name']} as {req['role']} on {req['harness']}"
-                    + (f" ({req['model']})" if req.get("model") else "")
-                    + f", reporting to {req['reports_to']}."
-                    + (f" {req['settings_note']}" if req.get("settings_note") else ""))
-        # a closed question with the request as its narrative (card #183): yes approves, no denies
-        msg = self.ctx.ledger.append(
-            SYSTEM,
-            HUMAN,
-            "approval",
-            what + "\n\nAnswer yes or no: xt answer {id} yes|no (or s, then y / n on it in the TUI's Inbox). "
-                   "xt approve {id} and xt deny {id} (a / d) still work.",
-            fill_id=True,
-            data={"question": {"kind": "closed"}},
-        )
-        with self.ctx.ledger.lock():
-            d = self._load()
-            d[str(msg["id"])] = req
-            self._save(d)
-        return msg["id"]
-
-    def pop(self, req_id: int) -> dict:
-        with self.ctx.ledger.lock():
-            d = self._load()
-            req = d.pop(str(req_id), None)
-            self._save(d)
-        if req is None:
-            asked = self.ctx.ledger.message(req_id)
-            if asked and asked["type"] == "approval":  # answered before, through any route (card #183)
-                from .operators import answered_by
-
-                by = answered_by(self.ctx, req_id)  # card #200: by an operator under a drive grant
-                if by:
-                    raise XtError(f"approval #{req_id}: {by}; nothing changed")
-                raise XtError(f"approval #{req_id} was already answered; nothing changed (xt log --id {req_id})")
-            raise XtError(f"no pending approval #{req_id}")
-        return req
-
-    def is_approval(self, req_id: int) -> bool:
-        """Whether this id is an approval request, pending or answered."""
-        if str(req_id) in self.pending():
-            return True
-        asked = self.ctx.ledger.message(req_id)
-        return bool(asked and asked["type"] == "approval")
 
 
 def spawn_settings(ctx: Ctx, name: str, harness: str, own: str | None) -> str:
@@ -533,8 +455,6 @@ def request_spawn(
         rid = Approvals(ctx).add(req)
         return f"approval #{rid} requested from the human; you'll get a message when it's decided"
     if requester != HUMAN:
-        from .jobs import Jobs
-
         jid = Jobs(ctx).add("spawn", req, requester)
         return f"spawn job #{jid} queued; the supervisor starts {name} within seconds and messages you"
     return execute_spawn(ctx, req)
@@ -547,16 +467,6 @@ def execute_spawn(ctx: Ctx, req: dict) -> str:
     ctx.reload_team()
     ws = do_spawn(ctx, req["name"])
     return f"spawned {req['name']} in workspace {ws}"
-
-
-def approval_what(r: dict) -> str:
-    """One line for a pending approval: `wake scout every 60m between …` / `spawn carol (role, harness/model)`."""
-    if r.get("kind") == "schedule":
-        return (f"wake {r['name']} every {r['every']}"
-                + (f" between {r['between']}" if r.get("between") and r["between"] != ALWAYS else "")
-                + (f" at {r['at']}" if r.get("at") and r["at"] not in (ALWAYS, "off") else ""))
-    return (f"spawn {r['name']} ({r['role']}, {harness_model(r['harness'], r.get('model'))})"
-            + (f" — {r['settings_note']}" if r.get("settings_note") else ""))
 
 
 def decide(ctx: Ctx, req_id: int, approve: bool, by: str | None = None) -> str:
@@ -576,8 +486,6 @@ def decide(ctx: Ctx, req_id: int, approve: bool, by: str | None = None) -> str:
     else:
         result = f"spawn of {req['name']} denied"
     if req["requester"] != HUMAN:
-        from .dispatch import send
-
         send(ctx, SYSTEM, req["requester"], "system",
              f"{by or 'Human'} {'approved' if approve else 'denied'} approval #{req_id}: {result}")
     return result
@@ -593,8 +501,6 @@ def retire(ctx: Ctx, requester: str, name: str) -> str:
     if requester != HUMAN and a.reports_to != requester:
         raise XtError(f"only {a.reports_to} or the human can retire {name}")
     if requester != HUMAN:
-        from .jobs import Jobs
-
         jid = Jobs(ctx).add("retire", {"name": name}, requester)
         return f"retire job #{jid} queued; the supervisor closes {name} within seconds and messages you"
     return retire_now(ctx, requester, name)
@@ -602,8 +508,6 @@ def retire(ctx: Ctx, requester: str, name: str) -> str:
 
 def retire_now(ctx: Ctx, requester: str, name: str) -> str:
     """Close the agent's workspace and mark it retired (the human, or the supervisor for a job)."""
-    from .reset import drop
-
     live = ctx.herdr.agents().get(name)
     set_expected(ctx, name, False)
     set_stopped(ctx, name, False)
@@ -619,8 +523,6 @@ def retire_now(ctx: Ctx, requester: str, name: str) -> str:
 
 def stop(ctx: Ctx, name: str) -> str:
     """Close an agent's workspace without changing the roster (it can be started again)."""
-    from .reset import drop
-
     live = ctx.herdr.agents().get(name)
     set_expected(ctx, name, False)
     set_stopped(ctx, name, True)

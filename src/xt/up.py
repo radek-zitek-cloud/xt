@@ -4,7 +4,7 @@ import json
 
 from .context import Ctx
 from .spawn import do_spawn
-from .watch import expected, watch_pid
+from .lifecycle import expected, watch_pid
 
 
 def up(ctx: Ctx) -> list[str]:
