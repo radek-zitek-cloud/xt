@@ -84,10 +84,12 @@ in [CHANGELOG.md](CHANGELOG.md).
 - **Upgrades you can see and undo (0.12, 0.14).** The published, installed and running versions
   are shown apart; `xt version use <tag>` switches after checks and a verified snapshot, and `xt
   version rollback` goes back ([Updating xt](docs/user-guide.md#7-updating-xt)).
-- **Fresh contexts and clean recoveries (0.12, 0.18).** `xt reset` gives an agent a fresh context
+- **Fresh contexts and clean recoveries (0.12, 0.18, 0.23).** `xt reset` gives an agent a fresh context
   once it has saved its notes (now or when it's free, or automatically above a size you set), and
   an agent resumed outside xt is flagged with `xt restart` as the fix
-  ([`xt reset`](docs/user-guide.md#xt-reset)).
+  ([`xt reset`](docs/user-guide.md#xt-reset)). Each agent's notes have a budget (16,000 bytes
+  unless you set `notes_budget`): `xt status` shows notes over it, and a day over it raises an
+  alert ([Memory and recovery](docs/user-guide.md#11-memory-and-recovery)).
 - **Agents in bounds, an operator within limits (0.11, 0.13, 0.19, 0.22).** No account connectors
   unless you opt one in, a permissions file per Claude Code agent, and your own coding agent may run
   `restart`, `reset`, `spawn` and `up` for you, or with `--scope drive` answer, approve and give
@@ -344,8 +346,8 @@ xt restart --all
   settings file can refuse them; a Codex agent is bounded only by its sandbox's escalation review.
 - Anything that can type into the liaison's pane through Herdr (`herdr agent prompt`, a script, an
   operator) is recorded as pane input from you, labelled unverified. It never answers or approves
-  anything in xt, but until card #209 (v0.23.0) the liaison can still close a question from it by
-  hand, as it does when you answer in its pane.
+  anything in xt, and from 0.23.0 agents treat pane text as conversation, never as authority: the
+  liaison asks you to answer in `xt chat` or the Inbox instead of closing a question from it.
 
 ## Versioning
 

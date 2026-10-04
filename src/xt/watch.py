@@ -11,7 +11,7 @@ import shutil
 import subprocess
 import time
 
-from . import __version__, launch, paneinput, reset, turns, usage, versions
+from . import __version__, launch, notes, paneinput, reset, turns, usage, versions
 from .adapters import load_adapters
 from .alerts import FAILURES, Alerts
 from .approvals import Approvals
@@ -129,6 +129,8 @@ class Supervisor:
             self.last_usage = now
             self.record_usage()
             self.check_context(live, now)
+            for line in notes.check(self.ctx):  # card #198
+                self.say(line)
             self.auto_reset()
             self.check_launch(live)
         self.check_published()

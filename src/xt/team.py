@@ -15,6 +15,15 @@ POLICY_DEFAULTS = {"spawn_approval": True, "max_agents": 8, "heartbeat_minutes":
                    "schedule_approval": True, "min_wake_minutes": 15,
                    # card #114: reset idle agents above an absolute context size (off by default)
                    "auto_reset": False, "auto_reset_tokens": 150_000, "auto_reset_cooldown_hours": 6}
+NOTES_BUDGET = 16_000  # bytes of members/<name>/notes.md, when team.toml sets no `notes_budget` (card #198)
+
+
+def _notes_budget_problem(value, where: str) -> str | None:
+    """Why a `notes_budget` value is refused, or None: a positive whole number of bytes."""
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return (f"{where} notes_budget = {value!r} in team.toml isn't a positive whole number of bytes "
+                f"(e.g. notes_budget = 16000)")
+    return None
 
 
 @dataclass
@@ -34,6 +43,7 @@ class Agent:
     permissions: str | None = None  # settings file for the harness, relative to the team repo (card #117)
     auto_reset_tokens: int | str | None = None  # card #114: this agent's threshold, or "off"; None = the team's
     codex_options: list[str] = field(default_factory=list)  # `-c` overrides for a Codex agent (card #169)
+    notes_budget: int | None = None  # card #198: this agent's notes budget in bytes; None = the team's
 
     @property
     def active(self) -> bool:
@@ -49,7 +59,28 @@ class Team:
     def load(cls, path: Path) -> "Team":
         if not path.exists():
             raise XtError(f"no team.toml at {path} — run `xt init` first")
-        return cls(path, tomlkit.parse(path.read_text()))
+        team = cls(path, tomlkit.parse(path.read_text()))
+        team.check()
+        return team
+
+    def check(self) -> None:
+        """Refuse settings xt can't use, at load (card #198: `notes_budget`)."""
+        defaults = self.doc.get("defaults", {})
+        problems = []
+        if "notes_budget" in defaults:
+            problems.append(_notes_budget_problem(defaults["notes_budget"], "[defaults]"))
+        for a in self.doc.get("agent", []):
+            if "notes_budget" in a:
+                problems.append(_notes_budget_problem(a["notes_budget"], f"agent {a.get('name')}'s"))
+        problems = [p for p in problems if p]
+        if problems:
+            raise XtError("; ".join(problems))
+
+    def notes_budget(self, agent: "Agent | None") -> int:
+        """The notes budget in bytes for `agent`: its own `notes_budget`, else `[defaults]`, else 16,000."""
+        if agent is not None and agent.notes_budget is not None:
+            return agent.notes_budget
+        return int(self.doc.get("defaults", {}).get("notes_budget", NOTES_BUDGET))
 
     def save(self) -> None:
         tmp = self.path.with_suffix(".toml.tmp")
@@ -103,6 +134,7 @@ class Team:
                     auto_reset_tokens=a.get("auto_reset_tokens"),
                     codex_options=([str(a["codex_options"])] if isinstance(a.get("codex_options"), str)
                                    else [str(o) for o in a.get("codex_options", [])]),
+                    notes_budget=int(a["notes_budget"]) if "notes_budget" in a else None,
                 )
             )
         return out

@@ -7,7 +7,7 @@ import time
 
 from . import __version__
 from . import brief as brief_mod
-from . import goals, operators, permissions
+from . import goals, notes, operators, permissions
 from .adapters import CODEX, allowed_codex_options, load_adapters
 from .alerts import Alerts, repeats
 from .context import Ctx
@@ -517,6 +517,9 @@ def cmd_status(args) -> None:
         opts = launch.codex_options_line(ctx, a, a.name in live)
         if opts:
             print(f"  {'':<12} {opts}")
+        notes_line = notes.status_text(ctx, a)  # card #198: only when over budget
+        if notes_line:
+            print(f"  {'':<12} {notes_line}")
         if a.name in resets:
             print(f"  {'':<12} {queued_text(resets[a.name])}")
         state_launch, why = launched.get(a.name, (None, ""))

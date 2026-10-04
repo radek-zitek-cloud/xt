@@ -83,6 +83,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/launch.py` | Card #165: whether each running agent is the process xt started, by its `XT_AGENT` in `/proc` (a harness process working in the team repo); the warning and one Inbox alert per agent running without xt's launch settings. |
 | `src/xt/operators.py` | Card #166: named operators acting for the human. Registration (`xt operator add NAME --pid PID`: a harness process that isn't a team agent, its start time, and a token in `.xt/operators/NAME.token`, mode 600), recognition (token in `XT_OPERATOR_TOKEN` *and* the registered process among the command's ancestors), the operator's reports to the liaison, and time-bound grants of `restart`, `reset`, `spawn` (existing agent) and `up` (at most 60 minutes, checked against the stored end time at each command). Card #200: the grant's scope `drive` (`drive`, `act`, `answered_by`, `announce_ended`): the operator's answers, approvals and goals as messages under its own name with a `delegated` field, and one line when a drive grant ends. |
 | `src/xt/reset.py` | `xt reset` and `xt checkpoint`: a fresh context for one agent, only after it has saved its notes. The queued reset (`--when-idle`; its records in `lifecycle`), the supervisor's non-blocking step that runs it, and the opt-in automatic policy that queues one above a token threshold. |
+| `src/xt/notes.py` | Card #198: the notes budget. Measures each `members/<name>/notes.md` in bytes against `Team.notes_budget` (`notes_budget` in `[defaults]` or the agent's table, 16,000 by default, checked at load), the `xt status` line (`status_text`, decimal kB, only over budget), and the supervisor's step (`check`, with the context checks): one `notes:NAME` alert when a file stays over budget more than `PERIOD` (24 h), then a new period; back within budget clears it and the timer (`state/notes_budget.json`). `brief_line` puts the alert in the agent's own brief. It never writes a notes file. |
 | `src/xt/usage.py` | Live context per agent, from its harness's session log. |
 | `src/xt/turns.py` | Per-turn usage and cost estimates, attributed to goals; the account allowance lines and windows. |
 | `src/xt/planusage.py` | Claude plan usage from the status line (standard library only). |
@@ -149,12 +150,13 @@ upstream and aren't edited by the team, so upstream merges rarely conflict.
             auto_reset (default false), auto_reset_tokens (150000), auto_reset_cooldown_hours (6)
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [notify]    enabled, command (e.g. "notify-send --app-name=xt {title} {body}"), quiet (e.g. "21:00-07:00")
-[defaults]  liaison / lead harness (and optional model); permissions? (settings file for every Claude agent)
+[defaults]  liaison / lead harness (and optional model); permissions? (settings file for every Claude agent);
+            notes_budget? (bytes, default 16000)
 [board_watch]  command (argument list), interval? ("5m"), timeout? ("30s"), column? (its name, for the message)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
             wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"), wake_at? (e.g. "09:30"; set with `xt schedule`),
             permissions? (e.g. "settings/carol.json"; Claude Code only), connectors? (account connectors opted in),
-            auto_reset_tokens? (this agent's threshold, or "off"),
+            auto_reset_tokens? (this agent's threshold, or "off"), notes_budget? (this agent's, bytes),
             codex_options? (e.g. ["sandbox_workspace_write.network_access=true"]; Codex only, allowlisted)
 ```
 
@@ -384,7 +386,9 @@ never copied back automatically. Switches are recorded in `state/switches.json`.
    the cool-down (`state/resets.json`). Also about once a minute, the **context check** (card #174,
    `Supervisor.check_context`): a running agent whose context still can't be read 10 minutes after
    its start raises one `context:<name>` alert for that start (`state/context_alerts.json`),
-   cleared when it becomes readable or the agent stops. And the **launch check** (card
+   cleared when it becomes readable or the agent stops. Then the **notes check** (card #198,
+   `notes.check`): one `notes:<name>` alert for notes over budget more than 24 hours
+   (`state/notes_budget.json`). And the **launch check** (card
    #165, `src/xt/launch.py`): harness processes in the team repo are matched to agents by their
    `XT_AGENT`; running agents left without a match are warned about (one `launch:<name>` alert,
    cleared when xt starts the agent again or it stops running) only on positive evidence, when at

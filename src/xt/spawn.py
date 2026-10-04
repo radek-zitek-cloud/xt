@@ -25,7 +25,6 @@ everything else (how you do your actual work), your usual instructions still app
 
 
 START_NOW = "Start now:"  # the first prompt's last line: stays on screen when the first line has scrolled away
-NOTES_BUDGET = 16_000  # bytes; over it, the notes still go in whole, with one line saying so (card #197)
 
 
 def notes_section(ctx: Ctx, name: str) -> str:
@@ -38,8 +37,9 @@ def notes_section(ctx: Ctx, name: str) -> str:
         notes = raw.decode()
     except (OSError, UnicodeDecodeError):
         return ""
-    over = (f"(This file is {len(raw)} bytes, over the notes budget of {NOTES_BUDGET} bytes: it is here whole, "
-            f"but shorten it.)\n") if len(raw) > NOTES_BUDGET else ""
+    budget = ctx.team.notes_budget(ctx.team.agent(name))  # card #198 (16,000 bytes unless team.toml says)
+    over = (f"(This file is {len(raw)} bytes, over the notes budget of {budget} bytes: it is here whole, "
+            f"but shorten it.)\n") if len(raw) > budget else ""
     return (f"===== your notes (members/{name}/notes.md, whole) =====\n{over}{notes}"
             f"{'' if notes.endswith(chr(10)) or not notes else chr(10)}===== end of your notes =====\n\n")
 

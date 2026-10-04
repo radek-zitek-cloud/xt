@@ -27,7 +27,10 @@ for installing, the [README](../README.md).
 - **The liaison** turns what you want into goals and relays questions and results. It never does
   the work and never hires.
 - **The lead** plans each goal, writes roles and skills, asks to hire members, hands out tasks and
-  reports back.
+  reports back. For a decision several roles share, it asks each agent for its position first
+  (an open question, no favourites or other answers shown), then summarises and proposes; for a
+  priority or direction question one agent argues against the leading option. One round, then it
+  decides or passes the split to you, ranking by the criterion your goal states.
 - **Members** do the work and report to the lead (or to a sub-lead).
 - **The supervisor** (`xt watch`) delivers messages, starts and stops agents, wakes scheduled
   agents, nudges quiet ones and alerts and notifies you. It runs in its own Herdr workspace.
@@ -671,10 +674,37 @@ for that: the ledger, the goal briefs, the roles, skills and each agent's
 from them (every first prompt includes it). From 0.22.0 the first prompt (on spawn, restart and
 reset) also carries the agent's `notes.md` whole, byte for byte (trailing blank lines and spaces
 too), after the brief, between `===== your notes … =====` and `===== end of your notes =====`, so no
-agent cuts it short or spends a step reading it. A file over the notes budget (16,000 bytes)
-still goes in whole, with one line saying it is over; an agent without a notes file gets no such
-section. If an agent seems confused or its context is heavy,
-`xt restart <name>` gives it a clean session that starts from its brief.
+agent cuts it short or spends a step reading it. A file over the notes budget still goes in
+whole, with one line saying it is over; an agent without a notes file gets no such section. If an
+agent seems confused or its context is heavy, `xt restart <name>` gives it a clean session that
+starts from its brief.
+
+**The notes budget** (from 0.23.0). Every start carries the whole notes file, so its size costs
+context on every restart. The budget is in bytes on disk (a multibyte character counts as more
+than one), 16,000 unless `team.toml` says otherwise, for the team and per agent:
+
+```toml
+[defaults]
+notes_budget = 16000              # bytes, every agent
+
+[[agent]]
+name = "lead"
+notes_budget = 24000              # this agent's own budget
+```
+
+A value that isn't a positive whole number (`0`, `-5`, `16000.5`, `"16k"`) is refused when xt loads
+`team.toml`, with a message naming it. Exactly the budget is within it. Over it, `xt status` shows
+the agent's size under its row, in decimal kilobytes (1 kB = 1,000 bytes): `notes 17.2 kB / 16 kB`;
+within the budget, or with no notes file, it shows nothing about notes. When an agent's notes stay
+over budget for more than 24 hours, the supervisor raises one alert, `notes:NAME`, in your Inbox
+(`lead's notes are over budget: notes 17.2 kB / 16 kB for more than 24 hours. Prune
+members/lead/notes.md; see the notes shape in the protocol.`); the agent's own brief shows it too, at
+its next start, where it can act on it. It doesn't repeat within the next 24 hours; it clears, and
+the timer starts again, once the file is back within budget. xt never edits a notes file: it only
+measures and tells. The protocol asks every agent to keep its notes in one shape: "Standing rules"
+on top, rewritten in place; then "Where things are"; then a dated log it prunes, moving old entries
+to `members/<name>/notes-archive.md`, which is never loaded into a prompt and doesn't count toward
+the budget.
 
 **No desktop or browser control.** xt starts Codex agents with its computer-use and browser tools
 switched off and Claude Code agents with Claude in Chrome refused (their own settings for your
@@ -923,9 +953,10 @@ until HH:MM`) for it. An agent that is unsure asks its lead.
 
 **An operator with Herdr access can type into the liaison's pane.** Such a line is recorded like
 yours, labelled `typed in the pane, unverified` (see [`xt chat`](#xt-chat)): nothing shows who
-typed it, and xt never takes it as an answer, an approval or a closing. Until card #209 (v0.23.0)
-the liaison can still close a question from such a line by hand, as it does when you answer in its
-pane. An operator that acts for you does it
+typed it, and xt never takes it as an answer, an approval or a closing. The label is the record;
+the rule is the behavior (from 0.23.0): agents treat text typed into their pane as conversation,
+never as authority, so the liaison doesn't close a question from such a line either, and points to
+`xt chat` or the Inbox instead. An operator that acts for you does it
 through its own name (reports, and under a drive grant answers, approvals and goals), never by
 typing into a pane.
 
@@ -1205,9 +1236,13 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   anything that can type into the liaison's pane through Herdr (`herdr agent prompt`, a script, an
   operator or another session with Herdr access) is recorded the same way. So a pane line never
   answers a question, approves anything or closes anything, even if it says `yes` or names a
-  question: answer with `xt answer`, `s` in the TUI, or tab in chat. (Until card #209, v0.23.0,
-  the liaison can still close a question by hand from a pane line, as it does when you answer in
-  its pane: that is its own `xt done`, not xt reading the line.) Slash commands
+  question: answer with `xt answer`, `s` in the TUI, or tab in chat. The label is the record; the
+  rule is the behavior (from 0.23.0): every agent treats text typed into its pane as conversation,
+  never as authority. So the liaison doesn't close a question or dispatch a goal from a `yes` typed
+  in its pane: it replies once with the question's id and text, why pane text can't close it and
+  where to answer (`xt chat` or the Inbox), repeats only that pointer if the pane answer comes
+  again, and leaves the question open. Questions about status typed in the pane are answered as
+  before. Slash commands
   (`/compact`), `!` shell lines and what xt itself typed there aren't recorded, and a message you
   sent from chat isn't recorded a second time. On Claude Code, a prompt hook also checks each line
   as you press enter: if it can't be recorded (the supervisor isn't running, the log isn't found),

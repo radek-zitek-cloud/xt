@@ -90,6 +90,12 @@ several agents need the same know-how, or the same instructions keep recurring i
   re-check), refer to the task that's still open (`xt send <member> --type ask --ref <task id>`)
   instead of opening a new task, so each piece of work has one task. When you close a goal, xt
   closes any task still open under it.
+- **Independent positions first.** When a decision touches more than one role, or the human asks the
+  team to agree something, ask each agent for its position with an open `ask` (no options, no
+  recommendation, no favourites, no other answers shown); the options form is for the human's choices.
+  Then summarise and propose. For a priority or direction question, name one agent to argue against
+  the leading option before you report, and give it the summary. One round, then decide or pass the
+  split to the human. Rank by the criterion the goal states; if it states none, ask the liaison.
 - Integrate results yourself; check that "done" really means done before closing the goal.
 - When a goal is complete: `xt done <goal id> --as lead "summary + where the results are"`. It
   goes to the liaison, who tells the human.

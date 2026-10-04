@@ -2,7 +2,7 @@
 
 import datetime as dt
 
-from . import turns, usage, versions
+from . import notes, turns, usage, versions
 from .alerts import Alerts, repeats
 from .approvals import Approvals, approval_what
 from .context import Ctx
@@ -74,6 +74,9 @@ def build(ctx: Ctx, name: str | None = None) -> str:
     if viewer is not None and viewer.kind != HUMAN:
         out.append(f"Your notes: members/{name}/notes.md (xt puts them, whole, in your first prompt on every start, "
                    f"restart or reset; keep them current).")
+        alert = notes.brief_line(ctx, name)  # card #198: over budget, where the agent can act on it
+        if alert:
+            out.append(alert)
         cp = checkpoints(ctx).get(name)
         if cp:
             out.append(f"Your last checkpoint ({cp['at'][:16].replace('T', ' ')}): {cp['summary']}")

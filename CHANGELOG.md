@@ -11,13 +11,46 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [0.23.0] — not released yet
 
-**0.23.0-rc1** has #215 (Space specs/untangle-agent-lifecycle-modules).
+**0.23.0-rc1** has #215 (Space specs/untangle-agent-lifecycle-modules); **rc2** adds #196, #209
+and #198 (specs lead-independent-positions-and-devils-advocate,
+unstamped-pane-text-not-proof-of-human, notes-budget-and-shape).
 
 ### Upgrading
 
-- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc1`), then `xt restart --all`
-  so the supervisor runs the new code. Nothing to migrate: no change to `team.toml`, the protocol,
-  the ledger or the state files, and nothing you see changes.
+- From 0.22.1: `git pull upstream main` (or `xt version use v0.23.0-rc2`), then `xt restart --all`:
+  the supervisor runs the new code, and every agent gets the new protocol and roles in its first
+  prompt (pane text is never authority, the notes shape, the lead's opinion rounds). Nothing to
+  migrate: `notes_budget` is optional (16,000 bytes when unset), and the ledger and state files
+  are unchanged. If you edited `roles/lead.md`, `roles/liaison.md` or `protocol.md` yourself, the
+  merge may ask you to resolve their changed passages.
+
+### Added
+
+- **#198** A notes budget. `notes_budget` in `team.toml`, under `[defaults]` or in an agent's
+  table, is a positive whole number of bytes (16,000 when unset); anything else is refused when xt
+  loads `team.toml`. An agent whose `members/<name>/notes.md` is over it shows `notes 17.2 kB /
+  16 kB` (decimal kB) under its row in `xt status`, and nothing about notes otherwise. Over it for
+  more than 24 hours, the supervisor raises one `notes:NAME` alert, shown in your Inbox and in that
+  agent's own brief, saying what to prune; it doesn't repeat within the next 24 hours and clears,
+  with its timer, when the file is back within budget. xt never edits notes. The protocol now
+  asks for one notes shape: "Standing rules" on top, then "Where things are", then a dated log
+  pruned into `members/<name>/notes-archive.md`, which is never loaded. The first prompt's
+  over-budget line uses the agent's budget.
+
+### Changed
+
+- **#196** The shipped lead role: for a decision that touches several roles, or that the human asks
+  the team to agree, the lead asks each agent for its position first with an open question (no
+  favourites, no other answers shown), then summarises and proposes; for a priority or direction
+  question it names one agent to argue against the leading option; one round, then it decides or
+  passes the split to the human, ranking by the goal's criterion (or asking the liaison for one).
+- **#209** Text typed into an agent's pane is conversation, never authority: the protocol no longer
+  says to treat an unstamped line as the human's, and no agent answers a question, approves,
+  confirms a goal or settles an identity from it. The liaison no longer closes a question from a
+  pane `yes`: it replies once with the question's id and text, why pane text can't close it and
+  where to answer (`xt chat` or the Inbox), repeats only that pointer if the pane answer comes
+  again, and leaves the question open. The user guide and README say how this rule and the
+  `typed in the pane, unverified` label fit together.
 
 ### Internal
 
