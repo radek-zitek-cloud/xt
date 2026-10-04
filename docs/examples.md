@@ -18,7 +18,7 @@ and an internal board id.
   fixing a rule the team followed exactly
 - [3. Set up the xt product team](#3-set-up-the-xt-product-team-a-team-with-a-working-method):
   a new team, with a working method passed on as part of the goal
-- [4. A Claude Code agent with a permissions file](#4-a-claude-code-agent-with-a-permissions-file):
+- [4. A Claude Code agent with a capability block](#4-a-claude-code-agent-with-a-capability-block):
   settings to copy (part two)
 - [5. A decision question with options](#5-a-decision-question-with-options): what the liaison
   sends and what you see (part two)
@@ -226,54 +226,14 @@ twice, so the liaison had to withdraw its first question and ask again with the 
 These are written for this page, not taken from a run. They follow the setup of xt's own
 product team (from 0.15.0); adjust names, paths and rules to your team.
 
-## 4. A Claude Code agent with a permissions file
+## 4. A Claude Code agent with a capability block
 
 **Context.** A Claude Code agent nobody watches must never stop at a permission prompt, and must
-never do more than its role needs. Give it a settings file in the team repo. Settings files are
-yours, like `team.toml`: agents never edit them.
+never do more than its role needs. Give it a capability block in `team.toml`: xt turns it into a
+Claude Code settings file (`dontAsk`: anything not allowed is refused at once instead of waiting).
+`team.toml` and settings files are yours: agents never edit them.
 
-`settings/researcher.json`:
-
-```json
-{
-  "permissions": {
-    "defaultMode": "dontAsk",
-    "allow": [
-      "Bash(/path/to/team/bin/xt *)",
-      "Bash(rg *)",
-      "Bash(cat *)",
-      "Bash(git status *)",
-      "Bash(git log *)",
-      "Edit(members/researcher/**)",
-      "Read"
-    ],
-    "deny": [
-      "Bash(git push *)",
-      "Bash(curl *)",
-      "Bash(rm *)",
-      "Edit(settings/**)",
-      "Edit(team.toml)",
-      "WebFetch"
-    ]
-  },
-  "statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}
-}
-```
-
-- `dontAsk` refuses anything not on the `allow` list at once, instead of waiting at a prompt
-  nobody sees. `deny` wins over `allow`.
-- The `xt` rule uses the team's absolute path, as in the agent's first prompt.
-- `statusLine` is optional: it shows the Claude plan's usage in `xt status` (one agent is enough).
-
-The lead asks for the hire with the file (the approval names it and its mode; without one, it
-warns that the agent would start with your own Claude defaults):
-
-```sh
-xt spawn researcher --harness claude --model claude-sonnet-5-5 --role researcher \
-  --permissions settings/researcher.json --as lead
-```
-
-After your approval, the agent's entry in `team.toml` has the line (you can also add it by hand):
+In `team.toml`:
 
 ```toml
 [[agent]]
@@ -281,37 +241,36 @@ name = "researcher"
 role = "researcher"
 harness = "claude"
 model = "claude-sonnet-5-5"
-permissions = "settings/researcher.json"
 reports_to = "lead"
 status = "active"
-```
-
-xt checks the file before every start (missing, not JSON, an unknown `defaultMode` or a malformed
-rule refuses the start) and the start note shows its path, a hash of its content and the mode. To
-give every Claude agent the same file, set it once under `[defaults]`: `permissions =
-"settings/claude-agents.json"`. See the [user guide](user-guide.md#11-memory-and-recovery).
-
-**From 0.23.0: the same with capabilities.** The `permissions` line is deprecated (removed in
-0.24.0). `xt capabilities researcher` prints the equivalent block and changes nothing:
-
-```text
-# xt capabilities researcher: the block equivalent to its legacy lines and settings/researcher.json (nothing was changed).
-# Under its [[agent]] entry (name = "researcher"), replacing `permissions`:
 [agent.capabilities]
 commands = ["rg", "cat", "git status", "git log"]
 extras = "settings/researcher.json"
-# kept in extras (settings/researcher.json: the block can't say these, so `extras` keeps the file on top, where it may only restrict):
-#   deny Bash(git push *)
-#   deny Bash(curl *)
-#   deny Bash(rm *)
-#   key statusLine
 ```
 
-Its own notes, `team.toml`, `settings/`, network off and the credential CLIs need no line: they are
-the defaults. Put the block under the agent and remove the `permissions` line. `extras` keeps the
-file on top of the block for what the block can't say (the three `deny` rules and `statusLine`),
-where it may only restrict; a file with nothing left over gets no `extras` line. The start then
-generates the settings file, and `xt status` shows the agent's `caps:` row.
+`settings/researcher.json`, for what the block can't say:
+
+```json
+{
+  "permissions": {
+    "deny": ["Bash(git push *)", "Bash(curl *)", "Bash(rm *)"]
+  },
+  "statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}
+}
+```
+
+- Its own notes, `team.toml`, `settings/`, network off and the credential CLIs need no line: they
+  are the defaults. xt itself is always allowed.
+- `commands` is the shell commands it may run; everything else is refused.
+- `extras` puts the file on top of the generated settings, where it may only restrict: a rule that
+  would loosen the block refuses the start, naming the rule. Without anything left to say, leave
+  `extras` out.
+- `statusLine` is optional: it shows the Claude plan's usage in `xt status` (one agent is enough).
+
+`xt spawn researcher` starts it (or the lead's `xt spawn researcher --as lead` asks for your
+approval, which shows what it may do in one sentence). The start note names the file and a hash of
+its content, and `xt status` shows the agent's `caps:` row. See the
+[user guide](user-guide.md#11-memory-and-recovery).
 
 ## 5. A decision question with options
 
@@ -406,25 +365,8 @@ isn't in its notes is gone. See the [user guide](user-guide.md#8-pausing-and-res
 the project's test suite and `uv run` in its own clean clone needs packages and local sockets that
 the sandbox refuses. Give that one agent network, and nobody else (from 0.19.0).
 
-In `team.toml` (yours to edit; agents never do):
-
-```toml
-[[agent]]
-name = "qa"
-role = "quality-analyst"
-harness = "codex"
-reports_to = "lead"
-status = "active"
-codex_options = ["sandbox_workspace_write.network_access=true"]
-```
-
-Then `xt restart qa`: options apply at the next start. xt passes the option as
-`-c sandbox_workspace_write.network_access=true`; the start note and the agent's detail show
-`codex options: sandbox_workspace_write.network_access=true (network on: it can reach any host)`.
-
-From 0.23.0 `codex_options` is deprecated (removed in 0.24.0; `xt status` shows it in the agent's
-`caps:` row as `deprecated codex network on`). The same with capabilities, which also lets the
-sandbox write the clean clone:
+In `team.toml` (yours to edit; agents never do), a block that also lets the sandbox write the
+clean clone:
 
 ```toml
 [[agent]]
@@ -437,6 +379,10 @@ status = "active"
 network = "on"
 write = ["/tmp/qa-check"]          # passed to Codex as --add-dir /tmp/qa-check
 ```
+
+Then `xt restart qa`: the block applies at the next start. Codex has no per-host limit: with
+network on, the agent can reach any host, so give it to an agent that works in a clean clone holding
+no credentials.
 
 Codex enforces `network` (its sandbox); its other capabilities show `advisory` in the row.
 
@@ -451,7 +397,7 @@ UV_CACHE_DIR=/tmp/qa-check/.uv-cache uv run pytest -q
 
 On the operator's check of 0.19.0-rc1 this passed (532 tests in about 90 s) without an
 escalation; with network on but the default cache, `uv run` failed. xt adds no option for the
-cache path: the network switch is the only one (a decision for this release).
+cache path.
 
 - Codex opens the network wholesale: the agent can reach any host, not just a package index.
   Give it only to an agent whose workspace holds no credentials (here a clean clone). xt doesn't

@@ -553,6 +553,39 @@ xt down && xt version rollback && xt restart --all
 - Neither command starts the team: `xt restart --all` (or `xt up`) does. `xt version` alone shows the
   three versions, the state format and the last switches.
 
+#### Upgrading to 0.24: convert the old permission lines
+
+xt 0.24.0 removed the `permissions`, `codex_options` and `connectors` lines (directly under an
+`[[agent]]` or under `[defaults]`); the [capability block](#11-memory-and-recovery) replaces them.
+**Convert before you upgrade:** a `team.toml` that still has one of them doesn't load in 0.24, so
+`xt status`, `xt up`, `xt down`, `xt brief`, `xt send` and the TUI all refuse until it's converted.
+For each agent that has one of the lines:
+
+```sh
+xt capabilities carol      # prints the block to paste; changes nothing
+```
+
+Paste the printed block under the agent's `[[agent]]` entry and remove its old lines. What the
+block can't say stays in the old settings file, which the block then names as `extras` (see the
+extras file under [11. Memory and recovery](#11-memory-and-recovery)). A `permissions` line under
+`[defaults]` has no agent name of its own: run `xt capabilities` for any Claude Code agent of the
+team (its block includes what it inherits from `[defaults]`), move the shared part into
+`[defaults.capabilities]` by hand and remove the line. When `xt status` loads again, the file is
+converted. An agent with both a block and an old line has nothing to convert: `xt capabilities`
+refuses it, and you remove one of the two by hand.
+
+If you upgraded first, every command except `xt capabilities` refuses and names each line, for
+example:
+
+```text
+team.toml still has permission lines that xt removed in 0.24 (nothing was started or changed):
+  agent carol: permissions, connectors
+Replace them with a [capabilities] block. `xt capabilities carol` prints the block to paste in place of the old lines (it changes nothing).
+Then remove the old lines; the user guide's Upgrading section has the steps.
+```
+
+`xt capabilities <name>` still works then: convert as above, then `xt restart --all`.
+
 ### 8. Pausing and resuming the team
 
 | You want to | Do |
@@ -727,20 +760,21 @@ in team Claude agents' panes (xt sends none, so nothing breaks); use `xt status`
 **No account connectors.** Harnesses can reach your accounts through connectors: Claude Code's
 claude.ai connectors (Gmail, Drive, Calendar…) and MCP servers, Codex's apps. xt starts agents
 without them: Claude Code with `--strict-mcp-config` (no MCP server loads), Codex with its apps
-switched off. Your own sessions keep them. When an agent needs one, opt it in by name in
-`team.toml` and restart the agent:
+switched off. Your own sessions keep them. When an agent needs one, opt it in by name in its
+capability block (below) and restart the agent:
 
 ```toml
 [[agent]]
 name = "researcher"
+[agent.capabilities]
 connectors = ["claude.ai Context7"]   # Claude Code: MCP server names as the harness lists them
 ```
 
 A Claude Code agent then gets exactly those servers (xt lists the others at start and refuses
 their tools). A Codex agent takes no opt-in: Codex can switch its apps back on only all at once,
-so xt refuses to start a Codex agent that has `connectors` (use Claude Code for that agent).
-The start note, the agent's detail and `xt harnesses` show what's opted in and what each harness
-covers. Removing the line restores the default at the next start. **Not covered:** command-line
+so xt refuses to start a Codex agent whose block names `connectors` (use Claude Code for that
+agent). The start note, the agent's detail and `xt harnesses` show what's opted in and what each
+harness covers. Removing the line restores the default at the next start. **Not covered:** command-line
 tools that hold your credentials (a mail CLI, for example) are ordinary programs to the harness;
 keep such skills out of an agent's reach if it shouldn't use them.
 
@@ -806,104 +840,46 @@ anything is cut). The brief, the agent's detail in the TUI and the start note sh
 text only).` **Codex and pi
 agents now show `advisory` for what they can't enforce. That was always true; it is now visible.**
 
-**Agents with only the old lines.** `permissions`, `codex_options` and `connectors` (below) keep
-working in 0.23.0 and show as deprecated in the row; they are removed in 0.24.0. An agent with
-only these lines, or none, gets two changes from 0.23.0 and nothing else: its personal skills are
-off (a pi agent starts with `--no-skills`, the team's own skills passed back; its first start says
-`skills: none, was loaded`), and the `caps:` row. With a team default block, an agent's old
-settings file still applies on top as **extras**, which may only add restrictions: a rule that would
-loosen the block is refused at start, naming the rule and the file. An agent's own block beside its
-own old line is refused at load. `xt capabilities <name>` prints the block equivalent to an
-agent's old lines and file, and changes nothing: paste it under the agent and remove the old lines.
-What the block can't say (a `deny` rule like `Bash(rm *)`, other settings keys) is listed as "kept in
-extras", and the block then has `extras = "settings/<name>.json"`: the file stays, applied on top of
-the block, where it may only restrict (a Claude Code setting; it isn't an old line, so it isn't
-mixing). A file with nothing left over gets no `extras` line. Anything in the file that would loosen
-the block (a `defaultMode` other than `dontAsk`, an unnamed connector's tools) is listed too: the
-start refuses it until you remove it from the file.
+**An agent without a block.** With no block of its own and no `[defaults.capabilities]`, an agent
+starts with its harness's own defaults and without your personal skills (a pi agent starts with
+`--no-skills`, the team's own skills passed back). A Claude Code agent then starts in Claude's
+default permission mode: its first command outside Claude's built-in safe set waits at a
+permission prompt, and an unattended agent sits blocked (`blocked:<name>`) until you answer it.
+A hire's approval warns about that. Give every Claude Code agent a block, or the team a default
+one: the settings xt generates use `dontAsk`, so anything not allowed is refused at once instead
+of waiting.
 
-**Permission settings for Claude Code agents** (the old way; deprecated in 0.23.0, use the
-capabilities above). A Claude Code agent starts in Claude's default
-permission mode: its first command outside Claude's built-in safe set waits at a permission
-prompt, and an unattended agent then sits blocked (`blocked:<name>`) until you answer it. Give it
-a settings file instead, per agent or once for all Claude agents:
-
-```toml
-[defaults]
-permissions = "settings/claude-agents.json"   # every Claude agent without its own line
-
-[[agent]]
-name = "liaison"
-permissions = "settings/liaison.json"         # this agent's own file wins
-```
-
-xt passes the file with `--settings`. For an agent nobody watches, use `"defaultMode":
-"dontAsk"`: anything not on its `allow` list is refused at once instead of waiting:
-
-```json
-{"permissions": {"defaultMode": "dontAsk",
-  "allow": ["Bash(/path/to/team/bin/xt *)", "Bash(cat *)", "Bash(rg *)", "Edit(goals/drafts/**)"],
-  "deny": ["Bash(git push *)", "Bash(curl *)", "WebFetch"]}}
-```
-
-Rules:
+**The extras file** (Claude Code). What the block can't say (a `deny` rule like `Bash(rm *)`, an
+`ask` rule, other settings keys such as `statusLine`) goes in a Claude Code settings file that the
+block names as `extras = "settings/<name>.json"`. xt applies it on top of the generated settings,
+where it may only restrict: a rule or mode that would loosen the block (an `allow` rule outside
+`write`, `commands`, `network` or `connectors`, a `defaultMode` other than `dontAsk`) refuses the
+start, naming the rule and the file. Rules:
 - The path is relative to the team repo and must stay inside it (no absolute path, no `..`, no
   symlink out). Settings files are yours, like `team.toml`: an agent that could edit its own file
   could widen its own permissions, so the protocol tells agents never to touch them.
-- xt checks the file before every start and refuses to start the agent (it never starts it without
-  the file) when it's missing, not a JSON object, has an unknown `permissions.defaultMode`, or has a
-  malformed `allow`, `deny` or `ask` rule. That check matters: Claude Code (2.1.284) silently ignores
-  a broken file, an unknown mode or a bad rule and starts anyway. Other settings keys pass through
-  unchecked; Claude Code owns its schema.
-- The `[defaults]` file applies only to agents whose harness takes one (Claude Code); Codex and pi
-  agents skip it, and the start note says so. A `permissions` line on a Codex or pi agent's own
-  entry is refused.
+- xt checks the file before every start and refuses to start the agent when it's missing, not a
+  JSON object, has an unknown `permissions.defaultMode`, or has a malformed `allow`, `deny` or `ask`
+  rule. That check matters: Claude Code (2.1.284) silently ignores a broken file, an unknown mode or
+  a bad rule and starts anyway. Other settings keys pass through unchecked; Claude Code owns its
+  schema.
+- `extras` is for Claude Code only: a Codex or pi agent whose block names one is refused at start.
 - The start note shows the file, a short hash of its content (a changed file shows a new hash at
-  the next start) and the mode, with a warning for `bypassPermissions` or `acceptEdits`, which let
-  the agent act without asking. `xt status` and the agent's detail show the path; `xt harnesses`
-  shows which harnesses take a file.
-- A new agent can get its line at spawn: `xt spawn carol ... --permissions settings/carol.json`
-  (from 0.15.0; see [`xt spawn`](#xt-spawn)). The spawn approval names the file, or warns when a
-  Claude agent would start without one.
-- Pass the file this way rather than as a project `.claude/settings.json`: in a folder Claude Code
-  hasn't trusted yet, a project settings file applies its `deny` rules but ignores its `allow` rules
-  (seen 2026-09-29).
-- Your own `~/.claude/settings.json` still applies to every Claude agent on top of the file: its
-  hooks, and its `allow` and `deny` rules. A user-level `allow` rule widens every agent.
+  the next start) and the mode.
+- Your own `~/.claude/settings.json` still applies to every Claude agent on top: its hooks, and its
+  `allow` and `deny` rules. A user-level `allow` rule widens every agent.
 
-**Options for a Codex agent** (from 0.19.0). Every Codex agent runs in Codex's sandbox:
-workspace-write, no network. One agent can get network with a line in its `team.toml` entry:
-
-```toml
-[[agent]]
-name = "qa"
-harness = "codex"
-codex_options = ["sandbox_workspace_write.network_access=true"]
-```
-
-xt passes each option as `-c key=value` when it starts the agent (`xt restart <name>` applies a
-changed line). Rules:
-- Only xt's allowlist is accepted, and in this release that's the network switch alone:
-  `sandbox_workspace_write.network_access`, `true` or `false`. Any other key or value refuses the
-  start with the allowed list, because Codex may silently take a key it doesn't know. The list is
-  part of xt, not something a team extends.
-- Codex only: the line on a Claude Code or pi agent refuses its start. `xt harnesses` says which
-  harness takes it.
-- Codex has no per-host limit: with network on, the agent can reach **any host**. Give it to an
-  agent that works in a clean clone holding no credentials (the intended user is the quality
-  analyst). That's a team rule: xt doesn't check it.
-- The start note, `xt status`, the brief and the agent's detail show the options, and say
-  `(running with …; xt restart <name> applies it)` when `team.toml` changed after the agent started.
-- An agent without the line runs as before.
+The lines that came before the block (`permissions`, `codex_options` and `connectors` directly
+under an agent or `[defaults]`) were removed in 0.24.0: a `team.toml` that still has one doesn't
+load. See [Upgrading to 0.24: convert the old permission lines](#upgrading-to-024-convert-the-old-permission-lines).
 
 **Claude plan usage in status** (from 0.15.0). Claude Code doesn't write its plan's rate limits to
 its session logs; it hands them only to a status-line command. xt ships one, `bin/xt-statusline`.
-To use it, add a `statusLine` entry to a Claude agent's settings file (one agent is enough; the
+To use it, add a `statusLine` entry to a Claude agent's extras file (one agent is enough; the
 reading is account-wide):
 
 ```json
-{"statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"},
- "permissions": {"defaultMode": "dontAsk", "allow": ["..."]}}
+{"statusLine": {"type": "command", "command": "/path/to/team/bin/xt-statusline"}}
 ```
 
 After each of that agent's replies, Claude Code passes its status to the script, which keeps the
@@ -1055,7 +1031,7 @@ xt delegate --revoke                         # end it now (or: xt delegate helpe
 
 Until the grant ends, the operator may run `xt restart <name>…`, `xt reset <name>` (and
 `--when-idle`, `--cancel`), `xt spawn <name>` for an agent already in `team.toml`, as it is (no
-`--harness`, `--model`, `--role`, `--reports-to` or `--permissions`), and `xt up`, each with `--as
+`--harness`, `--model`, `--role` or `--reports-to`), and `xt up`, each with `--as
 helper`. Each is recorded once it has run, as `helper, delegated by human until 14:45: xt restart
 lead`; one that fails (say, `spawn` of an agent that is already running) is recorded with `(failed:
 …)` and the reason. A grant over
@@ -1457,22 +1433,17 @@ to change a schedule's hours, or to switch one off.
 
 ### `xt spawn`
 
-`xt spawn <name> [--harness H --role R [--model M] [--reports-to NAME]] [--permissions FILE]` —
+`xt spawn <name> [--harness H --role R [--model M] [--reports-to NAME]]` —
 starts an agent. For an agent already in the roster (stopped), it starts it again with its role and
 harness; a running one is refused (`xt restart <name>` restarts it). For a new one, `--harness` and `--role` are needed and `roles/<role>.md` must exist. The
 lead's spawns become approval requests; yours start immediately. **Use it** to bring back a stopped
 agent (`u` in the TUI), or to add an agent yourself.
 
-**Permissions file** (from 0.15.0). `--permissions settings/carol.json` gives a Claude Code agent
-its settings file: the line is written to its `team.toml` entry, as if you had added `permissions`
-there by hand. xt checks the file as it does at every start (see **Permission settings for Claude
-Code agents** above) before anything else happens, so a bad file refuses the
-spawn request before any approval reaches you. Without the flag, an existing entry keeps its own
-line and a team-wide `[defaults]` file applies as usual. The approval names the file and its
-`permissions.defaultMode`; when no file applies to a Claude agent it says instead, in red in the
-TUI: "WARNING: carol would start without a permissions file, so the operator's own claude defaults
-apply". A harness that takes no settings file (codex, pi) refuses `--permissions`, and a team
-default is skipped for it with a note.
+**Settings.** What the agent may do comes from its capability block in `team.toml` (its own, or
+the team's `[defaults.capabilities]`); the approval shows it in one sentence. When no block applies
+to a Claude Code agent, the approval also says, in red in the TUI: "WARNING: carol would start
+without generated settings, so the operator's own claude defaults apply (a [capabilities] block in
+team.toml gives it some)."
 
 ### `xt stop`
 

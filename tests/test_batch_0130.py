@@ -93,8 +93,10 @@ def test_codex_uses_its_logged_window_never_an_api_maximum(paths):
 # --- #117 per-agent permission settings ----------------------------------------------------------
 
 
+# Since 0.24 (card #218) a settings file reaches Claude Code only as a [capabilities] block's `extras`,
+# on top of the generated settings, where it may only restrict.
 GOOD = {"permissions": {"defaultMode": "dontAsk",
-                        "allow": ["Bash(/team/bin/xt *)", "Bash(cat *)", "Edit(goals/drafts/**)", "Read"],
+                        "allow": ["Bash(/team/bin/xt *)", "Bash(cat *)", "Edit(members/carol/**)", "Read"],
                         "deny": ["Bash(git push *)", "WebFetch", "mcp__claude-in-chrome"]},
         "env": {"SOME_OTHER": "key Claude owns"}}
 
@@ -106,11 +108,8 @@ def _settings(ctx, rel="settings/carol.json", data=GOOD):
     return f
 
 
-def _set(ctx, agent=None, default=None):
-    if agent:
-        next(a for a in ctx.team.doc["agent"] if a["name"] == agent[0])["permissions"] = agent[1]
-    if default:
-        ctx.team.doc.setdefault("defaults", {})["permissions"] = default
+def _set(ctx, agent):
+    next(a for a in ctx.team.doc["agent"] if a["name"] == agent[0])["capabilities"] = {"extras": agent[1]}
     ctx.team.save()
     ctx.reload_team()
 
@@ -129,16 +128,20 @@ def test_an_agent_settings_file_is_passed_checked_and_shown(ctx, capsys, monkeyp
     _set(ctx, agent=("carol", "settings/carol.json"))
     request_spawn(ctx, "human", "carol", None, None, None, None)
     args = _args(ctx, "carol")
-    assert args[args.index("--settings") + 1] == str(f.resolve())
+    passed = args[args.index("--settings") + 1]
+    assert passed == str(ctx.paths.state / "settings" / "carol.json")  # generated, with the file on top
+    assert "Bash(git push *)" in json.loads(open(passed).read())["permissions"]["deny"]
+    assert f.read_text() == json.dumps(GOOD)  # the file itself is unchanged
     note = next(b for b in _system(ctx) if "Claude Code settings" in b)
     digest = permissions.preflight(ctx.paths.root, "settings/carol.json").digest
     assert f"settings/carol.json (sha256 {digest}, permissions.defaultMode dontAsk)" in note
-    assert "WARNING" not in note and "Bash(" not in note  # the path and hash, never the contents
+    assert "Bash(" not in note  # the path and hash, never the contents
     monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
     cli.cmd_status(cli.build_parser().parse_args(["status"]))
-    assert "legacy settings/carol.json" in capsys.readouterr().out  # in the caps row since 0.23.0 (#186)
+    out = capsys.readouterr().out
+    assert "caps: " in out and "legacy" not in out and "deprecated" not in out
     row = next(r for r in build(ctx).panels["Team"] if r.data and r.data.get("name") == "carol")
-    assert "legacy settings/carol.json (deprecated: xt capabilities carol)" in row.detail().plain  # #186
+    assert "caps: " in row.detail().plain and "legacy" not in row.detail().plain
 
 
 def test_a_changed_file_gets_a_new_hash_at_the_next_start(ctx):
@@ -149,34 +152,16 @@ def test_a_changed_file_gets_a_new_hash_at_the_next_start(ctx):
     assert permissions.preflight(ctx.paths.root, "settings/carol.json").digest != first
 
 
-def test_team_default_applies_to_claude_agents_and_codex_agents_skip_it(ctx):
-    add_member(ctx, "carol")
-    _settings(ctx, "settings/team.json")
-    _set(ctx, default="settings/team.json")
-    request_spawn(ctx, "human", "liaison", None, None, None, None)  # codex
-    request_spawn(ctx, "human", "carol", None, None, None, None)  # claude
-    assert "--settings" not in _args(ctx, "liaison")
-    assert "--settings" in _args(ctx, "carol")
-    assert any("team default permissions file settings/team.json not applied (codex" in b for b in _system(ctx))
-
-
-def test_an_agent_line_overrides_the_default_and_no_setting_starts_as_before(ctx):
-    add_member(ctx, "carol")
+def test_an_agent_without_a_block_starts_without_a_settings_file(ctx):
     add_member(ctx, "dave")
-    own = _settings(ctx, "settings/own.json")
-    _settings(ctx, "settings/team.json")
     request_spawn(ctx, "human", "dave", None, None, None, None)
-    assert "--settings" not in _args(ctx, "dave")  # nothing configured yet
-    _set(ctx, agent=("carol", "settings/own.json"), default="settings/team.json")
-    request_spawn(ctx, "human", "carol", None, None, None, None)
-    args = _args(ctx, "carol")
-    assert args[args.index("--settings") + 1] == str(own.resolve())
+    assert "--settings" not in _args(ctx, "dave")  # nothing configured
 
 
-def test_a_codex_agent_with_its_own_permissions_line_is_refused(ctx):
+def test_a_codex_agent_with_an_extras_file_is_refused(ctx):
     _settings(ctx, "settings/liaison.json")
     _set(ctx, agent=("liaison", "settings/liaison.json"))
-    with pytest.raises(XtError, match="takes no settings file"):
+    with pytest.raises(XtError, match="codex takes none"):
         request_spawn(ctx, "human", "liaison", None, None, None, None)
     assert not ctx.herdr.started
 
@@ -213,19 +198,18 @@ def test_a_symlink_out_of_the_team_repo_is_refused(ctx, tmp_path_factory):
         permissions.preflight(ctx.paths.root, "settings/link.json")
 
 
-def test_other_claude_keys_are_accepted_and_permissive_modes_warn(ctx):
+def test_other_claude_keys_are_accepted(ctx):
     add_member(ctx, "carol")
-    _settings(ctx, data={"permissions": {"defaultMode": "bypassPermissions"}, "hooks": {}, "model": "x"})
+    _settings(ctx, data={"permissions": {}, "hooks": {}, "model": "x"})
     _set(ctx, agent=("carol", "settings/carol.json"))
     request_spawn(ctx, "human", "carol", None, None, None, None)
-    assert any("WARNING: bypassPermissions lets carol run any tool without asking" in b for b in _system(ctx))
-    s = permissions.preflight(ctx.paths.root, "settings/carol.json")
-    assert "WARNING: acceptEdits" in permissions.start_note("carol", permissions.Settings(s.rel, s.path, s.digest, "acceptEdits"))
+    args = _args(ctx, "carol")
+    assert json.loads(open(args[args.index("--settings") + 1]).read())["model"] == "x"
 
 
 def test_xt_harnesses_describes_capability_not_a_path(ctx, capsys, monkeypatch):
     monkeypatch.setenv("XT_ROOT", str(ctx.paths.root))
     cli.cmd_harnesses(None)
     out = capsys.readouterr().out
-    assert "per-agent settings file (`permissions` in team.toml): yes, passed with --settings" in out
+    assert "settings file (generated from [capabilities], `extras` on top): yes, passed with --settings" in out
     assert "not supported" in out  # codex

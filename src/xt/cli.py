@@ -8,8 +8,8 @@ import time
 
 from . import __version__
 from . import brief as brief_mod
-from . import capabilities, capstart, goals, notes, operators, permissions
-from .adapters import CODEX, allowed_codex_options, load_adapters
+from . import capabilities, capstart, goals, notes, operators
+from .adapters import load_adapters
 from .alerts import Alerts, repeats
 from .context import Ctx
 from .dispatch import Queue, done_recipient, send
@@ -515,11 +515,6 @@ def cmd_status(args) -> None:
                                          time.time() - since if since else None)
             if line:
                 print(f"  {'':<12} {line}")
-        # card #186: the settings file and Codex options fold into the caps row below; a Codex
-        # option changed since the start still says what the running agent has
-        opts = launch.codex_options_line(ctx, a, a.name in live)
-        if "(running with" in opts:
-            print(f"  {'':<12} {opts}")
         notes_line = notes.status_text(ctx, a)  # card #198: only when over budget
         if notes_line:
             print(f"  {'':<12} {notes_line}")
@@ -791,14 +786,13 @@ def cmd_spawn(args) -> None:
         a = ctx.team.agent(args.name)
         if a is None or a.kind == HUMAN or not a.active:
             raise XtError(f"operator {who} may only start an existing agent; {args.name!r} isn't one")
-        if args.harness or args.model or args.role or args.reports_to or args.permissions:
+        if args.harness or args.model or args.role or args.reports_to:
             raise XtError(f"operator {who} starts {args.name} as it is in team.toml: no --harness, --model, "
-                          f"--role, --reports-to or --permissions")
+                          f"--role or --reports-to")
         with _delegated(ctx, who, "spawn", f"spawn {args.name}", ""):
-            print(request_spawn(ctx, HUMAN, args.name, None, None, None, None, None))
+            print(request_spawn(ctx, HUMAN, args.name, None, None, None, None))
         return
-    print(request_spawn(ctx, who, args.name, args.harness, args.model, args.role, args.reports_to,
-                        args.permissions))
+    print(request_spawn(ctx, who, args.name, args.harness, args.model, args.role, args.reports_to))
 
 
 def cmd_operator(args) -> None:
@@ -871,22 +865,30 @@ def cmd_stop(args) -> None:
 
 
 def cmd_capabilities(args) -> None:
-    """Card #186: print the [capabilities] block equivalent to an agent's legacy lines and settings
-    file, for review. Reads only: team.toml, the settings file and xt's state stay as they are. It
-    runs while an agent has both a block and an old line (the refusal for that names it)."""
+    """Card #186: print the [capabilities] block equivalent to an agent's old permission lines and
+    settings file, for review. Reads only: team.toml, the settings file and xt's state stay as they
+    are. Card #218: the one command that loads a team.toml with the lines removed in 0.24, to
+    convert them; an agent with both a block and an old line is refused (nothing to convert)."""
     paths = Paths(find_root())
-    team = Team.load(paths.team_toml, allow_mixing=True)
+    team = Team.load(paths.team_toml, allow_removed=True)
     a = team.agent(args.name)
     if a is None or a.kind == HUMAN:
         raise XtError(f"no agent named {args.name!r}")
-    rel = permissions.shown(team, a, load_adapters(paths).get(a.harness or ""))
+    table = team._table(a.name)
+    old = capabilities.removed_lines(table)
+    if old and "capabilities" in table:
+        raise XtError(capabilities.mixing_text(a.name, old))
+    adapter = load_adapters(paths).get(a.harness or "")
+    default = team.doc.get("defaults", {}).get("permissions")  # inherited by a settings-file harness
+    rel = table.get("permissions") or (default if adapter is not None and adapter.settings_flag else None)
+    rel = str(rel) if rel else None
     data = None
     if rel:
         try:
             data = json.loads((paths.root / rel).read_text())
         except (OSError, ValueError) as e:
             raise XtError(f"can't read {rel}: {e}") from None
-    print(capabilities.convert(a, data, rel))
+    print(capabilities.convert(a.name, table, data, rel))
 
 
 def cmd_harnesses(args) -> None:
@@ -907,10 +909,8 @@ def cmd_harnesses(args) -> None:
                       for label in (capabilities.ENFORCED, capabilities.ADVISORY)}
             print("   capabilities: " + "; ".join(f"{', '.join(ns)} {label}" for label, ns in groups.items() if ns)
                   + (f" (checked: {a.capabilities_checked})" if a.capabilities_checked else ""))
-        print(f"   per-agent settings file (`permissions` in team.toml): "
+        print("   settings file (generated from [capabilities], `extras` on top): "
               + (f"yes, passed with {a.settings_flag}" if a.settings_flag else "not supported"))
-        print("   per-agent options (`codex_options` in team.toml, Codex only): "
-              + (f"yes, passed with -c; allowed: {allowed_codex_options()}" if a.name == CODEX else "not supported"))
 
 
 def cmd_goal(args) -> None:
@@ -1074,8 +1074,6 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--model")
     sp.add_argument("--role")
     sp.add_argument("--reports-to")
-    sp.add_argument("--permissions", metavar="FILE",
-                    help="Claude Code settings file for the agent, relative to the team repo")
 
     sp = add("retire", cmd_retire, "close an agent's workspace and mark it retired")
     sp.add_argument("name")
@@ -1129,8 +1127,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     add("harnesses", cmd_harnesses, "which harnesses xt can use here")
     sp = add("capabilities", cmd_capabilities,
-             "print the [capabilities] block equivalent to an agent's old permissions, codex_options and "
-             "connectors lines (changes nothing)")
+             "print the [capabilities] block to paste in place of an agent's old permissions, "
+             "codex_options and connectors lines, removed in 0.24 (changes nothing)")
     sp.add_argument("name")
 
     sp = add("goal", cmd_goal, "goals: new draft, dispatch to the lead, list")

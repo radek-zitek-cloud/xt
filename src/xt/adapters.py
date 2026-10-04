@@ -87,42 +87,6 @@ class Adapter:
         return args
 
 
-# Per-agent Codex options (card #169): `codex_options = ["key=value", …]` on an agent in team.toml,
-# passed as `-c key=value`. Only these keys and values are accepted: Codex may silently take an
-# unknown key, so xt checks them itself. Not user-extensible.
-CODEX_OPTIONS = {"sandbox_workspace_write.network_access": ("true", "false")}
-CODEX = "codex"
-
-
-def allowed_codex_options() -> str:
-    return ", ".join(f"{k}={'|'.join(v)}" for k, v in CODEX_OPTIONS.items())
-
-
-def codex_option_args(name: str, harness: str | None, options: list[str]) -> list[str]:
-    """The `-c` arguments for an agent's `codex_options`; refuses another harness, an option off the
-    allowlist or a value it doesn't take, naming what is allowed."""
-    if not options:
-        return []
-    if harness != CODEX:
-        raise XtError(f"{name}: `codex_options` applies to Codex agents only ({name} runs on {harness}); "
-                      f"remove the line")
-    args = []
-    for opt in options:
-        key, sep, value = str(opt).partition("=")
-        if not sep or CODEX_OPTIONS.get(key.strip()) is None or value.strip() not in CODEX_OPTIONS[key.strip()]:
-            raise XtError(f"{name}: Codex option {opt!r} isn't allowed; xt accepts only: {allowed_codex_options()}")
-        args += ["-c", f"{key.strip()}={value.strip()}"]
-    return args
-
-
-def codex_options_text(options: list[str]) -> str:
-    """'sandbox_workspace_write.network_access=true (network on: any host)' for status and notes."""
-    text = ", ".join(options)
-    if any(o.replace(" ", "") == "sandbox_workspace_write.network_access=true" for o in options):
-        text += " (network on: it can reach any host)"
-    return text
-
-
 def tool_prefix(server: str) -> str:
     """How Claude Code names a server's tools: `claude.ai Gmail` -> mcp__claude_ai_Gmail__…"""
     return re.sub(r"[^A-Za-z0-9_-]", "_", server)

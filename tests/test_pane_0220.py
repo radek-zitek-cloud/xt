@@ -198,10 +198,13 @@ def test_the_claude_liaison_starts_with_the_hook_and_its_own_file_untouched(ctx)
     (ctx.paths.root / "settings").mkdir()
     own = ctx.paths.root / "settings" / "liaison.json"
     own.write_text(json.dumps({"permissions": {"allow": ["Bash(ls:*)"]}}))
-    request_spawn(ctx, "human", "liaison", "claude", None, "liaison", "human", "settings/liaison.json")
+    ctx.team._table("liaison")["capabilities"] = {"extras": "settings/liaison.json"}  # card #218: the one way
+    ctx.team.save()
+    ctx.reload_team()
+    request_spawn(ctx, "human", "liaison", "claude", None, "liaison", "human")
     args = next(a for n, _, a in ctx.herdr.started if n == "liaison")
     passed = json.loads(open(args[args.index("--settings") + 1]).read())
-    assert passed["permissions"] == {"allow": ["Bash(ls:*)"]}
+    assert "Bash(ls:*)" in passed["permissions"]["allow"] and passed["permissions"]["defaultMode"] == "dontAsk"
     (hook,) = passed["hooks"]["UserPromptSubmit"]
     assert hook["hooks"][0]["command"].endswith(" pane-input --hook")
     assert "hooks" not in json.loads(own.read_text())

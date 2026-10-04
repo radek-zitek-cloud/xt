@@ -13,8 +13,10 @@ A `[capabilities]` block per agent (`[agent.capabilities]`), with a team default
 
 This module parses and checks the blocks (at load, through `Team.check`) and works out an agent's
 effective set: the team default, then the agent's block (key by key), with `require` from both.
-Legacy lines (`permissions`, `codex_options`, `connectors`) keep working beside a team default;
-an agent's own block beside its own legacy line is refused.
+
+Card #218: the older `permissions`, `codex_options` and `connectors` lines were removed in 0.24. A
+team.toml that still has one is refused at load (`removed_refusal`); `convert` is the one reader
+left, for `xt capabilities NAME`, which prints the block to paste in their place.
 """
 
 import re
@@ -23,7 +25,7 @@ from dataclasses import dataclass, field
 from .paths import XtError
 
 NAMES = ("write", "deny", "commands", "network", "connectors", "skills", "credential_clis")
-LEGACY = ("permissions", "codex_options", "connectors")
+REMOVED = ("permissions", "codex_options", "connectors")  # team.toml lines removed in 0.24 (card #218)
 NETWORK = ("off", "on")
 # command-line tools known to hold the operator's credentials (card #126)
 CREDENTIAL_CLIS = ("gh", "glab", "aws", "gcloud", "az", "kubectl", "op", "bw", "fizzy", "doctl", "flyctl",
@@ -100,8 +102,8 @@ def parse(block, where: str) -> dict:
     return out
 
 
-def check(doc, allow_mixing: bool = False) -> list[str]:
-    """Problems with every capability block and with mixing, for `Team.check`."""
+def check(doc) -> list[str]:
+    """Problems with every capability block, for `Team.check`."""
     problems = []
     defaults = doc.get("defaults", {}).get("capabilities")
     if defaults is not None:
@@ -117,17 +119,48 @@ def check(doc, allow_mixing: bool = False) -> list[str]:
             parse(a["capabilities"], where)
         except XtError as e:
             problems.append(str(e))
-            continue
-        legacy = [k for k in LEGACY if a.get(k)]
-        if legacy and not allow_mixing:
-            problems.append(mixing_text(str(a.get("name")), legacy))
     return problems
 
 
-def mixing_text(name: str, legacy: list[str]) -> str:
-    lines = " and ".join(f"`{k} = …`" for k in legacy)
-    return (f"agent {name} has both a [capabilities] block and {lines} in team.toml: use one. "
-            f"`xt capabilities {name}` prints the block equivalent to the old lines")
+def removed_lines(table) -> list[str]:
+    """The removed lines (REMOVED) a team.toml table still has, in that order."""
+    return [k for k in REMOVED if k in table]
+
+
+def removed_refusal(doc) -> str | None:
+    """Card #218: why a team.toml with a removed line doesn't load, naming every offending line (the
+    agent, or the defaults) and `xt capabilities NAME`, the way to the block to paste; None to load."""
+    found = []  # (agent name or None for [defaults], keys)
+    defaults = removed_lines(doc.get("defaults", {}))
+    if defaults:
+        found.append((None, defaults))
+    for a in doc.get("agent", []):
+        keys = removed_lines(a)
+        if keys:
+            found.append((str(a.get("name")), keys))
+    if not found:
+        return None
+    out = ["team.toml still has permission lines that xt removed in 0.24 (nothing was started or changed):"]
+    out += [f"  {'[defaults]' if who is None else f'agent {who}'}: {', '.join(keys)}" for who, keys in found]
+    names = [who for who, _ in found if who is not None]
+    cmds = [f"`xt capabilities {n}`" for n in names]
+    out.append("Replace them with a [capabilities] block. " + (
+        (cmds[0] if len(cmds) == 1 else f"{', '.join(cmds[:-1])} and {cmds[-1]}")
+        + (" prints" if len(cmds) == 1 else " each print")
+        + " the block to paste in place of the old lines (it changes nothing)." if names else ""))
+    if defaults:
+        out.append("The [defaults] lines have no agent name of their own: run `xt capabilities NAME` for any "
+                   "agent of the team (it prints the block including what the agent inherits from "
+                   "[defaults]) and move the shared part into [defaults.capabilities] by hand.")
+    out.append("Then remove the old lines; the user guide's Upgrading section has the steps.")
+    return "\n".join(out)
+
+
+def mixing_text(name: str, keys: list[str]) -> str:
+    """Card #218 3a: `xt capabilities NAME` doesn't convert an agent with both a block and an old line."""
+    lines = " and ".join(f"`{k} = …`" for k in keys)
+    return (f"agent {name} has both a [capabilities] block and {lines} in team.toml, so there is nothing "
+            f"to convert: remove one of them by hand (xt doesn't choose between them)")
 
 
 def _apply(caps: Caps, settings: dict) -> None:
@@ -210,7 +243,7 @@ def _covers(rule: str, rules: list[str]) -> bool:
 
 
 def merge_extras(generated: dict, extras: dict, where: str) -> dict:
-    """The legacy settings file as extras on top of the generated settings: it may add deny and ask
+    """The block's `extras` settings file on top of the generated settings: it may add deny and ask
     rules and other keys, and allow rules the generated set allows anyway; a rule or mode that would
     loosen the generated restrictions is refused, naming both."""
     gen = generated["permissions"]
@@ -306,9 +339,10 @@ def pi_skill_args(caps: Caps, team_skills: list[str]) -> list[str]:
     return args
 
 
-def convert(agent, settings: dict | None, rel: str | None) -> str:
-    """`xt capabilities NAME`: the [capabilities] block equivalent to the agent's legacy lines and
-    settings file, as TOML for review. It changes nothing; what the vocabulary can't say is listed as
+def convert(name: str, table, settings: dict | None, rel: str | None) -> str:
+    """`xt capabilities NAME`: the [capabilities] block equivalent to the agent's removed lines (its
+    team.toml `table`) and settings file `rel` (its own `permissions`, or the [defaults] one it
+    inherits), as TOML for review. It changes nothing; what the vocabulary can't say is listed as
     "kept in extras" (it stays in the file, which then restricts on top of the block)."""
     block: dict = {}
     kept: list[str] = []
@@ -321,7 +355,7 @@ def convert(agent, settings: dict | None, rel: str | None) -> str:
         if tool in ("Edit", "Write") and spec:
             p = spec[1:] if spec.startswith("//") else spec
             p = p[:-3] if p.endswith("/**") else p
-            if p != f"members/{agent.name}":
+            if p != f"members/{name}":
                 write.append(p)
         elif tool == "Bash" and not spec:
             open_shell = True
@@ -358,7 +392,7 @@ def convert(agent, settings: dict | None, rel: str | None) -> str:
     if perms.get("defaultMode") not in (None, "dontAsk"):
         loosen.append(f"defaultMode {perms['defaultMode']} (the block's settings use dontAsk)")
     kept += [f"key {k}" for k in (settings or {}) if k != "permissions"]
-    connectors = list(getattr(agent, "connectors", None) or [])
+    connectors = [str(c) for c in table.get("connectors", None) or []]
     prefixes = {"mcp__" + re.sub(r"[^A-Za-z0-9_-]", "_", c) for c in connectors}
     for tool in connectors_seen:
         if any(tool == p or tool.startswith(p + "__") for p in prefixes):
@@ -373,8 +407,9 @@ def convert(agent, settings: dict | None, rel: str | None) -> str:
         block["commands"] = commands
     if clis_allowed:
         block["credential_clis"] = {"allow": sorted(set(clis_allowed))}
-    for o in getattr(agent, "codex_options", []) or []:
-        if o.replace(" ", "") == "sandbox_workspace_write.network_access=true":
+    options = table.get("codex_options", None) or []
+    for o in [options] if isinstance(options, str) else options:
+        if str(o).replace(" ", "") == "sandbox_workspace_write.network_access=true":
             block["network"] = "on"
     if connectors:
         block["connectors"] = connectors
@@ -382,10 +417,10 @@ def convert(agent, settings: dict | None, rel: str | None) -> str:
         block["extras"] = rel  # the file stays, on top of the block, for what the block can't say
     import tomlkit
 
-    old = " and ".join(f"`{k}`" for k in LEGACY if getattr(agent, k, None))
-    lines = [f"# xt capabilities {agent.name}: the block equivalent to its legacy lines"
+    old = " and ".join(f"`{k}`" for k in removed_lines(table))
+    lines = [f"# xt capabilities {name}: the block equivalent to its old permission lines"
              + (f" and {rel}" if rel else "") + " (nothing was changed).",
-             f"# Under its [[agent]] entry (name = \"{agent.name}\")" + (f", replacing {old}:" if old else ":"),
+             f"# Under its [[agent]] entry (name = \"{name}\")" + (f", replacing {old}:" if old else ":"),
              "[agent.capabilities]"]
     lines += tomlkit.dumps(block).strip().splitlines() if block else ["# (the defaults: nothing to set)"]
     if kept:

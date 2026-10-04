@@ -13,7 +13,7 @@ def test_every_started_claude_agent_has_disable_slash_commands(ctx, monkeypatch)
     add_member(ctx, "dave")
     ctx.team.upsert_agent("dave", "worker", "claude", "claude-sonnet-5-5", "lead")  # with a model
     add_member(ctx, "erin")
-    ctx.team._table("erin")["connectors"] = ["claude.ai Context7"]  # with a connector opt-in
+    ctx.team._table("erin")["capabilities"] = {"connectors": ["claude.ai Context7"]}  # with a connector opt-in
     ctx.team.save()
     ctx.reload_team()
     for name in ("carol", "dave", "erin"):

@@ -198,11 +198,11 @@ def header(s: tuple[str, str, str, str] | None, liaison_name: str, width: int) -
 # --- the hook (Claude Code: UserPromptSubmit) -------------------------------------------------------
 
 
-def hook_settings(ctx: Ctx, name: str, base: str | None, data: dict | None = None) -> str:
-    """A settings file for the liaison's Claude Code: its own permissions file (`base`, unchanged on
-    disk) or the settings generated from its [capabilities] (`data`, card #186), plus the prompt
-    hook. Written under .xt/state/settings/; the path to pass."""
-    data = dict(data) if data is not None else json.loads((ctx.paths.root / base).read_text()) if base else {}
+def hook_settings(ctx: Ctx, name: str, data: dict | None = None) -> str:
+    """A settings file for the liaison's Claude Code: the settings generated from its [capabilities]
+    (`data`, card #186), or none, plus the prompt hook. Written under .xt/state/settings/; the path
+    to pass."""
+    data = dict(data) if data is not None else {}
     hook = {"type": "command", "command": f"{shlex.quote(str(ctx.paths.xt_bin))} pane-input --hook"}
     hooks = data.setdefault("hooks", {})
     hooks.setdefault("UserPromptSubmit", []).append({"hooks": [hook]})

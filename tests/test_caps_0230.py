@@ -67,25 +67,6 @@ def test_186_unknown_names_and_bad_values_are_refused_at_load(ctx, block, messag
         Team.load(ctx.paths.team_toml)
 
 
-def test_186_an_agents_own_block_beside_its_legacy_line_is_refused_naming_both(ctx):
-    _team(ctx)
-    for a in ctx.team.doc["agent"]:
-        if a["name"] == "carol":
-            a["capabilities"] = {"network": "on"}
-            a["permissions"] = "settings/carol.json"
-    ctx.paths.team_toml.write_text(tomlkit.dumps(ctx.team.doc))
-    with pytest.raises(XtError) as e:
-        Team.load(ctx.paths.team_toml)
-    assert str(e.value) == ("agent carol has both a [capabilities] block and `permissions = …` in team.toml: "
-                            "use one. `xt capabilities carol` prints the block equivalent to the old lines")
-
-
-def test_186_a_team_default_beside_an_agents_legacy_line_loads(ctx):
-    _team(ctx)
-    _set(ctx, {"network": "off"}, carol={"permissions": "settings/carol.json"})  # legacy restricts on top
-    assert effective(ctx.team, ctx.team.agent("carol")).configured
-
-
 def test_186_skills_none_or_names(ctx):
     _team(ctx)
     _set(ctx, carol={"capabilities": {"skills": ["silverbullet"]}})

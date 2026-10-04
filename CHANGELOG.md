@@ -9,6 +9,46 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.24.0] — not released yet
+
+Documentation for the capability model, and the end of the old permission lines (Space
+releases/v0-24-0). **0.24.0-rc1** has #218 (Space specs/remove-legacy-permission-lines).
+
+### Upgrading
+
+- **Convert before you upgrade (#218).** A `team.toml` that still has a `permissions`,
+  `codex_options` or `connectors` line (directly under an `[[agent]]` or under `[defaults]`)
+  doesn't load in 0.24.0: every command refuses until it's converted. On 0.23.0, for each agent
+  with one of these lines, run `xt capabilities <name>`: it prints the `[capabilities]` block to
+  paste under the agent and changes nothing. Paste it, remove the old lines, and check that
+  `xt status` loads. A `[defaults] permissions` line has no agent name of its own: run
+  `xt capabilities` for any Claude Code agent (its block includes what it inherits), move the
+  shared part into `[defaults.capabilities]` by hand and remove the line. Then `git pull upstream
+  main` (or `xt version use v0.24.0`) and `xt restart --all`. If you upgraded first,
+  `xt capabilities <name>` still works in 0.24.0. The user guide's "Upgrading to 0.24" section has
+  the steps.
+- `xt spawn --permissions FILE` is gone with the line it wrote: a hire gets what it may do from
+  its capability block (the agent's own, or `[defaults.capabilities]`).
+
+### Removed
+
+- **#218** The `permissions`, `codex_options` and `connectors` lines in `team.toml`, deprecated in
+  0.23.0 (Radek's decision on #186). A `team.toml` with any of them is refused at load, by every
+  command that loads the team (`xt status`, `xt up`, `xt brief`, `xt send`, the TUI and the rest),
+  before anything starts or changes. One message names each offending line (the agent, or
+  `[defaults]`), says they were removed in 0.24, and names `xt capabilities NAME` for each agent
+  (for `[defaults]`: run it for any agent of the team and move the shared part into
+  `[defaults.capabilities]` by hand). `xt capabilities NAME` is the one command that still reads
+  the lines, to print the block; it refuses an agent that has both a block and an old line
+  (nothing to convert: remove one by hand). Gone with the lines: the settings file applied without
+  a block, Codex's `-c` option allowlist, the `codex options:` lines in status, the brief and the
+  TUI, the deprecation notes in the `caps:` row and the start note, the mixed-lines refusal, and
+  `xt spawn --permissions`. A Claude Code settings file now reaches an agent only as its block's
+  `extras`, where it may only restrict; the start note's warning for a permissive mode went too,
+  because `extras` refuses any mode but `dontAsk`. The spawn approval's warning now says a Claude
+  agent without a block would start with the operator's own defaults. The user guide, README,
+  examples, `roles/lead.md` and `protocol.md` describe only the capability block.
+
 ## [0.23.0] — 2026-10-04
 
 The release: the same code as 0.23.0-rc10 (the version, this changelog and the site's version and

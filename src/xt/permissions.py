@@ -1,12 +1,11 @@
-"""Per-agent permission settings for Claude Code agents (card #117).
+"""Claude Code settings files in the team repo (card #117): the check before a start.
 
-`permissions = "settings/liaison.json"` on an `[[agent]]` in team.toml (or once in `[defaults]` for
-every Claude agent) passes that file to Claude Code with `--settings`. xt checks the file before the
-start, because Claude Code (2.1.284) silently ignores a malformed file, an unknown `defaultMode` or a
-broken rule and starts anyway: with no permission rules an unattended agent stops at the first
-prompt nobody sees. Other settings keys are passed through unchecked; Claude Code owns its schema.
-Settings files are the human's, like team.toml: an agent that could edit its own file could widen
-its own permissions."""
+A [capabilities] block's `extras = "settings/carol.json"` (card #186) puts such a file on top of the
+settings xt generates. xt checks the file before the start, because Claude Code (2.1.284) silently
+ignores a malformed file, an unknown `defaultMode` or a broken rule and starts anyway. Other settings
+keys are passed through unchecked; Claude Code owns its schema. Settings files are the human's, like
+team.toml: an agent that could edit its own file could widen its own permissions. (The older
+`permissions` line in team.toml was removed in 0.24, card #218.)"""
 
 import hashlib
 import json
@@ -17,7 +16,6 @@ from pathlib import Path
 from .paths import XtError
 
 MODES = ("default", "acceptEdits", "plan", "auto", "dontAsk", "bypassPermissions", "manual")
-PERMISSIVE = ("bypassPermissions", "acceptEdits")  # act without asking: the start note warns
 RULE_LISTS = ("allow", "deny", "ask")
 RULE = re.compile(r"[A-Za-z][A-Za-z0-9_-]*(?:\((.*)\))?", re.S)  # Tool or Tool(specifier)
 
@@ -28,33 +26,6 @@ class Settings:
     path: Path  # resolved, inside the team repo
     digest: str  # short sha256 of the content used for this start
     mode: str | None  # permissions.defaultMode, if set
-
-
-def effective(team, agent, adapter) -> tuple[str | None, str]:
-    """The settings file an agent starts with, and a note when a team default doesn't apply.
-
-    An agent's own line wins; a harness that takes no settings file refuses it. The `[defaults]`
-    value applies to agents whose harness takes one and is skipped (with a note) for the others,
-    so a team default for its Claude agents doesn't stop its Codex agents from starting."""
-    if agent.permissions:
-        if not adapter.settings_flag:
-            raise XtError(f"{agent.name}: harness {adapter.name} takes no settings file, so it takes no "
-                          f"`permissions` line (asked for: {agent.permissions}); use claude for that agent "
-                          f"or remove the line")
-        return agent.permissions, ""
-    default = team.default_permissions
-    if not default:
-        return None, ""
-    if adapter.settings_flag:
-        return default, ""
-    return None, f"{agent.name}: team default permissions file {default} not applied ({adapter.name} takes no settings file)"
-
-
-def shown(team, agent, adapter) -> str | None:
-    """The effective settings path for status and detail views (never raises)."""
-    if agent.permissions:
-        return agent.permissions
-    return team.default_permissions if adapter and adapter.settings_flag else None
 
 
 def _rule_ok(rule) -> bool:
@@ -118,9 +89,7 @@ def preflight(root: Path, rel: str) -> Settings:
 
 
 def start_note(name: str, s: Settings) -> str:
-    note = (f"{name}: Claude Code settings {s.rel} (sha256 {s.digest}, "
+    """The start's note on the extras file (a mode other than dontAsk is refused before it, by
+    capabilities.merge_extras)."""
+    return (f"{name}: Claude Code settings {s.rel} (sha256 {s.digest}, "
             f"permissions.defaultMode {s.mode or 'not set'})")
-    if s.mode in PERMISSIVE:
-        note += (f" — WARNING: {s.mode} lets {name} "
-                 + ("run any tool without asking" if s.mode == "bypassPermissions" else "edit files without asking"))
-    return note

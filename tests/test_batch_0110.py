@@ -290,7 +290,7 @@ def test_start_note_and_detail_show_an_opt_in(ctx, monkeypatch):
     monkeypatch.setattr(adapters, "claude_mcp_servers", lambda binary="claude", cwd=None: ["claude.ai Context7"])
     add_member(ctx, "carol")  # a claude agent
     table = ctx.team._table("carol")
-    table["connectors"] = ["claude.ai Context7"]
+    table["capabilities"] = {"connectors": ["claude.ai Context7"]}  # card #218: the block names them
     ctx.team.save()
     ctx.reload_team()
     do_spawn(ctx, "carol")
@@ -299,12 +299,15 @@ def test_start_note_and_detail_show_an_opt_in(ctx, monkeypatch):
     notes = [m["body"] for m in ctx.ledger.messages() if m["type"] == "system"]
     assert any("carol: account connectors opted in: claude.ai Context7" in b for b in notes)
     row = next(r for r in build(ctx).panels["Team"] if r.data and r.data.get("name") == "carol")
-    assert "legacy connectors claude.ai Context7 (deprecated" in row.detail().plain  # its caps row (#186)
+    assert "connectors enforced" in row.detail().plain  # its caps row (#186)
     # removing the opt-in restores the default at the next start
-    del ctx.team._table("carol")["connectors"]
+    del ctx.team._table("carol")["capabilities"]
     ctx.team.save()
     ctx.reload_team()
-    assert "--strict-mcp-config" in load_adapters(ctx.paths)["claude"].start_args(None, ctx.team.agent("carol").connectors)
+    from xt.capstart import plan
+
+    connectors = plan(ctx, ctx.team.agent("carol"), load_adapters(ctx.paths)["claude"], load_adapters(ctx.paths)).connectors
+    assert "--strict-mcp-config" in load_adapters(ctx.paths)["claude"].start_args(None, connectors)
 
 
 def test_xt_harnesses_reports_connector_coverage(ctx, monkeypatch, capsys):
@@ -318,7 +321,7 @@ def test_xt_harnesses_reports_connector_coverage(ctx, monkeypatch, capsys):
 def test_a_codex_agent_with_an_opt_in_is_refused_before_any_workspace_opens(ctx):
     from xt.spawn import do_spawn
 
-    ctx.team._table("liaison")["connectors"] = ["Google Drive"]  # the liaison runs on codex here?
+    ctx.team._table("liaison")["capabilities"] = {"connectors": ["Google Drive"]}  # the liaison runs on codex here?
     ctx.team.save()
     ctx.reload_team()
     if ctx.team.agent("liaison").harness != "codex":

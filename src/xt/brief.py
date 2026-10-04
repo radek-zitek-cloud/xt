@@ -7,7 +7,6 @@ from .adapters import load_adapters
 from .alerts import Alerts, repeats
 from .approvals import Approvals, approval_what
 from .context import Ctx
-from .launch import codex_options_line
 from .ledger import pair
 from .lifecycle import checkpoints, suggestion
 from .team import HUMAN, harness_model, schedule_text
@@ -79,9 +78,7 @@ def build(ctx: Ctx, name: str | None = None) -> str:
         wakes = f", woken {schedule_text(a)}" if a.wake_every else ""
         cx = (f", context {usage.compact(contexts[a.name])}"
               if la and a.name in contexts and contexts[a.name].known else "")
-        opts = codex_options_line(ctx, a, la is not None)  # card #169; otherwise in the caps row (#186)
-        opts = f", {opts}" if "(running with" in opts else ""
-        out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}{opts}): {state}")
+        out.append(f"- {a.name} ({a.role}, {harness_model(a.harness, a.model)}, reports to {a.reports_to}{wakes}{cx}): {state}")
         caps = capstart.status_row(ctx, a, adapters.get(a.harness or ""))  # card #186: once it has started
         if caps:
             out.append(f"  {caps}")

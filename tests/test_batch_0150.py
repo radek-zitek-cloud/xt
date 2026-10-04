@@ -1,4 +1,4 @@
-"""v0.15.0: spawn with a permissions file (#122), recent messages by default in xt log (#113),
+"""v0.15.0: spawn and settings (#122; the permissions file went in 0.24, #218), recent messages by default in xt log (#113),
 Claude plan usage in status (#120), liaison goal writes in the protocol (#105), telling the human
 when a goal is done (#125)."""
 
@@ -18,24 +18,14 @@ import pytest
 from xt import cli, goaldone, permissions, planusage, turns
 from xt.paths import XtError
 from xt.approvals import approval_what
-from xt.spawn import Approvals, decide, request_spawn, stop
+from xt.spawn import Approvals, decide, request_spawn
 from xt.tui.app import LiveActions, XtTui
 from xt.tui.model import build
 from xt.watch import Supervisor
 
 from .conftest import REPO, add_member
 
-# --- #122 spawn with a permissions file ---------------------------------------------------------
-
-
-GOOD = {"permissions": {"defaultMode": "dontAsk", "allow": ["Bash(cat *)"], "deny": ["WebFetch"]}}
-
-
-def _settings(ctx, rel="settings/carol.json", data=GOOD):
-    f = ctx.paths.root / rel
-    f.parent.mkdir(parents=True, exist_ok=True)
-    f.write_text(data if isinstance(data, str) else json.dumps(data))
-    return f
+# --- #122 spawn and settings (card #218: the --permissions flag went with the permissions line) ---
 
 
 def _coder(ctx):
@@ -49,112 +39,41 @@ def _approval(ctx):
     return int(rid), req, body
 
 
-def _entry(ctx, name):
-    doc = tomllib.loads(ctx.paths.team_toml.read_text())
-    return next(a for a in doc["agent"] if a["name"] == name)
-
-
-def test_a_lead_spawn_with_permissions_writes_the_line_and_notes_the_hash(ctx):
-    _coder(ctx)
-    f = _settings(ctx)
-    out = request_spawn(ctx, "lead", "carol", "claude", None, "coder", None, "settings/carol.json")
-    assert "approval #" in out
-    rid, req, body = _approval(ctx)
-    assert "Settings: settings/carol.json (permissions.defaultMode dontAsk)." in body
-    assert "WARNING" not in body
-    assert "settings/carol.json" in approval_what(req)
-    decide(ctx, rid, approve=True)
-    assert _entry(ctx, "carol")["permissions"] == "settings/carol.json"
-    args = next(a for n, _, a in ctx.herdr.started if n == "carol")
-    assert args[args.index("--settings") + 1] == str(f.resolve())
-    digest = permissions.preflight(ctx.paths.root, "settings/carol.json").digest
-    assert any(f"carol: Claude Code settings settings/carol.json (sha256 {digest}" in m["body"]
-               for m in ctx.ledger.messages() if m["type"] == "system")
-
-
-def test_a_claude_spawn_without_any_file_warns_in_the_approval(ctx):
+def test_a_claude_spawn_without_a_block_warns_in_the_approval(ctx):
     _coder(ctx)
     request_spawn(ctx, "lead", "carol", "claude", None, "coder", None)
     rid, req, body = _approval(ctx)
-    assert "WARNING: carol would start without a permissions file, so the operator's own claude defaults apply" in body
+    assert ("WARNING: carol would start without generated settings, so the operator's own claude defaults "
+            "apply (a [capabilities] block in team.toml gives it some).") in body
     assert "WARNING" in approval_what(req)
     row = next(r for r in build(ctx).panels["Inbox"] if r.key == f"approval:{rid}")
-    assert "without a permissions file" in row.detail().plain
+    assert "without generated settings" in row.detail().plain
 
 
-def test_the_team_default_applies_to_a_spawned_claude_agent_and_codex_skips_it(ctx):
+def test_a_claude_spawn_under_a_team_default_block_has_no_warning_and_codex_none(ctx):
     _coder(ctx)
-    _settings(ctx, "settings/team.json")
-    ctx.team.doc.setdefault("defaults", {})["permissions"] = "settings/team.json"
+    ctx.team.doc.setdefault("defaults", {})["capabilities"] = {"network": "off"}
     ctx.team.save()
     ctx.reload_team()
     request_spawn(ctx, "lead", "carol", "claude", None, "coder", None)
-    _, _, body = _approval(ctx)
-    assert "Settings: settings/team.json" in body and "WARNING" not in body
-    decide(ctx, _approval(ctx)[0], approve=True)
-    assert "permissions" not in _entry(ctx, "carol")  # the default stays a default
+    rid, _, body = _approval(ctx)
+    assert "WARNING" not in body
+    decide(ctx, rid, approve=True)
     assert "--settings" in next(a for n, _, a in ctx.herdr.started if n == "carol")
     request_spawn(ctx, "lead", "dora", "codex", None, "coder", None)
-    _, _, body = _approval(ctx)
-    assert "settings/team.json not applied (codex takes no settings file)" in body
+    assert "WARNING" not in _approval(ctx)[2]  # codex takes no settings file: nothing to warn about
 
 
-@pytest.mark.parametrize("rel, content, why", [
-    ("settings/none.json", None, "no such file"),
-    ("settings/bad.json", '{"permissions": {', "not valid JSON"),
-    ("settings/mode.json", {"permissions": {"defaultMode": "nonsense"}}, "unknown permissions.defaultMode"),
-    ("../outside.json", None, "`..` isn't allowed"),
-])
-def test_a_bad_file_refuses_the_request_before_any_approval(ctx, rel, content, why):
-    _coder(ctx)
-    if content is not None:
-        _settings(ctx, rel, content)
-    with pytest.raises(XtError, match=why):
-        request_spawn(ctx, "lead", "carol", "claude", None, "coder", None, rel)
-    assert not Approvals(ctx).pending()
-    assert not any(m["type"] == "approval" for m in ctx.ledger.messages())
-    assert ctx.team.agent("carol") is None and not ctx.herdr.created
+def test_the_cli_has_no_permissions_flag(ctx, monkeypatch, capsys):
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(["spawn", "carol", "--harness", "claude", "--role", "coder",
+                                       "--permissions", "settings/carol.json", "--as", "lead"])
+    assert "unrecognized arguments: --permissions" in capsys.readouterr().err
 
 
-def test_a_codex_spawn_with_permissions_is_refused(ctx):
-    _coder(ctx)
-    _settings(ctx)
-    with pytest.raises(XtError, match="takes no settings file"):
-        request_spawn(ctx, "lead", "carol", "codex", None, "coder", None, "settings/carol.json")
-    assert not Approvals(ctx).pending()
-
-
-def test_spawning_over_an_existing_entry_keeps_its_line(ctx):
-    _coder(ctx)
-    add_member(ctx, "carol", role="coder")
-    _settings(ctx, "settings/own.json")
-    doc_agent = next(a for a in ctx.team.doc["agent"] if a["name"] == "carol")
-    doc_agent["permissions"] = "settings/own.json"
-    ctx.team.save()
-    ctx.reload_team()
-    request_spawn(ctx, "lead", "carol", "claude", None, "coder", None)  # new harness/role, no flag
-    rid, _, body = _approval(ctx)
-    assert "Settings: settings/own.json" in body
-    decide(ctx, rid, approve=True)
-    assert _entry(ctx, "carol")["permissions"] == "settings/own.json"
-    stop(ctx, "carol")
-    request_spawn(ctx, "human", "carol", None, None, None, None)  # plain restart after a stop
-    assert _entry(ctx, "carol")["permissions"] == "settings/own.json"
-
-
-def test_the_cli_passes_the_flag(ctx, monkeypatch):
-    _coder(ctx)
-    _settings(ctx)
-    monkeypatch.setattr(cli.Ctx, "load", classmethod(lambda cls, *a, **k: ctx))
-    cli.cmd_spawn(cli.build_parser().parse_args(
-        ["spawn", "carol", "--harness", "claude", "--role", "coder", "--permissions", "settings/carol.json",
-         "--as", "lead"]))
-    decide(ctx, _approval(ctx)[0], approve=True)
-    assert _entry(ctx, "carol")["permissions"] == "settings/carol.json"
-
-
-def test_the_shipped_lead_role_mentions_the_flag():
-    assert "--permissions" in (REPO / "roles/lead.md").read_text()
+def test_the_shipped_lead_role_names_the_block_not_the_flag():
+    text = (REPO / "roles/lead.md").read_text()
+    assert "--permissions" not in text and "[capabilities]" in text
 
 
 # --- #113 recent messages by default in xt log ---------------------------------------------------
@@ -651,13 +570,13 @@ def test_the_examples_settings_file_passes_the_preflight_and_its_question_render
     from xt import choices
 
     examples = (REPO / "docs/examples.md").read_text()
-    (settings,) = [b for b in _blocks(examples, "json") if '"defaultMode"' in b]
+    (settings,) = [b for b in _blocks(examples, "json") if '"statusLine"' in b]
     f = ctx.paths.root / "settings/researcher.json"
     f.parent.mkdir()
     f.write_text(settings)
-    assert permissions.preflight(ctx.paths.root, "settings/researcher.json").mode == "dontAsk"
+    assert permissions.preflight(ctx.paths.root, "settings/researcher.json").mode is None  # #218: the block's extras
     (toml_block,) = [b for b in _blocks(examples, "toml") if 'name = "researcher"' in b]
-    assert tomllib.loads(toml_block)["agent"][0]["permissions"] == "settings/researcher.json"
+    assert tomllib.loads(toml_block)["agent"][0]["capabilities"]["extras"] == "settings/researcher.json"
     (shown,) = [b for b in _blocks(examples, "text") if "Options:" in b]
     rendered = choices.render("Should the weekly digest go out today or tomorrow?",
                               ["Publish the digest today :: readers get it on time; the last section is unreviewed",

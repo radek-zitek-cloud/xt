@@ -13,7 +13,6 @@ from typing import Callable
 
 from rich.text import Text
 
-from .. import permissions
 from ..adapters import load_adapters
 from ..context import Ctx
 from ..dispatch import Queue
@@ -288,24 +287,11 @@ def build(ctx: Ctx) -> Snapshot:
             mine_today = spend.agents_today.get(a.name)
             out.append(f"usage today: {turns.fmt(mine_today) if mine_today else 'none recorded'}\n")
             from .. import capstart
-            from ..launch import codex_options_line
 
-            # card #186: a started agent's caps row, in full words, holds the old settings, Codex and
-            # connector lines (ux on rc6); one never started has no row, so it keeps them
+            # card #186: a started agent's caps row, in full words; one never started has none
             caps = capstart.detail_row(ctx, a, load_adapters(ctx.paths).get(a.harness))
-            opts = codex_options_line(ctx, a, la is not None)  # card #169
             if caps:
                 out.append(caps + "\n")
-                if "(running with" in opts:  # a changed option still says what the agent runs with
-                    out.append(opts + "\n", style="yellow")
-            else:
-                if a.connectors:
-                    out.append(f"account connectors (opted in): {', '.join(a.connectors)}\n", style="yellow")
-                settings_path = permissions.shown(ctx.team, a, load_adapters(ctx.paths).get(a.harness))
-                if settings_path:
-                    out.append(f"settings file: {settings_path}\n")
-                if opts:
-                    out.append(opts + "\n", style="yellow" if "network on" in opts else "")
             from ..lifecycle import queued, queued_text, suggestion
 
             entry = queued(ctx).get(a.name)

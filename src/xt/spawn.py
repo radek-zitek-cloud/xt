@@ -9,6 +9,7 @@ import time
 from . import (
     __version__,
     brief,
+    capabilities,
     capstart,
     paneinput,
     permissions,
@@ -16,7 +17,7 @@ from . import (
     usage,
     versions,
 )
-from .adapters import codex_options_text, get_adapter, load_adapters
+from .adapters import get_adapter, load_adapters
 from .alerts import Alerts
 from .approvals import Approvals
 from .context import Ctx
@@ -94,10 +95,10 @@ def do_spawn(ctx: Ctx, name: str) -> str:
         raise XtError(f"{name} is already running: spawn starts an agent that isn't running "
                       f"(`xt restart {name}` restarts a running one)")
     adapter = get_adapter(ctx.paths, a.harness)
-    # card #186: refuses a `require` the harness can't enforce, or a legacy line that would loosen
+    # card #186: refuses a `require` the harness can't enforce, or an extras file that would loosen
     # the block, before anything runs; generates the harness's settings from [capabilities]
     plan = capstart.plan(ctx, a, adapter, load_adapters(ctx.paths))
-    settings, skipped = plan.settings, plan.skipped
+    settings = plan.settings
     args = adapter.start_args(a.model, plan.connectors, str(ctx.paths.root),
                               plan.settings_file, plan.options) + plan.args  # may refuse an opt-in
     pane, workspace = ctx.herdr.create_workspace(str(ctx.paths.root), f"{ctx.team.name}·{name}")
@@ -132,18 +133,16 @@ def do_spawn(ctx: Ctx, name: str) -> str:
     note = "" if landed else " — FIRST PROMPT NOT CONFIRMED, see alert"
     if landed and adapter.check_prompt_in_log:
         note = check_prompt_in_log(ctx, name, adapter, began, settled)
-    versions.record_agent_start(ctx, name, ctx.ledger.clock(), a.codex_options, capstart.record(plan))
-    caps_line = (f"capabilities: {capstart.row(plan.caps, adapter, plan.legacy, name, 200, plan.was_loaded, plan.source)}"
+    versions.record_agent_start(ctx, name, ctx.ledger.clock(), capstart.record(plan))
+    caps_line = (f"capabilities: {capstart.row(plan.caps, adapter, 200, plan.was_loaded, plan.source)}"
                  + (f" (settings generated: .xt/state/settings/{name}.json)" if plan.generated else "")
                  + (f"; {capstart.BUILTIN_NOTE}" if capstart.builtin_caveat(plan.caps, adapter) else ""))
     ctx.ledger.append(SYSTEM, HUMAN, "system",
                       f"started {name} ({a.role}, {a.harness}) in workspace {workspace} with xt "
                       f"{versions.display(__version__)}{note}\n{caps_line}")  # card #186: one start, one note
-    if a.codex_options:
-        ctx.ledger.append(SYSTEM, HUMAN, "system", f"{name}: Codex options {codex_options_text(a.codex_options)}")
-    if a.connectors:
+    if plan.connectors:
         ctx.ledger.append(SYSTEM, HUMAN, "system",
-                          f"{name}: account connectors opted in: {', '.join(a.connectors)}"
+                          f"{name}: account connectors opted in: {', '.join(plan.connectors)}"
                           + (f" ({adapter.connectors_note})" if adapter.connectors_note else ""))
     elif adapter.connectors not in ("blocked", "none"):
         ctx.ledger.append(SYSTEM, HUMAN, "system",
@@ -151,8 +150,6 @@ def do_spawn(ctx: Ctx, name: str) -> str:
                           f"({adapter.connectors_note or 'no restriction declared'})")
     if settings:
         ctx.ledger.append(SYSTEM, HUMAN, "system", permissions.start_note(name, settings))
-    elif skipped:
-        ctx.ledger.append(SYSTEM, HUMAN, "system", skipped)
     if adapter.desktop_tools not in ("blocked", "none"):
         ctx.ledger.append(SYSTEM, HUMAN, "system",
                           f"{name}: desktop and browser tools are not fully blocked in {a.harness} "
@@ -397,31 +394,28 @@ def send_first_prompt(ctx: Ctx, name: str, pane: str, adapter, text: str) -> boo
     return False
 
 
-def spawn_settings(ctx: Ctx, name: str, harness: str, own: str | None) -> str:
-    """What the spawned agent's settings will be, in one sentence for the approval (card #122).
-
-    `own` is the `permissions` line the entry will have (from `--permissions`, or kept from an
-    existing entry). Checked with the #117 preflight here, so a bad file refuses the request before
-    any approval is asked for; do_spawn checks it again at the start."""
+def spawn_settings(ctx: Ctx, name: str, harness: str) -> str:
+    """What the spawned agent's settings will be, in one sentence for the approval (card #122): a
+    warning when a settings-file harness has no [capabilities] block to generate them from (card
+    #218: the block is the only way)."""
     adapter = get_adapter(ctx.paths, harness)
-    if own and not adapter.settings_flag:
-        raise XtError(f"{name}: harness {adapter.name} takes no settings file, so it takes no "
-                      f"permissions file (asked for: {own}); use claude for that agent or leave it out")
-    rel = own or (ctx.team.default_permissions if adapter.settings_flag else None)
-    if rel:
-        s = permissions.preflight(ctx.paths.root, rel)
-        return f"Settings: {s.rel} (permissions.defaultMode {s.mode or 'not set'})."
-    if adapter.settings_flag:
-        return (f"WARNING: {name} would start without a permissions file, so the operator's own "
-                f"{adapter.name} defaults apply (--permissions FILE gives it one).")
-    if ctx.team.default_permissions:
-        return f"Team default permissions file {ctx.team.default_permissions} not applied ({adapter.name} takes no settings file)."
+    caps = capabilities.effective(ctx.team, ctx.team.agent(name) or _Named(name))
+    if adapter.settings_flag and not caps.configured:
+        return (f"WARNING: {name} would start without generated settings, so the operator's own "
+                f"{adapter.name} defaults apply (a [capabilities] block in team.toml gives it some).")
     return ""
+
+
+class _Named:
+    """A hire not yet in team.toml: only its name, for the team's default capabilities."""
+
+    def __init__(self, name: str):
+        self.name = name
 
 
 def request_spawn(
     ctx: Ctx, requester: str, name: str, harness: str | None, model: str | None,
-    role: str | None, reports_to: str | None, permissions_file: str | None = None,
+    role: str | None, reports_to: str | None,
 ) -> str:
     existing = ctx.team.agent(name)
     if existing and existing.kind == HUMAN:
@@ -454,14 +448,11 @@ def request_spawn(
     if not existing and len(active) >= int(ctx.team.policy("max_agents")) and requester != HUMAN:
         raise XtError(f"team is at max_agents ({len(active)}); ask the human to raise it first")
 
-    own = permissions_file or (existing.permissions if existing else None)
-    note = spawn_settings(ctx, name, harness, own)  # refuses a bad file before anything else
+    note = spawn_settings(ctx, name, harness)  # refuses a bad extras file before anything else
     # card #186: refuses a `require` the harness can't enforce before an approval is asked for
-    caps_note = capstart.request_sentence(ctx, name, get_adapter(ctx.paths, harness), load_adapters(ctx.paths), own)
+    caps_note = capstart.request_sentence(ctx, name, get_adapter(ctx.paths, harness), load_adapters(ctx.paths))
     req = {"requester": requester, "name": name, "harness": harness, "model": model,
            "role": role, "reports_to": reports_to, "caps_note": caps_note}
-    if permissions_file:
-        req["permissions"] = permissions_file
     if note:
         req["settings_note"] = note
     if requester != HUMAN and ctx.team.policy("spawn_approval"):
@@ -474,8 +465,7 @@ def request_spawn(
 
 
 def execute_spawn(ctx: Ctx, req: dict) -> str:
-    ctx.team.upsert_agent(req["name"], req["role"], req["harness"], req.get("model"), req["reports_to"],
-                          permissions=req.get("permissions"))
+    ctx.team.upsert_agent(req["name"], req["role"], req["harness"], req.get("model"), req["reports_to"])
     ctx.team.save()
     ctx.reload_team()
     ws = do_spawn(ctx, req["name"])

@@ -1,5 +1,5 @@
 import datetime as dt
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import tomlkit
@@ -40,10 +40,7 @@ class Agent:
     wake_message: str | None = None
     wake_between: str | None = None  # "05:00-21:00": local-time window for wake-ups; None = any time
     wake_at: str | None = None  # "09:30": for daily (or longer) schedules, the local time to wake
-    connectors: list[str] = field(default_factory=list)  # account connectors opted in (card #101)
-    permissions: str | None = None  # settings file for the harness, relative to the team repo (card #117)
     auto_reset_tokens: int | str | None = None  # card #114: this agent's threshold, or "off"; None = the team's
-    codex_options: list[str] = field(default_factory=list)  # `-c` overrides for a Codex agent (card #169)
     notes_budget: int | None = None  # card #198: this agent's notes budget in bytes; None = the team's
 
     @property
@@ -57,17 +54,22 @@ class Team:
         self.doc = doc
 
     @classmethod
-    def load(cls, path: Path, allow_mixing: bool = False) -> "Team":
-        """`allow_mixing`: only for `xt capabilities`, which prints the way out of a block beside an
-        old line (card #186, ux on rc6), so the refusal it names doesn't refuse it."""
+    def load(cls, path: Path, allow_removed: bool = False) -> "Team":
+        """`allow_removed`: only for `xt capabilities`, which converts the lines removed in 0.24
+        (card #218), so the refusal that names it doesn't refuse it."""
         if not path.exists():
             raise XtError(f"no team.toml at {path} — run `xt init` first")
         team = cls(path, tomlkit.parse(path.read_text()))
-        team.check(allow_mixing)
+        team.check(allow_removed)
         return team
 
-    def check(self, allow_mixing: bool = False) -> None:
-        """Refuse settings xt can't use, at load (card #198: `notes_budget`)."""
+    def check(self, allow_removed: bool = False) -> None:
+        """Refuse settings xt can't use, at load (card #198: `notes_budget`; card #218: the removed
+        permission lines, in a message of their own)."""
+        if not allow_removed:
+            refused = capabilities.removed_refusal(self.doc)
+            if refused:
+                raise XtError(refused)
         defaults = self.doc.get("defaults", {})
         problems = []
         if "notes_budget" in defaults:
@@ -75,7 +77,7 @@ class Team:
         for a in self.doc.get("agent", []):
             if "notes_budget" in a:
                 problems.append(_notes_budget_problem(a["notes_budget"], f"agent {a.get('name')}'s"))
-        problems = [p for p in problems if p] + capabilities.check(self.doc, allow_mixing)  # card #186
+        problems = [p for p in problems if p] + capabilities.check(self.doc)  # card #186
         if problems:
             raise XtError("; ".join(problems))
 
@@ -112,12 +114,6 @@ class Team:
     def log_setting(self, key: str):
         return self.doc.get("log", {}).get(key, LOG_DEFAULTS[key])
 
-    @property
-    def default_permissions(self) -> str | None:
-        """`[defaults] permissions = "…"`: the settings file for every agent whose harness takes one."""
-        v = self.doc.get("defaults", {}).get("permissions")
-        return str(v) if isinstance(v, str) and v else None
-
     def default(self, role: str) -> dict:
         return dict(self.doc.get("defaults", {}).get(role, {}))
 
@@ -137,11 +133,7 @@ class Team:
                     wake_message=a.get("wake_message") or None,
                     wake_between=a.get("wake_between") or None,
                     wake_at=a.get("wake_at") or None,
-                    connectors=[str(c) for c in a.get("connectors", [])],
-                    permissions=str(a["permissions"]) if a.get("permissions") else None,
                     auto_reset_tokens=a.get("auto_reset_tokens"),
-                    codex_options=([str(a["codex_options"])] if isinstance(a.get("codex_options"), str)
-                                   else [str(o) for o in a.get("codex_options", [])]),
                     notes_budget=int(a["notes_budget"]) if "notes_budget" in a else None,
                 )
             )
@@ -162,9 +154,8 @@ class Team:
                 return a
         return None
 
-    def upsert_agent(self, name: str, role: str, harness: str, model: str | None, reports_to: str,
-                     permissions: str | None = None) -> None:
-        """Add or update an agent entry. A `permissions` line is set when given, else kept (card #122)."""
+    def upsert_agent(self, name: str, role: str, harness: str, model: str | None, reports_to: str) -> None:
+        """Add or update an agent entry."""
         t = self._table(name)
         if t is None:
             if "agent" not in self.doc:
@@ -181,8 +172,6 @@ class Team:
         elif "model" in t:
             del t["model"]
         t["reports_to"] = reports_to
-        if permissions:
-            t["permissions"] = permissions
         t["status"] = "active"
 
     def set_schedule(self, name: str, every: str | None, message: str | None = None,

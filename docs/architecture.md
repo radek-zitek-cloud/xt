@@ -63,7 +63,7 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/goals.py` | Goal drafts and dispatch (`xt goal new`, `dispatch`, `list`). |
 | `src/xt/goaldone.py` | One notification per goal the human dispatched, and the Inbox's done marker (`state/inbox_seen.json`). |
 | `src/xt/inbox.py` | The human's Inbox in three groups (Needs you, New, Friction; the TUI calls New Notifications) for the TUI and `xt inbox`, and friction's read marker. |
-| `src/xt/paneinput.py` | Card #193: each line typed in the liaison's pane, recorded as a message from `human` to the liaison (`source: pane`, logged, not delivered) and shown as `typed in the pane, unverified` (`ledger.sender`): anything that can type into the pane through Herdr lands there too. A pane message never answers, approves or closes anything: the ledger (`_apply`), the inbox's answered fold and chat's answered mark skip it. The supervisor (`scan`, every tick) reads the liaison's session log (`usage.session_for`, any harness) from its stored position (`mark_start` in `do_spawn` makes a new session's log read from its first line; a liaison never marked starts at the log's end) and records typed user entries as submitted, leaving out slash commands, `!` lines, the harness's `<…>` inserts and xt's own deliveries. On Claude Code the liaison starts with a generated settings file (`.xt/state/settings/<name>.json`: its own permissions file plus a `UserPromptSubmit` hook running `xt pane-input --hook`), which queues the line and warns in the pane when it can't be recorded; a queued line the log doesn't show within `CONFIRM_WAIT` is refused (alert, chat line). `state` gives one of five states (recorded, log only, isn't running, unknown when Herdr can't be reached and the supervisor's snapshot is older than `SNAPSHOT_FRESH` or missing (`Herdr.agents(max_snapshot_age=)`), NOT recorded; cards #201, #202), `signal` the full line for `xt status` and `header` the chat header fitted to its width. State: `.xt/state/pane_input.json`. |
+| `src/xt/paneinput.py` | Card #193: each line typed in the liaison's pane, recorded as a message from `human` to the liaison (`source: pane`, logged, not delivered) and shown as `typed in the pane, unverified` (`ledger.sender`): anything that can type into the pane through Herdr lands there too. A pane message never answers, approves or closes anything: the ledger (`_apply`), the inbox's answered fold and chat's answered mark skip it. The supervisor (`scan`, every tick) reads the liaison's session log (`usage.session_for`, any harness) from its stored position (`mark_start` in `do_spawn` makes a new session's log read from its first line; a liaison never marked starts at the log's end) and records typed user entries as submitted, leaving out slash commands, `!` lines, the harness's `<…>` inserts and xt's own deliveries. On Claude Code the liaison starts with a generated settings file (`.xt/state/settings/<name>.json`: the settings generated from its capability block, if any, plus a `UserPromptSubmit` hook running `xt pane-input --hook`), which queues the line and warns in the pane when it can't be recorded; a queued line the log doesn't show within `CONFIRM_WAIT` is refused (alert, chat line). `state` gives one of five states (recorded, log only, isn't running, unknown when Herdr can't be reached and the supervisor's snapshot is older than `SNAPSHOT_FRESH` or missing (`Herdr.agents(max_snapshot_age=)`), NOT recorded; cards #201, #202), `signal` the full line for `xt status` and `header` the chat header fitted to its width. State: `.xt/state/pane_input.json`. |
 | `src/xt/chat.py` | `xt chat` (from 0.21.0): the human's conversation with the liaison as a view over the ledger (the last 30 messages, new ones read every 2 s, pending questions and approvals answered in place through `cli.answer`); Textual, as the TUI; nothing stored of its own. Card #199: `kind_of` adds an operator's messages and drive actions (labelled `NAME (operator)`) and xt's delegation lines to the conversation, and the liaison's messages to the team as `.activity` one-liners (`one_liner`, modes hidden/goals/all, goals by default, `ctrl+t`; ↑/↓ and enter expand); the view follows new lines only when it is at the end. 0.22.1: `hint_keys`/`hint_line` build the hint from per-key words in three tiers taken one key at a time (`SHORT_FIRST`, `SHORTEST_FIRST`) until it fits with `HINT_SPARE` columns (#206); PageUp/PageDown/Home/End scroll the history with the draft focused, `stick` keeps an at-end view at the end as lines get their height, and `#newmark` counts lines that arrived while scrolled up (#210); the header comes from `paneinput.header` (#202). |
 | `src/xt/choices.py` | Questions with a declared answer type (closed, options, open; from 0.21.0): validation, rendering, the `question` data stored on an ask (read from the text for older asks), and checking an answer against it, a numeric answer recorded as the option's text. |
 | `src/xt/brief.py` | `xt brief`: the recovery summary, included in every first prompt. |
@@ -71,9 +71,9 @@ goals, the message log) is in the repo, so any agent can lose its memory and rec
 | `src/xt/spawn.py` | Starting agents (`do_spawn`: workspace, startup dialogs, readiness wait, first prompt with pi's guard line, landed check, the session-log check and the one resend of a damaged prompt, `Resends`/`run_resends`), spawn requests and carrying out their approvals (`decide`), stop and retire. |
 | `src/xt/lifecycle.py` | Card #215: the lifecycle's shared records, imported by spawn, watch, reset, jobs, dispatch, pane input and the brief and importing none of them: the supervisor's pid and `recently_ticked`, expected and stopped agents, the jobs queue (`Jobs`), checkpoints, queued resets (`queued`, `drop`, `state/resets.json`) and when a reset is suggested (`suggestion`). |
 | `src/xt/approvals.py` | Card #215: pending approvals of spawns and schedules (`Approvals`, `state/approvals.json`; each a closed question in the ledger, answered once by `xt answer`, `approve`/`deny` or the TUI) and their one-line summary (`approval_what`). |
-| `src/xt/capabilities.py` | Card #186: the capability model. Parses and checks `[defaults.capabilities]` and `[agent.capabilities]` at load (`check`, from `Team.check`): `write`, `deny`, `commands`, `network`, `connectors`, `skills`, `credential_clis` and `require`; refuses an agent's own block beside its own legacy line. `effective`: defaults, then the team's block, then the agent's, `require` from both. `support` and `refusal` read each harness's `[capabilities]` table (`harnesses/*.toml`, `enforced` or `advisory`, with the version checked). The generators: `claude_rules` (a `dontAsk` settings file), `merge_extras` (the legacy file, or the block's own `extras` file, on top: refused where it would loosen a governed tool), `codex_args` (network switch, `--add-dir`), `pi_skill_args` (`--no-skills`, the team's skills and named ones with `--skill`). |
-| `src/xt/capstart.py` | Card #186: an agent's start under the model (`plan`: refusals before anything runs, the generated or legacy settings, harness arguments, connectors) and the one compact row every surface shows (`row`, `spawn_sentence`, `status_row`, used by `xt status`, the brief, the TUI's agent detail and the start note): what deviates from the defaults, grouped `require`, `enforced`, `advisory`, with the old lines folded in as deprecated (`legacy_items`: the settings file, Codex's network, connectors), within 76 columns (shorter words before `…`). `record` goes into the `versions` start record; `skills_were_loaded` marks a pi agent whose personal skills this start turned off, once. |
-| `src/xt/permissions.py` | Claude Code settings files: which file applies (`effective`), the preflight check, the start note. |
+| `src/xt/capabilities.py` | Card #186: the capability model. Parses and checks `[defaults.capabilities]` and `[agent.capabilities]` at load (`check`, from `Team.check`): `write`, `deny`, `commands`, `network`, `connectors`, `skills`, `credential_clis`, `require` and `extras`. `removed_refusal` (card #218, from `Team.check`) refuses a `team.toml` that still has the `permissions`, `codex_options` or `connectors` lines removed in 0.24, naming each line and `xt capabilities NAME`; `convert` is the one reader left of those lines, for that command. `effective`: defaults, then the team's block, then the agent's, `require` from both. `support` and `refusal` read each harness's `[capabilities]` table (`harnesses/*.toml`, `enforced` or `advisory`, with the version checked). The generators: `claude_rules` (a `dontAsk` settings file), `merge_extras` (the block's `extras` file on top: refused where it would loosen a governed tool), `codex_args` (network switch, `--add-dir`), `pi_skill_args` (`--no-skills`, the team's skills and named ones with `--skill`). |
+| `src/xt/capstart.py` | Card #186: an agent's start under the model (`plan`: refusals before anything runs, the generated settings with the extras file on top, harness arguments, connectors) and the one compact row every surface shows (`row`, `spawn_sentence`, `status_row`, used by `xt status`, the brief, the TUI's agent detail and the start note): what deviates from the defaults, grouped `require`, `enforced`, `advisory`, within 76 columns (shorter words before `…`). `record` goes into the `versions` start record; `skills_were_loaded` marks a pi agent whose personal skills this start turned off, once. |
+| `src/xt/permissions.py` | Claude Code settings files (a capability block's `extras`): the preflight check before a start, the start note. |
 | `src/xt/adapters.py` | Harness adapters from `harnesses/*.toml`: start arguments (Codex options from the allowlist, settings file, connector block or opt-in, model flag), dialogs, readiness (`ready_settle`, `check_prompt_in_log`, `first_prompt_prefix`), `first_prompt_note`, limits. |
 | `src/xt/herdr.py` | The thin wrapper over the `herdr` CLI, always with `--session`. |
 | `src/xt/jobs.py` | Herdr work agents ask for (spawn, start, retire), queued for the supervisor (`lifecycle.Jobs`) and run by it (`run_pending`). |
@@ -152,15 +152,19 @@ upstream and aren't edited by the team, so upstream merges rarely conflict.
             auto_reset (default false), auto_reset_tokens (150000), auto_reset_cooldown_hours (6)
 [log]       raw_days, delete_after_days, daily_alert_mb, message_max_kb
 [notify]    enabled, command (e.g. "notify-send --app-name=xt {title} {body}"), quiet (e.g. "21:00-07:00")
-[defaults]  liaison / lead harness (and optional model); permissions? (settings file for every Claude agent);
-            notes_budget? (bytes, default 16000)
+[defaults]  liaison / lead harness (and optional model); notes_budget? (bytes, default 16000)
+[defaults.capabilities]  the team's capability block (the same keys as an agent's)
 [board_watch]  command (argument list), interval? ("5m"), timeout? ("30s"), column? (its name, for the message)
 [[agent]]   name, role, harness, model?, reports_to, status (active | retired),
             wake_every? (e.g. "30m"), wake_message?, wake_between? (e.g. "05:00-21:00"), wake_at? (e.g. "09:30"; set with `xt schedule`),
-            permissions? (e.g. "settings/carol.json"; Claude Code only), connectors? (account connectors opted in),
-            auto_reset_tokens? (this agent's threshold, or "off"), notes_budget? (this agent's, bytes),
-            codex_options? (e.g. ["sandbox_workspace_write.network_access=true"]; Codex only, allowlisted)
+            auto_reset_tokens? (this agent's threshold, or "off"), notes_budget? (this agent's, bytes)
+[agent.capabilities]  write?, deny?, commands?, network?, connectors?, skills?, credential_clis?,
+            require?, extras? (a Claude Code settings file on top, restricting only)
 ```
+
+The older `permissions`, `codex_options` and `connectors` lines (under `[defaults]` or an agent)
+were removed in 0.24.0 (card #218): `Team.check` refuses a file that still has one, naming each
+(`capabilities.removed_refusal`); only `xt capabilities NAME` loads it, to print the block.
 
 `reports_to` is the communication chain: human ↔ liaison ↔ lead ↔ members (sub-leads possible).
 Runtime facts such as pane ids never go in `team.toml`. A section left out uses xt's defaults.
@@ -213,23 +217,22 @@ supervisor, never inside an agent's shell.
    `state/prompt_resends.json`, and the supervisor resends it (below).
 5. The agent is added to the "expected" set, so the supervisor can tell a crash from a stop.
 
-**What goes into the start command.** Before step 1, `permissions.effective` picks the agent's
-settings file (its own `permissions` line, else `[defaults] permissions` when the harness takes one;
-a Codex or pi agent with its own line is refused), `permissions.preflight` checks it (inside the
-repo, JSON, known `defaultMode`, well-formed rules; a bad file refuses the start) and
-`Adapter.start_args` builds the arguments: the adapter's own `args` (for Claude Code, Claude in
-Chrome refused and `--disable-slash-commands`, card #188, which also turns off built-in slash
-commands such as `/context`; xt sends none), then a Codex agent's
-`codex_options` as `-c key=value` (checked by `adapters.codex_option_args` against the allowlist
-`CODEX_OPTIONS`, which is the sandbox network switch alone; anything else, or the line on another
-harness, refuses the start; card #169), then `--settings <file>` (the
-adapter's `settings_flag`), then the connector block (or, for an opt-in, a refusal of every other
-connector's tools), then the adapter's `model_flag` with the agent's `model`. The start note in the
-ledger records the file's path, a short hash of its content and its mode. A spawn *request*
-(`request_spawn`, e.g. the lead's `xt spawn … --permissions FILE`) runs the same check before it
-asks the human, and the approval names the file or warns that a Claude agent would start without
-one. The model tables don't reach the harness: the adapter's `context_windows` and `prices.toml`
-are only read back by `usage` and `turns` to show context and estimate cost.
+**What goes into the start command.** Before step 1, `capstart.plan` turns the agent's capability
+block into the harness's configuration (refusing before anything runs): for Claude Code a generated
+settings file under `.xt/state/settings/`, with the block's `extras` file checked by
+`permissions.preflight` (inside the repo, JSON, known `defaultMode`, well-formed rules) and merged on
+top; for Codex its sandbox options (`-s workspace-write`, the network switch, `--add-dir`); for pi its
+skill flags. `Adapter.start_args` then builds the arguments: the adapter's own `args` (for Claude
+Code, Claude in Chrome refused and `--disable-slash-commands`, card #188, which also turns off
+built-in slash commands such as `/context`; xt sends none), then the Codex options, then
+`--settings <file>` (the adapter's `settings_flag`), then the connector block (or, for the block's
+named connectors, a refusal of every other connector's tools), then the adapter's `model_flag` with
+the agent's `model`. The start note in the ledger records the capability row and, for an extras
+file, its path, a short hash of its content and its mode. A spawn *request* (`request_spawn`) runs
+the `require` check before it asks the human; the approval shows the capability sentence, or warns
+that a Claude agent without a block would start with the operator's own defaults. The model tables
+don't reach the harness: the adapter's `context_windows` and `prices.toml` are only read back by
+`usage` and `turns` to show context and estimate cost.
 
 An agent keeps the instructions of its first prompt until it's restarted, so a team picks up
 changed roles or a new xt version only after a restart (`xt down`, then `xt`).

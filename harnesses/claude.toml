@@ -10,13 +10,13 @@ desktop_tools = "partial"
 desktop_tools_note = "Claude in Chrome tools refused for this session; other desktop or computer-use skills not verified"
 # The operator's account connectors (card #101): claude.ai connectors (mail, drive, calendar…)
 # and plugin or user MCP servers. --strict-mcp-config with no --mcp-config loads none of them
-# (checked 2026-09-28: 87 tools with them, 24 without). An agent with `connectors = [...]` in
-# team.toml gets only those servers: xt lists the others at start and refuses their tools.
+# (checked 2026-09-28: 87 tools with them, 24 without). An agent whose [capabilities] block names
+# `connectors = [...]` gets only those servers: xt lists the others at start and refuses their tools.
 connectors = "blocked"
 connectors_note = "no MCP servers or claude.ai connectors unless opted in per agent; CLIs holding your credentials aren't covered"
 connector_block_args = ["--strict-mcp-config"]
 connector_style = "claude-mcp"
-# Per-agent settings file (card #117): `permissions = "settings/<agent>.json"` in team.toml.
+# Settings file (card #117): the one xt generates from the [capabilities] block, `extras` on top.
 settings_flag = "--settings"
 model_flag = "--model"
 summary = "Claude Code: careful multi-step work and writing; reads repo skills via .claude/skills"

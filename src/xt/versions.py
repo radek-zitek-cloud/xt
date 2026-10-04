@@ -90,12 +90,9 @@ def mark_starting(ctx: Ctx, name: str, now: dt.datetime) -> None:
     _save(ctx, data)
 
 
-def record_agent_start(ctx: Ctx, name: str, now: dt.datetime, codex_options: list[str] | None = None,
-                       capabilities: dict | None = None) -> None:
+def record_agent_start(ctx: Ctx, name: str, now: dt.datetime, capabilities: dict | None = None) -> None:
     data = load(ctx)
     rec = {"version": __version__, "since": now.isoformat(timespec="seconds")}
-    if codex_options:  # what this start ran with, so status can tell a changed team.toml (card #169)
-        rec["codex_options"] = list(codex_options)
     if capabilities is not None:  # card #186: the effective model this start ran with
         rec["capabilities"] = capabilities
     data.setdefault("agents", {})[name] = rec
@@ -119,12 +116,6 @@ def started_capabilities(ctx: Ctx, name: str) -> dict | None:
     """The capabilities the agent's last start ran with (card #186); None for an older or no record."""
     rec = load(ctx).get("agents", {}).get(name)
     return None if rec is None else rec.get("capabilities")
-
-
-def started_codex_options(ctx: Ctx, name: str) -> list[str] | None:
-    """The Codex options the agent's last start ran with ([] for none); None when xt has no record."""
-    rec = load(ctx).get("agents", {}).get(name)
-    return None if rec is None else list(rec.get("codex_options", []))
 
 
 def latest_final(tag_lines: str) -> str | None:

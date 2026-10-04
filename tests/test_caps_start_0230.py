@@ -39,6 +39,15 @@ def _edit(ctx, defaults: dict | None = None, **agents: dict):
     ctx.reload_team()
 
 
+def _old(ctx, **agents: dict):
+    """Write lines removed in 0.24 (card #218) without loading the team: only `xt capabilities` reads
+    them now, from the file."""
+    for a in ctx.team.doc["agent"]:
+        for key, value in agents.get(a["name"], {}).items():
+            a[key] = value
+    ctx.paths.team_toml.write_text(tomlkit.dumps(ctx.team.doc))
+
+
 def _start(ctx, name):
     request_spawn(ctx, "human", name, None, None, None, None)
     return next(args for n, _, args in reversed(ctx.herdr.started) if n == name)
@@ -176,7 +185,7 @@ def test_186_require_refuses_a_hire_before_any_approval_or_team_change(ctx):
     assert Approvals(ctx).pending() == {} and ctx.paths.team_toml.read_text() == before
 
 
-# --- precedence: legacy lines and extras only restrict -------------------------------------------------
+# --- precedence: extras only restrict ---------------------------------------------------------------
 
 
 def _extras(ctx, name, perms: dict):
@@ -184,10 +193,10 @@ def _extras(ctx, name, perms: dict):
     (ctx.paths.root / "settings" / f"{name}.json").write_text(json.dumps({"permissions": perms}))
 
 
-def test_186_the_legacy_file_adds_restrictions_on_top_of_the_team_default_block(ctx):
+def test_186_the_extras_file_adds_restrictions_on_top_of_the_team_default_block(ctx):
     _team(ctx, carol="claude")
     _extras(ctx, "carol", {"deny": ["Bash(rm *)"], "allow": ["Edit(members/carol/notes.md)", "Read(//tmp/**)"]})
-    _edit(ctx, {"commands": ["git"]}, carol={"permissions": "settings/carol.json"})
+    _edit(ctx, {"commands": ["git"]}, carol={"capabilities": {"extras": "settings/carol.json"}})
     s = _settings(_start(ctx, "carol"))["permissions"]
     assert "Bash(rm *)" in s["deny"] and "Bash(git *)" in s["allow"] and s["defaultMode"] == "dontAsk"
 
@@ -200,39 +209,9 @@ def test_186_the_legacy_file_adds_restrictions_on_top_of_the_team_default_block(
 def test_186_an_extras_rule_that_loosens_the_block_is_refused_naming_both(ctx, perms, message):
     _team(ctx, carol="claude")
     _extras(ctx, "carol", perms)
-    _edit(ctx, {"commands": ["git"]}, carol={"permissions": "settings/carol.json"})
+    _edit(ctx, {"commands": ["git"]}, carol={"capabilities": {"extras": "settings/carol.json"}})
     with pytest.raises(XtError, match=r"settings/carol.json: " + message):
         _start(ctx, "carol")
-
-
-def test_186_legacy_connectors_and_codex_network_may_only_restrict(ctx):
-    _team(ctx, carol="claude", dana="codex")
-    _edit(ctx, {"network": "on"}, carol={"connectors": ["mail"]},
-          dana={"codex_options": ["sandbox_workspace_write.network_access=false"]})
-    with pytest.raises(XtError, match=r"carol: `connectors = \['mail'\]` would loosen the \[capabilities\] block"):
-        _start(ctx, "carol")
-    args = _start(ctx, "dana")
-    assert "sandbox_workspace_write.network_access=false" in args  # the legacy line restricts: kept
-    _edit(ctx, {"network": "off"}, dana={"codex_options": ["sandbox_workspace_write.network_access=true"]})
-    from xt.spawn import stop
-
-    stop(ctx, "dana")
-    with pytest.raises(XtError, match=r"would loosen the \[capabilities\] block \(network = \"off\"\)"):
-        _start(ctx, "dana")
-
-
-# --- legacy-only agents start as before (only skills and the display change) --------------------------
-
-
-def test_186_legacy_only_agents_start_with_their_own_lines_unchanged(ctx):
-    _team(ctx, carol="claude", dana="codex")
-    _extras(ctx, "carol", {"allow": ["Bash(curl *)"], "defaultMode": "dontAsk"})
-    _edit(ctx, carol={"permissions": "settings/carol.json"},
-          dana={"codex_options": ["sandbox_workspace_write.network_access=true"]})
-    args = _start(ctx, "carol")
-    assert args[args.index("--settings") + 1] == str(ctx.paths.root / "settings" / "carol.json")  # as before
-    dargs = _start(ctx, "dana")
-    assert "sandbox_workspace_write.network_access=true" in dargs and "--add-dir" not in dargs
 
 
 # --- display: status row, start note, spawn sentence ---------------------------------------------------
@@ -259,33 +238,24 @@ def test_186_a_mixed_set_is_never_enforced_as_a_whole(ctx, monkeypatch, capsys):
     assert row == "    caps: require write; commands enforced; network advisory"
 
 
-def test_186_a_claude_agent_without_any_file_shows_its_rules_as_advisory_and_a_legacy_file_isnt_judged(ctx):
-    _team(ctx, carol="claude", ben="claude")
-    _extras(ctx, "ben", {"allow": ["Read"]})
-    _edit(ctx, ben={"permissions": "settings/ben.json"})
+def test_186_a_claude_agent_without_a_block_shows_its_rules_as_advisory(ctx):
+    _team(ctx, carol="claude")
     ad = load_adapters(ctx.paths)["claude"]
-    c = capstart.status_row
     _start(ctx, "carol")
-    _start(ctx, "ben")
-    assert c(ctx, ctx.team.agent("carol"), ad) == "caps: write, deny, network, credential_clis advisory"
-    # the full form (72 columns) doesn't fit, so shorter words; the start note keeps the full one
-    assert c(ctx, ctx.team.agent("ben"), ad) == "caps: net advisory; legacy settings/ben.json, deprecated"
-    note = [m for m in ctx.ledger.messages() if m["body"].startswith("started ben")][-1]["body"]
-    assert note.endswith("capabilities: network advisory; legacy settings/ben.json (deprecated: xt capabilities ben)")
+    assert capstart.status_row(ctx, ctx.team.agent("carol"), ad) == "caps: write, deny, network, credential_clis advisory"
 
 
 def test_186_rows_fit_80_columns_with_4_spare_and_the_sentence_two_rows(paths):
     ad = load_adapters(paths)
     worst = Caps(write=["/w"], deny=["~/Work"], commands=["git"], network="on", connectors=["mail"],
                  credential_clis=["aws"], require=["write", "commands", "credential_clis"], configured=True)
-    cases = [(worst, "claude", []), (Caps(), "codex", ["codex_options"]), (Caps(), "pi", []),
-             (Caps(write=["/w"], commands=["git"], configured=True), "pi", [])]
-    for caps, h, legacy in cases:
-        line = capstart.INDENT + "caps: " + capstart.row(caps, ad[h], legacy, "release-mgr1", capstart.STATUS_WIDTH,
-                                                       was_loaded=h == "pi")
+    cases = [(worst, "claude"), (Caps(), "codex"), (Caps(), "pi"),
+             (Caps(write=["/w"], commands=["git"], configured=True), "pi")]
+    for caps, h in cases:
+        line = capstart.INDENT + "caps: " + capstart.row(caps, ad[h], capstart.STATUS_WIDTH, was_loaded=h == "pi")
         assert len(line) <= 76 and "…" not in line, line
         assert len(textwrap.wrap(capstart.spawn_sentence(caps, ad[h]), 80)) <= 2
-    long = capstart.row(worst, ad["claude"], [], "x", 40)
+    long = capstart.row(worst, ad["claude"], 40)
     assert "cmds" in long  # shorter words first
 
 
@@ -324,7 +294,7 @@ def test_186_xt_capabilities_prints_the_equivalent_block_and_changes_nothing(ctx
         "deny": ["Edit(team.toml)", "Edit(settings/**)", "Edit(roles/**)", "Read(//home/me/Work/usb/**)",
                  "Bash(rm *)"],
         "ask": ["Bash(git push *)"]})
-    _edit(ctx, carol={"permissions": "settings/carol.json", "connectors": ["claude.ai Gmail"]})
+    _old(ctx, carol={"permissions": "settings/carol.json", "connectors": ["claude.ai Gmail"]})
     before = _snapshot(ctx.paths.root)
     monkeypatch.setattr(cli, "find_root", lambda: ctx.paths.root)
     args = cli.build_parser().parse_args(["capabilities", "carol"])
@@ -332,7 +302,7 @@ def test_186_xt_capabilities_prints_the_equivalent_block_and_changes_nothing(ctx
     out = capsys.readouterr().out
     assert _snapshot(ctx.paths.root) == before  # nothing changed: team files and state
     assert out.splitlines()[:3] == [
-        "# xt capabilities carol: the block equivalent to its legacy lines and settings/carol.json (nothing was changed).",
+        "# xt capabilities carol: the block equivalent to its old permission lines and settings/carol.json (nothing was changed).",
         '# Under its [[agent]] entry (name = "carol"), replacing `permissions` and `connectors`:',
         "[agent.capabilities]"]
     body = tomlkit.parse("\n".join(x for x in out.splitlines() if not x.startswith("#") and x != "[agent.capabilities]"))
@@ -375,29 +345,33 @@ def test_186_the_guide_section_has_the_vocabulary_a_require_example_and_the_conv
     for phrase in ("**Capabilities: one model for every harness** (from 0.23.0)", "[defaults.capabilities]",
                    "`erin can't start: commands is marked require, and pi can only keep it advisory (role text "
                    "only). Drop require on commands, or hire erin under claude`",
-                   "`xt capabilities <name>` prints the block equivalent",
+                   "xt capabilities carol # prints the block to paste; changes nothing",
                    "That was always true; it is now visible.",
-                   "An agent with only these lines, or none, gets two changes from 0.23.0 and nothing else",
+                   "**An agent without a block.**", "**The extras file** (Claude Code).",
                    "`caps: require write, cmds; deny, creds enforced; net advisory`"):
         assert phrase in guide, phrase
     for name in NAMES:
         assert f"{name} = " in guide or f"`{name}`" in guide, name
 
 
-def test_186_the_examples_conversion_is_what_xt_prints(ctx, monkeypatch, capsys):
+def test_218_the_examples_block_and_extras_file_load_and_start_as_described(ctx):
     from .test_batch_0150 import _blocks
 
     examples = (REPO / "docs/examples.md").read_text()
-    (settings,) = [b for b in _blocks(examples, "json") if '"defaultMode"' in b]
-    _extras(ctx, "researcher", {})
+    (settings,) = [b for b in _blocks(examples, "json") if '"statusLine"' in b]
+    (entry,) = [b for b in _blocks(examples, "toml") if 'name = "researcher"' in b]
+    (ctx.paths.root / "settings").mkdir(exist_ok=True)
     (ctx.paths.root / "settings" / "researcher.json").write_text(settings)
-    _team(ctx, researcher="claude")
-    _edit(ctx, researcher={"permissions": "settings/researcher.json"})
-    monkeypatch.setattr(cli, "find_root", lambda: ctx.paths.root)
-    args = cli.build_parser().parse_args(["capabilities", "researcher"])
-    args.func(args)
-    (doc,) = [b for b in _blocks(examples, "text") if "xt capabilities researcher" in b]
-    assert capsys.readouterr().out.strip() == doc.strip()
+    (ctx.paths.roles / "researcher.md").write_text("# Role: researcher\n")
+    request_spawn(ctx, "human", "lead", None, None, None, None)
+    ctx.paths.team_toml.write_text(ctx.paths.team_toml.read_text() + "\n" + entry)
+    ctx.reload_team()
+    s = _settings(_start(ctx, "researcher"))
+    assert s["permissions"]["defaultMode"] == "dontAsk" and "statusLine" in s
+    for rule in ("Bash(rg *)", "Bash(cat *)", "Bash(git status *)", "Bash(git log *)", "Edit(members/researcher/**)"):
+        assert rule in s["permissions"]["allow"], rule
+    for rule in ("Bash(git push *)", "Bash(curl *)", "Bash(rm *)", "Edit(team.toml)", "WebFetch"):
+        assert rule in s["permissions"]["deny"], rule
 
 
 # --- the conversion round-trips (QA on rc6, #3610) ----------------------------------------------------
@@ -410,8 +384,8 @@ def _convert(ctx, monkeypatch, capsys, name) -> str:
     return capsys.readouterr().out
 
 
-def _apply(ctx, name, out: str):
-    """Do what the output says: its block under the agent, the legacy lines removed."""
+def _apply(ctx, name, out: str, reload: bool = True):
+    """Do what the output says: its block under the agent, the old lines removed."""
     parsed = tomlkit.parse("\n".join(x for x in out.splitlines() if not x.startswith("#")
                                      and x != "[agent.capabilities]") + "\n")
     block = tomlkit.table()
@@ -424,13 +398,14 @@ def _apply(ctx, name, out: str):
                     del a[k]
             a["capabilities"] = block
     ctx.paths.team_toml.write_text(tomlkit.dumps(ctx.team.doc))
-    ctx.reload_team()  # loads: not mixing
+    if reload:
+        ctx.reload_team()  # loads: no old line left
 
 
 def test_186_qas_case_the_unrepresentable_deny_survives_the_conversion(ctx, monkeypatch, capsys):
     _team(ctx, carol="claude")
     _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)"], "deny": ["Bash(rm *)"]})
-    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    _old(ctx, carol={"permissions": "settings/carol.json"})
     out = _convert(ctx, monkeypatch, capsys, "carol")
     assert 'extras = "settings/carol.json"' in out and 'commands = ["git"]' in out
     _apply(ctx, "carol", out)
@@ -441,7 +416,7 @@ def test_186_qas_case_the_unrepresentable_deny_survives_the_conversion(ctx, monk
 def test_186_the_printed_text_pasted_as_is_under_the_agent_loads_and_starts(ctx, monkeypatch, capsys):
     _team(ctx, carol="claude")  # carol is the last [[agent]] entry
     _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)"], "deny": ["Bash(rm *)"]})
-    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    _old(ctx, carol={"permissions": "settings/carol.json"})
     out = _convert(ctx, monkeypatch, capsys, "carol")
     text = ctx.paths.team_toml.read_text().replace('permissions = "settings/carol.json"\n', "")
     ctx.paths.team_toml.write_text(text.rstrip("\n") + "\n" + out)  # comments, header and all
@@ -454,7 +429,7 @@ def test_186_where_nothing_is_lost_there_are_no_extras(ctx, monkeypatch, capsys)
     _team(ctx, carol="claude")
     _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)", "Edit(//tmp/carol/**)", "Read"],
                            "deny": ["Edit(team.toml)", "WebFetch", "Bash(gh *)"]})
-    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    _old(ctx, carol={"permissions": "settings/carol.json"})
     out = _convert(ctx, monkeypatch, capsys, "carol")
     assert "extras" not in out and "kept in extras" not in out
     _apply(ctx, "carol", out)
@@ -474,7 +449,7 @@ def test_186_a_realistic_settings_file_round_trips_and_starts(ctx, monkeypatch, 
                   "Edit(//tmp/xt-**)", "Read(//home/me/**)", "Read", "Glob", "Grep", "TodoWrite", "Task"],
         "deny": ["Bash(rm *)", "Bash(git push *)", "Edit(settings/**)", "Edit(team.toml)", "Edit(roles/**)",
                  "Edit(//home/me/Work/**)", "Read(//home/me/.agents/skills/fizzy/**)", "WebFetch", "WebSearch"]})
-    _edit(ctx, builder={"permissions": "settings/builder.json"})
+    _old(ctx, builder={"permissions": "settings/builder.json"})
     out = _convert(ctx, monkeypatch, capsys, "builder")
     assert "would loosen" not in out
     _apply(ctx, "builder", out)
@@ -490,7 +465,7 @@ def test_186_a_realistic_settings_file_round_trips_and_starts(ctx, monkeypatch, 
 def test_186_what_would_loosen_is_named_and_the_start_says_so(ctx, monkeypatch, capsys):
     _team(ctx, carol="claude")
     _extras(ctx, "carol", {"defaultMode": "acceptEdits", "allow": ["Bash(git *)"]})
-    _edit(ctx, carol={"permissions": "settings/carol.json"})
+    _old(ctx, carol={"permissions": "settings/carol.json"})
     out = _convert(ctx, monkeypatch, capsys, "carol")
     assert "# would loosen the block, so the start refuses them until they are removed from settings/carol.json:" in out
     assert "#   defaultMode acceptEdits (the block's settings use dontAsk)" in out
@@ -505,10 +480,11 @@ def test_186_codex_network_and_claude_connectors_round_trip(ctx, monkeypatch, ca
     monkeypatch.setattr(adapters, "claude_mcp_servers", lambda *a, **k: ["claude.ai Gmail", "claude.ai Drive"])
     _team(ctx, carol="claude", dana="codex")
     _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["mcp__claude_ai_Gmail__search"]})
-    _edit(ctx, carol={"permissions": "settings/carol.json", "connectors": ["claude.ai Gmail"]},
-          dana={"codex_options": ["sandbox_workspace_write.network_access=true"]})
-    for name in ("carol", "dana"):
-        _apply(ctx, name, _convert(ctx, monkeypatch, capsys, name))
+    _old(ctx, carol={"permissions": "settings/carol.json", "connectors": ["claude.ai Gmail"]},
+         dana={"codex_options": ["sandbox_workspace_write.network_access=true"]})
+    outs = {name: _convert(ctx, monkeypatch, capsys, name) for name in ("carol", "dana")}
+    _apply(ctx, "carol", outs["carol"], reload=False)  # dana still has its old line
+    _apply(ctx, "dana", outs["dana"])
     s = _settings(_start(ctx, "carol"))["permissions"]
     assert "mcp__claude_ai_Gmail" in s["allow"] and "mcp__claude_ai_Gmail__search" in s["allow"]
     assert "sandbox_workspace_write.network_access=true" in _start(ctx, "dana")
@@ -624,18 +600,16 @@ def test_186_the_tuis_approval_detail_and_s_dialog_show_the_capability_sentence(
     assert seen["dialog"] is not None and sentence in seen["dialog"].splitlines()
 
 
-def test_186_xt_capabilities_runs_while_mixing_is_refused(ctx, monkeypatch, capsys):
+def test_218_xt_capabilities_refuses_an_agent_with_both_a_block_and_an_old_line(ctx, monkeypatch, capsys):
     _team(ctx, carol="claude")
     _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Bash(git *)"]})
-    for a in ctx.team.doc["agent"]:
-        if a["name"] == "carol":
-            a["permissions"] = "settings/carol.json"
-            a["capabilities"] = {"network": "on"}
-    ctx.paths.team_toml.write_text(tomlkit.dumps(ctx.team.doc))
-    with pytest.raises(XtError, match="`xt capabilities carol` prints the block"):
+    _old(ctx, carol={"permissions": "settings/carol.json", "capabilities": {"network": "on"}})
+    with pytest.raises(XtError, match="removed in 0.24"):
         ctx.reload_team()  # every other command refuses
-    out = _convert(ctx, monkeypatch, capsys, "carol")  # the way out it names works
-    assert 'commands = ["git"]' in out and "replacing `permissions`:" in out
+    with pytest.raises(XtError) as e:
+        _convert(ctx, monkeypatch, capsys, "carol")
+    assert str(e.value) == ("agent carol has both a [capabilities] block and `permissions = …` in team.toml, so "
+                            "there is nothing to convert: remove one of them by hand (xt doesn't choose between them)")
 
 
 def test_186_an_agent_without_old_lines_gets_no_dangling_replacing(ctx, monkeypatch, capsys):
@@ -643,20 +617,6 @@ def test_186_an_agent_without_old_lines_gets_no_dangling_replacing(ctx, monkeypa
     out = _convert(ctx, monkeypatch, capsys, "carol")
     assert out.splitlines()[1] == '# Under its [[agent]] entry (name = "carol"):'
     assert "# (the defaults: nothing to set)" in out
-
-
-def test_186_the_tui_detail_folds_the_old_lines_into_the_full_row(ctx):
-    from xt.tui.model import build
-
-    _team(ctx, carol="claude")
-    _extras(ctx, "carol", {"defaultMode": "dontAsk", "allow": ["Read"]})
-    _edit(ctx, carol={"permissions": "settings/carol.json"})
-    team = lambda: {r.data["name"]: r for r in build(ctx).panels["Team"] if r.data and r.data.get("name")}
-    assert "settings file: settings/carol.json" in team()["carol"].detail().plain  # never started: as before
-    _start(ctx, "carol")
-    detail = team()["carol"].detail().plain
-    assert "caps: network advisory; legacy settings/carol.json (deprecated: xt capabilities carol)" in detail
-    assert "settings file:" not in detail  # said once, in the row
 
 
 def test_186_connectors_per_harness_are_pinned_statically(ctx, monkeypatch):

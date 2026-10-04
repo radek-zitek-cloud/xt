@@ -174,7 +174,7 @@ release's **Upgrading** note in [CHANGELOG.md](CHANGELOG.md). From 0.14.0 on, `x
   problems with xt or a harness reach you as `friction` in the Inbox.
 - **You stay in control of spending.** Hires and agent-set schedules wait for your approval;
   schedules have a minimum interval and can be limited to local hours (`--between 05:00-21:00`).
-  A hire's approval names the Claude agent's permissions file, or warns that it has none.
+  A hire's approval says what the agent may do, or warns when a Claude agent has no capability block.
 - **Alerts, never repairs.** A crashed, blocked or silent agent raises an alert for you, and so
   does a message that waits two minutes for a member you stopped; xt doesn't guess at fixes.
 - **Any harness per agent.** Adapters in [harnesses/](harnesses/) describe how to start Claude
@@ -250,7 +250,7 @@ equivalent and when you'd use it.
 | `xt approve [<id>…]` / `xt deny <id>…` | Decide hires and schedules (several ids at once; bare `xt approve` lists what's waiting); aliases of `xt answer <id> yes\|no` from 0.21.0 |
 | `xt clear <alert>` | Dismiss an alert |
 | `xt schedule <name> 30m\|off [--message …] [--between 05:00-21:00] [--at 09:30]` | Wake an agent periodically when idle, optionally only within local hours or at a set time |
-| `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent (`xt spawn … --permissions FILE`: a Claude agent's settings file) |
+| `xt spawn`, `xt stop`, `xt retire` | Start, stop (stays in the roster) or retire an agent |
 | `xt restart <name>…` / `xt restart --all` | Restart agents with fresh instructions; `--all` restarts the supervisor too and brings the team back as it was |
 | `xt reset <name>` / `xt checkpoint` | A fresh context for one agent, only after it saved its notes (the agent confirms with `xt checkpoint`); `--when-idle` queues it until the agent is free, `--cancel` removes the queued one |
 | `xt version` / `xt version check` / `xt version use <tag>` / `xt version rollback` | The team's versions; ask the upstream for the published one now; switch to a release (a candidate with `--candidate`) or undo the last switch |
@@ -290,11 +290,9 @@ raw_days = 30               # then gzipped; delete_after_days = 0 keeps them for
 ```
 
 Each `[[agent]]` has `name`, `role`, `harness`, optional `model`, `reports_to`, `status`, an
-optional schedule (`wake_every`, `wake_message`, `wake_between`, `wake_at`), optional
-`connectors` (account connectors opted in for that agent; none by default) and, for a Claude Code
-agent, optional `permissions` (its settings file, e.g. `"settings/carol.json"`; `[defaults]
-permissions` sets one for every Claude agent), and for a Codex agent optional `codex_options`
-(only `["sandbox_workspace_write.network_access=true"]`: network for that agent). An optional
+optional schedule (`wake_every`, `wake_message`, `wake_between`, `wake_at`) and an optional
+`[agent.capabilities]` block: what it may write, run and reach (`[defaults.capabilities]` for the
+whole team; see the user guide). An optional
 `[board_watch]` names a command that lists a Board column's cards, so the lead hears when one
 enters it. Runtime facts such as pane ids never go in `team.toml`. Copyable examples of each are in
 [docs/examples.md](docs/examples.md).
