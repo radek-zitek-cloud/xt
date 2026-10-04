@@ -743,6 +743,27 @@ def test_211_readme_examples_carry_no_release_placeholders_and_the_caption_names
     assert "](docs/screen-v0180.png)" in readme
 
 
+def test_201_a_sandboxed_shell_reads_the_supervisors_snapshot_when_herdr_cant_be_reached(ctx, fake_home, monkeypatch):
+    # QA #3373: xt querying Herdr itself says unknown; a shell that can't reach Herdr (an agent's
+    # sandbox) reads the supervisor's saved live state instead, so it reports what that says.
+    from xt import herdr
+    from xt.herdr import Herdr, LiveAgent
+
+    _liaison(ctx, fake_home, "claude")
+
+    def unreachable(argv, timeout=120):
+        raise XtError("herdr: server_unreachable: no server")
+
+    monkeypatch.setattr(herdr, "_exec", unreachable)
+    snapshot = ctx.paths.state / "live.json"
+    monkeypatch.setattr(ctx, "herdr", Herdr("test", snapshot=snapshot))
+    assert paneinput.signal(ctx) == STATUS["unknown"]  # no snapshot: unknown
+    ctx.herdr.save_snapshot({"liaison": LiveAgent("liaison", "idle", "w1:p1", "w1")}, "2026-09-26T12:00:00+00:00")
+    assert paneinput.signal(ctx) == STATUS["recorded"]  # the snapshot says it runs
+    ctx.herdr.save_snapshot({}, "2026-09-26T12:00:00+00:00")
+    assert paneinput.signal(ctx) == STATUS["not running"]  # the snapshot says it doesn't
+
+
 def test_201_a_retired_liaison_isnt_running(ctx, fake_home):
     from xt.spawn import retire
 

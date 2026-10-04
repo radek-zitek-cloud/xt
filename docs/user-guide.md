@@ -1225,6 +1225,13 @@ everyday way to talk with the team; the TUI stays the view for understanding and
   | the Herdr server can't be reached | `liaison (claude): pane input: unknown (herdr server not reachable)` |
   | its session log isn't found | `liaison (claude): pane input NOT recorded (no session log): talk in xt chat` |
 
+  Which shell sees `unknown`: xt asks Herdr itself, so in your own terminal (`xt status`, `xt chat`)
+  a Herdr server that can't be reached shows `unknown (herdr server not reachable)` (`xt status`
+  prints that line, then stops with Herdr's error). An agent's shell that can't reach Herdr (a
+  sandboxed one, such as Codex's) reads the supervisor's last saved live state instead, so there
+  the line says what that state says (`recorded`, `isn't running`, …), and `unknown` only when
+  nothing was saved.
+
   The chat header says the same in one row: at 80 to 96 columns `xt chat with liaison (claude) ·
   pane input recorded`, `· pane input: session log only`, `· pane input: liaison isn't running`,
   `· pane input: unknown (herdr unreachable)` or `· pane input NOT recorded — type here`; wider, it
