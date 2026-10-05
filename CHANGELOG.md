@@ -9,10 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.24.1] — not released yet
+## [0.24.1] — 2026-10-05
 
 A patch for what a team meets in its first hour and on its first upgrade (Space
-specs/patch-0-24-1, releases/v0-24-1): #225, #226 and #213.
+specs/patch-0-24-1, releases/v0-24-1): #225, #226 and #213. The release has the same code and docs
+as 0.24.1-rc2 (the version, this changelog and the site's version badge and release count changed).
 
 ### Upgrading
 
