@@ -220,8 +220,9 @@ def test_221_the_story_only_gains_a_date_line_and_the_epilogue():
 
 def test_222_the_site_agrees_with_the_readme():
     page = (REPO / "site" / "index.html").read_text()
-    version = re.search(r'^version = "([\d.]+)', (REPO / "pyproject.toml").read_text(), re.M).group(1)
-    assert f"open source · MIT · v{version}" in page
+    version, pre = re.search(r'^version = "([\d.]+)(\w*)', (REPO / "pyproject.toml").read_text(), re.M).groups()
+    if not pre:  # the final updates the site (a candidate never does), so a candidate shows the last release
+        assert f"open source · MIT · v{version}" in page
     assert "https://github.com/radek-zitek-cloud/xt/issues/new/choose" in page
     assert "https://github.com/radek-zitek-cloud/xt/discussions/1" in page
     assert "github.com/radek-zitek-cloud/xt#quick-start" in page and "## Quick start" in README
