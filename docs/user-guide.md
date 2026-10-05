@@ -67,8 +67,8 @@ xt                             # first run asks a few questions (xt init), then 
 ```
 
 Worth doing once: add your own `origin` remote if you want to push the team's repo somewhere, set
-`[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notifications at night, and give
-the team a capability block (see 13) so a Claude Code agent never waits at a permission prompt.
+`[notify] quiet = "21:00-07:00"` in `team.toml` if you don't want notifications at night, and read
+the capability block `xt init` wrote there (see 13): it is what every agent may do without asking.
 
 **If the first start fails.** Where it usually stops:
 
@@ -80,7 +80,8 @@ the team a capability block (see 13) so a Claude Code agent never waits at a per
 - `xt init` ends with `next: start the Herdr session with herdr --session my-team, then run xt
   inside it`: agents run inside that session, so open it, then run `xt`.
 - The Inbox shows `blocked:liaison` (or another agent): it is stuck at a prompt in its pane,
-  usually a Claude Code agent asking for permission because the team has no capability block yet.
+  usually a Claude Code agent asking for permission because the team has no capability block (a
+  `team.toml` from before 0.24.1, or one whose block was removed).
   `f` on it in the TUI switches to its workspace; answer the prompt, then add a block (see 13).
 - The Inbox shows `noprompt:liaison`: the agent started but its first prompt never showed on its
   screen, so it doesn't know who it is. `xt restart liaison`.
@@ -900,7 +901,27 @@ anything is cut). The brief, the agent's detail in the TUI and the start note sh
 `Approve its start: require write, commands; deny, credential_clis enforced; network advisory (role
 text only).` Codex and pi agents show `advisory` for what they can't enforce.
 
-**An agent without a block.** With no block of its own and no `[defaults.capabilities]`, an agent
+**The block `xt init` writes.** A new team's `team.toml` has a team default, with a comment above
+it saying what it allows:
+
+```toml
+[defaults.capabilities]
+write = [".", "/tmp/xt-**"]    # the team repo (relative to it) and xt's temporary files
+credential_clis = []            # gh, aws, gcloud, op, fizzy and so on stay refused by name
+# network: advisory under Claude Code, as always; commands: not restricted
+```
+
+Every agent without a block of its own inherits it: it may write in the team repo and under
+`/tmp/xt-`, run any shell command except the credential CLIs, which are refused at once, and never
+waits at a permission prompt. `.` is the team repo wherever it is: xt resolves it at each start, so
+the block stays valid when you move or clone the repo. xt's own files, `team.toml` and `settings/`
+stay protected as always, and xt itself, `cd` and Claude Code's built-in read-only commands need no
+entry. Change the block in `team.toml`; `xt init` never rewrites a `team.toml` that exists. A Codex
+agent gets the repo as `--add-dir` and skips the `/tmp/xt-**` pattern: its sandbox writes `/tmp`
+anyway.
+
+**An agent without a block.** A team made by `xt init` 0.24.1 or later has the block above, so this
+applies to older teams or one whose block was removed. With no block of its own and no `[defaults.capabilities]`, an agent
 starts with its harness's own defaults and without your personal skills (a pi agent starts with
 `--no-skills`, the team's own skills passed back; Codex's can't be switched off). A Claude Code
 agent then starts in Claude's default permission mode: its first command outside Claude's built-in

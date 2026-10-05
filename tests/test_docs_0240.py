@@ -190,10 +190,10 @@ def test_220_the_illustrative_hire_quotes_what_xt_prints(ctx):
     assert f"# {out.replace('approval #1', 'approval #6')}" in section or f"# {out}" in section.replace("#6", "#1")
     body = [m["body"] for m in ctx.ledger.messages() if m["type"] == "approval"][-1]
     shown = " ".join(_blocks(section, "text")[0].split())
-    for sentence in ("WARNING: writer would start without generated settings, so the operator's own claude "
-                     "defaults apply (a [capabilities] block in team.toml gives it some).",
-                     "Approve its start: write, deny, network, credential_clis advisory (role text only)."):
+    for sentence in ("lead asks to spawn writer as writer on claude, reporting to lead.",  # #226: the default block
+                     "Approve its start: write enforced; network advisory (role text only)."):
         assert sentence in " ".join(body.split()) and sentence in shown, sentence
+    assert "WARNING" not in body
 
 
 # --- #221 story -------------------------------------------------------------------------------------

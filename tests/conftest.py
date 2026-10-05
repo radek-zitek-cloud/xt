@@ -183,6 +183,13 @@ def ctx(paths, clock) -> Ctx:
     return Ctx(paths, Team.load(paths.team_toml), Ledger(paths, clock=clock), FakeHerdr())
 
 
+def no_default_block(ctx: Ctx):
+    """A team without the [defaults.capabilities] block xt init writes (card #226): an older team."""
+    del ctx.team.doc["defaults"]["capabilities"]
+    ctx.team.save()
+    ctx.reload_team()
+
+
 def add_member(ctx: Ctx, name: str, role: str = "worker", reports_to: str = "lead"):
     (ctx.paths.roles / f"{role}.md").write_text(f"# Role: {role}\n")
     ctx.team.upsert_agent(name, role, "claude", None, reports_to)

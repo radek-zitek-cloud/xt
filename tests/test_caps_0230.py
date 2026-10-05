@@ -9,7 +9,7 @@ from xt.paths import XtError
 from xt.spawn import request_spawn
 from xt.team import Team
 
-from .conftest import add_member
+from .conftest import add_member, no_default_block
 
 
 def _team(ctx):
@@ -30,6 +30,7 @@ def _set(ctx, defaults: dict | None = None, **agents: dict):
 
 
 def test_186_no_block_means_the_defaults_and_not_configured(ctx):
+    no_default_block(ctx)
     _team(ctx)
     c = effective(ctx.team, ctx.team.agent("carol"))
     assert c == Caps() and not c.configured and c.changed() == []

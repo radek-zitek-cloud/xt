@@ -22,6 +22,21 @@ specs/patch-0-24-1, releases/v0-24-1): #225, #226 and #213.
   (0.24.0 refused only that agent's start). A team converted by 0.24.0's `xt capabilities` with
   narrow credential-CLI rules (`Bash(fizzy card show *)`, `Bash(gh release view *)`) hits this:
   add those subcommands to the agent's `commands`, as the refusal names them.
+- An existing team keeps its `team.toml` as it is: the default capability block (#226) is written
+  only by `xt init` into a new team. To give an older team the same, copy the block from the user
+  guide (section 13, "The block `xt init` writes") into its `team.toml`.
+
+### Added
+
+- **`xt init` writes a default capability block (#226).** A new team's `team.toml` has a
+  `[defaults.capabilities]` block, with a comment saying what it allows and where to change it:
+  `write = [".", "/tmp/xt-**"]` (the team repo, relative to it, so it survives a move or a clone,
+  and xt's temporary files) and `credential_clis = []` (gh, aws, fizzy and the rest stay refused by
+  name); `commands` unset, network advisory under Claude Code. A new Claude Code liaison no longer
+  stops at a permission prompt before its first command. `xt init` still changes nothing in a
+  `team.toml` that exists. A Codex agent skips a `write` pattern with `*` in `--add-dir` (its
+  sandbox writes `/tmp` anyway). README's first-start item, the guide's "An agent without a block"
+  and example 6 (a hire under the default block) say so.
 
 ### Fixed
 

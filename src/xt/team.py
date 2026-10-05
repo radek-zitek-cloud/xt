@@ -275,6 +275,15 @@ quiet = ""                        # local-time window with no notifications, e.g
 liaison = {{ {harness_line(liaison)} }}
 lead = {{ {harness_line(lead)} }}
 
+# What every agent may do without asking, unless its own [agent.capabilities] block says otherwise:
+# write in the team repo and /tmp/xt-*, run any shell command except the credential CLIs, which are
+# refused by name; xt's own files, team.toml and settings/ stay protected. Change it here (user guide,
+# "What agents may do: capabilities"); xt init never rewrites it.
+[defaults.capabilities]
+write = [".", "/tmp/xt-**"]    # the team repo (relative to it) and xt's temporary files
+credential_clis = []            # gh, aws, gcloud, op, fizzy and so on stay refused by name
+# network: advisory under Claude Code, as always; commands: not restricted
+
 # reports_to is the communication chain: an agent may message its reports_to and its reports.
 
 [[agent]]

@@ -1,13 +1,22 @@
-"""v0.24.1: #225 (the converted block passes its own extras check, and the check runs at load)."""
+"""v0.24.1: #225 (the converted block passes its own extras check, and the check runs at load);
+#226 (xt init writes a default capability block)."""
 
 import fnmatch
+import shutil
 
 import pytest
 import tomlkit
 
-from xt import capstart
+from xt import capstart, init
 from xt.adapters import load_adapters
-from xt.paths import XtError
+from xt.capabilities import CREDENTIAL_CLIS, effective
+from xt.context import Ctx
+from xt.ledger import Ledger
+from xt.paths import Paths, XtError
+from xt.spawn import request_spawn
+from xt.team import Team
+
+from .conftest import REPO, FakeHerdr
 
 from .test_caps_start_0230 import _apply, _convert, _edit, _extras, _old, _settings, _start, _team
 
@@ -112,6 +121,101 @@ def test_225_edit_only_denials_stay_in_extras_so_the_agent_still_reads_them(ctx,
         assert f"Edit({path})" in perms["deny"], path  # editing stays refused
         assert f"Read({path})" not in perms["deny"], path  # reading is not
     assert "Read(//home/me/Work/usb/**)" in perms["deny"]
+
+
+def _repo(root):
+    """xt's own files, as a fresh clone has them, and no team.toml yet."""
+    root.mkdir(parents=True, exist_ok=True)
+    for name in ("protocol.md", "roles", "harnesses"):
+        src = REPO / name
+        (shutil.copytree if src.is_dir() else shutil.copy)(src, root / name)
+    return Paths(root)
+
+
+def test_226_xt_init_on_an_empty_directory_writes_the_default_block(tmp_path, monkeypatch):
+    monkeypatch.setattr(init, "prerequisites", lambda paths: ([], []))
+    paths = _repo(tmp_path)
+    init.init(paths, "t", "t", "claude", "codex", True, yes=True, commit=False)
+    text = paths.team_toml.read_text()
+    block = ('[defaults.capabilities]\n'
+             'write = [".", "/tmp/xt-**"]    # the team repo (relative to it) and xt\'s temporary files\n'
+             'credential_clis = []            # gh, aws, gcloud, op, fizzy and so on stay refused by name\n'
+             '# network: advisory under Claude Code, as always; commands: not restricted\n')
+    assert block in text and text.count("[defaults.capabilities]") == 1
+    above = text.split(block)[0].rstrip().splitlines()[-4:]
+    assert above[0].startswith("# What every agent may do without asking") and "Change it here" in " ".join(above)
+    team = Team.load(paths.team_toml)  # loads, with no warning
+    assert team.doc["defaults"]["capabilities"].unwrap() == {"write": [".", "/tmp/xt-**"], "credential_clis": []}
+    caps = effective(team, team.agent("liaison"))
+    assert caps.configured and caps.write == [".", "/tmp/xt-**"] and caps.commands is None
+    assert caps.network == "off" and caps.credential_clis == list(CREDENTIAL_CLIS)  # all still refused
+
+
+def test_226_xt_init_never_rewrites_an_existing_team_toml(tmp_path, monkeypatch):
+    monkeypatch.setattr(init, "prerequisites", lambda paths: ([], []))
+    paths = _repo(tmp_path)
+    init.init(paths, "t", "t", "claude", "codex", True, yes=True, commit=False)
+    once = paths.team_toml.read_bytes()
+    out = init.init(paths, "t", "t", "claude", "codex", True, yes=True, commit=False)
+    assert paths.team_toml.read_bytes() == once and out[0].startswith("already initialised")
+    custom = once.replace(b'write = [".", "/tmp/xt-**"]', b'write = ["/srv/mine"]\ncommands = ["rg"]')
+    paths.team_toml.write_bytes(custom)
+    init.init(paths, "t", "t", "claude", "codex", True, yes=True, commit=False)
+    assert paths.team_toml.read_bytes() == custom  # a block of any content stays byte for byte
+
+
+def _ctx_at(root, clock, cwds: list) -> Ctx:
+    herdr = FakeHerdr()
+    create = herdr.create_workspace
+    herdr.create_workspace = lambda cwd, label: (cwds.append(cwd), create(cwd, label))[1]
+    return Ctx(Paths(root), Team.load(root / "team.toml"), Ledger(Paths(root), clock=clock), herdr)
+
+
+def test_226_the_team_repo_resolves_relative_to_the_repo_after_a_move(tmp_path, clock):
+    """`.` resolves at each start: Claude agents start in the repo (the rule is `Edit(./**)`), Codex
+    gets the repo's absolute path; moved or cloned, the block stays valid."""
+    first = _repo(tmp_path / "team").root
+    (first / "skills").mkdir()
+    from xt.team import new_team_doc
+
+    (first / "team.toml").write_text(new_team_doc("t", "t", {"harness": "claude"}, {"harness": "codex"}, True))
+    for root in (first, tmp_path / "moved"):
+        if root != first:
+            shutil.move(first, root)
+        cwds: list = []
+        ctx = _ctx_at(root, clock, cwds)
+        request_spawn(ctx, "human", "liaison", None, None, None, None)
+        request_spawn(ctx, "human", "lead", None, None, None, None)
+        started = {n: args for n, _, args in ctx.herdr.started}
+        assert cwds == [str(root), str(root)]
+        settings = _settings(started["liaison"])["permissions"]
+        assert "Edit(./**)" in settings["allow"] and "Edit(//tmp/xt-**)" in settings["allow"]
+        assert "Edit(team.toml)" in settings["deny"] and "Bash" in settings["allow"]  # commands not restricted
+        assert "Bash(gh *)" in settings["deny"] and "WebFetch" in settings["deny"]
+        args = started["lead"]
+        assert args[args.index("--add-dir") + 1] == str(root) and "/tmp/xt-**" not in args
+
+
+def test_226_status_shows_the_liaisons_caps_row(ctx, monkeypatch, capsys):
+    from .test_caps_start_0230 import _row, _status
+
+    ctx.team.doc["agent"][1]["harness"] = "claude"  # liaison
+    ctx.team.save()
+    ctx.reload_team()
+    request_spawn(ctx, "human", "liaison", None, None, None, None)
+    assert _row(_status(ctx, monkeypatch, capsys), "liaison") == "    caps: write enforced; network advisory"
+
+
+def test_226_the_guide_and_readme_show_the_block_xt_init_writes():
+    from xt.team import new_team_doc
+
+    written = new_team_doc("t", "t", {"harness": "claude"}, {"harness": "codex"}, True)
+    block = written.split("[defaults.capabilities]\n", 1)[1].split("\n\n", 1)[0]
+    guide = (REPO / "docs/user-guide.md").read_text()
+    assert f"```toml\n[defaults.capabilities]\n{block}\n```" in guide
+    assert "**An agent without a block.** A team made by `xt init` 0.24.1 or later has the block above" in guide
+    readme = " ".join((REPO / "README.md").read_text().split())
+    assert "`xt init` writes a `[defaults.capabilities]` block into `team.toml`" in readme
 
 
 def test_225_the_load_check_skips_other_harnesses_and_leaves_a_missing_file_to_the_start(ctx):

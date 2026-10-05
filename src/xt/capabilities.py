@@ -360,7 +360,8 @@ def codex_args(caps: Caps, root) -> list[str]:
     args = ["-s", "workspace-write",
             "-c", f"sandbox_workspace_write.network_access={'true' if caps.network == 'on' else 'false'}"]
     for p in caps.write:
-        args += ["--add-dir", resolve(p, root)]
+        if "*" not in p:  # card #226: a pattern (/tmp/xt-**) isn't a directory; Codex writes /tmp anyway
+            args += ["--add-dir", resolve(p, root)]
     return args
 
 

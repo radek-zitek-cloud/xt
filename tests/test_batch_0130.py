@@ -14,7 +14,7 @@ from xt.paths import XtError
 from xt.spawn import request_spawn
 from xt.tui.model import build
 
-from .conftest import REPO, add_member
+from .conftest import REPO, add_member, no_default_block
 
 PRICES = tomllib.loads((REPO / "prices.toml").read_text())["models"]
 FIXTURE = REPO / "tests/fixtures/claude-sonnet-5-5-session.jsonl"
@@ -153,6 +153,7 @@ def test_a_changed_file_gets_a_new_hash_at_the_next_start(ctx):
 
 
 def test_an_agent_without_a_block_starts_without_a_settings_file(ctx):
+    no_default_block(ctx)
     add_member(ctx, "dave")
     request_spawn(ctx, "human", "dave", None, None, None, None)
     assert "--settings" not in _args(ctx, "dave")  # nothing configured

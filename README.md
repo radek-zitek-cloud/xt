@@ -54,9 +54,11 @@ Where a first start usually stops, and what to do:
   `mise trust` in the clone, or call `./bin/xt`.
 - `xt init` ends with `next: start the Herdr session with herdr --session my-team`: xt runs its
   agents inside that session, so open it first, then run `xt`.
-- A Claude Code liaison sits at a permission prompt and the Inbox shows `blocked:liaison`. A new
-  team has no capability block, so Claude Code asks before its first command. Answer it in the
-  liaison's pane, then give the team a `[defaults.capabilities]` block (see the guide).
+- No permission prompt to answer: `xt init` writes a `[defaults.capabilities]` block into
+  `team.toml`, so every agent may write in the team repo and `/tmp/xt-*` and run any shell command,
+  except credential CLIs (`gh`, `aws`, `fizzy`, …), which are refused at once. Change it there (see
+  the guide). If the Inbox shows `blocked:liaison`, the team has no block (made before 0.24.1, or
+  removed): answer the prompt in the liaison's pane, then add one.
 - The Inbox shows `noprompt:liaison`: its first prompt never showed on its screen.
   `xt restart liaison` starts it again.
 

@@ -23,7 +23,7 @@ from xt.tui.app import LiveActions, XtTui
 from xt.tui.model import build
 from xt.watch import Supervisor
 
-from .conftest import REPO, add_member
+from .conftest import REPO, add_member, no_default_block
 
 # --- #122 spawn and settings (card #218: the --permissions flag went with the permissions line) ---
 
@@ -40,6 +40,7 @@ def _approval(ctx):
 
 
 def test_a_claude_spawn_without_a_block_warns_in_the_approval(ctx):
+    no_default_block(ctx)
     _coder(ctx)
     request_spawn(ctx, "lead", "carol", "claude", None, "coder", None)
     rid, req, body = _approval(ctx)

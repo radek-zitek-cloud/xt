@@ -346,11 +346,8 @@ claude/default)  yes/no`, with a desktop notification):
 
 ```text
 12:00 xt  #6  ⚑ yes/no
-lead asks to spawn writer as writer on claude, reporting to lead. WARNING:
-writer would start without generated settings, so the operator's own claude
-defaults apply (a [capabilities] block in team.toml gives it some).
-Approve its start: write, deny, network, credential_clis advisory (role text
-only).
+lead asks to spawn writer as writer on claude, reporting to lead.
+Approve its start: write enforced; network advisory (role text only).
 
 Answer yes or no: xt answer 6 yes|no (or s, then y / n on it in the TUI's
 Inbox). xt approve 6 and xt deny 6 (a / d) still work.
@@ -358,8 +355,10 @@ Inbox). xt approve 6 and xt deny 6 (a / d) still work.
 ```
 
 The sentence says what the agent may do and which of it its harness can only keep advisory. Here
-the team has no capability block yet, hence the warning: give the team one first (see 8), and the
-same request says what the block enforces instead. Answer `yes` (`tab` in chat, or
+the writer inherits the `[defaults.capabilities]` block `xt init` wrote: Claude Code enforces its
+`write` list, and network stays advisory. In a team without any block the request starts with a
+warning instead: `writer would start without generated settings, so the operator's own claude
+defaults apply`. Answer `yes` (`tab` in chat, or
 `xt answer 6 yes`): `#6: spawned writer in workspace …`, and the lead hears it. `no` denies it.
 
 ## 7. Hand your coding agent the wheel for half an hour

@@ -14,7 +14,7 @@ from xt.capabilities import NAMES, Caps
 from xt.paths import XtError
 from xt.spawn import request_spawn
 
-from .conftest import REPO
+from .conftest import REPO, no_default_block
 
 
 def _team(ctx, **members):
@@ -242,6 +242,7 @@ def test_186_a_mixed_set_is_never_enforced_as_a_whole(ctx, monkeypatch, capsys):
 
 
 def test_186_a_claude_agent_without_a_block_shows_its_rules_as_advisory(ctx):
+    no_default_block(ctx)
     _team(ctx, carol="claude")
     ad = load_adapters(ctx.paths)["claude"]
     _start(ctx, "carol")
