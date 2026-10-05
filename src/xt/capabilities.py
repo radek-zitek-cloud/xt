@@ -19,6 +19,7 @@ team.toml that still has one is refused at load (`removed_refusal`); `convert` i
 left, for `xt capabilities NAME`, which prints the block that replaces them.
 """
 
+import json
 import re
 from dataclasses import dataclass, field
 
@@ -287,6 +288,32 @@ def merge_extras(generated: dict, extras: dict, where: str) -> dict:
     return out
 
 
+def extras_problems(team) -> list[str]:
+    """Card #225: the start's extras merge, run at load for every Claude agent whose block names
+    `extras`, so a block its own file would loosen is refused before any agent starts, naming the
+    rule and the file. A missing or unreadable file is left to the start, which says why."""
+    from . import permissions
+
+    root = team.path.parent
+    out = []
+    for a in team.agents():
+        if a.kind != "agent" or a.harness != "claude":
+            continue
+        caps = effective(team, a)
+        if not (caps.configured and caps.extras):
+            continue
+        try:
+            settings = permissions.preflight(root, caps.extras)
+            extras = json.loads(settings.path.read_text())
+        except (XtError, OSError, ValueError):
+            continue
+        try:
+            merge_extras(claude_rules(a.name, caps, str(root / "bin" / "xt")), extras, caps.extras)
+        except XtError as e:
+            out.append(f"agent {a.name}: {e}")
+    return out
+
+
 GOVERNED = ("Edit", "Write", "MultiEdit", "NotebookEdit", "Bash", "WebFetch", "WebSearch")  # by the block
 
 
@@ -380,7 +407,16 @@ def convert(name: str, table, settings: dict | None, rel: str | None) -> str:
         elif tool == "Bash":
             cmd = spec[:-2] if spec.endswith(" *") else spec[:-2] if spec.endswith(":*") else spec
             if cmd.split()[0] in CREDENTIAL_CLIS:
+                # card #225: the rule at its own scope in commands (`gh release view`, `gh api
+                # repos/O/R/*`), the CLI's name in credential_clis; never wider than the rule was
+                if not spec.endswith("*"):
+                    loosen.append(f"allow {rule} (commands would allow `{cmd}` with any arguments: add it "
+                                  f"to commands and {cmd.split()[0]} to credential_clis.allow if that's "
+                                  f"meant, or remove the rule)")
+                    continue
                 clis_allowed.append(cmd.split()[0])
+                if cmd not in commands:
+                    commands.append(cmd)
             elif "xt" != cmd.rsplit("/", 1)[-1] and cmd not in commands:
                 commands.append(cmd)
         elif tool in ("WebFetch", "WebSearch"):
@@ -391,14 +427,25 @@ def convert(name: str, table, settings: dict | None, rel: str | None) -> str:
             connectors_seen.append(tool)
         else:
             kept.append(f"allow {rule}")  # a tool the block doesn't govern: stays in extras
+    def denied_path(spec: str) -> str:
+        p = spec[1:] if spec.startswith("//") else spec
+        return p[:-3] if p.endswith("/**") else p
+
+    # card #225: only a Read denial becomes `deny`, which in a block forbids reading too; an
+    # Edit-only denial (Edit(roles/**)) stays in extras, where it still forbids the edit alone
+    read_denied = [denied_path(s.rstrip(")")) for t, _, s in (str(r).partition("(") for r in perms.get("deny", []))
+                   if t == "Read" and s.rstrip(")")]
     for rule in perms.get("deny", []):
         tool, _, spec = str(rule).partition("(")
         spec = spec.rstrip(")")
         if tool in ("Edit", "Read", "Write") and spec:
-            p = spec[1:] if spec.startswith("//") else spec
-            p = p[:-3] if p.endswith("/**") else p
-            if p.rstrip("/") + ("/" if spec.endswith("/**") else "") not in ALWAYS_DENIED and p not in deny:
+            p = denied_path(spec)
+            if p.rstrip("/") + ("/" if spec.endswith("/**") else "") in ALWAYS_DENIED or p in deny:
+                continue
+            if tool == "Read":
                 deny.append(p)
+            elif p not in read_denied:
+                kept.append(f"deny {rule}")
         elif tool == "Bash" and spec and spec.split()[0].rstrip(":*") in CREDENTIAL_CLIS:
             continue  # denied by default
         elif tool in ("WebFetch", "WebSearch"):
@@ -450,7 +497,7 @@ def convert(name: str, table, settings: dict | None, rel: str | None) -> str:
                      f"on top, where it may only restrict):")
         lines += [f"#   {k}" for k in kept]
     if loosen:
-        lines.append(f"# would loosen the block, so the start refuses them until they are removed from {rel}:")
+        lines.append(f"# would loosen the block, so xt refuses to load the team until they are removed from {rel}:")
         lines += [f"#   {k}" for k in loosen]
     return "\n".join(lines)
 

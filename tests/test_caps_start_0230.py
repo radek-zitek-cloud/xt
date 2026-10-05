@@ -208,10 +208,13 @@ def test_186_the_extras_file_adds_restrictions_on_top_of_the_team_default_block(
 ])
 def test_186_an_extras_rule_that_loosens_the_block_is_refused_naming_both(ctx, perms, message):
     _team(ctx, carol="claude")
-    _extras(ctx, "carol", perms)
+    _extras(ctx, "carol", {})
     _edit(ctx, {"commands": ["git"]}, carol={"capabilities": {"extras": "settings/carol.json"}})
+    _extras(ctx, "carol", perms)  # changed after the load: the start refuses it
     with pytest.raises(XtError, match=r"settings/carol.json: " + message):
         _start(ctx, "carol")
+    with pytest.raises(XtError, match=r"agent carol: settings/carol.json: " + message):  # card #225: and the load
+        ctx.reload_team()
 
 
 # --- display: status row, start note, spawn sentence ---------------------------------------------------
@@ -307,11 +310,11 @@ def test_186_xt_capabilities_prints_the_equivalent_block_and_changes_nothing(ctx
         '`permissions` and `connectors`:',
         "[agent.capabilities]"]
     body = tomlkit.parse("\n".join(x for x in out.splitlines() if not x.startswith("#") and x != "[agent.capabilities]"))
-    assert body["write"] == ["/home/me/work"] and body["commands"] == ["git", "sed -n"]
-    assert body["deny"] == ["roles", "/home/me/Work/usb"] and body["network"] == "on"
+    assert body["write"] == ["/home/me/work"] and body["commands"] == ["git", "sed -n", "gh"]  # #225: gh too
+    assert body["deny"] == ["/home/me/Work/usb"] and body["network"] == "on"  # #225: Edit(roles/**) stays in extras
     assert body["credential_clis"] == {"allow": ["gh"]} and body["connectors"] == ["claude.ai Gmail"]
     kept = out.split("# kept in extras", 1)[1]
-    for k in ("allow mcp__claude_ai_Gmail", "deny Bash(rm *)", "ask Bash(git push *)"):
+    for k in ("allow mcp__claude_ai_Gmail", "deny Bash(rm *)", "ask Bash(git push *)", "deny Edit(roles/**)"):
         assert k in kept
 
 
@@ -464,16 +467,16 @@ def test_186_a_realistic_settings_file_round_trips_and_starts(ctx, monkeypatch, 
         assert rule in s["deny"], rule
 
 
-def test_186_what_would_loosen_is_named_and_the_start_says_so(ctx, monkeypatch, capsys):
+def test_186_what_would_loosen_is_named_and_the_load_says_so(ctx, monkeypatch, capsys):
     _team(ctx, carol="claude")
     _extras(ctx, "carol", {"defaultMode": "acceptEdits", "allow": ["Bash(git *)"]})
     _old(ctx, carol={"permissions": "settings/carol.json"})
     out = _convert(ctx, monkeypatch, capsys, "carol")
-    assert "# would loosen the block, so the start refuses them until they are removed from settings/carol.json:" in out
+    assert ("# would loosen the block, so xt refuses to load the team until they are removed from "
+            "settings/carol.json:") in out
     assert "#   defaultMode acceptEdits (the block's settings use dontAsk)" in out
-    _apply(ctx, "carol", out)
-    with pytest.raises(XtError, match="permissions.defaultMode 'acceptEdits' would loosen"):
-        _start(ctx, "carol")
+    with pytest.raises(XtError, match="agent carol: settings/carol.json: permissions.defaultMode 'acceptEdits' would loosen"):
+        _apply(ctx, "carol", out)  # card #225: refused at load, before any start
 
 
 def test_186_codex_network_and_claude_connectors_round_trip(ctx, monkeypatch, capsys):

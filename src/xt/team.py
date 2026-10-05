@@ -82,7 +82,7 @@ class Team:
 
     def check(self, allow_removed: bool = False) -> None:
         """Refuse settings xt can't use, at load (card #198: `notes_budget`; card #218: the removed
-        permission lines, in a message of their own)."""
+        permission lines, in a message of their own; card #225: an extras file that loosens its block)."""
         stray = [_stray_problem(k, self.doc[k]) for k in self.doc if k not in TOP_LEVEL]
         if not allow_removed:
             refused = capabilities.removed_refusal(self.doc)
@@ -96,6 +96,8 @@ class Team:
             if "notes_budget" in a:
                 problems.append(_notes_budget_problem(a["notes_budget"], f"agent {a.get('name')}'s"))
         problems = [p for p in problems if p] + capabilities.check(self.doc)  # card #186
+        if not problems and not allow_removed:  # card #225: the start's extras check, before any start
+            problems = capabilities.extras_problems(self)
         if problems:
             raise XtError("; ".join(problems))
 

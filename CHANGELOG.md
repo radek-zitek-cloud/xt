@@ -9,6 +9,34 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
+## [0.24.1] — not released yet
+
+A patch for what a team meets in its first hour and on its first upgrade (Space
+specs/patch-0-24-1, releases/v0-24-1): #225, #226 and #213.
+
+### Upgrading
+
+- **A converted team is checked with its extras files at load (#225).** If an agent's block
+  names `extras` and that file still has an allow rule outside the block, `team.toml` no longer
+  loads: every command refuses, naming the agent, the rule and the file, before any agent starts
+  (0.24.0 refused only that agent's start). A team converted by 0.24.0's `xt capabilities` with
+  narrow credential-CLI rules (`Bash(fizzy card show *)`, `Bash(gh release view *)`) hits this:
+  add those subcommands to the agent's `commands`, as the refusal names them.
+
+### Fixed
+
+- **`xt capabilities` prints a block its own extras check accepts (#225).** An allow rule for a
+  credential CLI now goes into `commands` at its own scope (`fizzy card show`, `gh release view`,
+  `gh api repos/OWNER/REPO/*` with its path), never as the bare `fizzy`, `gh` or `gh api`, and the
+  CLI's name into `credential_clis.allow`. A rule without a trailing `*`, which a command entry
+  would open to any arguments, is named under "would loosen" instead of being widened. The extras
+  check the start makes now also runs when xt loads `team.toml`.
+- **`xt capabilities` no longer turns an Edit-only denial into `deny` (#225).** `deny` in a block
+  forbids reading as well, so `Edit(roles/**)` or `Edit(skills/**)` made the agent unable to read
+  its team's roles and skills. Only a `Read(...)` denial becomes `deny`; an Edit-only one stays in
+  the extras file, which still refuses the edit. A team converted by 0.24.0 may want to move such
+  paths from `deny` back to its extras file.
+
 ## [0.24.0] — 2026-10-05
 
 The release: the same code and docs as 0.24.0-rc2 (the version, this changelog and the site's

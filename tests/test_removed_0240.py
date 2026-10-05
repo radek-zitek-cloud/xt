@@ -171,7 +171,8 @@ def test_218_xt_capabilities_converts_an_inherited_defaults_file_and_changes_not
 
 
 PM_SETTINGS = {"permissions": {"defaultMode": "dontAsk", "allow": ["Edit(goals/drafts/**)", "Bash(rg *)",
-                                                                  "Bash(git log *)", "Bash(fizzy *)"],
+                                                                  "Bash(git log *)", "Bash(fizzy card show *)",
+                                                                  "Bash(fizzy comment create *)"],
                                "deny": ["Bash(rm *)"]}}
 
 

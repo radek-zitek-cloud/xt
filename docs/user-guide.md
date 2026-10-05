@@ -913,8 +913,9 @@ at once instead of waiting.
 `ask` rule, other settings keys such as `statusLine`) goes in a Claude Code settings file that the
 block names as `extras = "settings/<name>.json"`. xt applies it on top of the generated settings,
 where it may only restrict: a rule or mode that would loosen the block (an `allow` rule outside
-`write`, `commands`, `network` or `connectors`, a `defaultMode` other than `dontAsk`) refuses the
-start, naming the rule and the file. Rules:
+`write`, `commands`, `network` or `connectors`, a `defaultMode` other than `dontAsk`) is refused,
+naming the rule and the file: when xt loads `team.toml` (so every command refuses until it's fixed)
+and again at the start, in case the file changed since. Rules:
 - The path is relative to the team repo and must stay inside it (no absolute path, no `..`, no
   symlink out). Settings files are yours, like `team.toml`: an agent that could edit its own file
   could widen its own permissions, so the protocol tells agents never to touch them.
@@ -1073,14 +1074,21 @@ and remove its old lines. Where it goes matters: in TOML every key after a `[tab
 that table, so a block pasted where the old line was would take the agent's `reports_to` and
 `status` into it; xt refuses such a file at load and says so. What the block can't say stays in the
 old settings file, which the block then names as `extras` (see the extras file under
-[13](#13-what-agents-may-do-capabilities)). For example, `xt capabilities pm` might print:
+[13](#13-what-agents-may-do-capabilities)). An allow rule for a credential CLI keeps its scope: a
+narrow rule such as `Bash(fizzy card show *)` or `Bash(gh api repos/OWNER/REPO/*)` goes into
+`commands` as written (`fizzy card show`, `gh api repos/OWNER/REPO/*`), never as the bare `fizzy` or
+`gh api`, and the CLI's name goes into `credential_clis.allow`. A rule `commands` can't hold at its
+scope (one without a trailing `*`, which a command entry would open to any arguments) is named
+under "would loosen", for you to decide. Only a `Read(...)` denial becomes `deny`, which in a block
+forbids reading too; an Edit-only denial such as `Edit(roles/**)` stays in the extras file, so the
+agent may still read there. For example, `xt capabilities pm` might print:
 
 ```text
 # xt capabilities pm: the block equivalent to its old permission lines and settings/pm.json (nothing was changed).
 # Put it at the end of its [[agent]] entry (name = "pm"), after the entry's other keys, and remove `permissions`:
 [agent.capabilities]
 write = ["goals/drafts"]
-commands = ["rg", "git log"]
+commands = ["rg", "git log", "fizzy card show", "fizzy comment create"]
 credential_clis = {allow = ["fizzy"]}
 extras = "settings/pm.json"
 # kept in extras (settings/pm.json: the block can't say these, so `extras` keeps the file on top, where it may only restrict):
@@ -1098,10 +1106,14 @@ reports_to = "lead"
 status = "active"
 [agent.capabilities]
 write = ["goals/drafts"]
-commands = ["rg", "git log"]
+commands = ["rg", "git log", "fizzy card show", "fizzy comment create"]
 credential_clis = {allow = ["fizzy"]}
 extras = "settings/pm.json"
 ```
+
+xt checks the block with its extras file when it loads `team.toml`, the same check the start makes:
+if the file still has an allow rule outside the block, every command refuses, naming the agent, the
+rule and the file, before any agent starts.
 
 A `permissions` line under
 `[defaults]` has no agent name of its own: run `xt capabilities` for any Claude Code agent of the
