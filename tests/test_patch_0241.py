@@ -218,6 +218,69 @@ def test_226_the_guide_and_readme_show_the_block_xt_init_writes():
     assert "`xt init` writes a `[defaults.capabilities]` block into `team.toml`" in readme
 
 
+# --- #213: xt status shows a queue folded into a missing: alert (a synthetic ledger) --------------------
+
+
+def _missing_crew(ctx, *names):
+    from xt import versions
+    from xt.lifecycle import set_expected
+
+    from .conftest import add_member
+    from .test_polish_0221 import _crew
+
+    _crew(ctx)  # builder: started once, not running
+    for n in names:
+        add_member(ctx, n, reports_to="lead")
+        versions.record_agent_start(ctx, n, ctx.ledger.clock())
+    for n in ("builder", *names):
+        set_expected(ctx, n, True)  # xt started it and it vanished: missing:NAME
+
+
+def test_213_status_shows_the_queue_line_with_its_missing_alert(ctx, clock, monkeypatch, capsys):
+    from .test_polish_0221 import _alerts, _status_out, _task, _tick
+
+    _missing_crew(ctx)
+    _task(ctx)
+    clock.advance(minutes=17)
+    _tick(ctx)
+    assert set(_alerts(ctx)) == {"missing:builder"}
+    out = _status_out(ctx, monkeypatch, capsys)
+    lines = [x for x in out.splitlines() if x.startswith("⚠")]
+    assert lines == ["⚠ builder is not running (crashed or closed outside xt): 1 message waiting 17m  "
+                     "(xt clear missing:builder)"]
+    assert "1 message waiting" in lines[0]  # the stable text and count, whatever the minutes
+
+
+def test_213_two_missing_alerts_only_the_members_own_carries_its_queue(ctx, clock, monkeypatch, capsys):
+    from .test_polish_0221 import _alerts, _status_out, _task, _tick
+
+    _missing_crew(ctx, "tester")
+    _task(ctx)  # queued for builder only
+    clock.advance(minutes=5)
+    _tick(ctx)
+    alerts = _alerts(ctx)
+    assert {"missing:builder", "missing:tester"} <= set(alerts) and "base" not in alerts["missing:tester"]
+    out = _status_out(ctx, monkeypatch, capsys)
+    lines = [x for x in out.splitlines() if x.startswith("⚠")]
+    assert len(lines) == 1 and lines[0].startswith("⚠ builder is not running") and "1 message waiting" in lines[0]
+    assert "tester" not in "\n".join(lines) and "2 messages" not in out  # no cross-attached or summed count
+
+
+def test_213_queued_alerts_print_as_before_and_a_bare_missing_alert_adds_nothing(ctx, clock, monkeypatch, capsys):
+    from xt.alerts import Alerts
+
+    from .test_polish_0221 import _crew, _status_out, _task, _tick
+
+    _crew(ctx)  # builder stopped, not expected: its queue raises queued:builder
+    _task(ctx)
+    clock.advance(minutes=3)
+    _tick(ctx)
+    queued = Alerts(ctx).active()["queued:builder"]["text"]
+    Alerts(ctx).raise_("missing:tester", "tester is not running although xt started it.")
+    lines = [x for x in _status_out(ctx, monkeypatch, capsys).splitlines() if x.startswith("⚠")]
+    assert lines == [f"⚠ {queued}  (xt clear queued:builder)"]
+
+
 def test_225_the_load_check_skips_other_harnesses_and_leaves_a_missing_file_to_the_start(ctx):
     _team(ctx, carol="claude", dana="codex")
     _extras(ctx, "dana", {"allow": ["Bash(curl *)"]})  # codex takes no settings file: its start says so

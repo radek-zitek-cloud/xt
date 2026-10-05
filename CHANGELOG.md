@@ -51,6 +51,12 @@ specs/patch-0-24-1, releases/v0-24-1): #225, #226 and #213.
   its team's roles and skills. Only a `Read(...)` denial becomes `deny`; an Edit-only one stays in
   the extras file, which still refuses the edit. A team converted by 0.24.0 may want to move such
   paths from `deny` back to its extras file.
+- **`xt status` shows a queue folded into a `missing:` alert (#213).** When messages wait for a
+  member whose `missing:NAME` alert is open, the queue line joined that alert in the Inbox and the
+  TUI but `xt status` showed only the alert count. It now prints one line for each such alert,
+  with that member's name and its own count (`⚠ builder is not running (crashed or closed outside
+  xt): 1 message waiting 17m`). `queued:` alerts print as before; a `missing:` alert without a
+  queue adds no line.
 
 ## [0.24.0] — 2026-10-05
 

@@ -551,6 +551,10 @@ def cmd_status(args) -> None:
     for key, al in sorted(Alerts(ctx).active().items()):
         if key.startswith("queued:"):  # card #187: a message waits for a member that isn't running
             print(f"⚠ {al['text']}  (xt clear {key})")
+        elif key.startswith("missing:") and al.get("base") and al["text"] != al["base"]:
+            # card #213: its queue folded into the member's missing: alert, one line under the counts
+            line = al["text"][len(al["base"]):].strip()
+            print(f"⚠ {key[len('missing:'):]} is not running (crashed or closed outside xt): {line}  (xt clear {key})")
     from .versions import not_started_yet
 
     waits: dict[str, int] = {}
