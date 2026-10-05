@@ -9,10 +9,11 @@ Every release has an **Upgrading** note: what a team that already runs xt has to
 
 ## [Unreleased]
 
-## [0.24.0] — not released yet
+## [0.24.0] — 2026-10-05
 
-Documentation for the capability model, and the end of the old permission lines (Space
-releases/v0-24-0). **0.24.0-rc1** has #218 (Space specs/remove-legacy-permission-lines); **rc2**
+The release: the same code and docs as 0.24.0-rc2 (the version, this changelog and the site's
+release count changed). Documentation for the capability model, and the end of the old permission
+lines (Space releases/v0-24-0). **0.24.0-rc1** has #218 (Space specs/remove-legacy-permission-lines); **rc2**
 adds the documentation rework, #214, #219, #220, #221 and #222 (spec
 documentation-rework-for-0-24-0), and fixes where the conversion's block goes (#218, from the
 operator's live check of rc1).
@@ -21,10 +22,14 @@ operator's live check of rc1).
 
 - **Convert before you upgrade (#218).** A `team.toml` that still has a `permissions`,
   `codex_options` or `connectors` line (directly under an `[[agent]]` or under `[defaults]`)
-  doesn't load in 0.24.0: every command refuses until it's converted. On 0.23.0, for each agent
-  with one of these lines, run `xt capabilities <name>`: it prints the `[capabilities]` block to
-  paste under the agent and changes nothing. Paste it, remove the old lines, and check that
-  `xt status` loads. A `[defaults] permissions` line has no agent name of its own: run
+  doesn't load in 0.24.0: every command that loads the team refuses until it's converted, except
+  `xt capabilities <name>`. On 0.23.0, for each agent
+  with one of these lines, run `xt capabilities <name>`: it prints the `[capabilities]` block and
+  changes nothing. Put the block at the end of the agent's entry, after its other keys, remove the
+  old lines, and check that `xt status` loads. 0.23.0 prints credential CLI exceptions as a
+  separate `[credential_clis]` table after the block: write them inside the block instead
+  (`credential_clis = { allow = [...] }`), or the keys after it leave the agent's entry. 0.24.0's
+  `xt capabilities` prints them that way and says where the block goes. A `[defaults] permissions` line has no agent name of its own: run
   `xt capabilities` for any Claude Code agent (its block includes what it inherits), move the
   shared part into `[defaults.capabilities]` by hand and remove the line. Then `git pull upstream
   main` (or `xt version use v0.24.0`) and `xt restart --all`. If you upgraded first,
